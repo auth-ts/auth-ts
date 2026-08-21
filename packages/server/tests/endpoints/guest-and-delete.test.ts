@@ -286,7 +286,7 @@ describe("account deletion", () => {
       })
       const refreshToken = await signIn(context)
 
-      vi.advanceTimersByTime(14 * 60_000)
+      vi.advanceTimersByTime(15 * 60_000 - 1)
       const fresh = await context.authServer.handler(
         request("DELETE", "/api/auth/user", {
           cookies: { "auth-ts.refresh": refreshToken }
@@ -294,6 +294,28 @@ describe("account deletion", () => {
       )
 
       expect(fresh.status).toBe(204)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("challenges once the non-zero window has elapsed", async () => {
+    vi.useFakeTimers()
+    try {
+      const context = await createTestServer({
+        user: { deleteFreshWindow: "15m" }
+      })
+      const refreshToken = await signIn(context)
+
+      vi.advanceTimersByTime(15 * 60_000)
+      const stale = await context.authServer.handler(
+        request("DELETE", "/api/auth/user", {
+          cookies: { "auth-ts.refresh": refreshToken }
+        })
+      )
+
+      expect(stale.status).toBe(403)
+      expect(context.db.users()).toHaveLength(1)
     } finally {
       vi.useRealTimers()
     }
