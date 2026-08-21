@@ -7,7 +7,7 @@ import {
   DocsPage,
   DocsTitle
 } from "fumadocs-ui/page"
-import { Logo } from "~/components/logo"
+import { baseOptions } from "~/lib/layout.shared"
 import { source } from "~/lib/source"
 import { getMDXComponents } from "~/mdx-components"
 import browserCollections from "../../.source/browser.ts"
@@ -21,7 +21,15 @@ export const Route = createFileRoute("/docs/$")({
     await clientLoader.preload(data.path)
 
     return data
-  }
+  },
+  head: ({ loaderData }) => ({
+    meta: loaderData
+      ? [
+          { title: `${loaderData.title} — Auth.ts` },
+          { name: "description", content: loaderData.description }
+        ]
+      : []
+  })
 })
 
 const loadPage = createServerFn({ method: "GET" })
@@ -30,13 +38,19 @@ const loadPage = createServerFn({ method: "GET" })
     const page = source.getPage(slugs)
     if (!page) throw notFound()
 
-    return { path: page.path }
+    // Title and description travel with the path so the document head can be
+    // rendered before the MDX chunk has loaded.
+    return {
+      path: page.path,
+      title: page.data.title,
+      description: page.data.description
+    }
   })
 
 const clientLoader = browserCollections.docs.createClientLoader({
-  component({ frontmatter, default: MDX }) {
+  component({ frontmatter, toc, default: MDX }) {
     return (
-      <DocsPage>
+      <DocsPage toc={toc}>
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <DocsBody>
@@ -53,17 +67,7 @@ function DocumentationPage() {
   // The tree is read directly rather than returned from the server function:
   // it carries React nodes for icons, which cannot cross that boundary.
   return (
-    <DocsLayout
-      tree={source.pageTree}
-      nav={{
-        title: (
-          <>
-            <Logo className="size-5" />
-            Auth.ts
-          </>
-        )
-      }}
-    >
+    <DocsLayout {...baseOptions()} tree={source.pageTree}>
       {clientLoader.useContent(data.path)}
     </DocsLayout>
   )

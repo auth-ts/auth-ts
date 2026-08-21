@@ -17,7 +17,23 @@ export default defineConfig({
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     // Fully prerendered: the output is static files, which is what gets deployed
     // to Cloudflare Pages. Nothing here needs a server at request time.
-    tanstackStart({ prerender: { enabled: true }, pages: [{ path: "/" }] }),
+    tanstackStart({
+      prerender: { enabled: true },
+      pages: [
+        { path: "/" },
+        {
+          // The search index, written once at build time. It is JSON rather
+          // than a page, so it needs an explicit filename and must not be
+          // crawled for links.
+          path: "/api/search",
+          prerender: {
+            enabled: true,
+            outputPath: "/api/search.json",
+            crawlLinks: false
+          }
+        }
+      ]
+    }),
     react()
   ]
 })
