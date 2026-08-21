@@ -152,6 +152,18 @@ describe("sessions", () => {
     expect(await db.getSession({ tokenHash: "hash-1" })).toBeNull()
   })
 
+  it("deletes by token hash alone, which is what logout presents", async () => {
+    await db.upsertSession(session())
+
+    // The other branch of the union takes no owner, and should not: the token
+    // hash is derived from the secret the caller already holds, so possession
+    // is the check. Logout has a cookie, not a user id.
+    const removed = await db.deleteSession({ tokenHash: "hash-1" })
+
+    expect(removed?.id).toBe("session-1")
+    expect(await db.getSession({ tokenHash: "hash-1" })).toBeNull()
+  })
+
   it("spares the current session when deleting the others", async () => {
     await db.upsertSession(session())
     await db.upsertSession(session({ id: "session-2", tokenHash: "hash-2" }))
