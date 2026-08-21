@@ -227,7 +227,17 @@ export function createMemoryDb(): MemoryDb {
     },
 
     async upsertRateLimit(rateLimit) {
-      rateLimits.set(rateLimit.key, { ...rateLimit })
+      const existing = rateLimits.get(rateLimit.key)
+      // Same branch the SQL takes: a fresh window when the key is absent or its
+      // window has passed, otherwise one more on the existing count with the
+      // existing resetAt kept. Single-threaded here, so trivially atomic.
+      const next: AuthRateLimit =
+        !existing || existing.resetAt.getTime() <= Date.now()
+          ? { key: rateLimit.key, count: 1, resetAt: rateLimit.resetAt }
+          : { ...existing, count: existing.count + 1 }
+
+      rateLimits.set(rateLimit.key, next)
+      return { ...next }
     },
 
     async upsertConnection(connection: UpsertConnectionInput) {

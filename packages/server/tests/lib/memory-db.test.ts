@@ -289,6 +289,36 @@ describe("every delete returns what it removed", () => {
   })
 })
 
+describe("upsertRateLimit", () => {
+  it("starts a window at 1 and increments on each call, keeping resetAt", async () => {
+    const resetAt = new Date(Date.now() + 60_000)
+    expect((await db.upsertRateLimit({ key: "k", resetAt })).count).toBe(1)
+    expect(
+      (
+        await db.upsertRateLimit({
+          key: "k",
+          resetAt: new Date(Date.now() + 999_999)
+        })
+      ).count
+    ).toBe(2)
+    const third = await db.upsertRateLimit({
+      key: "k",
+      resetAt: new Date(Date.now() + 999_999)
+    })
+    expect(third.count).toBe(3)
+    // The original window end is kept; a live window is never extended.
+    expect(third.resetAt.getTime()).toBe(resetAt.getTime())
+  })
+
+  it("resets to 1 and adopts the new resetAt once the window has passed", async () => {
+    await db.upsertRateLimit({ key: "k", resetAt: new Date(Date.now() - 1) })
+    const fresh = new Date(Date.now() + 60_000)
+    const reset = await db.upsertRateLimit({ key: "k", resetAt: fresh })
+    expect(reset.count).toBe(1)
+    expect(reset.resetAt.getTime()).toBe(fresh.getTime())
+  })
+})
+
 describe("deleteExpired", () => {
   it("removes only rows that are already past their expiry", async () => {
     const past = new Date(Date.now() - 60_000)
@@ -322,8 +352,8 @@ describe("deleteExpired", () => {
       createdAt: past,
       expiresAt: future
     })
-    await db.upsertRateLimit({ key: "old", count: 3, resetAt: past })
-    await db.upsertRateLimit({ key: "live", count: 3, resetAt: future })
+    await db.upsertRateLimit({ key: "old", resetAt: past })
+    await db.upsertRateLimit({ key: "live", resetAt: future })
 
     await db.deleteExpired()
 

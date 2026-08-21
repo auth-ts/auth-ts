@@ -10,6 +10,7 @@ export type {
   MagicCodePurpose,
   UpsertConnectionInput,
   UpsertMagicCodeInput,
+  UpsertRateLimitInput,
   UpsertSessionInput,
   UpsertUserInput,
   UserType

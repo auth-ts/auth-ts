@@ -223,17 +223,26 @@ const authDb: AuthDb = {
   },
 
   async upsertRateLimit(rateLimit) {
-    await db
+    // One atomic statement is the whole limiter: a burst of parallel requests
+    // each gets its own count, instead of all reading the same value and each
+    // writing back count + 1. The window reset lives in the same statement
+    // because it has the same race.
+    const windowPassed = sql`${rateLimits.resetAt} <= now()`
+    const [counted] = await db
       .insert(rateLimits)
-      .values(rateLimit)
+      .values({ key: rateLimit.key, count: 1, resetAt: rateLimit.resetAt })
       .onConflictDoUpdate({
         target: rateLimits.key,
         set: {
-          count: rateLimit.count,
-          resetAt: rateLimit.resetAt,
+          count: sql`CASE WHEN ${windowPassed} THEN 1 ELSE ${rateLimits.count} + 1 END`,
+          resetAt: sql`CASE WHEN ${windowPassed} THEN excluded."resetAt" ELSE ${rateLimits.resetAt} END`,
           updatedAt: new Date()
         }
       })
+      .returning()
+
+    if (!counted) throw new Error("upsertRateLimit returned no row")
+    return counted
   },
 
   async upsertConnection(connection) {

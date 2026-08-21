@@ -150,6 +150,18 @@ export interface UpsertConnectionInput {
   email?: string
 }
 
+/**
+ * Fields written by {@link AuthDb.upsertRateLimit}.
+ *
+ * There is no `count` on purpose: the store owns it. `resetAt` is what the
+ * window end should be *if this call starts a new window*; the store decides
+ * whether it does.
+ */
+export interface UpsertRateLimitInput {
+  key: string
+  resetAt: Date
+}
+
 /** Query accepted by {@link AuthDb.getUser} — exactly one key. */
 export type GetUserWhere =
   | { id: string }
@@ -281,11 +293,45 @@ export interface AuthDb {
     codeHash?: string
   }): Promise<AuthMagicCode | null>
 
-  /** Reads a rate-limit counter. Never called when `rateLimit: false`. */
+  /**
+   * Reads a rate-limit counter. Never called when `rateLimit: false`.
+   *
+   * For inspection and tests. The limiter itself never reads first — see
+   * {@link AuthDb.upsertRateLimit}.
+   */
   getRateLimit(where: { key: string }): Promise<AuthRateLimit | null>
 
-  /** Writes a rate-limit counter. Never called when `rateLimit: false`. */
-  upsertRateLimit(rateLimit: AuthRateLimit): Promise<void>
+  /**
+   * Counts one request against a key, atomically, and returns the counter.
+   *
+   * This is the whole rate limiter, and it has to be one statement. Read the
+   * count, add one, write it back — and ten parallel requests all read the same
+   * value and each store `count + 1`, so a burst registers as a single request.
+   * An atomic upsert is the fix, and it is still an upsert:
+   *
+   * ```sql
+   * INSERT INTO "rateLimits" ("key", "count", "resetAt") VALUES ($1, 1, $2)
+   * ON CONFLICT ("key") DO UPDATE SET
+   *   "count"   = CASE WHEN "rateLimits"."resetAt" <= now() THEN 1
+   *                    ELSE "rateLimits"."count" + 1 END,
+   *   "resetAt" = CASE WHEN "rateLimits"."resetAt" <= now() THEN EXCLUDED."resetAt"
+   *                    ELSE "rateLimits"."resetAt" END
+   * RETURNING *
+   * ```
+   *
+   * The contract in words: insert with `count = 1` and the given `resetAt` if
+   * the key is absent **or its window has passed**; otherwise add one to the
+   * existing count and keep the existing `resetAt`. Return the row as stored.
+   * The window reset is inside the same statement because it has the same race.
+   *
+   * Core compares the returned `count` against the window's `max`, so every
+   * request is counted — including the ones that are then refused. A store
+   * without conditional upsert expressions does the same thing inside a
+   * transaction.
+   *
+   * Never called when `rateLimit: false`.
+   */
+  upsertRateLimit(rateLimit: UpsertRateLimitInput): Promise<AuthRateLimit>
 
   /**
    * Links a provider identity to a user, keyed on `(provider, providerAccountId)`.
