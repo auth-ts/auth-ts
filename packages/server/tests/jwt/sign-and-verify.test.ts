@@ -137,6 +137,28 @@ describe("signToken", () => {
     ).toBe("user-1")
   })
 
+  it("never lets configured claims supply a sub either", async () => {
+    // jwt.claims is refused a sub at startup; this is the last line of defence
+    // for a hand-built context, where a configured sub would become the
+    // subject of every token minted without a userId.
+    const context = {
+      ...signContext,
+      claims: { role: "authenticated", sub: "other-user" }
+    }
+    const service = await verifyToken(
+      verifyContext,
+      await signToken(context, { role: "service" })
+    )
+    expect(service?.sub).toBeUndefined()
+    expect(service?.role).toBe("service")
+
+    const user = await verifyToken(
+      verifyContext,
+      await signToken(context, { userId: "user-1" })
+    )
+    expect(user?.sub).toBe("user-1")
+  })
+
   it("mints a service token with no subject at all", async () => {
     const token = await signToken(signContext, { role: "service" })
     const claims = await verifyToken(verifyContext, token)

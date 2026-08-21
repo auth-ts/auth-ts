@@ -190,6 +190,26 @@ describe("construction failures", () => {
     ).toThrow(/rateLimit.verifyCodePerIP.max/)
   })
 
+  it("refuses sub, iat, and exp as configured default claims", () => {
+    for (const owned of ["sub", "iat", "exp"]) {
+      expect(
+        () =>
+          createAuthServer({
+            ...baseOptions(),
+            jwt: { ...baseOptions().jwt, claims: { [owned]: "x" } }
+          }),
+        owned
+      ).toThrow(new RegExp(`jwt\\.claims.*"${owned}"`))
+    }
+    // Anything else is the consumer's to set.
+    expect(
+      createAuthServer({
+        ...baseOptions(),
+        jwt: { ...baseOptions().jwt, claims: { role: "app_user", tier: 2 } }
+      }).options.jwt.claims
+    ).toEqual({ role: "app_user", tier: 2 })
+  })
+
   it("rejects a trustedProxies count that could never address an entry", () => {
     // Each of these would not error at request time — getClientIp would index
     // the chain at a position that does not exist, derive nothing, and every

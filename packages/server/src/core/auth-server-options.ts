@@ -68,7 +68,16 @@ export interface JwtOptions {
   alg?: JwtAlgorithm
   /** Access-token lifetime, which is also the revocation latency. @default "10m" */
   ttl?: Duration
-  /** Merged into every token, under the caller's own claims. @default { role: "authenticated" } */
+  /**
+   * Merged into every token, under the caller's own claims.
+   *
+   * `sub`, `iat`, and `exp` are refused here: the subject is always the
+   * `userId` a token is minted for, and the timestamps always come from the
+   * clock and `ttl`. A default for any of them would be either ignored or a
+   * way to mint tokens for someone else, and neither is worth allowing.
+   *
+   * @default { role: "authenticated" }
+   */
   claims?: Record<string, unknown>
   /** Key id in the JWKS and the token header. @default "main" */
   kid?: string
@@ -365,6 +374,30 @@ function requireDuration(value: Duration, optionName: string) {
   return value
 }
 
+/** Claims `signToken` owns outright; a configured default for one is a misconfiguration. */
+const SERVER_OWNED_CLAIMS = ["sub", "iat", "exp"] as const
+
+/**
+ * Applies the default claims and refuses any that `signToken` owns.
+ *
+ * Configured claims sit under the caller's, but `sub`, `iat`, and `exp` are
+ * not the caller's either — they are set by the signer from `userId`, the
+ * clock, and `ttl`. A configured `sub` in particular would become the subject
+ * of every token minted without a `userId`, which is a service token that
+ * quietly claims to be a user.
+ */
+function requireClaims(claims: Record<string, unknown> | undefined) {
+  const resolved = claims ?? { role: "authenticated" }
+  for (const owned of SERVER_OWNED_CLAIMS) {
+    if (owned in resolved) {
+      throw new AuthConfigError(
+        `jwt.claims cannot set "${owned}": it is always derived by the signer (${SERVER_OWNED_CLAIMS.join(", ")} are server-owned).`
+      )
+    }
+  }
+  return resolved
+}
+
 /**
  * Resolves `clientIp` and refuses a proxy count that cannot index the chain.
  *
@@ -495,7 +528,7 @@ export function resolveAuthServerOptions(
       privateKey,
       alg: options.jwt?.alg ?? "RS256",
       ttl: requireDuration(options.jwt?.ttl ?? "10m", "jwt.ttl"),
-      claims: options.jwt?.claims ?? { role: "authenticated" },
+      claims: requireClaims(options.jwt?.claims),
       kid: options.jwt?.kid ?? "main",
       ...(options.jwt?.audience ? { audience: options.jwt.audience } : {}),
       ...(options.jwt?.additionalPublicKeys
