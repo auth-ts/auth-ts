@@ -48,7 +48,13 @@ export function resolveCodeIdentifier(
   if (hasEmail) {
     if (!internals.options.email)
       throw new AuthApiError("channelNotConfigured", 400)
-    return { kind: "email", value: normalizeEmail(body.email as string) }
+    const value = normalizeEmail(body.email as string)
+    if (!/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value)) {
+      throw new AuthApiError("invalidField", 400, {
+        message: "Provide a valid email address."
+      })
+    }
+    return { kind: "email", value }
   }
 
   if (!internals.options.sms)
