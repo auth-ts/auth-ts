@@ -1,4 +1,4 @@
-import { notFound } from "../../http/auth-api-error.ts"
+import { AuthApiError, notFound } from "../../http/auth-api-error.ts"
 import { defineEndpoint } from "../../http/define-endpoint.ts"
 import { resolveLocale } from "../../http/resolve-locale.ts"
 import { validateAdditionalFields } from "../../http/validate-additional-fields.ts"
@@ -16,6 +16,23 @@ export interface SignInProviderInput {
   additionalFields?: Record<string, unknown>
   headers?: Headers
   requestURL?: string
+}
+
+/**
+ * Reads the `additionalFields` query parameter, which is JSON in a URL.
+ *
+ * Malformed JSON is the caller's mistake and gets a 400 that says so; left to
+ * `JSON.parse` alone it surfaced as a 500, which reads as the server's fault.
+ * Shape and declared-ness are checked later by `validateAdditionalFields`.
+ */
+function parseAdditionalFields(raw: string) {
+  try {
+    return JSON.parse(raw) as Record<string, unknown>
+  } catch {
+    throw new AuthApiError("invalidField", 400, {
+      message: "additionalFields must be valid JSON."
+    })
+  }
 }
 
 /**
@@ -47,7 +64,7 @@ export const signInProvider = defineEndpoint({
           internals.options.localization
         ),
       additionalFields: rawFields
-        ? (JSON.parse(rawFields) as Record<string, unknown>)
+        ? parseAdditionalFields(rawFields)
         : undefined,
       headers: request.headers,
       requestURL: request.url

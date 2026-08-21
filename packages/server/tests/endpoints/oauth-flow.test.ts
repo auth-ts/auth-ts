@@ -81,6 +81,19 @@ describe("oauth start", () => {
     }
   })
 
+  it("answers 400, not 500, when additionalFields is not JSON", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+
+    const response = await authServer.handler(
+      request("GET", "/api/auth/sign-in/github?additionalFields=%7Bnope")
+    )
+
+    expect(response.status).toBe(400)
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code
+    ).toBe("invalidField")
+  })
+
   it("404s an unconfigured provider, the reserved guest name, and prototype keys", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
 
