@@ -28,6 +28,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
+          # Download Bun rather than restoring it from the Actions cache. This
+          # is the toolchain that builds and signs what gets published, and the
+          # cache is mutable storage a compromised workflow could write to. One
+          # extra download per release is a fair price for that.
+          no-cache: true
 
       - uses: actions/setup-node@v4
         with:
@@ -35,7 +40,11 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: bun install --frozen-lockfile
-      - run: bun x nx run-many -t build --projects=packages/*
+
+      # Build from source at the tagged commit, never from the cache. The Nx
+      # cache is remote now, so a cache hit would publish artifacts this run did
+      # not produce — while npm provenance attests that it did.
+      - run: bun x nx run-many -t build --projects='packages/*' --skip-nx-cache
 
       - name: Publish
         run: bun x nx release publish
