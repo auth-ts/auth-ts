@@ -56,11 +56,17 @@ export async function resolveSession(
   headers: Headers
 ): Promise<ResolvedSession | null> {
   const rawToken = readRefreshToken(internals, headers)
-  if (!rawToken) return null
+  if (!rawToken) {
+    internals.log.debug("no refresh credential on request")
+    return null
+  }
 
   const tokenHash = await sha256Hex(rawToken)
   const session = await internals.db.getSession({ tokenHash })
-  if (!session) return null
+  if (!session) {
+    internals.log.debug("refresh credential does not match a stored session")
+    return null
+  }
 
   if (session.expiresAt.getTime() <= Date.now()) {
     internals.log.debug("session expired on read")

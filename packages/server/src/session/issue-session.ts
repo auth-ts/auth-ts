@@ -82,6 +82,7 @@ export async function issueSession(
 
   const responseHeaders = new Headers()
   const accessToken = await mintAccessToken(internals, user)
+  internals.log.debug("session issued", { userType: user.type, mode })
 
   if (mode === "token") {
     return {
@@ -173,6 +174,7 @@ export async function slideSession(
   headers: Headers
 ) {
   if (!internals.options.session.sliding) return
+  internals.log.debug("sliding session expiry")
 
   await internals.db.upsertSession({
     id: session.id,

@@ -21,6 +21,9 @@
       "dependencies": {
         "jose": "6.2.9",
       },
+      "devDependencies": {
+        "typescript": "7.0.2",
+      },
     },
   },
   "packages": {

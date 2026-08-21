@@ -183,7 +183,9 @@ export interface CorsOptions {
 export interface AuthServerOptions {
   /** The callbacks that read and write your database. */
   db: AuthDb
+  /** Sign-in method: magic codes over email. */
   email?: EmailOptions
+  /** Sign-in method: magic codes over SMS. */
   sms?: SmsOptions
   /**
    * Enables `POST /sign-in/guest`.
@@ -193,7 +195,9 @@ export interface AuthServerOptions {
    * @default false
    */
   guest?: boolean
+  /** Sign-in method: OAuth. Requires {@link AuthServerOptions.baseURL}. */
   providers?: ProvidersOptions
+  /** Token signing, lifetime, claims, and key publication. */
   jwt?: JwtOptions
   /**
    * Server secret that keys the magic-code HMAC. Defaults to the `AUTH_SECRET`
@@ -211,8 +215,11 @@ export interface AuthServerOptions {
    * attacker can set.
    */
   baseURL?: string
+  /** Refresh-token lifetime and whether it slides on use. */
   session?: SessionOptions
+  /** Refresh-cookie name and scope. Security attributes are fixed, not options. */
   cookie?: CookieOptions
+  /** Additional user fields and the account-deletion freshness window. */
   user?: UserOptions
   /** Set `false` to disable the built-in limiter and bring your own. */
   rateLimit?: RateLimitOptions | false
@@ -231,10 +238,13 @@ export interface AuthServerOptions {
    * @default true
    */
   cleanup?: boolean
+  /** Server-side localization of error messages. Codes stay stable; only messages translate. */
   localization?: LocalizationOptions
+  /** Cross-origin access, needed when the client is configured with a different `baseURL`. */
   cors?: CorsOptions
   /** @default "warn" */
   logLevel?: LogLevel
+  /** Log sink override, e.g. pino. Defaults to `console`. */
   logger?: Logger
 }
 
