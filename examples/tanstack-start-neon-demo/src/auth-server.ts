@@ -1,6 +1,6 @@
 import type { AuthDb } from "@auth-ts/server"
 import { createAuthServer } from "@auth-ts/server"
-import { and, eq, lt, sql } from "drizzle-orm"
+import { and, eq, exists, lt, ne, sql } from "drizzle-orm"
 import { db } from "./db/client.ts"
 import {
   connections,
@@ -278,12 +278,43 @@ const authDb: AuthDb = {
   },
 
   async deleteConnection(where) {
+    const ownership = and(
+      eq(connections.userId, where.userId),
+      eq(connections.provider, where.provider)
+    )
+    if (!where.unlessLast) {
+      const [deleted] = await db
+        .delete(connections)
+        .where(ownership)
+        .returning()
+      return deleted ?? null
+    }
+
+    // Lock every connection this user has before deciding, so a concurrent
+    // delete of a sibling waits here and then sees what is really left. A bare
+    // EXISTS reads a snapshot from before that delete and lets both through —
+    // see AuthDb.deleteConnection.
+    const held = db
+      .$with("held")
+      .as(
+        db
+          .select({ provider: connections.provider })
+          .from(connections)
+          .where(eq(connections.userId, where.userId))
+          .for("update")
+      )
     const [deleted] = await db
+      .with(held)
       .delete(connections)
       .where(
         and(
-          eq(connections.userId, where.userId),
-          eq(connections.provider, where.provider)
+          ownership,
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(held)
+              .where(ne(held.provider, where.provider))
+          )
         )
       )
       .returning()

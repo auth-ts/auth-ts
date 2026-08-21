@@ -11,11 +11,17 @@ export interface DisconnectProviderInput {
 /**
  * Unlinks a provider from the signed-in user.
  *
- * Refuses when it is the last way in. Counting the remaining methods — email,
- * phone number, and any other linked provider — is the difference between a
- * settings screen and a trapdoor: without this check, a user who signed up with
- * GitHub and never added an email can remove GitHub and lock themselves out of
- * their own data permanently.
+ * Refuses when it is the last way in. That is the difference between a settings
+ * screen and a trapdoor: without it, a user who signed up with GitHub and never
+ * added an email can remove GitHub and lock themselves out of their own data.
+ *
+ * The check is split by who can answer it safely. Email and phone number can
+ * never be cleared once set, so if either is present the user keeps a way in no
+ * matter what happens to their connections, and a plain delete is fine. Without
+ * them the connections are all there is, and "is this the last one" has to be
+ * decided by the store, in the same statement as the delete — two concurrent
+ * disconnects for different providers would otherwise each see the other still
+ * linked, both proceed, and remove every method between them.
  */
 export const disconnectProvider = defineEndpoint({
   method: "DELETE",
@@ -31,28 +37,25 @@ export const disconnectProvider = defineEndpoint({
     )
     if (!resolved) throw unauthenticated()
 
+    const hasOtherMethod = Boolean(
+      resolved.user.email || resolved.user.phoneNumber
+    )
+    const deleted = await internals.db.deleteConnection({
+      userId: resolved.user.id,
+      provider: input.provider,
+      unlessLast: !hasOtherMethod
+    })
+    if (deleted) return { data: undefined, status: 204 }
+
+    // `null` is either a link that was never there or one the store refused to
+    // remove as the last. One read tells them apart.
     const connections = await internals.db.listConnections({
       userId: resolved.user.id
     })
-    if (
-      !connections.some((connection) => connection.provider === input.provider)
-    ) {
-      throw new AuthApiError("notFound", 404)
-    }
-
-    const remainingMethods =
-      (resolved.user.email ? 1 : 0) +
-      (resolved.user.phoneNumber ? 1 : 0) +
-      connections.filter((connection) => connection.provider !== input.provider)
-        .length
-
-    if (remainingMethods === 0) throw new AuthApiError("lastSignInMethod", 409)
-
-    await internals.db.deleteConnection({
-      userId: resolved.user.id,
-      provider: input.provider
-    })
-
-    return { data: undefined, status: 204 }
+    const stillLinked = connections.some(
+      (connection) => connection.provider === input.provider
+    )
+    if (stillLinked) throw new AuthApiError("lastSignInMethod", 409)
+    throw new AuthApiError("notFound", 404)
   }
 })
