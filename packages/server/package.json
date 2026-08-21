@@ -31,5 +31,25 @@
   },
   "devDependencies": {
     "typescript": "7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/auth-ts/auth-ts.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://authts.dev",
+  "bugs": "https://github.com/auth-ts/auth-ts/issues",
+  "keywords": [
+    "auth",
+    "authentication",
+    "jwt",
+    "jwks",
+    "postgrest",
+    "rls",
+    "neon",
+    "supabase"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
