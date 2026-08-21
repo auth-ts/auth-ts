@@ -8,6 +8,16 @@ import {
 const xff = (value: string) => new Headers({ "x-forwarded-for": value })
 
 describe("isIpAddress", () => {
+  it("stays strict about wrappers — unwrapping is getClientIp's job, on the trusted entry only", () => {
+    for (const wrapped of [
+      "[2001:db8::1]",
+      "[2001:db8::1]:443",
+      "203.0.113.7:54321"
+    ]) {
+      expect(isIpAddress(wrapped), wrapped).toBe(false)
+    }
+  })
+
   it("accepts valid IPv4 and IPv6, including compression and v4-mapped", () => {
     for (const valid of [
       "1.2.3.4",
@@ -39,6 +49,25 @@ describe("isIpAddress", () => {
 })
 
 describe("getClientIp", () => {
+  it("drops a port and IPv6 brackets from the trusted entry, returning the bare address", () => {
+    // Azure's front door and IIS ARR write `address:port`; brackets are how an
+    // IPv6 entry carries a port at all. What comes back is the bare address —
+    // that is what becomes the rate-limit key and the stored column.
+    const one = resolveClientIpOptions({ trustedProxies: 1 })
+    expect(getClientIp(xff("203.0.113.7:54321"), one)).toBe("203.0.113.7")
+    expect(getClientIp(xff("[2001:db8::1]:443"), one)).toBe("2001:db8::1")
+    expect(getClientIp(xff("[2001:db8::1]"), one)).toBe("2001:db8::1")
+    // Unbracketed IPv6 is left whole: its last group is a group, not a port.
+    expect(getClientIp(xff("2001:db8::1:443"), one)).toBe("2001:db8::1:443")
+    // The wrapper buys nothing for junk — what is inside is still validated.
+    expect(getClientIp(xff("[not-an-ip]:443"), one)).toBeUndefined()
+    expect(getClientIp(xff("203.0.113.7:port"), one)).toBeUndefined()
+    // And it applies at the trusted position, not to whatever is leftmost.
+    expect(getClientIp(xff("10.0.0.1, 203.0.113.7:54321"), one)).toBe(
+      "203.0.113.7"
+    )
+  })
+
   it("derives nothing with the default zero trusted proxies", () => {
     // The header is client-controlled, so without a declared proxy no entry is
     // trustworthy — deriving one would let a caller rotate the header to dodge
