@@ -326,6 +326,41 @@ function requireDuration(value: Duration, optionName: string) {
 }
 
 /**
+ * Merges rate-limit overrides over the defaults and validates the result.
+ *
+ * Two things a plain spread gets wrong. An explicit `undefined` — easy to
+ * produce from `{ sendCodePerIP: process.env.X ? ... : undefined }` — would
+ * overwrite the default with nothing, and the limiter would then read `.max`
+ * off `undefined` on the first request. And the durations inside each window
+ * would skip the validation every other duration option receives, so a typo
+ * like `"10 minutes"` would be accepted here and explode at request time,
+ * which is exactly what this function exists to prevent.
+ */
+function resolveRateLimit(
+  overrides: RateLimitOptions | undefined
+): Required<RateLimitOptions> {
+  const defined = Object.fromEntries(
+    Object.entries(overrides ?? {}).filter(([, value]) => value !== undefined)
+  ) as RateLimitOptions
+  const merged = { ...DEFAULT_RATE_LIMIT, ...defined }
+
+  requireDuration(merged.sendCodeCooldown, "rateLimit.sendCodeCooldown")
+
+  for (const [name, limit] of Object.entries(merged)) {
+    if (typeof limit === "string") continue
+
+    if (!Number.isInteger(limit.max) || limit.max < 1) {
+      throw new AuthConfigError(
+        `rateLimit.${name}.max must be a positive integer.`
+      )
+    }
+    requireDuration(limit.window, `rateLimit.${name}.window`)
+  }
+
+  return merged
+}
+
+/**
  * Applies defaults, reads secrets from the environment, and validates.
  *
  * Synchronous and free of input/output, so constructing a server is cheap enough
@@ -384,9 +419,7 @@ export function resolveAuthServerOptions(
   assertNoReservedFields(additionalFields, RESERVED_USER_FIELDS)
 
   const rateLimit =
-    options.rateLimit === false
-      ? false
-      : { ...DEFAULT_RATE_LIMIT, ...(options.rateLimit ?? {}) }
+    options.rateLimit === false ? false : resolveRateLimit(options.rateLimit)
 
   return {
     db: options.db,

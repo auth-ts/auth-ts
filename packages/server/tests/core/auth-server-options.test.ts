@@ -77,6 +77,53 @@ describe("construction failures", () => {
     ).not.toThrow()
   })
 
+  it("rejects an invalid rate-limit window at construction, not on the first request", () => {
+    // Regression: windows skipped the duration check every other option gets,
+    // so a typo was accepted here and threw inside the limiter at request time.
+    // "1 month" rather than "10 minutes": plurals and spaces are valid in the
+    // duration grammar, and months are the one unit it deliberately refuses.
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { sendCodePerIP: { max: 30, window: "1 month" } }
+      })
+    ).toThrow(/rateLimit.sendCodePerIP.window/)
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { sendCodeCooldown: "soon" }
+      })
+    ).toThrow(/rateLimit.sendCodeCooldown/)
+  })
+
+  it("rejects a non-positive or fractional rate-limit max", () => {
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { sendCodePerIP: { max: 0, window: "10m" } }
+      })
+    ).toThrow(/rateLimit.sendCodePerIP.max/)
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { verifyCodePerIP: { max: 2.5, window: "10m" } }
+      })
+    ).toThrow(/rateLimit.verifyCodePerIP.max/)
+  })
+
+  it("treats an explicit undefined override as absent, keeping the default", () => {
+    // Regression: a spread copied `undefined` over the default, so the limiter
+    // read `.max` off `undefined` and every send failed with internalError.
+    const { options } = createAuthServer({
+      ...baseOptions(),
+      rateLimit: { sendCodePerIP: undefined }
+    })
+
+    expect(options.rateLimit).toMatchObject({
+      sendCodePerIP: { max: 30, window: "10m" }
+    })
+  })
+
   it("rejects an unparseable duration, naming the option", () => {
     expect(() =>
       createAuthServer({ ...baseOptions(), session: { ttl: "soon" } })
