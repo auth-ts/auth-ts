@@ -315,6 +315,11 @@ export const authServer = createAuthServer({
     // The console transport. Swapping in a real provider is one fetch call here
     // and nothing else — the library never sees your email vendor.
     sendCode: ({ email, code, purpose }) => {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "The console email transport must not run in production. Replace sendCode with a real email provider."
+        )
+      }
       console.log(
         `\n  ✉️  ${purpose === "deleteUser" ? "Deletion" : "Sign-in"} code for ${email}: ${code}\n`
       )
