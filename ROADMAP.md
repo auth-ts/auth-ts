@@ -60,6 +60,9 @@ The one part of the build with no real-world evidence behind it.
       `set local role authenticated; select count(*) from users;` must return 0.
 - [ ] Set `AUTH_BASE_URL` to the deployed origin — it is `http://localhost:3000`
       today, and OAuth redirect URIs are built from it.
+- [ ] Set `AUTH_TRUSTED_PROXIES` to the platform's real proxy count (1 on
+      Vercel and most PaaS). Unset, per-IP rate limits stay off; too high, and
+      they key on an `X-Forwarded-For` entry the client wrote.
 
 ### Publish the packages
 
