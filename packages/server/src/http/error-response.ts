@@ -18,8 +18,6 @@ export type AuthErrorCode =
   | "staleSession"
   /** No session, or a session that no longer resolves. */
   | "unauthenticated"
-  /** Removing this provider would leave no way to sign in. */
-  | "lastSignInMethod"
   /** That provider identity is already linked to a different user. */
   | "providerConflict"
   /** A code was requested for a channel this server has no sender for. */

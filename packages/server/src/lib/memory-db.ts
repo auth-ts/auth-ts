@@ -269,16 +269,6 @@ export function createMemoryDb(): MemoryDb {
           connection.userId === where.userId &&
           connection.provider === where.provider
         ) {
-          // Nothing in here yields, so the count and the delete are one step —
-          // the guarantee a real store earns with a row lock.
-          if (where.unlessLast) {
-            const hasAnother = [...connections.values()].some(
-              (other) =>
-                other.userId === where.userId &&
-                other.provider !== where.provider
-            )
-            if (!hasAnother) return null
-          }
           connections.delete(key)
           return { ...connection }
         }

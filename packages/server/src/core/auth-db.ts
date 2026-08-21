@@ -173,18 +173,6 @@ export type DeleteSessionWhere =
   | { tokenHash: string }
   | { id: string; userId: string }
 
-/** Query accepted by {@link AuthDb.deleteConnection}. */
-export interface DeleteConnectionWhere {
-  userId: string
-  provider: string
-  /**
-   * Refuse — return `null`, change nothing — if this is the user's only
-   * connection. Core sets it when no other sign-in method exists. See
-   * {@link AuthDb.deleteConnection} for why the refusal has to be atomic.
-   */
-  unlessLast?: boolean
-}
-
 /**
  * The integration surface: the callbacks that read and write your database.
  *
@@ -366,33 +354,11 @@ export interface AuthDb {
   /**
    * Unlinks a provider from a user and returns the removed link, or `null`.
    * Ownership is enforced in the query, so another user's provider matches nothing.
-   *
-   * With `unlessLast`, the delete must refuse — return `null`, change nothing —
-   * when it would remove the user's only remaining connection, **and it must do
-   * so atomically against a concurrent delete of a sibling**. Core asks for this
-   * when the user has no email or phone number, so a connection is the only way
-   * back in. A read-then-delete is not enough, and neither is a bare
-   * `WHERE EXISTS (another connection)`: under READ COMMITTED, two requests for
-   * different providers each read a snapshot in which the other's row is still
-   * there, both pass, and the user is left with no way to sign in. Lock the
-   * user's connections in the statement that deletes, so the second statement
-   * waits for the first and then re-reads what is actually left:
-   *
-   * ```sql
-   * WITH held AS (
-   *   SELECT provider FROM connections WHERE "userId" = $1 FOR UPDATE
-   * )
-   * DELETE FROM connections
-   * WHERE "userId" = $1 AND provider = $2
-   *   AND EXISTS (SELECT 1 FROM held WHERE provider <> $2)
-   * RETURNING *
-   * ```
-   *
-   * A store without row locks does the same inside a serializable transaction.
-   * Core tells a refused delete from a missing one with a follow-up read, so
-   * `null` is the right answer for both.
    */
-  deleteConnection(where: DeleteConnectionWhere): Promise<AuthConnection | null>
+  deleteConnection(where: {
+    userId: string
+    provider: string
+  }): Promise<AuthConnection | null>
 
   /**
    * Deletes expired magic codes, sessions, and rate-limit counters.
