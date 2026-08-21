@@ -10,7 +10,7 @@
         "examples/tanstack-start-neon-demo",
         "dev"
       ],
-      "port": 5173
+      "port": 3000
     },
     {
       "name": "docs",

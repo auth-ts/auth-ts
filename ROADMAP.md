@@ -58,7 +58,7 @@ The one part of the build with no real-world evidence behind it.
       security and the ten-minute token lifetime are what contain that.
 - [ ] Confirm the auth tables are still unreachable after any schema change:
       `set local role authenticated; select count(*) from users;` must return 0.
-- [ ] Set `AUTH_BASE_URL` to the deployed origin — it is `http://localhost:5173`
+- [ ] Set `AUTH_BASE_URL` to the deployed origin — it is `http://localhost:3000`
       today, and OAuth redirect URIs are built from it.
 
 ### Publish the packages

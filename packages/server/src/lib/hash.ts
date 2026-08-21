@@ -9,9 +9,11 @@ function toHex(buffer: ArrayBuffer) {
 /**
  * Hashes a value with SHA-256 and returns lowercase hex.
  *
- * Refresh tokens are stored this way: the database only ever sees the hash, so
- * a leaked table cannot be replayed as a session, and a leaked token cannot be
- * found in the table without also knowing it.
+ * Refresh tokens are stored this way, so a leaked table cannot be replayed as a
+ * session. That is all it buys: the hash is unkeyed, so anyone holding a token
+ * can find its row, and the token stays a bearer credential either way. Thirty
+ * two random bytes need no key — six-digit codes do, which is why those get
+ * {@link hmacSha256Hex} instead.
  */
 export async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(
