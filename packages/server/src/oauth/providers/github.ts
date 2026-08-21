@@ -5,6 +5,7 @@ import type {
   OAuthProvider,
   ProviderIdentity
 } from "./oauth-provider.ts"
+import { providerRejected } from "./provider-response.ts"
 
 interface GitHubUser {
   id: number
@@ -64,6 +65,7 @@ export const github: OAuthProvider = {
       }
     )
 
+    if (!tokenResponse.ok) throw providerRejected(tokenResponse)
     const token = (await tokenResponse.json().catch(() => ({}))) as {
       access_token?: string
     }
@@ -78,13 +80,17 @@ export const github: OAuthProvider = {
       headers: authorization,
       signal
     })
-    if (!profileResponse.ok) throw new AuthApiError("unauthenticated", 401)
+    if (!profileResponse.ok) throw providerRejected(profileResponse)
     const profile = (await profileResponse.json()) as GitHubUser
 
     const emailResponse = await fetch("https://api.github.com/user/emails", {
       headers: authorization,
       signal
     })
+    // A 4xx here — typically the scope was not granted — is legitimately "no
+    // verified address", and the flow below refuses the sign-in for that reason.
+    // A 5xx is GitHub being down, which must not masquerade as that refusal.
+    if (emailResponse.status >= 500) throw providerRejected(emailResponse)
     const emails = emailResponse.ok
       ? ((await emailResponse.json()) as GitHubEmail[])
       : []
