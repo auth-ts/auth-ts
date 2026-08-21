@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server.ts"
 import { readSetCookies, request } from "../helpers/request.ts"
 import { required } from "../helpers/required.ts"
+import { decodeState, forgeState } from "../helpers/state-cookie.ts"
 import { stubGitHub } from "../helpers/stub-provider-network.ts"
 
 const OAUTH_OPTIONS = {
@@ -31,7 +32,7 @@ async function startSignIn(
     readSetCookies(response).get("auth-ts.state"),
     "state cookie"
   ).value
-  const state = (JSON.parse(stateCookie) as { state: string }).state
+  const state = decodeState(stateCookie).state
 
   return { response, stateCookie, state }
 }
@@ -69,18 +70,14 @@ describe("oauth start", () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
 
     const safe = await startSignIn(authServer, "?redirect=%2Fdashboard")
-    expect(
-      (JSON.parse(safe.stateCookie) as { redirect: string }).redirect
-    ).toBe("/dashboard")
+    expect(decodeState(safe.stateCookie).redirect).toBe("/dashboard")
 
     for (const hostile of [
       "https%3A%2F%2Fevil.example",
       "%2F%2Fevil.example"
     ]) {
       const blocked = await startSignIn(authServer, `?redirect=${hostile}`)
-      expect(
-        (JSON.parse(blocked.stateCookie) as { redirect: string }).redirect
-      ).toBe("/")
+      expect(decodeState(blocked.stateCookie).redirect).toBe("/")
     }
   })
 
@@ -275,7 +272,7 @@ describe("oauth callback", () => {
       readSetCookies(startResponse).get("auth-ts.state"),
       "state"
     ).value
-    const { state } = JSON.parse(stateCookie) as { state: string }
+    const { state } = decodeState(stateCookie)
     stubGitHub({ id: 4242, emails: verifiedEmails("owner@example.com") })
 
     const response = await authServer.handler(
@@ -343,6 +340,82 @@ describe("oauth callback", () => {
       )?.userId
     ).toBe(guest.id)
     expect(db.users()).toHaveLength(1)
+  })
+
+  it("revalidates additionalFields from the state cookie instead of trusting them", async () => {
+    // The cookie is plain JSON. Anything that can set cookies for the host can
+    // rewrite it after /sign-in/:provider validated the fields, so the callback
+    // has to check again or an undeclared column rides into user creation.
+    const { authServer, db } = await createTestServer({
+      ...OAUTH_OPTIONS,
+      user: { additionalFields: { plan: "string" } }
+    })
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+
+    // Signed with the real secret, so only the revalidation can catch it.
+    const tampered = await forgeState({
+      ...decodeState(stateCookie),
+      additionalFields: { plan: "pro", type: "admin" }
+    })
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: { "auth-ts.state": tampered }
+      })
+    )
+
+    expect(response.status).toBe(400)
+    expect(db.users()).toHaveLength(0)
+    // The state cookie is cleared whichever way the callback ends.
+    expect(
+      required(readSetCookies(response).get("auth-ts.state"), "state").value
+    ).toBe("")
+
+    // And a declared field still comes through untouched.
+    const clean = await startSignIn(authServer)
+    const accepted = await authServer.handler(
+      request(
+        "GET",
+        `/api/auth/callback/github?code=abc&state=${clean.state}`,
+        {
+          cookies: {
+            "auth-ts.state": await forgeState({
+              ...decodeState(clean.stateCookie),
+              additionalFields: { plan: "pro" }
+            })
+          }
+        }
+      )
+    )
+    expect(accepted.status).toBe(302)
+    expect(db.users()[0]).toMatchObject({ plan: "pro" })
+  })
+
+  it("rejects a state cookie that this server did not sign", async () => {
+    const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+    const payload = decodeState(stateCookie)
+
+    const forgeries = [
+      // Edited in place: the payload no longer matches the signature.
+      `${stateCookie.startsWith("A") ? "B" : "A"}${stateCookie.slice(1)}`,
+      // The open-redirect attempt: same state, hostile return path, signed
+      // under some other key.
+      await forgeState({ ...payload, redirect: "//evil.example" }, "not-it"),
+      // The pre-signing shape, for anyone replaying an old cookie.
+      JSON.stringify(payload),
+      ""
+    ]
+    for (const forged of forgeries) {
+      const response = await authServer.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          cookies: { "auth-ts.state": forged }
+        })
+      )
+      expect(response.status, JSON.stringify(forged)).toBe(401)
+    }
+    expect(db.users()).toHaveLength(0)
   })
 
   it("rejects a mismatched state, which is the CSRF guard", async () => {
@@ -529,7 +602,7 @@ describe("connect and disconnect", () => {
       readSetCookies(startResponse).get("auth-ts.state"),
       "state"
     ).value
-    const { state } = JSON.parse(stateCookie) as { state: string }
+    const { state } = decodeState(stateCookie)
 
     stubGitHub({ id: 4242, emails: verifiedEmails("different@example.com") })
     const callbackResponse = await context.authServer.handler(
@@ -565,7 +638,7 @@ describe("connect and disconnect", () => {
       readSetCookies(startResponse).get("auth-ts.state"),
       "state"
     ).value
-    const { state } = JSON.parse(stateCookie) as { state: string }
+    const { state } = decodeState(stateCookie)
 
     stubGitHub({ id: 4242, emails: verifiedEmails("attacker@example.com") })
     // The victim follows the link without the session that started it.
@@ -603,7 +676,7 @@ describe("connect and disconnect", () => {
       readSetCookies(startResponse).get("auth-ts.state"),
       "state"
     ).value
-    const { state } = JSON.parse(stateCookie) as { state: string }
+    const { state } = decodeState(stateCookie)
 
     stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
     const callbackResponse = await context.authServer.handler(

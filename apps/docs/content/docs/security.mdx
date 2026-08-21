@@ -42,7 +42,11 @@ everything, these routes included.
 **State is verified** against a short-lived `HttpOnly` cookie scoped to the
 callback path. Without it, an attacker hands a victim a callback URL carrying the
 attacker's own authorization code and the victim's browser quietly completes a
-sign-in as the attacker.
+sign-in as the attacker. The cookie is also **HMAC-signed under `secret`**, so
+its contents — the return path, whether the flow is a sign-in or a connect, and
+any sign-up fields — cannot be rewritten by anything else able to set cookies for
+your host; an unsigned or edited cookie is treated as missing. The callback
+re-validates the sign-up fields against the declared schema regardless.
 
 **Only verified email addresses are accepted.** GitHub returns unverified
 addresses, so the library takes only the entry that is both `primary` and
