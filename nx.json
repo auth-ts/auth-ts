@@ -10,7 +10,8 @@
     ],
     "sharedGlobals": [
       "{workspaceRoot}/tsconfig.base.json",
-      "{workspaceRoot}/biome.json"
+      "{workspaceRoot}/biome.json",
+      "{workspaceRoot}/tools/testing/**/*"
     ]
   },
   "targetDefaults": {
