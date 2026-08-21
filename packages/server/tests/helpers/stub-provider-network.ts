@@ -76,6 +76,8 @@ export interface StubGoogleIdentity {
     wrongKey?: boolean
     /** Hand back something that is not a JWT at all. */
     malformed?: boolean
+    /** Leave these claims out, for tokens that are signed but incomplete. */
+    omit?: Array<"exp" | "iat" | "sub">
   }
   /** HTTP statuses to answer with instead of 200, per endpoint. */
   status?: { token?: number; jwks?: number }
@@ -129,8 +131,9 @@ async function mintGoogleIdToken(identity: StubGoogleIdentity) {
     ? strangerKeys
     : googleSigningKeys)
   const now = Math.floor(Date.now() / 1000)
+  const omitted = new Set(overrides.omit ?? [])
 
-  return new SignJWT({
+  const jwt = new SignJWT({
     ...(identity.email ? { email: identity.email } : {}),
     ...(identity.emailVerified === undefined
       ? {}
@@ -139,12 +142,15 @@ async function mintGoogleIdToken(identity: StubGoogleIdentity) {
     ...(identity.picture ? { picture: identity.picture } : {})
   })
     .setProtectedHeader({ alg: "RS256", kid: GOOGLE_KID })
-    .setSubject(identity.sub)
     .setIssuer(overrides.issuer ?? "https://accounts.google.com")
     .setAudience(overrides.audience ?? "client-id")
-    .setIssuedAt(now)
-    .setExpirationTime(now + (overrides.expiresIn ?? 3600))
-    .sign(privateKey)
+  if (!omitted.has("sub")) jwt.setSubject(identity.sub)
+  if (!omitted.has("iat")) jwt.setIssuedAt(now)
+  if (!omitted.has("exp")) {
+    jwt.setExpirationTime(now + (overrides.expiresIn ?? 3600))
+  }
+
+  return jwt.sign(privateKey)
 }
 
 function jsonResponse(body: unknown, status = 200) {
