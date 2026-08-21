@@ -115,7 +115,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       return await createHandler(internals, endpoint)(request)
     } catch (error) {
       if (!isAuthApiError(error)) throw error
-      return createHandler(internals, notFoundEndpoint(error))(request)
+      return createHandler(internals, notFoundEndpoint(error, request))(request)
     }
   }
 
@@ -174,10 +174,14 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
  */
 const COOKIE_PLANE_CALLABLES = new Set(["getToken"])
 
-/** Turns a routing failure into an endpoint, so it flows through the usual middleware. */
-function notFoundEndpoint(error: AuthApiError): AnyEndpoint {
+/**
+ * Turns a routing failure into an endpoint, so it flows through the usual
+ * middleware. It claims the request's own method so the handler's method check
+ * is a no-op here and the router's verdict — 404 or 405 — is what gets served.
+ */
+function notFoundEndpoint(error: AuthApiError, request: Request): AnyEndpoint {
   return {
-    method: "GET",
+    method: request.method,
     path: "/",
     run: async () => {
       throw error

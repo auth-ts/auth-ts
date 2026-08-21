@@ -1,6 +1,6 @@
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 import { applyCorsHeaders, preflightResponse } from "./apply-cors.ts"
-import { isAuthApiError } from "./auth-api-error.ts"
+import { AuthApiError, isAuthApiError } from "./auth-api-error.ts"
 import type { AnyEndpoint } from "./define-endpoint.ts"
 import { errorResponse } from "./error-response.ts"
 import { getErrorMessage } from "./get-error-message.ts"
@@ -14,9 +14,15 @@ export type AuthHandler = (request: Request) => Promise<Response>
  * Turns an endpoint declaration into an HTTP handler.
  *
  * The one piece of middleware in the package, and the only place HTTP meets the
- * logic. Before: answer a CORS preflight. After: attach CORS headers, serialize a
- * thrown {@link AuthApiError} into the standard envelope in the request's locale,
- * and sweep expired rows fire-and-forget.
+ * logic. Before: answer a CORS preflight, and refuse a method the endpoint does
+ * not declare. After: attach CORS headers, serialize a thrown
+ * {@link AuthApiError} into the standard envelope in the request's locale, and
+ * sweep expired rows fire-and-forget.
+ *
+ * The method check has to live here and not only in the router: a consumer who
+ * mounts `authServer.handlers.getToken` on their own route may hand it any method
+ * their framework lets through, and without CORS configured an `OPTIONS` would
+ * otherwise fall straight into `parse` and `run`.
  *
  * There is no chain and no plugin system. Everything it does is unconditional or
  * driven by configuration, so reading this function tells you everything that
@@ -40,6 +46,10 @@ export function createHandler(
     )
 
     try {
+      if (request.method !== endpoint.method) {
+        throw new AuthApiError("methodNotAllowed", 405)
+      }
+
       const params = matchEndpointParams(internals, request, endpoint.path)
       const input = endpoint.parse
         ? await endpoint.parse({ request, params, internals })
