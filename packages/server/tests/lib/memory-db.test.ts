@@ -196,6 +196,99 @@ describe("magic codes", () => {
   })
 })
 
+describe("every delete returns what it removed", () => {
+  it("deleteUser returns the row, or null for an unknown id", async () => {
+    const user = await db.upsertUser({ email: "ada@example.com" })
+    expect((await db.deleteUser({ id: user.id }))?.email).toBe(
+      "ada@example.com"
+    )
+    expect(await db.deleteUser({ id: user.id })).toBeNull()
+  })
+
+  it("deleteSession returns the row, and null when ownership does not match", async () => {
+    await db.upsertSession({
+      id: "s1",
+      userId: "u1",
+      tokenHash: "h1",
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000)
+    })
+    expect(
+      await db.deleteSession({ id: "s1", userId: "someone-else" })
+    ).toBeNull()
+    expect(
+      (await db.deleteSession({ id: "s1", userId: "u1" }))?.tokenHash
+    ).toBe("h1")
+    expect(await db.deleteSession({ tokenHash: "h1" })).toBeNull()
+  })
+
+  it("deleteSessions returns every row it removed", async () => {
+    const base = {
+      userId: "u1",
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000)
+    }
+    await db.upsertSession({ ...base, id: "s1", tokenHash: "h1" })
+    await db.upsertSession({ ...base, id: "s2", tokenHash: "h2" })
+    await db.upsertSession({ ...base, id: "s3", tokenHash: "h3" })
+    const removed = await db.deleteSessions({
+      userId: "u1",
+      exceptTokenHash: "h2"
+    })
+    expect(removed.map((s) => s.tokenHash).sort()).toEqual(["h1", "h3"])
+  })
+
+  it("deleteConnection returns the link, or null", async () => {
+    await db.upsertConnection({
+      userId: "u1",
+      provider: "github",
+      providerAccountId: "42"
+    })
+    expect(
+      (await db.deleteConnection({ userId: "u1", provider: "github" }))
+        ?.providerAccountId
+    ).toBe("42")
+    expect(
+      await db.deleteConnection({ userId: "u1", provider: "github" })
+    ).toBeNull()
+  })
+
+  it("deleteMagicCode with codeHash deletes only a matching row — the one-time gate", async () => {
+    const row = {
+      identifier: "ada@example.com",
+      expiresAt: new Date(Date.now() + 60_000),
+      attempts: 0,
+      purpose: "signIn" as const
+    }
+    await db.upsertMagicCode({ ...row, codeHash: "current" })
+    // A stale hash (a code issued before a resend) must not consume the row.
+    expect(
+      await db.deleteMagicCode({
+        identifier: "ada@example.com",
+        codeHash: "stale"
+      })
+    ).toBeNull()
+    expect(
+      (await db.getMagicCode({ identifier: "ada@example.com" }))?.codeHash
+    ).toBe("current")
+    // The matching hash does, and exactly once.
+    expect(
+      (
+        await db.deleteMagicCode({
+          identifier: "ada@example.com",
+          codeHash: "current"
+        })
+      )?.codeHash
+    ).toBe("current")
+    expect(
+      await db.deleteMagicCode({
+        identifier: "ada@example.com",
+        codeHash: "current"
+      })
+    ).toBeNull()
+  })
+})
+
 describe("deleteExpired", () => {
   it("removes only rows that are already past their expiry", async () => {
     const past = new Date(Date.now() - 60_000)

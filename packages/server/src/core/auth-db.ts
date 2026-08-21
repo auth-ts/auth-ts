@@ -206,13 +206,18 @@ export interface AuthDb {
   getUser(where: GetUserWhere): Promise<AuthUser | null>
 
   /**
-   * Deletes a user.
+   * Deletes a user and returns the deleted row, or `null` if none matched.
+   *
+   * Every `delete*` callback returns what it removed — `DELETE … RETURNING *`,
+   * `findOneAndDelete`, `OUTPUT deleted.*`. One round trip, and the caller
+   * learns whether anything was actually there, which is the difference between
+   * a 204 and a 404.
    *
    * **Contract:** this must also remove or invalidate that user's sessions, via
    * `ON DELETE CASCADE` or by calling your own `deleteSessions`. A deleted
    * account that keeps a live refresh token is still a working login.
    */
-  deleteUser(where: { id: string }): Promise<void>
+  deleteUser(where: { id: string }): Promise<AuthUser | null>
 
   /** Creates or updates a session row, keyed by `tokenHash`. */
   upsertSession(session: UpsertSessionInput): Promise<void>
@@ -224,14 +229,15 @@ export interface AuthDb {
   listSessions(where: { userId: string }): Promise<AuthSession[]>
 
   /**
-   * Deletes one session.
+   * Deletes one session and returns it, or `null` if none matched.
    *
    * The `{ id, userId }` form must filter on **both** columns, so that revoking
    * someone else's session id is structurally impossible rather than a check you
-   * remembered to write. After deletion, `getSession` must return null — a soft
-   * delete is fine as long as reads respect it.
+   * remembered to write — and because it returns `null` in that case, core
+   * answers 404 without a separate lookup. After deletion, `getSession` must
+   * return null; a soft delete is fine as long as reads respect it.
    */
-  deleteSession(where: DeleteSessionWhere): Promise<void>
+  deleteSession(where: DeleteSessionWhere): Promise<AuthSession | null>
 
   /**
    * Deletes all of a user's sessions, optionally sparing the current one.
@@ -242,7 +248,7 @@ export interface AuthDb {
   deleteSessions(where: {
     userId: string
     exceptTokenHash?: string
-  }): Promise<void>
+  }): Promise<AuthSession[]>
 
   /**
    * Stores the live magic code for an identifier, replacing any existing one.
@@ -256,8 +262,24 @@ export interface AuthDb {
   /** Reads the live magic code for an identifier. */
   getMagicCode(where: { identifier: string }): Promise<AuthMagicCode | null>
 
-  /** Deletes the magic code for an identifier — on success, or when attempts run out. */
-  deleteMagicCode(where: { identifier: string }): Promise<void>
+  /**
+   * Deletes the live magic code and returns it, or `null` if nothing matched.
+   *
+   * When `codeHash` is given, the delete must match on **both** columns in one
+   * statement — `DELETE … WHERE identifier = ? AND codeHash = ? RETURNING *`.
+   * That single conditional delete is what makes a code usable exactly once:
+   * two requests can both read the row and both pass the HMAC check, but the
+   * database lets only one of them delete it, and the other gets `null`. It
+   * also means a code sent *before* a resend can never consume the row the
+   * resend created, since the hashes differ.
+   *
+   * Without `codeHash` it deletes by identifier alone — used when the attempt
+   * cap is reached and the code is burned regardless.
+   */
+  deleteMagicCode(where: {
+    identifier: string
+    codeHash?: string
+  }): Promise<AuthMagicCode | null>
 
   /** Reads a rate-limit counter. Never called when `rateLimit: false`. */
   getRateLimit(where: { key: string }): Promise<AuthRateLimit | null>
@@ -283,8 +305,14 @@ export interface AuthDb {
   /** Lists a user's linked providers. */
   listConnections(where: { userId: string }): Promise<AuthConnection[]>
 
-  /** Unlinks a provider from a user; ownership is enforced in the query. */
-  deleteConnection(where: { userId: string; provider: string }): Promise<void>
+  /**
+   * Unlinks a provider from a user and returns the removed link, or `null`.
+   * Ownership is enforced in the query, so another user's provider matches nothing.
+   */
+  deleteConnection(where: {
+    userId: string
+    provider: string
+  }): Promise<AuthConnection | null>
 
   /**
    * Deletes expired magic codes, sessions, and rate-limit counters.
@@ -300,6 +328,10 @@ export interface AuthDb {
    *
    * This is hygiene, never a security boundary: expiry is enforced on read
    * everywhere regardless of whether a sweep has ever run.
+   *
+   * The one `delete*` that returns nothing: it sweeps three tables
+   * fire-and-forget, so there is no single row to hand back and no caller
+   * waiting to hear about it.
    */
   deleteExpired(): Promise<void>
 }

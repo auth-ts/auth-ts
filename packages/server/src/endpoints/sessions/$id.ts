@@ -34,16 +34,19 @@ export const revokeSession = defineEndpoint({
     const resolved = await resolveSession(internals, headers)
     if (!resolved) throw unauthenticated()
 
-    const owned = await internals.db.listSessions({ userId: resolved.user.id })
-    const target = owned.find((session) => session.id === input.id)
-    if (!target) throw new AuthApiError("notFound", 404)
-
-    await internals.db.deleteSession({ id: input.id, userId: resolved.user.id })
+    // The delete filters on id AND userId and returns what it removed, so one
+    // statement both enforces ownership and tells us whether anything was
+    // there. No read-then-delete window for someone else's id to slip through.
+    const revoked = await internals.db.deleteSession({
+      id: input.id,
+      userId: resolved.user.id
+    })
+    if (!revoked) throw new AuthApiError("notFound", 404)
 
     // Revoking the session you are using is a local sign-out, so the cookie has
     // to go too — otherwise the browser keeps presenting a token that no longer
     // resolves and every later request looks mysteriously unauthenticated.
-    if (target.tokenHash === resolved.tokenHash) {
+    if (revoked.tokenHash === resolved.tokenHash) {
       const responseHeaders = new Headers()
       responseHeaders.append(
         "set-cookie",

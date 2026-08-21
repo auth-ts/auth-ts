@@ -102,7 +102,11 @@ const authDb: AuthDb = {
   async deleteUser(where) {
     // Sessions and connections cascade via the foreign keys, which satisfies the
     // contract that a deleted account cannot keep a live refresh token.
-    await db.delete(users).where(eq(users.id, where.id))
+    const [deleted] = await db
+      .delete(users)
+      .where(eq(users.id, where.id))
+      .returning()
+    return deleted ?? null
   },
 
   async upsertSession(session) {
@@ -151,7 +155,8 @@ const authDb: AuthDb = {
         ? eq(sessions.tokenHash, where.tokenHash)
         : and(eq(sessions.id, where.id), eq(sessions.userId, where.userId))
 
-    await db.delete(sessions).where(condition)
+    const [deleted] = await db.delete(sessions).where(condition).returning()
+    return deleted ?? null
   },
 
   async deleteSessions(where) {
@@ -162,7 +167,7 @@ const authDb: AuthDb = {
         )
       : eq(sessions.userId, where.userId)
 
-    await db.delete(sessions).where(condition)
+    return db.delete(sessions).where(condition).returning()
   },
 
   async upsertMagicCode(magicCode) {
@@ -194,9 +199,18 @@ const authDb: AuthDb = {
   },
 
   async deleteMagicCode(where) {
-    await db
-      .delete(magicCodes)
-      .where(eq(magicCodes.identifier, where.identifier))
+    // One conditional DELETE … RETURNING is the whole one-time guarantee: two
+    // racing consumers both pass the HMAC check, but Postgres lets exactly one
+    // of them delete the row. The other gets nothing back and is rejected.
+    const condition = where.codeHash
+      ? and(
+          eq(magicCodes.identifier, where.identifier),
+          eq(magicCodes.codeHash, where.codeHash)
+        )
+      : eq(magicCodes.identifier, where.identifier)
+
+    const [deleted] = await db.delete(magicCodes).where(condition).returning()
+    return deleted ?? null
   },
 
   async getRateLimit(where) {
@@ -255,7 +269,7 @@ const authDb: AuthDb = {
   },
 
   async deleteConnection(where) {
-    await db
+    const [deleted] = await db
       .delete(connections)
       .where(
         and(
@@ -263,6 +277,8 @@ const authDb: AuthDb = {
           eq(connections.provider, where.provider)
         )
       )
+      .returning()
+    return deleted ?? null
   },
 
   async deleteExpired() {
