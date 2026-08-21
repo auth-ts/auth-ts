@@ -9,9 +9,19 @@ export type UserType = "guest" | "user" | "admin"
 /**
  * A user row, as core reads it.
  *
- * Your table may carry any number of extra columns; structural typing means
- * returning a richer object is fine. This is also the `user` returned to the
- * browser on sign-in and refresh, so nothing sensitive belongs on it.
+ * Declared `additionalFields` are **flat on this type**, not nested under a
+ * property: your row already has them as columns, so `AuthUser & YourFields` is
+ * what a `select *` actually returns and what application code wants to read.
+ * Structural typing means returning a richer object is always fine.
+ *
+ * Note the deliberate asymmetry with {@link UpsertUserInput}, which nests them:
+ * on the way *in* they are an allowlisted payload that must stay visibly
+ * separate from the fields core owns, and writing `...user.additionalFields` in
+ * your insert is the line that makes mass assignment impossible to do by
+ * accident. On the way *out* there is nothing to separate — it is just your row.
+ *
+ * This is also the `user` returned to the browser on sign-in and refresh, so
+ * nothing sensitive belongs on it.
  */
 export interface AuthUser {
   id: string
@@ -20,7 +30,7 @@ export interface AuthUser {
   /** Null for guests; unique when present. E.164. */
   phoneNumber?: string | null
   name?: string | null
-  avatar?: string | null
+  imageURL?: string | null
   type: UserType
   /**
    * Set on a **guest** row when its sign-in resolved to an existing account —
@@ -31,8 +41,6 @@ export interface AuthUser {
    * describes a data migration rather than who is signed in.
    */
   primaryUserId?: string | null
-  /** Values for any fields declared in `user.additionalFields`. */
-  additionalFields?: Record<string, string | number | boolean>
 }
 
 /** A refresh-token row. Core stores only the hash of the token, never the token. */
@@ -93,7 +101,7 @@ export interface UpsertUserInput {
   email?: string
   phoneNumber?: string
   name?: string
-  avatar?: string
+  imageURL?: string
   type?: UserType
   primaryUserId?: string
   /** Declared `additionalFields`, applied on insert. Spread them into your insert. */
