@@ -49,6 +49,8 @@ describe("getToken as a function", () => {
     ).expiresAt.getTime()
 
     expect(result?.user.email).toBe("ada@example.com")
+    // Shares run() with POST /token, so it gets the same projection — no hash.
+    expect(JSON.stringify(result)).not.toContain("tokenHash")
     expect(
       (
         await context.authServer.verifyToken(
@@ -113,6 +115,10 @@ describe("getSession", () => {
 
     expect(result?.user.email).toBe("ada@example.com")
     expect(result?.session.id).toBeTruthy()
+    // The server-side primitive deliberately returns the full row, hash included:
+    // this has no HTTP route, and server code uses the hash (e.g. deleteSession).
+    // Only POST /token and getToken() project it away.
+    expect(result?.session.tokenHash).toBeTruthy()
   })
 
   it("resolves null for a revoked or expired session", async () => {

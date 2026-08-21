@@ -4,11 +4,28 @@ import { mintAccessToken, slideSession } from "../session/issue-session.ts"
 import type { HeadersInput } from "../session/resolve-session.ts"
 import { resolveSession } from "../session/resolve-session.ts"
 
+/**
+ * The session as a token response describes it — a projection, never the row.
+ *
+ * `tokenHash` must not cross to the browser; `id` is the only address a client
+ * ever needs, and `createdAt` is the authentication time that server-side
+ * freshness checks read. Listed field by field, rather than spread from
+ * `AuthSession`, so adding a column to the stored row can never silently widen
+ * what a refresh returns.
+ */
+export interface TokenSession {
+  /** The browser-safe address of this session, for `revokeSession`. */
+  id: string
+  /** When identity was proven — what the deletion freshness window reads. */
+  createdAt: Date
+  expiresAt: Date
+}
+
 /** What `POST /token` and `authServer.getToken` return. */
 export interface AuthTokenResult {
   accessToken: string
   user: import("../core/auth-db.ts").AuthUser
-  session: import("../core/auth-db.ts").AuthSession
+  session: TokenSession
 }
 
 /**
@@ -43,7 +60,11 @@ export const getToken = defineEndpoint({
       data: {
         accessToken,
         user: resolved.user,
-        session: resolved.session
+        session: {
+          id: resolved.session.id,
+          createdAt: resolved.session.createdAt,
+          expiresAt: resolved.session.expiresAt
+        }
       } satisfies AuthTokenResult
     }
   }

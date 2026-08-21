@@ -187,6 +187,29 @@ describe("token and user endpoints", () => {
     expect(claims?.role).toBe("authenticated")
   })
 
+  it("never returns the stored token hash on refresh — only a projection of the session", async () => {
+    // The hash at rest is the whole point of storing sha256(token) instead of the
+    // token. Handing it back on every refresh would undo that, and it was.
+    const { authServer, refreshToken, db } = await signIn()
+
+    const response = await authServer.handler(
+      request("POST", "/api/auth/token", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+    const body = (await response.json()) as { session: Record<string, unknown> }
+    const storedHash = required(db.sessions()[0], "session").tokenHash
+
+    expect(JSON.stringify(body)).not.toContain("tokenHash")
+    expect(JSON.stringify(body)).not.toContain(storedHash)
+    // Exact key set, so a new AuthSession column cannot widen this silently.
+    expect(Object.keys(body.session).sort()).toEqual([
+      "createdAt",
+      "expiresAt",
+      "id"
+    ])
+  })
+
   it("401s the token endpoint without a cookie", async () => {
     const { authServer } = await createTestServer()
     const response = await authServer.handler(
