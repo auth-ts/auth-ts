@@ -52,8 +52,10 @@ The one part of the build with no real-world evidence behind it.
 
 ### Neon, for a deployed environment
 
-- [ ] **Lock the Data API's allowed origins** to your own domain. Empty means
-      anyone on the internet can query it with a stolen token.
+- [ ] **Set the Data API's allowed origins** to your own domain. Worth doing,
+      but know the limit: origins are browser-enforced, so they stop another
+      site's JavaScript, not a leaked token replayed from curl. Row-level
+      security and the ten-minute token lifetime are what contain that.
 - [ ] Confirm the auth tables are still unreachable after any schema change:
       `set local role authenticated; select count(*) from users;` must return 0.
 - [ ] Set `AUTH_BASE_URL` to the deployed origin — it is `http://localhost:5173`
@@ -143,8 +145,9 @@ has to do the things that are easy to skip:
   role full access to everything in `public` when the Data API is enabled, so the
   auth tables have to be explicitly protected. The demo enables row-level
   security with no policy on them, which denies every role except the owner.
-- **Lock the Data API's allowed origins.** Empty means the whole internet can
-  query it with a stolen token.
+- **Set the Data API's allowed origins.** Browser-enforced only: it stops
+  another site's JavaScript using your visitors' credentials, not a leaked token
+  replayed from a script.
 - **Replace the console email transport.** It prints codes to the server console,
   which is a sign-in-as-anyone hole the moment those logs are readable.
 

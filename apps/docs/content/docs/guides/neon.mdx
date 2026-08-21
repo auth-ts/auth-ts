@@ -77,10 +77,24 @@ set local role authenticated;
 select count(*) from users;  -- must be 0
 ```
 
-## 5. Lock CORS
+## 5. Set the allowed origins
 
-Set the allowed origins on the Data API to your own domain. Empty means anyone
-can query it with a stolen token.
+Set the Data API's allowed origins to your own domain — and know precisely what
+that buys, because it is easy to overestimate.
+
+Allowed origins are enforced by **browsers**, not by the Data API. They stop
+another website's JavaScript from calling the API with your visitor's
+credentials. That is worth having, and it is the whole of it.
+
+They do nothing about a token that has leaked. curl, a server, a script, a
+mobile app — anything that is not a browser ignores CORS entirely, and the
+request succeeds no matter what the origin list says. So this is not token
+protection, and it is not a substitute for the policy.
+
+What actually contains a leaked token is the rest of the design: it lives in
+memory rather than storage, it expires in ten minutes, and row-level security
+still decides what it can read. A stolen token reads the rows of whoever it
+belongs to and nothing else.
 
 ## Using it
 
