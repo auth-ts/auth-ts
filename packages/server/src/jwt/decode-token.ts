@@ -1,10 +1,15 @@
 import { decodeJwt } from "jose"
-import type { TokenClaims } from "./verify-token.ts"
+import type { UnverifiedClaims } from "./verify-token.ts"
 
 /** The result of an unverified decode. */
 export interface DecodedToken {
-  claims: TokenClaims
-  /** Whether `exp` has passed. Says nothing about whether the token is genuine. */
+  /** Exactly what the token says, with nothing guaranteed — `exp` may be absent. */
+  claims: UnverifiedClaims
+  /**
+   * Whether `exp` has passed. Says nothing about whether the token is genuine,
+   * and is `false` for a token that has no `exp` at all — such a token is not
+   * expired; it is one that verification would refuse.
+   */
   expired: boolean
 }
 
@@ -26,7 +31,7 @@ export interface DecodedToken {
  */
 export function decodeToken(token: string): DecodedToken | null {
   try {
-    const claims = decodeJwt(token) as TokenClaims
+    const claims = decodeJwt(token) as UnverifiedClaims
     const expired =
       typeof claims.exp === "number" && claims.exp * 1000 <= Date.now()
 

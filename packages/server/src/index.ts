@@ -66,7 +66,7 @@ export type {
 export type { DecodedToken } from "./jwt/decode-token.ts"
 export type { JwtAlgorithm } from "./jwt/import-signing-key.ts"
 export type { SignTokenClaims } from "./jwt/sign-token.ts"
-export type { TokenClaims } from "./jwt/verify-token.ts"
+export type { TokenClaims, UnverifiedClaims } from "./jwt/verify-token.ts"
 export type {
   ClientIpOptions,
   ResolvedClientIpOptions

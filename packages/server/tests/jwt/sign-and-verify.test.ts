@@ -227,6 +227,31 @@ describe("verifyToken", () => {
 
     expect(claims?.sub).toBe("user-1")
   })
+
+  it("rejects a correctly signed token that omits exp or iat", async () => {
+    // jose checks an expiry it finds and is silent about one it does not, so a
+    // token minted elsewhere that leaves `exp` out would otherwise verify and
+    // never expire. `TokenClaims` types both as required; this is what makes
+    // that true.
+    const base = () =>
+      new SignJWT({ sub: "user-1" })
+        .setProtectedHeader({ alg: "RS256", kid: "main" })
+        .setIssuer("https://app.example.com/api/auth")
+        .setAudience("authenticated")
+    const noExp = await base().setIssuedAt().sign(signContext.signingKey)
+    const noIat = await base()
+      .setExpirationTime("10m")
+      .sign(signContext.signingKey)
+    const both = await base()
+      .setIssuedAt()
+      .setExpirationTime("10m")
+      .sign(signContext.signingKey)
+
+    await expect(verifyToken(verifyContext, noExp)).resolves.toBeNull()
+    await expect(verifyToken(verifyContext, noIat)).resolves.toBeNull()
+    // And the same token with both present is fine — it is the absence that fails.
+    expect((await verifyToken(verifyContext, both))?.sub).toBe("user-1")
+  })
 })
 
 describe("ES256", () => {
@@ -327,5 +352,21 @@ describe("decodeToken", () => {
   it("returns null for malformed input", () => {
     expect(decodeToken("not-a-jwt")).toBeNull()
     expect(decodeToken("")).toBeNull()
+  })
+
+  it("decodes a token with no exp as present and not expired, rather than lying about it", async () => {
+    // A well-formed JWT may omit `exp`. Decoding is unverified, so the answer is
+    // what the token says — `exp` absent, not expired — not null, and not a
+    // fabricated number. The type says so too: `claims.exp` is optional here.
+    const noExp = await new SignJWT({ sub: "user-1" })
+      .setProtectedHeader({ alg: "RS256", kid: "main" })
+      .setIssuedAt()
+      .sign(signContext.signingKey)
+
+    const decoded = decodeToken(noExp)
+    expect(decoded).not.toBeNull()
+    expect(decoded?.claims.sub).toBe("user-1")
+    expect(decoded?.claims.exp).toBeUndefined()
+    expect(decoded?.expired).toBe(false)
   })
 })
