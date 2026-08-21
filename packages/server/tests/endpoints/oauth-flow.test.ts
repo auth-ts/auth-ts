@@ -3,7 +3,7 @@ import { createTestServer } from "../helpers/create-test-server.ts"
 import { readSetCookies, request } from "../helpers/request.ts"
 import { required } from "../helpers/required.ts"
 import { decodeState, forgeState } from "../helpers/state-cookie.ts"
-import { stubGitHub } from "../helpers/stub-provider-network.ts"
+import { stubGitHub, stubGoogle } from "../helpers/stub-provider-network.ts"
 
 const OAUTH_OPTIONS = {
   baseURL: "https://app.example.com",
@@ -174,6 +174,44 @@ describe("oauth callback", () => {
 
     expect(response.status).toBe(401)
     expect(response.headers.get("content-type")).toContain("text/html")
+  })
+
+  it("reports a provider 5xx as unavailable, not as a refused sign-in", async () => {
+    const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
+
+    for (const status of [
+      { token: 503 },
+      { profile: 502 },
+      { emails: 500 }
+    ] as const) {
+      const { stateCookie, state } = await startSignIn(authServer)
+      stubGitHub({
+        id: 4242,
+        emails: verifiedEmails("ada@example.com"),
+        status
+      })
+
+      const response = await authServer.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          cookies: { "auth-ts.state": stateCookie }
+        })
+      )
+
+      expect(response.status, JSON.stringify(status)).toBe(502)
+      expect(await response.text()).toContain("did not respond")
+    }
+    expect(db.users()).toHaveLength(0)
+
+    // A 4xx on the emails endpoint is the scope not being granted, which is the
+    // "no verified address" refusal — still a 403, not an outage.
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({ id: 4242, status: { emails: 403 } })
+    const refused = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: { "auth-ts.state": stateCookie }
+      })
+    )
+    expect(refused.status).toBe(403)
   })
 
   it("merges a guest into the account a provider identity is already linked to, without moving the link", async () => {
@@ -710,5 +748,130 @@ describe("connect and disconnect", () => {
 
     expect(response.status).toBe(204)
     expect(await context.db.listConnections({ userId: user.id })).toEqual([])
+  })
+})
+
+describe("google", () => {
+  const GOOGLE_OPTIONS = {
+    baseURL: "https://app.example.com",
+    providers: {
+      google: { clientId: "client-id", clientSecret: "client-secret" }
+    }
+  }
+
+  /** Starts the flow and returns what the callback will need. */
+  async function startGoogle(
+    authServer: Awaited<ReturnType<typeof createTestServer>>["authServer"]
+  ) {
+    const response = await authServer.handler(
+      request("GET", "/api/auth/sign-in/google")
+    )
+    const stateCookie = required(
+      readSetCookies(response).get("auth-ts.state"),
+      "state cookie"
+    ).value
+    return { stateCookie, state: decodeState(stateCookie).state }
+  }
+
+  async function callback(
+    authServer: Awaited<ReturnType<typeof createTestServer>>["authServer"],
+    identity: Parameters<typeof stubGoogle>[0]
+  ) {
+    const { stateCookie, state } = await startGoogle(authServer)
+    stubGoogle(identity)
+    return authServer.handler(
+      request("GET", `/api/auth/callback/google?code=abc&state=${state}`, {
+        cookies: { "auth-ts.state": stateCookie }
+      })
+    )
+  }
+
+  it("signs in with a verified ID token and takes only a verified email", async () => {
+    const { authServer, db } = await createTestServer(GOOGLE_OPTIONS)
+
+    const response = await callback(authServer, {
+      sub: "g-1",
+      email: "Ada@Example.com",
+      emailVerified: true,
+      name: "Ada",
+      picture: "https://lh3.example/ada"
+    })
+
+    expect(response.status).toBe(302)
+    expect(readSetCookies(response).has("auth-ts.refresh")).toBe(true)
+    expect(db.users()[0]).toMatchObject({
+      email: "ada@example.com",
+      name: "Ada",
+      imageURL: "https://lh3.example/ada"
+    })
+  })
+
+  it("refuses an ID token that does not verify — wrong key, audience, issuer, expiry, or shape", async () => {
+    const { authServer, db } = await createTestServer(GOOGLE_OPTIONS)
+
+    // Each would have sailed through a decode-only check, and each is a
+    // token Google did not issue to this client for use right now.
+    for (const token of [
+      { wrongKey: true },
+      { audience: "someone-elses-client-id" },
+      { issuer: "https://accounts.evil.example" },
+      { expiresIn: -60 },
+      { malformed: true }
+    ]) {
+      const response = await callback(authServer, {
+        sub: "g-1",
+        email: "ada@example.com",
+        emailVerified: true,
+        token
+      })
+      expect(response.status, JSON.stringify(token)).toBe(401)
+    }
+    expect(db.users()).toHaveLength(0)
+  })
+
+  it("drops an unverified email rather than trusting it", async () => {
+    const { authServer, db } = await createTestServer(GOOGLE_OPTIONS)
+
+    const response = await callback(authServer, {
+      sub: "g-1",
+      email: "victim@example.com",
+      emailVerified: false
+    })
+
+    expect(response.status).toBe(403)
+    expect(db.users()).toHaveLength(0)
+  })
+
+  it("reports an unreachable token endpoint as the provider being down", async () => {
+    const { authServer, db } = await createTestServer(GOOGLE_OPTIONS)
+
+    const response = await callback(authServer, {
+      sub: "g-1",
+      email: "ada@example.com",
+      emailVerified: true,
+      status: { token: 503 }
+    })
+
+    expect(response.status).toBe(502)
+    expect(db.users()).toHaveLength(0)
+  })
+
+  it("reports an unreachable key set as the provider being down", async () => {
+    // jose caches Google's keys at module level, so once any test in this file
+    // has verified a token the endpoint is never consulted again — which is the
+    // point in production. A fresh module instance is the only way to reach the
+    // first-fetch failure path.
+    vi.resetModules()
+    const { google } = await import("../../src/oauth/providers/google.ts")
+    stubGoogle({ sub: "g-1", status: { jwks: 503 } })
+
+    await expect(
+      google.exchangeCode({
+        credentials: { clientId: "client-id", clientSecret: "client-secret" },
+        redirectURI: "https://app.example.com/api/auth/callback/google",
+        code: "abc",
+        signal: AbortSignal.timeout(5_000)
+      })
+    ).rejects.toMatchObject({ code: "providerUnavailable", status: 502 })
   })
 })

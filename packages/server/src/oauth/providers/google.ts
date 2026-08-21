@@ -1,4 +1,4 @@
-import { decodeJwt } from "jose"
+import { createRemoteJWKSet, errors, jwtVerify } from "jose"
 import { AuthApiError } from "../../http/auth-api-error.ts"
 import type {
   AuthorizeURLInput,
@@ -6,6 +6,7 @@ import type {
   OAuthProvider,
   ProviderIdentity
 } from "./oauth-provider.ts"
+import { providerRejected } from "./provider-response.ts"
 
 interface GoogleIdTokenClaims {
   sub?: string
@@ -14,6 +15,23 @@ interface GoogleIdTokenClaims {
   name?: string
   picture?: string
 }
+
+/** Both forms Google has issued as `iss`; the OIDC discovery document lists the first. */
+const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"]
+
+/**
+ * Google's signing keys, fetched on first use and cached by jose.
+ *
+ * Module-level so the cache outlives a request: jose refetches only when a
+ * token arrives with a `kid` it has not seen (with a cooldown), which is how
+ * key rotation is absorbed. The timeout is shorter than the callback's own
+ * deadline, so a stalled JWKS is reported as the provider being unreachable
+ * rather than as the whole request timing out.
+ */
+const googleKeys = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/oauth2/v3/certs"),
+  { timeoutDuration: 5_000 }
+)
 
 /**
  * Google sign-in, via the standard OIDC authorization code flow.
@@ -52,17 +70,28 @@ export const google: OAuthProvider = {
       signal
     })
 
+    if (!tokenResponse.ok) throw providerRejected(tokenResponse)
     const token = (await tokenResponse.json().catch(() => ({}))) as {
       id_token?: string
     }
     if (!token.id_token) throw new AuthApiError("unauthenticated", 401)
 
-    // Decoded rather than verified on purpose: this token came back over TLS
-    // directly from Google's token endpoint in response to our own client secret,
-    // so the channel already establishes provenance. Verifying the signature here
-    // would mean fetching and caching Google's JWKS to re-prove what the transport
-    // just proved. (A token received any other way must always be verified.)
-    const claims = decodeJwt(token.id_token) as GoogleIdTokenClaims
+    // Verified in full — signature against Google's published keys, issuer,
+    // audience, and expiry — even though the token just arrived over TLS from
+    // Google's own endpoint. The transport argues for provenance; the
+    // verification proves it, and also catches the mundane failures the
+    // transport cannot: a token minted for a different client id, or one that
+    // has already expired.
+    let claims: GoogleIdTokenClaims
+    try {
+      const verified = await jwtVerify(token.id_token, googleKeys, {
+        issuer: GOOGLE_ISSUERS,
+        audience: credentials.clientId
+      })
+      claims = verified.payload as GoogleIdTokenClaims
+    } catch (error) {
+      throw classifyVerifyFailure(error)
+    }
     if (!claims.sub) throw new AuthApiError("unauthenticated", 401)
 
     // Same stakes as GitHub: an unverified address is an account takeover waiting
@@ -76,4 +105,22 @@ export const google: OAuthProvider = {
       ...(claims.picture ? { imageURL: claims.picture } : {})
     }
   }
+}
+
+/**
+ * Separates "Google could not be reached" from "this token does not check out".
+ *
+ * A JWKS timeout, a non-200 from the key endpoint, or a network error is the
+ * provider being unavailable. Everything jose says about the token itself — bad
+ * signature, wrong audience, expired, unknown key — is a refusal.
+ */
+function classifyVerifyFailure(error: unknown) {
+  const unreachable =
+    !(error instanceof errors.JOSEError) ||
+    error instanceof errors.JWKSTimeout ||
+    error.code === "ERR_JOSE_GENERIC"
+
+  return unreachable
+    ? new AuthApiError("providerUnavailable", 502)
+    : new AuthApiError("unauthenticated", 401)
 }

@@ -48,6 +48,11 @@ any sign-up fields — cannot be rewritten by anything else able to set cookies 
 your host; an unsigned or edited cookie is treated as missing. The callback
 re-validates the sign-up fields against the declared schema regardless.
 
+**Google's ID token is verified, not decoded.** Signature against Google's
+published keys, issuer, audience (your client id), and expiry — even though it
+arrived over TLS from Google's own token endpoint. A provider outage, including
+an unreachable key set, is reported as such rather than as a refused sign-in.
+
 **Only verified email addresses are accepted.** GitHub returns unverified
 addresses, so the library takes only the entry that is both `primary` and
 `verified`; Google must report `email_verified: true`. Skipping this is a
