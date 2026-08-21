@@ -7,6 +7,7 @@ import {
   DocsPage,
   DocsTitle
 } from "fumadocs-ui/page"
+import { Logo } from "~/components/logo"
 import { source } from "~/lib/source"
 import { getMDXComponents } from "~/mdx-components"
 import browserCollections from "../../.source/browser.ts"
@@ -52,7 +53,17 @@ function DocumentationPage() {
   // The tree is read directly rather than returned from the server function:
   // it carries React nodes for icons, which cannot cross that boundary.
   return (
-    <DocsLayout tree={source.pageTree} nav={{ title: "auth-ts" }}>
+    <DocsLayout
+      tree={source.pageTree}
+      nav={{
+        title: (
+          <>
+            <Logo className="size-5" />
+            Auth.ts
+          </>
+        )
+      }}
+    >
       {clientLoader.useContent(data.path)}
     </DocsLayout>
   )
