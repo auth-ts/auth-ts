@@ -20,13 +20,7 @@ export interface DisconnectInput {
   provider: string
 }
 
-/**
- * Unlinks a provider.
- *
- * @throws {AuthError} `lastSignInMethod` when this is the only way the user can
- * sign in. Show that as an explanation, not a generic failure — it is the server
- * preventing a lockout, and the fix is to add another method first.
- */
+/** Unlinks a provider. */
 export function createDisconnect(internals: AuthClientInternals) {
   return async function disconnect(input: DisconnectInput): Promise<void> {
     await internals.fetchJson({

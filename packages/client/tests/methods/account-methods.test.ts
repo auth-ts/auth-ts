@@ -237,24 +237,6 @@ describe("sessions and accounts", () => {
     expect(seen).toEqual(["grace@example.com"])
     expect(client.getCachedUser()?.email).toBe("grace@example.com")
   })
-
-  it("reports the lockout guard when unlinking the last provider", async () => {
-    server.on("DELETE", "/api/auth/connections/github", {
-      status: 409,
-      body: {
-        error: {
-          code: "lastSignInMethod",
-          message: "This is your only way to sign in."
-        }
-      }
-    })
-
-    await expect(
-      createAuthClient().disconnect({ provider: "github" })
-    ).rejects.toMatchObject({
-      code: "lastSignInMethod"
-    })
-  })
 })
 
 describe("oauth navigation", () => {

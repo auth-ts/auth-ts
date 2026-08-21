@@ -5,7 +5,6 @@ export type {
   AuthRateLimit,
   AuthSession,
   AuthUser,
-  DeleteConnectionWhere,
   DeleteSessionWhere,
   GetUserWhere,
   MagicCodePurpose,

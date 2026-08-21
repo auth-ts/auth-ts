@@ -19,8 +19,6 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   codeSent: "For your security, confirm this with the code we just sent you.",
   staleSession: "Please sign in again to continue.",
   unauthenticated: "You are not signed in.",
-  lastSignInMethod:
-    "This is your only way to sign in, so it cannot be removed.",
   providerConflict: "That account is already connected to a different user.",
   channelNotConfigured: "That sign-in method is not available.",
   invalidField: "Some of the submitted fields are not accepted.",
