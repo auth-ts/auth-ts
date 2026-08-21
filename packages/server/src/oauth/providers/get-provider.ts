@@ -22,9 +22,16 @@ export const RESERVED_PROVIDER_NAMES = ["guest"]
  * Returns nothing for a provider that exists in code but has no credentials, so
  * an unconfigured provider is indistinguishable from one that was never
  * implemented — both are simply not there.
+ *
+ * Own properties only: the name is a URL segment, and plain bracket access would
+ * let `/sign-in/constructor` resolve `Object` from the prototype chain on both
+ * records and answer 500 instead of 404.
  */
 export function getProvider(providers: ProvidersOptions, name: string) {
   if (RESERVED_PROVIDER_NAMES.includes(name)) return undefined
+  if (!Object.hasOwn(PROVIDERS, name) || !Object.hasOwn(providers, name)) {
+    return undefined
+  }
 
   const credentials = (
     providers as Record<string, ProviderCredentials | undefined>

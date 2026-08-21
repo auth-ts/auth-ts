@@ -84,17 +84,27 @@ describe("oauth start", () => {
     }
   })
 
-  it("404s an unconfigured provider and the reserved guest name", async () => {
+  it("404s an unconfigured provider, the reserved guest name, and prototype keys", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
 
-    expect(
-      (await authServer.handler(request("GET", "/api/auth/sign-in/google")))
-        .status
-    ).toBe(404)
-    expect(
-      (await authServer.handler(request("GET", "/api/auth/sign-in/guest")))
-        .status
-    ).toBe(404)
+    for (const name of [
+      "google",
+      "guest",
+      "constructor",
+      "__proto__",
+      "toString"
+    ]) {
+      for (const route of ["sign-in", "callback"]) {
+        expect(
+          (
+            await authServer.handler(
+              request("GET", `/api/auth/${route}/${name}`)
+            )
+          ).status,
+          `${route}/${name}`
+        ).toBe(404)
+      }
+    }
   })
 })
 
