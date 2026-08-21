@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
+import { hmacSha256Hex } from "../../src/lib/hash.ts"
 import { consumeMagicCode } from "../../src/magic-code/consume-magic-code.ts"
 import { resolveCodeIdentifier } from "../../src/magic-code/resolve-code-identifier.ts"
 import { sendMagicCode } from "../../src/magic-code/send-magic-code.ts"
@@ -347,12 +348,13 @@ describe("consumeMagicCode", () => {
         })
       ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     }
+    // The counter is the rate-limit row keyed on the code's hash, not a field
+    // on the code row — that is what makes it atomic.
+    const key = `magicCode:attempts:${await hmacSha256Hex(code, internals.options.secret)}`
+    expect((await db.getRateLimit({ key }))?.count).toBe(4)
     expect(
-      required(
-        await db.getMagicCode({ identifier: "ada@example.com" }),
-        "code row"
-      ).attempts
-    ).toBe(4)
+      await db.getMagicCode({ identifier: "ada@example.com" })
+    ).not.toBeNull()
 
     await expect(
       consumeMagicCode(internals, {
@@ -491,17 +493,66 @@ describe("consumeMagicCode", () => {
 
     const codeB = required(sentCodes.at(-1), "resent code").code
     expect(codeB).not.toBe(codeA)
-    // B is still there and untouched: the burn matched A's hash and found nothing.
-    const fresh = required(
-      await db.getMagicCode({ identifier: "ada@example.com" }),
-      "the resend's row"
-    )
-    expect(fresh.attempts).toBe(0)
+    // B is still there: the burn matched A's hash and found nothing. And the
+    // stale guesses counted against A's key alone — B starts with a full budget,
+    // so a wrong guess against it is its first, not its sixth.
+    const keyFor = async (c: string) =>
+      `magicCode:attempts:${await hmacSha256Hex(c, internals.options.secret)}`
+    expect((await db.getRateLimit({ key: await keyFor(codeA) }))?.count).toBe(5)
+    expect(await db.getRateLimit({ key: await keyFor(codeB) })).toBeNull()
+    await guessWrong()
+    expect(
+      await db.getMagicCode({ identifier: "ada@example.com" })
+    ).not.toBeNull()
     await consumeMagicCode(internals, {
       identifier: "ada@example.com",
       code: codeB,
       purpose: "signIn"
     })
+  })
+
+  it("counts concurrent wrong guesses atomically, so the cap cannot be raced past", async () => {
+    // Fifty wrong guesses in flight at once, every one reading the row before
+    // any has counted. A counter on the code row let them all write back 0 + 1
+    // and the code survived with one attempt against it; through
+    // upsertRateLimit they count as fifty and the code is burned. The read is
+    // made to cross an event-loop turn so the guesses genuinely overlap. Default
+    // options, which is the configuration with no per-IP limit behind the cap.
+    const { internals, db, sentCodes } = await createTestInternals()
+    await sendMagicCode(internals, {
+      identifier: emailIdentifier,
+      purpose: "signIn",
+      locale: "en",
+      headers: new Headers()
+    })
+    const code = required(sentCodes[0], "code").code
+    const wrongCode = code === "000000" ? "111111" : "000000"
+    const realGet = db.getMagicCode.bind(db)
+    vi.spyOn(db, "getMagicCode").mockImplementation(async (where) => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      return realGet(where)
+    })
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 50 }, () =>
+        consumeMagicCode(internals, {
+          identifier: "ada@example.com",
+          code: wrongCode,
+          purpose: "signIn"
+        })
+      )
+    )
+
+    expect(results.every((result) => result.status === "rejected")).toBe(true)
+    expect(await realGet({ identifier: "ada@example.com" })).toBeNull()
+    // And the right code is dead with it.
+    await expect(
+      consumeMagicCode(internals, {
+        identifier: "ada@example.com",
+        code,
+        purpose: "signIn"
+      })
+    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
 
   it("rejects an expired code", async () => {
