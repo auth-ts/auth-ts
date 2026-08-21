@@ -17,9 +17,12 @@ revoked or expires, and hashing does nothing to change that.
 PostgREST verifies. It lives in a JavaScript variable for at most ten minutes and
 is never persisted anywhere.
 
-Every client method except `getToken` is authenticated by the cookie. An
-application that never touches the access token still gets working sign-in,
-profile updates, deletion, and a correct user object.
+Once a session exists, every client method is authenticated by the cookie —
+`getToken` included, since it is the call that exchanges the cookie for a JWT
+rather than one that presents a JWT. The sign-in methods are the exception only
+in the obvious sense: they run before a cookie exists, because they are what
+create it. An application that never touches the access token still gets
+working sign-in, profile updates, deletion, and a correct user object.
 
 ## Why the token is only in memory
 
