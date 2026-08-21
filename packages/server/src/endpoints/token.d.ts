@@ -1,9 +1,9 @@
-import type { HeadersInput } from "../session/resolve-session.ts";
+import type { HeadersInput } from "../session/resolve-session.ts"
 /** What `POST /token` and `authServer.getToken` return. */
 export interface AuthTokenResult {
-    accessToken: string;
-    user: import("../core/auth-db.ts").AuthUser;
-    session: import("../core/auth-db.ts").AuthSession;
+  accessToken: string
+  user: import("../core/auth-db.ts").AuthUser
+  session: import("../core/auth-db.ts").AuthSession
 }
 /**
  * Exchanges the refresh cookie for a fresh access token.
@@ -17,9 +17,12 @@ export interface AuthTokenResult {
  *
  * @throws {AuthApiError} `unauthenticated` when there is no live session.
  */
-export declare const getToken: import("../http/define-endpoint.ts").EndpointDefinition<HeadersInput, {
-    accessToken: string;
-    user: import("../index.ts").AuthUser;
-    session: import("../index.ts").AuthSession;
-}>;
+export declare const getToken: import("../http/define-endpoint.ts").EndpointDefinition<
+  HeadersInput,
+  {
+    accessToken: string
+    user: import("../index.ts").AuthUser
+    session: import("../index.ts").AuthSession
+  }
+>
 //# sourceMappingURL=token.d.ts.map

@@ -256,3 +256,50 @@ describe("subscribe", () => {
     expect(server.requests).toHaveLength(0)
   })
 })
+
+describe("cross-tab sync", () => {
+  it("drops this tab's access token when another tab signs out", async () => {
+    server.on("POST", "/api/auth/token", {
+      body: { accessToken: fakeAccessToken(), user }
+    })
+    const client = createAuthClient()
+
+    await client.getToken()
+    expect(server.requests).toHaveLength(1)
+
+    // Another tab signs out: the storage event carries the user change, but the
+    // token is per-tab memory and must be discarded here too, or this tab would
+    // keep querying the data plane as a signed-out user.
+    globalThis.dispatchEvent(
+      new StorageEvent("storage", { key: "auth-ts.user", newValue: null })
+    )
+
+    server.on("POST", "/api/auth/token", {
+      status: 401,
+      body: {
+        error: { code: "unauthenticated", message: "You are not signed in." }
+      }
+    })
+
+    await expect(client.getToken()).rejects.toMatchObject({
+      code: "unauthenticated"
+    })
+    expect(server.requests).toHaveLength(2)
+  })
+
+  it("ignores storage events for unrelated keys", async () => {
+    server.on("POST", "/api/auth/token", {
+      body: { accessToken: fakeAccessToken(), user }
+    })
+    const client = createAuthClient()
+    client.subscribe(() => {})
+    await client.getToken()
+
+    globalThis.dispatchEvent(
+      new StorageEvent("storage", { key: "some-other-app", newValue: null })
+    )
+
+    await client.getToken()
+    expect(server.requests).toHaveLength(1)
+  })
+})

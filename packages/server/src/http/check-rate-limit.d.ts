@@ -1,5 +1,5 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
-import type { RateLimitWindow } from "../core/auth-server-options.ts";
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import type { RateLimitWindow } from "../core/auth-server-options.ts"
 /**
  * Counts one request against a fixed window, throwing when the window is full.
  *
@@ -10,5 +10,9 @@ import type { RateLimitWindow } from "../core/auth-server-options.ts";
  *
  * @throws {AuthApiError} `rateLimited` with the seconds until the window resets.
  */
-export declare function checkRateLimit(internals: AuthServerInternals, key: string, window: RateLimitWindow): Promise<void>;
+export declare function checkRateLimit(
+  internals: AuthServerInternals,
+  key: string,
+  window: RateLimitWindow
+): Promise<void>
 //# sourceMappingURL=check-rate-limit.d.ts.map

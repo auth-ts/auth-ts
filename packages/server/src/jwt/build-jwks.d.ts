@@ -1,7 +1,7 @@
-import type { JWK } from "jose";
+import type { JWK } from "jose"
 /** The JWKS document served at `<basePath>/jwks.json`. */
 export interface Jwks {
-    keys: JWK[];
+  keys: JWK[]
 }
 /**
  * Builds the JWKS document.
@@ -12,5 +12,8 @@ export interface Jwks {
  * signed by a key you are about to drop, switch signing to the new key, then
  * remove the old one.
  */
-export declare function buildJwks(signingPublicJwk: JWK, additionalPublicJwks?: JWK[]): Jwks;
+export declare function buildJwks(
+  signingPublicJwk: JWK,
+  additionalPublicJwks?: JWK[]
+): Jwks
 //# sourceMappingURL=build-jwks.d.ts.map

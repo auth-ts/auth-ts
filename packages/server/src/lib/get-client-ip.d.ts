@@ -10,5 +10,5 @@
  * service on sign-in. One extractor is used everywhere an IP is read, so this is
  * the single place that behaviour is defined.
  */
-export declare function getClientIp(headers: Headers): string | undefined;
+export declare function getClientIp(headers: Headers): string | undefined
 //# sourceMappingURL=get-client-ip.d.ts.map

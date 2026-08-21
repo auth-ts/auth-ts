@@ -1,9 +1,9 @@
-import type { TokenClaims } from "./verify-token.ts";
+import type { TokenClaims } from "./verify-token.ts"
 /** The result of an unverified decode. */
 export interface DecodedToken {
-    claims: TokenClaims;
-    /** Whether `exp` has passed. Says nothing about whether the token is genuine. */
-    expired: boolean;
+  claims: TokenClaims
+  /** Whether `exp` has passed. Says nothing about whether the token is genuine. */
+  expired: boolean
 }
 /**
  * Decodes a token **without verifying its signature**.
@@ -21,5 +21,5 @@ export interface DecodedToken {
  * @returns The claims and whether they have expired, or `null` if the input is
  * not a well-formed JWT.
  */
-export declare function decodeToken(token: string): DecodedToken | null;
+export declare function decodeToken(token: string): DecodedToken | null
 //# sourceMappingURL=decode-token.d.ts.map

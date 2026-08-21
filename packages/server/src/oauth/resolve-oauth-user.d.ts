@@ -1,6 +1,6 @@
-import type { AuthUser } from "../core/auth-db.ts";
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
-import type { ProviderIdentity } from "./providers/oauth-provider.ts";
+import type { AuthUser } from "../core/auth-db.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import type { ProviderIdentity } from "./providers/oauth-provider.ts"
 /**
  * Finds or creates the user behind a verified provider identity.
  *
@@ -19,5 +19,10 @@ import type { ProviderIdentity } from "./providers/oauth-provider.ts";
  * @throws {AuthApiError} `unauthenticated` when the provider gave no verified email
  * and there is no existing connection to fall back on.
  */
-export declare function resolveOAuthUser(internals: AuthServerInternals, provider: string, identity: ProviderIdentity, additionalFields?: Record<string, string | number | boolean>): Promise<AuthUser>;
+export declare function resolveOAuthUser(
+  internals: AuthServerInternals,
+  provider: string,
+  identity: ProviderIdentity,
+  additionalFields?: Record<string, string | number | boolean>
+): Promise<AuthUser>
 //# sourceMappingURL=resolve-oauth-user.d.ts.map

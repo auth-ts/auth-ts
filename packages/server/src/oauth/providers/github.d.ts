@@ -1,4 +1,4 @@
-import type { OAuthProvider } from "./oauth-provider.ts";
+import type { OAuthProvider } from "./oauth-provider.ts"
 /**
  * GitHub sign-in.
  *
@@ -6,5 +6,5 @@ import type { OAuthProvider } from "./oauth-provider.ts";
  * a usable email — `/user/emails` is a second call, and the only one that reports
  * verification status.
  */
-export declare const github: OAuthProvider;
+export declare const github: OAuthProvider
 //# sourceMappingURL=github.d.ts.map

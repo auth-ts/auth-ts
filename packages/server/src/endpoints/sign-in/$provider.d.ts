@@ -1,12 +1,12 @@
 /** Input for starting an OAuth sign-in. */
 export interface SignInProviderInput {
-    provider: string;
-    /** Same-origin path to return to; anything else falls back to `/`. */
-    redirect?: string;
-    locale?: string;
-    additionalFields?: Record<string, unknown>;
-    headers?: Headers;
-    requestURL?: string;
+  provider: string
+  /** Same-origin path to return to; anything else falls back to `/`. */
+  redirect?: string
+  locale?: string
+  additionalFields?: Record<string, unknown>
+  headers?: Headers
+  requestURL?: string
 }
 /**
  * Starts an OAuth sign-in.
@@ -20,5 +20,8 @@ export interface SignInProviderInput {
  * recorded in the state cookie. Anything else would mean a stray sign-in silently
  * attaching a provider to whoever happened to be logged in.
  */
-export declare const signInProvider: import("../../http/define-endpoint.ts").EndpointDefinition<SignInProviderInput, undefined>;
+export declare const signInProvider: import("../../http/define-endpoint.ts").EndpointDefinition<
+  SignInProviderInput,
+  undefined
+>
 //# sourceMappingURL=$provider.d.ts.map

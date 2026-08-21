@@ -3,6 +3,9 @@ import type { AuthUser } from "@auth-ts/server"
 /** Called with the current user whenever it changes. */
 export type UserListener = (user: AuthUser | null) => void
 
+/** Reacts to a change another tab made, before subscribers are notified. */
+export type ExternalChangeListener = (user: AuthUser | null) => void
+
 /** Holds the current user and notifies subscribers when it changes. */
 export interface UserStore {
   get(): AuthUser | null
@@ -51,7 +54,9 @@ function writeStorage(user: AuthUser | null) {
  * importing the module is free and safe during server-side rendering. Everything
  * is wired lazily on first use.
  */
-export function createUserStore(): UserStore {
+export function createUserStore(
+  onExternalChange?: ExternalChangeListener
+): UserStore {
   let user: AuthUser | null = null
   let restored = false
   const listeners = new Set<UserListener>()
@@ -73,11 +78,18 @@ export function createUserStore(): UserStore {
       const storageEvent = event as StorageEvent
       if (storageEvent.key !== STORAGE_KEY) return
 
-      // Update memory and notify only. Fetching here would mean every open tab
-      // stampeding the refresh endpoint the moment one of them signs in.
+      // Update memory and notify only — never fetch. Every open tab hitting the
+      // refresh endpoint the moment one of them signs in is a stampede against
+      // your own server.
       user = storageEvent.newValue
         ? (JSON.parse(storageEvent.newValue) as AuthUser)
         : null
+
+      // The access token is per-tab memory, so the storage event does not cover
+      // it. Without this, a tab informed of a sign-out elsewhere would render as
+      // signed out while its cached token kept working against the data plane
+      // until it expired.
+      onExternalChange?.(user)
       notify()
     })
   }
@@ -86,6 +98,10 @@ export function createUserStore(): UserStore {
     get: () => user,
 
     set(nextUser) {
+      // Attached on first write, not only on subscribe: a tab that just calls
+      // getToken still needs to hear about a sign-out in another tab, and it may
+      // never subscribe to anything.
+      attachStorageListener()
       user = nextUser
       restored = true
       writeStorage(nextUser)

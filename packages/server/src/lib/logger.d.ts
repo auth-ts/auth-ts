@@ -1,5 +1,5 @@
 /** Log levels in increasing verbosity. `"silent"` disables logging entirely. */
-export type LogLevel = "silent" | "error" | "warn" | "info" | "debug";
+export type LogLevel = "silent" | "error" | "warn" | "info" | "debug"
 /**
  * A log sink.
  *
@@ -8,13 +8,17 @@ export type LogLevel = "silent" | "error" | "warn" | "info" | "debug";
  * away from every log aggregator. Correlation data (path, request id) is passed
  * explicitly in `data` instead.
  */
-export type Logger = (level: Exclude<LogLevel, "silent">, message: string, data?: Record<string, unknown>) => void;
+export type Logger = (
+  level: Exclude<LogLevel, "silent">,
+  message: string,
+  data?: Record<string, unknown>
+) => void
 /** The logging surface handed to internals — one method per level, already filtered. */
 export interface LeveledLogger {
-    error(message: string, data?: Record<string, unknown>): void;
-    warn(message: string, data?: Record<string, unknown>): void;
-    info(message: string, data?: Record<string, unknown>): void;
-    debug(message: string, data?: Record<string, unknown>): void;
+  error(message: string, data?: Record<string, unknown>): void
+  warn(message: string, data?: Record<string, unknown>): void
+  info(message: string, data?: Record<string, unknown>): void
+  debug(message: string, data?: Record<string, unknown>): void
 }
 /**
  * Builds the level-filtered logger used throughout the library.
@@ -28,10 +32,13 @@ export interface LeveledLogger {
  * @param logLevel - Highest level to emit. Defaults to `"warn"`.
  * @param logger - Sink override, e.g. pino. Defaults to `console`.
  */
-export declare function createLogger(logLevel?: LogLevel, logger?: Logger): {
-    error: (message: string, data?: Record<string, unknown>) => void;
-    warn: (message: string, data?: Record<string, unknown>) => void;
-    info: (message: string, data?: Record<string, unknown>) => void;
-    debug: (message: string, data?: Record<string, unknown>) => void;
-};
+export declare function createLogger(
+  logLevel?: LogLevel,
+  logger?: Logger
+): {
+  error: (message: string, data?: Record<string, unknown>) => void
+  warn: (message: string, data?: Record<string, unknown>) => void
+  info: (message: string, data?: Record<string, unknown>) => void
+  debug: (message: string, data?: Record<string, unknown>) => void
+}
 //# sourceMappingURL=logger.d.ts.map

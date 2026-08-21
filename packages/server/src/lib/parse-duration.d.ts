@@ -6,7 +6,7 @@
  * and the common abbreviations). Months are deliberately unsupported because
  * their length is ambiguous; a year is 365.25 days.
  */
-export type Duration = string;
+export type Duration = string
 /**
  * Parses a {@link Duration} into milliseconds.
  *
@@ -19,7 +19,7 @@ export type Duration = string;
  * @returns The span in milliseconds.
  * @throws {TypeError} If the value is not a recognised duration.
  */
-export declare function parseDuration(duration: Duration): number;
+export declare function parseDuration(duration: Duration): number
 /** Parses a {@link Duration} into whole seconds, rounding down. */
-export declare function parseDurationSeconds(duration: Duration): number;
+export declare function parseDurationSeconds(duration: Duration): number
 //# sourceMappingURL=parse-duration.d.ts.map

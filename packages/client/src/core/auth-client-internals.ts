@@ -35,10 +35,16 @@ export function createAuthClientInternals(
 ): AuthClientInternals {
   const resolved = resolveAuthClientOptions(options)
 
+  const tokenStore = createTokenStore()
+
   const internals: AuthClientInternals = {
     options: resolved,
-    tokenStore: createTokenStore(),
-    userStore: createUserStore(),
+    tokenStore,
+    // When another tab signs out, this tab's in-memory token has to go with it,
+    // or the interface would say signed out while the token still worked.
+    userStore: createUserStore((user) => {
+      if (!user) tokenStore.clear()
+    }),
     fetchJson: undefined as unknown as FetchJson,
     log: createLogger(resolved.logLevel, resolved.logger),
     locale: resolved.locale

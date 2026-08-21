@@ -1,6 +1,6 @@
-import type { MagicCodePurpose } from "../core/auth-db.ts";
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
-import type { CodeIdentifier } from "./resolve-code-identifier.ts";
+import type { MagicCodePurpose } from "../core/auth-db.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import type { CodeIdentifier } from "./resolve-code-identifier.ts"
 /**
  * How long a magic code is valid.
  *
@@ -8,13 +8,13 @@ import type { CodeIdentifier } from "./resolve-code-identifier.ts";
  * short enough that the five-attempt cap and this window together make guessing a
  * six-digit code hopeless. A knob here would only ever be turned the wrong way.
  */
-export declare const MAGIC_CODE_TTL = "10m";
+export declare const MAGIC_CODE_TTL = "10m"
 /** What sending a code needs to know. */
 export interface SendMagicCodeInput {
-    identifier: CodeIdentifier;
-    purpose: MagicCodePurpose;
-    locale: string;
-    headers: Headers;
+  identifier: CodeIdentifier
+  purpose: MagicCodePurpose
+  locale: string
+  headers: Headers
 }
 /**
  * Generates, stores, and delivers a magic code.
@@ -28,5 +28,8 @@ export interface SendMagicCodeInput {
  *
  * @throws {AuthApiError} `cooldown` or `rateLimited` when throttled.
  */
-export declare function sendMagicCode(internals: AuthServerInternals, input: SendMagicCodeInput): Promise<void>;
+export declare function sendMagicCode(
+  internals: AuthServerInternals,
+  input: SendMagicCodeInput
+): Promise<void>
 //# sourceMappingURL=send-magic-code.d.ts.map
