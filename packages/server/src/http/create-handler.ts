@@ -1,0 +1,144 @@
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import { applyCorsHeaders, preflightResponse } from "./apply-cors.ts"
+import { isAuthApiError } from "./auth-api-error.ts"
+import type { AnyEndpoint, EndpointDefinition } from "./define-endpoint.ts"
+import { errorResponse } from "./error-response.ts"
+import { getErrorMessage } from "./get-error-message.ts"
+import { matchEndpointParams } from "./match-route.ts"
+import { resolveLocale } from "./resolve-locale.ts"
+
+/** A mounted endpoint: what the consumer's framework calls. */
+export type AuthHandler = (request: Request) => Promise<Response>
+
+/**
+ * Turns an endpoint declaration into an HTTP handler.
+ *
+ * The one piece of middleware in the package, and the only place HTTP meets the
+ * logic. Before: answer a CORS preflight. After: attach CORS headers, serialize a
+ * thrown {@link AuthApiError} into the standard envelope in the request's locale,
+ * and sweep expired rows fire-and-forget.
+ *
+ * There is no chain and no plugin system. Everything it does is unconditional or
+ * driven by configuration, so reading this function tells you everything that
+ * happens around every endpoint.
+ */
+export function createHandler<Input, Data>(
+  internals: AuthServerInternals,
+  endpoint: EndpointDefinition<Input, Data>
+): AuthHandler {
+  return async (request) => {
+    const { options } = internals
+
+    if (request.method === "OPTIONS") {
+      const preflight = preflightResponse(options.cors)
+      if (preflight) return preflight
+    }
+
+    const locale = resolveLocale(
+      request.headers.get("accept-language"),
+      options.localization
+    )
+
+    try {
+      const input = endpoint.parse
+        ? await endpoint.parse(request, internals)
+        : (undefined as Input)
+      const result = await endpoint.run(internals, input)
+
+      const headers = applyCorsHeaders(
+        new Headers(result.headers),
+        options.cors
+      )
+      const status = result.status ?? 200
+
+      if (status === 204 || result.data === undefined) {
+        return new Response(null, { status, headers })
+      }
+
+      headers.set("content-type", "application/json")
+      return new Response(JSON.stringify(result.data), { status, headers })
+    } catch (error) {
+      return toErrorResponse(internals, error, locale)
+    } finally {
+      sweepExpired(internals)
+    }
+  }
+}
+
+/** Serializes a failure into the standard envelope. */
+function toErrorResponse(
+  internals: AuthServerInternals,
+  error: unknown,
+  locale: string
+) {
+  const { options } = internals
+  const headers = applyCorsHeaders(new Headers(), options.cors)
+
+  if (isAuthApiError(error)) {
+    const message = getErrorMessage(error.code, locale, options.localization, {
+      ...(error.retryAfter === undefined
+        ? {}
+        : { retryAfter: error.retryAfter })
+    })
+
+    return errorResponse(error.code, error.status, message, {
+      headers,
+      ...(error.retryAfter === undefined
+        ? {}
+        : { retryAfter: error.retryAfter })
+    })
+  }
+
+  // An unexpected throw is a bug in the consumer's callbacks or in this library.
+  // It is logged with its message but answered with a generic body, because an
+  // internal error message is exactly the kind of thing that leaks a query or a
+  // connection string to whoever is poking at the endpoint.
+  internals.log.error("unhandled error in auth endpoint", {
+    error: String(error)
+  })
+
+  return new Response(
+    JSON.stringify({
+      error: { code: "notFound", message: "Something went wrong." }
+    }),
+    {
+      status: 500,
+      headers: (headers.set("content-type", "application/json"), headers)
+    }
+  )
+}
+
+/**
+ * Deletes expired rows without making the caller wait.
+ *
+ * Sweeping after every mutating request sounds wasteful and is the opposite:
+ * frequent sweeps each delete almost nothing, and an indexed delete-where-expired
+ * on a nearly clean table costs microseconds — far less than the bookkeeping
+ * needed to run it less often. Failures go to the log rather than vanishing into
+ * an empty catch, and never affect the response.
+ */
+function sweepExpired(internals: AuthServerInternals) {
+  if (!internals.options.cleanup) return
+
+  void Promise.resolve(
+    internals.db.deleteExpired({ before: new Date() })
+  ).catch((error: unknown) => {
+    internals.log.error("deleteExpired failed", { error: String(error) })
+  })
+}
+
+/** Mounts every endpoint in a registry, keyed by name. */
+export function createHandlers<Registry extends Record<string, AnyEndpoint>>(
+  internals: AuthServerInternals,
+  registry: Registry
+) {
+  const handlers = {} as Record<keyof Registry, AuthHandler>
+
+  for (const [name, endpoint] of Object.entries(registry) as Array<
+    [keyof Registry, AnyEndpoint]
+  >) {
+    handlers[name] = createHandler(internals, endpoint)
+  }
+
+  return handlers
+}
