@@ -8,6 +8,10 @@ export interface ClientIpOptions {
    * Cloudflare, `true-client-ip` on Akamai — since those cannot be spoofed
    * past the edge.
    *
+   * An entry may carry a port — `203.0.113.7:54321`, `[2001:db8::1]:443` — as
+   * Azure's front door and IIS ARR write it. The port is dropped, and the bare
+   * address is what is validated, keyed, and stored.
+   *
    * @default "x-forwarded-for"
    */
   header?: string
@@ -104,6 +108,27 @@ export function isIpAddress(value: string): boolean {
 }
 
 /**
+ * Strips the wrapper a proxy may put around an entry — `[2001:db8::1]:443`,
+ * `[2001:db8::1]`, `203.0.113.7:54321` — leaving the bare address.
+ *
+ * Azure's front door and IIS ARR write `address:port` into `X-Forwarded-For`,
+ * and brackets are the only unambiguous way to carry IPv6 there at all. The
+ * entry being unwrapped is the one at the trusted position — written by your
+ * proxy, not the client — and what comes out is still validated before it
+ * becomes a rate-limit key or a stored column, so tolerating the wrapper gives
+ * nothing away. Without it the address is rejected and IP-keyed limiting
+ * silently stops applying on those platforms, which is the worse failure. An
+ * unbracketed IPv6 is left whole: its last group is a group, not a port.
+ */
+function stripPort(entry: string): string {
+  const bracketed = /^\[([^\]]+)\](?::\d{1,5})?$/.exec(entry)
+  if (bracketed?.[1]) return bracketed[1]
+
+  const withPort = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(entry)
+  return withPort?.[1] ?? entry
+}
+
+/**
  * Derives the client IP from proxy headers, or `undefined` when none can be trusted.
  *
  * The address is taken from a fixed position in the forwarded chain — counted
@@ -136,8 +161,10 @@ export function getClientIp(
   // stripped a header or the count is wrong — so fail closed rather than trust
   // whatever is leftmost.
   const candidate = chain[chain.length - options.trustedProxies]
+  if (!candidate) return undefined
 
-  return candidate && isIpAddress(candidate) ? candidate : undefined
+  const address = stripPort(candidate)
+  return isIpAddress(address) ? address : undefined
 }
 
 /** Resolves {@link ClientIpOptions}, turning the `true` shorthand into 1. */
