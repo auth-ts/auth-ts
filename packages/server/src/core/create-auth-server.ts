@@ -88,6 +88,17 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     [string, AnyEndpoint]
   >) {
     callables[name] = async (input: unknown) => {
+      // Called in-process rather than over HTTP, so this is where the "server-side
+      // rendering never sees the cookie" trap is explained instead of silently
+      // resolving to null.
+      if (COOKIE_PLANE_CALLABLES.has(name)) {
+        assertCookieReachable(
+          resolved,
+          (input as HeadersInput | undefined)?.headers,
+          internals
+        )
+      }
+
       const result = await endpoint.run(internals, input as never)
       return result.data
     }
@@ -150,6 +161,15 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
   }
 }
 
+/**
+ * Callables that read the refresh cookie and are meant for server-side use.
+ *
+ * Only these get the configuration guard: over HTTP a missing cookie is just an
+ * unauthenticated request, but in a loader it almost always means `cookie.path`
+ * is still scoped to the auth mount.
+ */
+const COOKIE_PLANE_CALLABLES = new Set(["getToken"])
+
 /** Turns a routing failure into an endpoint, so it flows through the usual middleware. */
 function notFoundEndpoint(error: AuthApiError): AnyEndpoint {
   return {
@@ -171,12 +191,12 @@ function notFoundEndpoint(error: AuthApiError): AnyEndpoint {
  */
 function assertCookieReachable(
   resolved: import("./auth-server-options.ts").ResolvedAuthServerOptions,
-  headers: Headers,
+  headers: Headers | undefined,
   internals: import("./auth-server-internals.ts").AuthServerInternals
 ) {
   if (resolved.cookie.path === "/") return
-  if (readRefreshToken(internals, headers)) return
-  if (!headers.get("cookie")) {
+  if (headers && readRefreshToken(internals, headers)) return
+  if (!headers?.get("cookie")) {
     throw new AuthConfigError(
       `No auth cookie on this request, and cookie.path is "${resolved.cookie.path}" rather than "/". ` +
         'Server-side rendering only receives the refresh cookie when cookie.path is "/".'

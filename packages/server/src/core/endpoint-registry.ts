@@ -1,4 +1,6 @@
 import { getDiscovery } from "../endpoints/.well-known/openid-configuration.ts"
+import { switchAccount } from "../endpoints/accounts/switch.ts"
+import { listAccounts } from "../endpoints/accounts.ts"
 import { callbackProvider } from "../endpoints/callback/$provider.ts"
 import { connectProvider } from "../endpoints/connect/$provider.ts"
 import { disconnectProvider } from "../endpoints/connections/$provider.ts"
@@ -35,6 +37,8 @@ export const endpointRegistry = {
   deleteUser,
   listSessions,
   revokeSession,
+  listAccounts,
+  switchAccount,
   signInGuest,
   signInProvider,
   callbackProvider,
