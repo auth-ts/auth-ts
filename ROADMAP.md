@@ -3,11 +3,88 @@
 What is deliberately not in v1, what is built but unproven, and what is someone
 else's job. Nothing here is a bug; the bugs go in issues.
 
-Three lists, because they need different decisions from you:
+Four lists, because they need different decisions from you:
 
-1. **[Before v0.1.0 is real](#before-v010-is-real)** — this build stopped short of it.
-2. **[Deferred features](#deferred-features)** — wanted, scoped, not yet.
-3. **[Not building](#not-building)** — declined on purpose, with the reason.
+1. **[Your checklist](#your-checklist)** — everything that needs a human, in order.
+2. **[Before v0.1.0 is real](#before-v010-is-real)** — the detail behind the checklist.
+3. **[Deferred features](#deferred-features)** — wanted, scoped, not yet.
+4. **[Not building](#not-building)** — declined on purpose, with the reason.
+
+---
+
+## Your checklist
+
+Everything that needs you rather than more code. Roughly in the order it wants
+doing; nothing here is blocked on anything in the later sections.
+
+### Before merging
+
+- [ ] **Review the amendments table** at the end of the plan file. Fifteen places
+      this deviates from the original brief, each with its reasoning. Several were
+      your calls made mid-build, so they are worth confirming rather than
+      discovering later.
+- [ ] **Open the pull request:**
+      https://github.com/auth-ts/auth-ts/pull/new/feat/initial-build
+
+### Prove OAuth against a live provider
+
+The one part of the build with no real-world evidence behind it.
+
+- [ ] Register a **GitHub OAuth app**; callback
+      `<AUTH_BASE_URL>/api/auth/callback/github`.
+- [ ] Register a **Google OAuth client**; callback
+      `<AUTH_BASE_URL>/api/auth/callback/google`.
+- [ ] Put the four credentials in the demo's `.env`.
+- [ ] Run each provider through: sign in, connect from the account page,
+      disconnect, and sign in again to confirm the stable-id match holds.
+
+### The JWKS gist, if you keep using one
+
+- [ ] **Use the unpinned raw URL.** The one you shared is pinned to a commit SHA,
+      so editing the gist will not change what Neon fetches:
+      `https://gist.githubusercontent.com/daveycodez/93e780d7a7745317f3a65e7ceca93111/raw/auth-ts-jwks.json`
+- [ ] Re-run `bun run jwks` and update the gist whenever the signing key changes —
+      it is a snapshot, not a mirror.
+- [ ] **In production, skip the gist entirely** and point Neon at
+      `<baseURL>/api/auth/jwks.json`, so key rotation needs no second step.
+- [ ] Treat the current key as a **development key**. Generate a separate one for
+      any deployed environment.
+
+### Neon, for a deployed environment
+
+- [ ] **Lock the Data API's allowed origins** to your own domain. Empty means
+      anyone on the internet can query it with a stolen token.
+- [ ] Confirm the auth tables are still unreachable after any schema change:
+      `set local role authenticated; select count(*) from users;` must return 0.
+- [ ] Set `AUTH_BASE_URL` to the deployed origin — it is `http://localhost:5173`
+      today, and OAuth redirect URIs are built from it.
+
+### Publish the packages
+
+- [ ] Confirm the **`@auth-ts` npm scope** and the **`auth-ts` GitHub
+      organisation** are yours.
+- [ ] Add `NPM_TOKEN` to the repository secrets.
+- [ ] Tag `v0.1.0`. The release workflow publishes both packages with provenance.
+
+### Deploy the docs
+
+- [ ] Create the **Cloudflare Pages** project. Build `bun run build`, output
+      `dist/client`, root `apps/docs`.
+- [ ] Point `authts.dev` at it. The `authts.com → authts.dev` redirect ships in
+      `public/_redirects`.
+
+### If you deploy the demo publicly
+
+- [ ] **Swap the console email transport for a real provider.** It currently logs
+      codes to the server console, which is fine locally and a security hole in
+      public — anyone who can read your logs can sign in as anyone. The sender is
+      one function in `src/auth-server.ts`; a Resend call is about four lines.
+
+### Nx Cloud
+
+- [ ] Its setup rewrote `nx.json` in a formatting style Biome rejects and dropped
+      the trailing newline. Reformatted here — worth knowing it will happen again
+      the next time that tool writes to the file.
 
 ---
 
@@ -47,7 +124,9 @@ Cloudflare Pages project exists. Build command `bun run build`, output directory
 ### Things the reference application proves that a fresh deployment does not
 
 The demo runs against a real Neon database with row-level security enforcing row
-ownership. A new deployment still has to do the two things that are easy to skip:
+ownership — two users, each seeing only their own rows, with `userId` derived
+from the verified token rather than sent by the client. A new deployment still
+has to do the things that are easy to skip:
 
 - **Confirm which header your platform sets for the client IP.** If neither
   `X-Forwarded-For` nor `X-Real-IP` arrives, every visitor shares one rate-limit
@@ -56,6 +135,10 @@ ownership. A new deployment still has to do the two things that are easy to skip
   role full access to everything in `public` when the Data API is enabled, so the
   auth tables have to be explicitly protected. The demo enables row-level
   security with no policy on them, which denies every role except the owner.
+- **Lock the Data API's allowed origins.** Empty means the whole internet can
+  query it with a stolen token.
+- **Replace the console email transport.** It prints codes to the server console,
+  which is a sign-in-as-anyone hole the moment those logs are readable.
 
 ---
 
