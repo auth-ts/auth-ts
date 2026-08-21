@@ -70,8 +70,13 @@ The one part of the build with no real-world evidence behind it.
 
 - [ ] Create the **Cloudflare Pages** project. Build `bun run build`, output
       `dist/client`, root `apps/docs`.
-- [ ] Point `authts.dev` at it. The `authts.com → authts.dev` redirect ships in
-      `public/_redirects`.
+- [ ] Point `authts.dev` at it.
+- [ ] **Configure the `authts.com → authts.dev` redirect in Cloudflare itself**,
+      as a Redirect Rule (Rules → Redirect Rules) on the `authts.com` zone,
+      preserving the path — source `authts.com/*`, target
+      `https://authts.dev/${1}`, 301. It cannot live in `_redirects`: Pages
+      lists domain-level redirects as unsupported there, so a rule written that
+      way is silently ignored rather than rejected.
 
 ### If you deploy the demo publicly
 
@@ -117,9 +122,12 @@ exist and are yours before tagging.
 
 ### Deploying the docs
 
-`wrangler.jsonc` and the `authts.com → authts.dev` redirect are written; no
-Cloudflare Pages project exists. Build command `bun run build`, output directory
-`dist/client`.
+`wrangler.jsonc` is written; no Cloudflare Pages project exists. Build command
+`bun run build`, output directory `dist/client`.
+
+The `authts.com → authts.dev` redirect is **not** configured anywhere. It has to
+be a Cloudflare Redirect Rule on the `authts.com` zone — Pages `_redirects` does
+not support domain-level rules, and writes one there are ignored without error.
 
 ### Things the reference application proves that a fresh deployment does not
 
