@@ -22,9 +22,25 @@ function sourceFiles(directory: string): string[] {
   })
 }
 
-/** Declarations that must carry a doc comment: an exported value or type. */
+/**
+ * Declarations that must carry a doc comment: an exported value or type.
+ *
+ * The alternation is deliberately wide. This gate is only as strong as the
+ * syntax it recognises, so any form it misses is an export that ships
+ * undocumented because of how it was written rather than because someone
+ * decided it needed no comment. Modifiers are matched as an optional chain
+ * rather than spelled out per keyword, so `declare`, `abstract`, generators
+ * and their combinations cannot slip through either.
+ *
+ * The name is required, which is what keeps re-export lines — `export {` and
+ * `export type {` — out of the check. An anonymous `export default` has no
+ * name to require, so it is matched separately below.
+ */
 const EXPORTED_DECLARATION =
-  /^export (?:async function|function|const|class|interface|type|abstract class) ([A-Za-z0-9_]+)/
+  /^export (?:declare )?(?:default )?(?:abstract )?(?:async )?(?:function\*?|const|let|var|enum|class|interface|type) ([A-Za-z0-9_$]+)/
+
+/** Any remaining default export, which may be anonymous and so unnamed. */
+const DEFAULT_EXPORT = /^export default(?: |$)/
 
 /**
  * Finds exported declarations with no doc comment immediately above them.
@@ -40,10 +56,11 @@ function undocumentedExports(filePath: string) {
 
   for (const [index, line] of lines.entries()) {
     const matched = EXPORTED_DECLARATION.exec(line)
-    if (!matched) continue
+    const name = matched?.[1] ?? (DEFAULT_EXPORT.test(line) ? "default" : null)
+    if (name === null) continue
 
     const previous = lines[index - 1]?.trim() ?? ""
-    if (!previous.endsWith("*/")) undocumented.push(`${matched[1]}`)
+    if (!previous.endsWith("*/")) undocumented.push(name)
   }
 
   return undocumented
