@@ -40,6 +40,12 @@ These are not enforced by types, so they are worth reading once:
   the database lets only one of them delete it. That single conditional delete
   is the whole one-time guarantee — it is exactly what Better Auth's
   `consumeOne`, Auth.js's `useVerificationToken`, and InstantDB's `consume!` do.
+- **`upsertRateLimit` is an atomic increment, and the store owns the count.**
+  Insert with `count = 1` if the key is absent or its window has passed;
+  otherwise add one and keep the existing `resetAt` — in one statement
+  (`ON CONFLICT … DO UPDATE SET count = CASE …`). Core never reads the counter
+  first: a read-then-write lets ten parallel requests each see the same value
+  and register as one, which is exactly the burst a limiter exists to stop.
 - **`deleteSession({ id, userId })` must filter on both columns**, so that
   revoking another user's session id matches nothing.
 - **`deleteExpired` takes no arguments.** Expired means expired now, and your

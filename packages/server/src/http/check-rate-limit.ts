@@ -11,6 +11,12 @@ import { AuthApiError } from "./auth-api-error.ts"
  * at the window boundary buys nothing against the threats here — email flooding
  * and code guessing, both of which are about volume over minutes.
  *
+ * The count is never read here. A read-then-write would let a burst of parallel
+ * requests all see the same value and each write back `count + 1`, so ten
+ * requests register as one — which is precisely the attack a limiter exists to
+ * stop. Instead the store does the increment atomically in `upsertRateLimit`
+ * and hands back the result; this function only compares it to the cap.
+ *
  * @throws {AuthApiError} `rateLimited` with the seconds until the window resets.
  */
 export async function checkRateLimit(
@@ -21,30 +27,21 @@ export async function checkRateLimit(
   if (internals.options.rateLimit === false) return
 
   const now = Date.now()
-  const existing = await internals.db.getRateLimit({ key })
+  const counted = await internals.db.upsertRateLimit({
+    key,
+    resetAt: new Date(now + parseDuration(window.window))
+  })
 
-  if (!existing || existing.resetAt.getTime() <= now) {
-    await internals.db.upsertRateLimit({
-      key,
-      count: 1,
-      resetAt: new Date(now + parseDuration(window.window))
-    })
-    return
-  }
-
-  if (existing.count >= window.max) {
+  // The returned count includes this request, so the cap is exceeded at
+  // max + 1 — and requests refused here are still counted, which is what a
+  // single atomic increment naturally gives.
+  if (counted.count > window.max) {
     const retryAfter = Math.max(
       1,
-      Math.ceil((existing.resetAt.getTime() - now) / 1000)
+      Math.ceil((counted.resetAt.getTime() - now) / 1000)
     )
     internals.log.warn("rate limit exceeded", { key: key.split(":")[0] })
 
     throw new AuthApiError("rateLimited", 429, { retryAfter })
   }
-
-  await internals.db.upsertRateLimit({
-    key,
-    count: existing.count + 1,
-    resetAt: existing.resetAt
-  })
 }
