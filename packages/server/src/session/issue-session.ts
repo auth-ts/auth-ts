@@ -173,23 +173,36 @@ export async function mintAccessToken(
  * `createdAt` is passed through unchanged: it records when identity was proven,
  * which is what account deletion checks. Sliding it would let a browser left open
  * for a month look freshly authenticated.
+ *
+ * @returns The expiry now in effect — the one just persisted, or the existing
+ * one when sliding is off — so a caller reports what the row actually says
+ * rather than what it said before this ran.
  */
 export async function slideSession(
   internals: AuthServerInternals,
-  session: { id: string; userId: string; tokenHash: string; createdAt: Date },
+  session: {
+    id: string
+    userId: string
+    tokenHash: string
+    createdAt: Date
+    expiresAt: Date
+  },
   headers: Headers
-) {
-  if (!internals.options.session.sliding) return
+): Promise<Date> {
+  if (!internals.options.session.sliding) return session.expiresAt
   internals.log.debug("sliding session expiry")
 
+  const expiresAt = new Date(
+    Date.now() + parseDuration(internals.options.session.ttl)
+  )
   await internals.db.upsertSession({
     id: session.id,
     userId: session.userId,
     tokenHash: session.tokenHash,
     createdAt: session.createdAt,
-    expiresAt: new Date(
-      Date.now() + parseDuration(internals.options.session.ttl)
-    ),
+    expiresAt,
     ...sessionStamp(internals, headers)
   })
+
+  return expiresAt
 }

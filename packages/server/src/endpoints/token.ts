@@ -49,7 +49,10 @@ export const getToken = defineEndpoint({
     const resolved = await resolveSession(internals, input.headers)
     if (!resolved) throw unauthenticated()
 
-    await slideSession(
+    // The expiry reported below is the one sliding just persisted, not the one
+    // the row had when it was read — otherwise every refresh would describe a
+    // session that is already out of date.
+    const expiresAt = await slideSession(
       internals,
       { ...resolved.session, tokenHash: resolved.tokenHash },
       input.headers
@@ -64,7 +67,7 @@ export const getToken = defineEndpoint({
         session: {
           id: resolved.session.id,
           createdAt: resolved.session.createdAt,
-          expiresAt: resolved.session.expiresAt
+          expiresAt
         }
       } satisfies AuthTokenResult
     }
