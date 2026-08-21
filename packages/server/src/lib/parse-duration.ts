@@ -40,6 +40,15 @@ const MILLISECONDS_PER_UNIT: Record<string, number> = {
 const DURATION_PATTERN = /^(\+|-)?\s*(\d+(?:\.\d+)?)\s*([a-z]+)$/i
 
 /**
+ * The furthest a `Date` can reach from the epoch, in milliseconds.
+ *
+ * Every duration here ends up added to `Date.now()`, so anything past this is
+ * not a long time but an `Invalid Date` — and a session or token whose expiry is
+ * `NaN` compares as neither expired nor live.
+ */
+const MAX_DURATION_MS = 8.64e15
+
+/**
  * Parses a {@link Duration} into milliseconds.
  *
  * This is the only duration parser in the codebase. Cookie `Max-Age`, session
@@ -49,7 +58,8 @@ const DURATION_PATTERN = /^(\+|-)?\s*(\d+(?:\.\d+)?)\s*([a-z]+)$/i
  *
  * @param duration - A time span such as `"10m"` or `"30 days"`.
  * @returns The span in milliseconds.
- * @throws {TypeError} If the value is not a recognised duration.
+ * @throws {TypeError} If the value is not a recognised duration, or is too large
+ * for a `Date` to represent.
  */
 export function parseDuration(duration: Duration) {
   const matched = DURATION_PATTERN.exec(duration.trim())
@@ -71,6 +81,13 @@ export function parseDuration(duration: Duration) {
   }
 
   const milliseconds = Number(amount) * millisecondsPerUnit
+  // `>` rather than `isFinite`: an amount long enough to overflow to Infinity
+  // is only the extreme case of one too large for a Date to represent.
+  if (!(milliseconds <= MAX_DURATION_MS)) {
+    throw new TypeError(
+      `Duration out of range: ${JSON.stringify(duration)}. The largest supported span is about 273,000 years.`
+    )
+  }
   return sign === "-" ? -milliseconds : milliseconds
 }
 
