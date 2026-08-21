@@ -5,8 +5,12 @@ import {
   Scripts
 } from "@tanstack/react-router"
 import { RootProvider } from "fumadocs-ui/provider/tanstack"
-import type { ReactNode } from "react"
+import { lazy, type ReactNode } from "react"
 import styles from "../styles.css?url"
+
+// Loaded on demand: the search index and its engine are far larger than the
+// page that opens them, and most visitors never press the key.
+const SearchDialog = lazy(() => import("~/components/search"))
 
 export const Route = createRootRoute({
   head: () => ({
@@ -40,7 +44,12 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body className="flex min-h-screen flex-col">
-        <RootProvider>{children}</RootProvider>
+        <RootProvider
+          search={{ SearchDialog }}
+          theme={{ defaultTheme: "system", enableSystem: true }}
+        >
+          {children}
+        </RootProvider>
         <Scripts />
       </body>
     </html>
