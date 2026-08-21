@@ -18,9 +18,22 @@ const distributionRoot = resolve(
   "../dist"
 )
 
-const NODE_IMPORT =
+/** `import x from "node:fs"`, and the `export ... from` form. */
+const NODE_IMPORT_FROM =
   /(?:^|\s)(?:import|export)[^;]*?from\s*["'](node:[^"']+)["']/gm
+/** `import "node:fs"` — no bindings, so no `from` for the pattern above to find. */
+const NODE_SIDE_EFFECT_IMPORT = /(?:^|\s)import\s*["'](node:[^"']+)["']/gm
+/** `import("node:fs")` — evaluated at runtime, so just as fatal on an edge runtime. */
+const NODE_DYNAMIC_IMPORT = /\bimport\(\s*["'](node:[^"']+)["']\s*\)/g
+/** `require("node:fs")` in any CommonJS output. */
 const NODE_REQUIRE = /require\(\s*["'](node:[^"']+)["']\s*\)/g
+
+const NODE_REFERENCE_PATTERNS = [
+  NODE_IMPORT_FROM,
+  NODE_SIDE_EFFECT_IMPORT,
+  NODE_DYNAMIC_IMPORT,
+  NODE_REQUIRE
+]
 
 function javascriptFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
@@ -36,7 +49,7 @@ const violations: string[] = []
 for (const filePath of javascriptFiles(distributionRoot)) {
   const contents = readFileSync(filePath, "utf8")
 
-  for (const pattern of [NODE_IMPORT, NODE_REQUIRE]) {
+  for (const pattern of NODE_REFERENCE_PATTERNS) {
     pattern.lastIndex = 0
     for (const match of contents.matchAll(pattern)) {
       violations.push(
