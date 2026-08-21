@@ -89,7 +89,7 @@ minutes by default — which is stated plainly rather than glossed over.
 
 ## Repository
 
-```
+```text
 packages/server    @auth-ts/server
 packages/client    @auth-ts/client
 apps/docs          the documentation site
