@@ -115,11 +115,16 @@ function toErrorResponse(
 /**
  * Deletes expired rows without making the caller wait.
  *
- * Sweeping after every mutating request sounds wasteful and is the opposite:
- * frequent sweeps each delete almost nothing, and an indexed delete-where-expired
- * on a nearly clean table costs microseconds — far less than the bookkeeping
- * needed to run it less often. Failures go to the log rather than vanishing into
- * an empty catch, and never affect the response.
+ * Runs after every request that reaches an endpoint, reads included — a CORS
+ * preflight is the only thing that returns before the sweep. Reads are not an
+ * oversight: rows expire on a clock rather than on writes, so a read-heavy
+ * deployment is exactly the one that would otherwise never clean up.
+ *
+ * Sweeping that often sounds wasteful and is the opposite: frequent sweeps each
+ * delete almost nothing, and an indexed delete-where-expired on a nearly clean
+ * table costs microseconds — far less than the bookkeeping needed to run it less
+ * often. Failures go to the log rather than vanishing into an empty catch, and
+ * never affect the response.
  */
 function sweepExpired(internals: AuthServerInternals) {
   if (!internals.options.cleanup) return
