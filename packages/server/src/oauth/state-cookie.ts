@@ -1,6 +1,8 @@
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 import { AuthApiError } from "../http/auth-api-error.ts"
+import { decodeBase64url, encodeBase64url } from "../lib/base64url.ts"
 import { randomBytesBase64url } from "../lib/generate-random.ts"
+import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash.ts"
 import { readCookie } from "../lib/parse-cookies.ts"
 import { clearCookie, serializeCookie } from "../lib/serialize-cookie.ts"
 
@@ -28,8 +30,51 @@ export interface OAuthStatePayload {
   userId?: string
 }
 
+/**
+ * Serializes and signs a state payload: `base64url(json).hmac`.
+ *
+ * Signed because the cookie is the callback's only memory of how the flow
+ * began, and a cookie is writable by more than this server — a sibling
+ * subdomain, or script on the page. Without the signature, whatever set it
+ * could rewrite `redirect` into a path of their choosing, flip a sign-in into a
+ * connect, or add sign-up fields the start endpoint never validated. The HMAC
+ * is keyed on `secret`, which nothing outside this process holds.
+ */
+export async function signStatePayload(
+  payload: OAuthStatePayload,
+  secret: string
+) {
+  const encoded = encodeBase64url(JSON.stringify(payload))
+  return `${encoded}.${await hmacSha256Hex(encoded, secret)}`
+}
+
+/** Verifies a cookie value produced by {@link signStatePayload}; `null` otherwise. */
+async function verifyStatePayload(
+  value: string,
+  secret: string
+): Promise<OAuthStatePayload | null> {
+  const separator = value.lastIndexOf(".")
+  if (separator === -1) return null
+
+  const encoded = value.slice(0, separator)
+  const signature = value.slice(separator + 1)
+  const expected = await hmacSha256Hex(encoded, secret)
+  if (!timingSafeEqualHex(signature, expected)) return null
+
+  const json = decodeBase64url(encoded)
+  if (json === null) return null
+  try {
+    const parsed: unknown = JSON.parse(json)
+    return parsed !== null && typeof parsed === "object"
+      ? (parsed as OAuthStatePayload)
+      : null
+  } catch {
+    return null
+  }
+}
+
 /** Builds the state cookie for a flow about to start. */
-export function createStateCookie(
+export async function createStateCookie(
   internals: AuthServerInternals,
   provider: string,
   payload: Omit<OAuthStatePayload, "state">,
@@ -38,7 +83,10 @@ export function createStateCookie(
   const state = randomBytesBase64url(32)
   const setCookie = serializeCookie({
     name: internals.options.cookie.stateName,
-    value: JSON.stringify({ ...payload, state } satisfies OAuthStatePayload),
+    value: await signStatePayload(
+      { ...payload, state } satisfies OAuthStatePayload,
+      internals.options.secret
+    ),
     // Scoped to the exact callback path: this cookie is only ever read there, so
     // there is no reason for it to ride along with anything else.
     path: `${internals.options.basePath}/callback/${provider}`,
@@ -58,10 +106,14 @@ export function createStateCookie(
  * — or, on a connect flow, link the attacker's provider identity to the victim's
  * account.
  *
- * @throws {AuthApiError} `unauthenticated` when the cookie is missing, unreadable,
- * or does not match the parameter.
+ * The signature is checked before anything in the payload is read, so a cookie
+ * this server did not write — or one it wrote and something else edited — is
+ * indistinguishable from a missing one.
+ *
+ * @throws {AuthApiError} `unauthenticated` when the cookie is missing, was not
+ * signed by this server, or does not match the parameter.
  */
-export function readStateCookie(
+export async function readStateCookie(
   internals: AuthServerInternals,
   headers: Headers,
   stateParameter: string | null
@@ -69,10 +121,9 @@ export function readStateCookie(
   const raw = readCookie(headers, internals.options.cookie.stateName)
   if (!raw || !stateParameter) throw new AuthApiError("unauthenticated", 401)
 
-  let payload: OAuthStatePayload
-  try {
-    payload = JSON.parse(raw) as OAuthStatePayload
-  } catch {
+  const payload = await verifyStatePayload(raw, internals.options.secret)
+  if (!payload) {
+    internals.log.warn("oauth state cookie failed signature check")
     throw new AuthApiError("unauthenticated", 401)
   }
 

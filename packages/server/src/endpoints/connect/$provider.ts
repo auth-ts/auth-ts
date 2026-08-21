@@ -49,7 +49,7 @@ export const connectProvider = defineEndpoint({
     )
     const redirectURI = `${options.baseURL}${options.basePath}/callback/${input.provider}`
 
-    const { state, setCookie } = createStateCookie(
+    const { state, setCookie } = await createStateCookie(
       internals,
       input.provider,
       {

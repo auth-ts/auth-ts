@@ -1,3 +1,5 @@
+import { bytesToBase64url } from "./base64url.ts"
+
 /**
  * Generates cryptographically random bytes and encodes them base64url.
  *
@@ -7,12 +9,7 @@
  * @param byteLength - How many random bytes to draw. Refresh tokens use 32.
  */
 export function randomBytesBase64url(byteLength: number) {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength))
-
-  let binary = ""
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+  return bytesToBase64url(crypto.getRandomValues(new Uint8Array(byteLength)))
 }
 
 /**

@@ -3,6 +3,8 @@ import { isAuthApiError, notFound } from "../../http/auth-api-error.ts"
 import { defineEndpoint } from "../../http/define-endpoint.ts"
 import type { AuthErrorCode } from "../../http/error-response.ts"
 import { getErrorMessage } from "../../http/get-error-message.ts"
+import type { AdditionalFieldValues } from "../../http/validate-additional-fields.ts"
+import { validateAdditionalFields } from "../../http/validate-additional-fields.ts"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie.ts"
 import { getProvider } from "../../oauth/providers/get-provider.ts"
 import type { ProviderIdentity } from "../../oauth/providers/oauth-provider.ts"
@@ -64,11 +66,26 @@ export const callbackProvider = defineEndpoint({
 
     // Verified before anything else is trusted, and the cookie is cleared
     // whichever way this goes so a state value is never replayable.
-    const payload = readStateCookie(internals, input.headers, input.state)
+    const payload = await readStateCookie(internals, input.headers, input.state)
     const locale = payload.locale ?? options.localization?.defaultLocale ?? "en"
 
     if (input.providerError || !input.code) {
       return errorPage(internals, "unauthenticated", locale, clearState)
+    }
+
+    // Validated again here, not trusted from the cookie. `/sign-in/:provider`
+    // checked these fields on a different request, and the state cookie is plain
+    // JSON that anything able to set cookies for this host can rewrite — so
+    // without this, an undeclared column could ride into user creation.
+    let additionalFields: AdditionalFieldValues
+    try {
+      additionalFields = validateAdditionalFields(
+        options.user.additionalFields,
+        payload.additionalFields
+      )
+    } catch (error) {
+      if (!isAuthApiError(error)) throw error
+      return errorPage(internals, error.code, locale, clearState, error.status)
     }
 
     let identity: ProviderIdentity
@@ -129,7 +146,7 @@ export const callbackProvider = defineEndpoint({
     // connection-first cascade as everyone else — a provider account already
     // linked to an account is never silently re-pointed at the guest.
     const user = await resolveOAuthUser(internals, input.provider, identity, {
-      additionalFields: payload.additionalFields ?? {},
+      additionalFields,
       ...(active?.user.type === "guest" ? { guest: active.user } : {})
     })
 
