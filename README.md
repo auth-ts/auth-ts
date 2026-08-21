@@ -101,6 +101,13 @@ bun install
 bun x nx run-many -t typecheck test build
 ```
 
+## What is not here yet
+
+[ROADMAP.md](ROADMAP.md) covers what is deliberately deferred, what is built but
+not yet proven against a live provider, and what this project declines to build
+at all — with the reasoning, so the decisions can be argued with rather than
+guessed at.
+
 ## Documentation
 
 [authts.dev](https://authts.dev)

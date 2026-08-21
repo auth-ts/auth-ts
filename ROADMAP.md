@@ -1,0 +1,204 @@
+# Roadmap
+
+What is deliberately not in v1, what is built but unproven, and what is someone
+else's job. Nothing here is a bug; the bugs go in issues.
+
+Three lists, because they need different decisions from you:
+
+1. **[Before v0.1.0 is real](#before-v010-is-real)** — this build stopped short of it.
+2. **[Deferred features](#deferred-features)** — wanted, scoped, not yet.
+3. **[Not building](#not-building)** — declined on purpose, with the reason.
+
+---
+
+## Before v0.1.0 is real
+
+### OAuth has never talked to GitHub or Google
+
+The flows are covered end to end, including the four scenarios that are account
+takeovers if they regress: state mismatch, unverified email, non-primary email,
+and a connect callback arriving without the session that started it. But those
+tests fake the network beneath the real provider modules — **no live provider has
+ever completed a round trip.**
+
+What could still be wrong is exactly what a fake cannot catch: a changed response
+shape, a scope that no longer returns what it used to, a redirect URI mismatch
+the provider reports differently than expected.
+
+To close it: register a GitHub app and a Google client, point the callback at
+`<AUTH_BASE_URL>/api/auth/callback/<provider>`, and run both flows plus a connect
+and a disconnect against the demo.
+
+### Publishing
+
+`nx release --dry-run` produces the changelog correctly and both packages version
+together from `0.1.0`. Nothing has been published. It needs `NPM_TOKEN` in the
+repository secrets and a `v0.1.0` tag.
+
+Check the `@auth-ts` npm scope and the `auth-ts` GitHub organisation actually
+exist and are yours before tagging.
+
+### Deploying the docs
+
+`wrangler.jsonc` and the `authts.com → authts.dev` redirect are written; no
+Cloudflare Pages project exists. Build command `bun run build`, output directory
+`dist/client`.
+
+### Things the reference application proves that a fresh deployment does not
+
+The demo runs against a real Neon database with row-level security enforcing row
+ownership. A new deployment still has to do the two things that are easy to skip:
+
+- **Confirm which header your platform sets for the client IP.** If neither
+  `X-Forwarded-For` nor `X-Real-IP` arrives, every visitor shares one rate-limit
+  bucket, which is a denial of service on your own sign-in page.
+- **Check what your database grants by default.** Neon gives the `authenticated`
+  role full access to everything in `public` when the Data API is enabled, so the
+  auth tables have to be explicitly protected. The demo enables row-level
+  security with no policy on them, which denies every role except the owner.
+
+---
+
+## Deferred features
+
+### Email and phone number changes
+
+Changing an identifier re-keys the account, because every sign-in resolves
+through it. That makes it a ceremony — a code verified at the **new** address,
+and a notification to the old one — not a field on `PATCH /user`, which is why
+that endpoint rejects `email` and `phoneNumber` today.
+
+### Magic links
+
+Codes were chosen for v1 because they survive the common case where the link
+opens in a different browser than the one you started in. Links need one-time
+URLs, a different email template, and their own expiry semantics.
+
+### Custom OIDC providers
+
+Two halves of very different sizes.
+
+**Consuming** a custom issuer — `providers.custom: { issuer, clientId, clientSecret }`,
+discovery-driven code flow, `sub` as the provider account id — is configuration
+only. The generic `:provider` routes guarantee no new endpoints and no breaking
+change, so this is the cheap half and the obvious next provider feature.
+
+**Being** an identity provider — an authorize endpoint, a code grant, a client
+registry — is a v2-scale subsystem. Worth naming because it is the real answer to
+multi-domain single sign-on: each domain keeps its own first-party session and
+the central domain is an IdP reached by top-level redirect, never by shared
+cookies. Until then, the centre can be any existing provider.
+
+### Identifier linking for guests
+
+A guest can already gain recoverability by connecting an OAuth provider. Adding
+an email or phone number to a guest account without a full sign-in is a separate
+verification ceremony.
+
+### BroadcastChannel for cross-tab sync
+
+Cross-tab sync currently rides the `localStorage` `storage` event: a sign-out in
+one tab clears the user and the access token in the others, with no fetch, so N
+tabs cannot stampede the refresh endpoint. It degrades silently where storage is
+unavailable — private-mode Safari, for instance.
+
+`BroadcastChannel` is the better transport: structured messages and no storage
+dependency. It is a strict improvement, just not a necessary one.
+
+### Single-session-per-user enforcement
+
+"Only one device at a time" is a policy some products want. The devices list and
+`DELETE /sessions/:id` already give you the pieces; the missing part is a config
+flag that revokes on sign-in.
+
+### Lifecycle webhooks
+
+Mostly unnecessary by construction: **the callbacks are the hooks.** Your
+`upsertUser` knows when it inserts, which is where the welcome email belongs. A
+webhook layer would be a second, worse copy of information you already have.
+
+### Native application OAuth
+
+Deep-link flows for iOS and Android. `mode: "token"` already exists for clients
+with no cookie jar, so this is the redirect handling rather than the token model.
+
+---
+
+## Not building
+
+Declining these is a design position, not a backlog.
+
+### Database adapters — ever
+
+Adapters are a standing promise to track someone else's schema conventions, and
+they always leak: your table has an extra required column, a different id type, or
+a naming convention the adapter cannot express. The nineteen callbacks are the
+same code an adapter would generate, except you can read them and they are
+already written against your own tables.
+
+**The callback interface is the product.** That is where the semver discipline
+goes.
+
+### Rotating the refresh token on every use
+
+Refresh tokens themselves are core to the design — stable per session, revoked
+through `deleteSession`. Only the rotate-on-every-refresh pattern is excluded.
+
+The cookie is `HttpOnly`, path-scoped, and never crosses an origin, so rotation
+mostly defends against theft requiring a compromise that defeats rotation anyway.
+What it reliably causes is a race between concurrent tabs, where the second
+presents a token the first has already spent.
+
+If you store the refresh token outside an `HttpOnly` cookie, rotation and reuse
+detection become mandatory — which is precisely why that mode is unsupported.
+
+### Password authentication
+
+A different threat model with its own permanent obligations: breach lists, reset
+flows, rotation policies, and slow hashing. The library would become mostly
+password machinery.
+
+### Organisations, role-based access control, and two-factor
+
+`type` is carried into the JWT so your policies can read it, and `admin` is
+vocabulary the library never assigns — promoting someone is your own SQL. Beyond
+that, authorization is your schema's job. Two-factor is a real feature and a real
+subsystem; it is not a v1 omission that gets quietly patched in.
+
+### A hosted service
+
+There is no company. That is a feature.
+
+### A server-side "optimistic" user
+
+The client's user object is a render hint — it decides whether to show a name in
+the corner. On the server the same object would be an authorization decision made
+from a cache, which is a 1am phone call waiting to happen. Server-side code calls
+`getSession` or `getToken` and gets the truth.
+
+---
+
+## Known constraints worth remembering
+
+**TypeScript 7 ships no compiler API.** The native package exports `version` and
+nothing else. Anything needing `ts.createProgram` — the documentation type-table
+generator, most codemods — needs TypeScript 5.x pinned for that package alone.
+`apps/docs` does exactly this; the rest of the workspace builds on 7.
+
+**Attempt counting on magic codes is not atomic.** Verification reads the row,
+then writes `attempts + 1`, so two simultaneous wrong guesses can undercount by
+one. Accepted deliberately: the HMAC, the ten-minute lifetime, and the per-IP
+verify limit are the real throttles, and making it atomic would mean a new
+callback every consumer has to implement correctly.
+
+**Revocation latency is the access-token lifetime.** The database checks a
+signature and an expiry; it does not call you. "Signed out everywhere" means
+within `jwt.ttl` — ten minutes by default. Shortening it trades refresh traffic
+for revocation speed.
+
+**Cross-domain deployment is deliberately limited.** Same origin needs no
+configuration. A different subdomain of the same registrable domain works with
+`baseURL` and `cors.origin`. A genuinely foreign domain never receives the
+cookie, because `SameSite=Lax` does not send cross-site and `SameSite=None`
+reopens CSRF while dying to cookie partitioning. The fix is a reverse proxy that
+puts the auth mount back on the application's own origin.
