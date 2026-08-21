@@ -114,6 +114,29 @@ describe("signToken", () => {
     expect(claims?.exp).toBe((claims?.iat ?? 0) + 600)
   })
 
+  it("keeps sub as userId's alone, dropping one smuggled through a widened payload", async () => {
+    // Same hole as iat/exp, but setSubject only runs when userId is given, so
+    // a stripped type was the only thing between a smuggled sub and the token.
+    const smuggled: Record<string, unknown> = { sub: "someone-else" }
+    expect(
+      (await verifyToken(verifyContext, await signToken(signContext, smuggled)))
+        ?.sub
+    ).toBeUndefined()
+
+    const overridden: Record<string, unknown> = {
+      userId: "user-1",
+      sub: "someone-else"
+    }
+    expect(
+      (
+        await verifyToken(
+          verifyContext,
+          await signToken(signContext, overridden)
+        )
+      )?.sub
+    ).toBe("user-1")
+  })
+
   it("mints a service token with no subject at all", async () => {
     const token = await signToken(signContext, { role: "service" })
     const claims = await verifyToken(verifyContext, token)
