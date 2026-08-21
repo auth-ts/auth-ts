@@ -15,14 +15,7 @@
     {
       "name": "docs",
       "runtimeExecutable": "bun",
-      "runtimeArgs": [
-        "run",
-        "--cwd",
-        "apps/docs",
-        "dev",
-        "--port",
-        "5174"
-      ],
+      "runtimeArgs": ["run", "--cwd", "apps/docs", "dev", "--port", "5174"],
       "port": 5174
     }
   ]
