@@ -1,4 +1,4 @@
-import { importSPKI, SignJWT } from "jose"
+import { decodeJwt, importSPKI, SignJWT } from "jose"
 import { beforeAll, describe, expect, it } from "vitest"
 import { buildJwks } from "../../src/jwt/build-jwks.ts"
 import { decodeToken } from "../../src/jwt/decode-token.ts"
@@ -79,12 +79,38 @@ describe("signToken", () => {
     expect(claims?.tenant).toBe("acme")
   })
 
-  it("keeps iat, exp, iss, and aud core-set regardless of the caller", async () => {
+  it("defaults iss and aud from the context", async () => {
     const token = await signToken(signContext, { userId: "user-1" })
     const claims = await verifyToken(verifyContext, token)
 
     expect(claims?.iss).toBe("https://app.example.com/api/auth")
     expect(claims?.aud).toBe("authenticated")
+  })
+
+  it("lets the caller override iss and aud", async () => {
+    // Widened so the `never`-free keys can be passed without a cast.
+    const custom: Record<string, unknown> = {
+      iss: "https://other.example",
+      aud: "reporting"
+    }
+    const token = await signToken(signContext, custom)
+    const claims = decodeJwt(token)
+
+    expect(claims.iss).toBe("https://other.example")
+    expect(claims.aud).toBe("reporting")
+    // And it no longer passes this server's own verification, as it should.
+    await expect(verifyToken(verifyContext, token)).resolves.toBeNull()
+  })
+
+  it("keeps iat and exp server-owned even when a widened payload carries them", async () => {
+    const smuggled: Record<string, unknown> = {
+      iat: 1,
+      exp: 4_102_444_800 // 2100-01-01
+    }
+    const token = await signToken(signContext, smuggled)
+    const claims = await verifyToken(verifyContext, token)
+
+    expect(claims?.iat).not.toBe(1)
     expect(claims?.exp).toBe((claims?.iat ?? 0) + 600)
   })
 

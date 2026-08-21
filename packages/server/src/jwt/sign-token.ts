@@ -7,14 +7,14 @@ import type { JwtAlgorithm } from "./import-signing-key.ts"
 /**
  * Claims you may put in a token.
  *
- * Anything not listed passes through untouched, so policies can read whatever
- * your schema needs. The envelope claims are typed `never` on purpose: `iat`,
- * `exp`, `iss`, and `aud` are owned by the server's configuration, and the type
- * rejects overriding them rather than letting a caller quietly mint a token that
- * outlives its TTL.
+ * Anything not listed passes through untouched and wins over the configured
+ * `jwt.claims`, `issuer`, and `jwt.audience`, so you can mint a token for another
+ * audience or issuer when you need one. Only `iat` and `exp` are typed `never`:
+ * they always come from the clock and `jwt.ttl`, so no caller can quietly mint a
+ * token that outlives its TTL. `sub` is set through `userId`.
  */
 export type SignTokenClaims = {
-  /** Becomes `sub`. */
+  /** Becomes `sub`, and is the only way to set it. */
   userId?: string
   /** What row-level security policies read, e.g. `auth.session()->>'type'`. */
   type?: UserType
@@ -25,10 +25,9 @@ export type SignTokenClaims = {
    * query fails. Application-level roles belong in `type`.
    */
   role?: string
+  sub?: never
   iat?: never
   exp?: never
-  iss?: never
-  aud?: never
 } & Record<string, unknown>
 
 /** What {@link signToken} needs to know, resolved from the server options. */
@@ -39,7 +38,9 @@ export interface SignTokenContext {
   ttl: Duration
   /** Claims merged under the caller's — caller wins. */
   claims: Record<string, unknown>
+  /** Default `iss`; a caller-supplied `iss` wins. */
   issuer?: string
+  /** Default `aud`; a caller-supplied `aud` wins. */
   audience?: string
 }
 
@@ -61,7 +62,14 @@ export async function signToken(
   claims: SignTokenClaims = {}
 ) {
   const { userId, ...rest } = claims
-  const payload = { ...context.claims, ...rest }
+  // Configured values are defaults under the caller's claims. The setters below
+  // run after this and overwrite, so `iat` and `exp` are the server's alone.
+  const payload = {
+    ...context.claims,
+    ...(context.issuer ? { iss: context.issuer } : {}),
+    ...(context.audience ? { aud: context.audience } : {}),
+    ...rest
+  }
 
   const issuedAt = Math.floor(Date.now() / 1000)
   const signer = new SignJWT(payload)
@@ -70,8 +78,6 @@ export async function signToken(
     .setExpirationTime(issuedAt + parseDurationSeconds(context.ttl))
 
   if (userId !== undefined) signer.setSubject(userId)
-  if (context.issuer) signer.setIssuer(context.issuer)
-  if (context.audience) signer.setAudience(context.audience)
 
   return signer.sign(context.signingKey)
 }
