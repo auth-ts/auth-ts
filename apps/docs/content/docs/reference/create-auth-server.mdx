@@ -1,0 +1,57 @@
+---
+title: createAuthServer
+description: Every option, its default, and why it defaults that way.
+---
+
+```ts
+import { createAuthServer } from "@auth-ts/server"
+
+export const authServer = createAuthServer({
+  db: {
+    /* the callbacks */
+  },
+  email: { sendCode: async ({ email, code }) => {} }
+})
+```
+
+Construction is synchronous and does no input/output, so it is cheap to memoize
+one instance per tenant. Everything that can be wrong with a configuration throws
+here — a missing key, no sign-in method, a reserved field name — with the
+offending option named, rather than surfacing on the first user's sign-in.
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-server-options.ts" name="AuthServerOptions" />
+
+## What you get back
+
+The same endpoints, three ways, all derived from one registry so they cannot
+disagree:
+
+```ts
+// 1. Call it directly from your own backend. No HTTP round-trip to yourself.
+const { accessToken, user } = await authServer.getToken({ headers })
+
+// 2. One catch-all handler, mounted once.
+authServer.handler(request)
+
+// 3. Individual handlers, if you prefer explicit routes.
+authServer.handlers.sendCode(request)
+```
+
+Plus the JWT-plane functions:
+
+- `verifyToken(token)` — verifies locally against the public key. No database, no
+  network. Returns `null` for any failure.
+- `signToken(claims)` — mints anything, with no session check. This is the
+  private key with a function signature; never expose it through a route.
+- `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
+  Never authorize with it.
+- `getSession({ headers })` — resolves the cookie to a session and user. One
+  database round-trip, and instant revocation truth.
+
+<auto-type-table path="../../../../../packages/server/src/jwt/sign-token.ts" name="SignTokenClaims" />
+
+## Durations
+
+Every duration uses one format — `"10m"`, `"30d"`, `"60s"` — and one parser, so
+`jwt.ttl` and a rate-limit window cannot disagree about what `"1h"` means. Months
+are unsupported because their length is ambiguous.

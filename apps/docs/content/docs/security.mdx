@@ -1,0 +1,102 @@
+---
+title: Security
+description: The threat model, and what each defence is actually defending against.
+---
+
+Every item here has a test. Several exist because the failure mode is a full
+account takeover rather than a bug.
+
+## Magic codes
+
+Six digits, drawn from a CSPRNG with rejection sampling — never
+`Math.random()`, and never a plain modulo, which biases the range and therefore
+shrinks it.
+
+Stored as **HMAC-SHA-256 keyed with your server secret**, not as a bare hash. A
+million possibilities means an unkeyed digest is reversible from a database read
+in about a second; keyed with a secret the database never holds, a database leak
+alone yields no working codes.
+
+Five wrong guesses burn the code. Sending a new one **replaces** the live code,
+so a resend cannot widen the set of values an attacker may guess. No slow hashing
+— the ten-minute lifetime and the attempt cap do that job, and bcrypt here would
+only slow down honest sign-ins.
+
+## Rate limiting
+
+On by default, backed by your database through two callbacks. Sending is limited
+per identifier and per IP, verification per IP, and deletion codes per identifier.
+There is also a sixty-second cooldown between sends to one address, derived from
+the live code's own expiry so it needs no extra state.
+
+The per-identifier send window is what closes the loop where an attacker resends
+a code repeatedly to reset the attempt counter.
+
+Scope is authentication abuse only — email flooding and credential guessing. It
+is not a general API limiter; that belongs in infrastructure in front of
+everything, these routes included.
+
+## OAuth
+
+**State is verified** against a short-lived `HttpOnly` cookie scoped to the
+callback path. Without it, an attacker hands a victim a callback URL carrying the
+attacker's own authorization code and the victim's browser quietly completes a
+sign-in as the attacker.
+
+**Only verified email addresses are accepted.** GitHub returns unverified
+addresses, so the library takes only the entry that is both `primary` and
+`verified`; Google must report `email_verified: true`. Skipping this is a
+complete account takeover, and row-level security cannot save you — it will
+faithfully serve the attacker the victim's rows, because authorization cannot fix
+an authentication failure.
+
+**Redirects are validated.** A `?redirect=` value must be a same-origin relative
+path: it must start with `/`, and `//evil.example` is rejected because browsers
+treat protocol-relative URLs as absolute.
+
+**Connecting requires the same session** that started the flow. Otherwise an
+attacker who lures a signed-in victim through a connect URL links their own
+provider identity to the victim's account, and signs in as them afterwards. A
+provider identity already linked elsewhere is never re-pointed.
+
+## Sessions
+
+The browser receives the refresh token only as an `HttpOnly`, `Secure`,
+`SameSite=Lax`, path-scoped cookie with **no `Domain` attribute**, so it is never
+broadcast to sibling subdomains. The database sees only the hash. A leak of
+either one alone is useless.
+
+Revoking a session filters on both the session id and the user id **in the
+query**, so revoking someone else's session is structurally impossible rather
+than a check somebody remembered to write.
+
+## Accounts
+
+`type` is written by core only as `guest` or `user`, and only on insert — so
+signing in cannot demote an administrator, and no endpoint can produce `admin`.
+`PATCH /user` rejects `email`, `phoneNumber`, and `type`.
+
+Additional fields are an allowlist applied on insert only. On an existing user
+they are ignored, because otherwise any sign-in request could rewrite profile
+columns.
+
+Deletion is always gated: either the session authenticated within the freshness
+window, or a code is emailed. The challenge answers **403**, never a 2xx, so a
+client cannot mistake it for success and tell someone their account is gone when
+it is not.
+
+Codes carry a purpose. A sign-in code cannot authorize a deletion, and a deletion
+code cannot sign anyone in.
+
+## Deploying
+
+Confirm which header your platform sets for the client IP. If neither
+`X-Forwarded-For` nor `X-Real-IP` arrives, every visitor shares one rate-limit
+bucket, which is a self-inflicted denial of service on your own sign-in page.
+
+If your database exposes a REST API, check what it grants by default. Neon, for
+example, grants the `authenticated` role full access to everything in `public`
+when the Data API is enabled — so the auth tables must be explicitly protected,
+or any signed-in user can read every session hash in your system. The reference
+application enables row-level security with no policy on those tables, which
+denies every role except the owner.

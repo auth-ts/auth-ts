@@ -1,6 +1,6 @@
 import type { AuthDb } from "@auth-ts/server"
 import { createAuthServer } from "@auth-ts/server"
-import { and, eq, lt, or, sql } from "drizzle-orm"
+import { and, eq, lt, sql } from "drizzle-orm"
 import { db } from "./db/client.ts"
 import {
   connections,

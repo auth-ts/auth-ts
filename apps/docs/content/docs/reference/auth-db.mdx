@@ -1,0 +1,63 @@
+---
+title: AuthDb
+description: The nineteen callbacks that connect this library to your database.
+---
+
+This interface is the product. You write these functions against your own tables,
+and in exchange the library never owns your schema, your migrations, or your data.
+
+Two conventions run through it. `upsert*` takes the entity; `get*`, `list*`, and
+`delete*` take a `where` query. And upserts are deliberate rather than split into
+create-and-update: the create-or-merge race is delegated to your store, where
+`ON CONFLICT`, `MERGE`, or `$setOnInsert` settles it atomically, instead of being
+relocated into this library as a read-then-write on every sign-in.
+
+Callbacks never receive request headers. Header-dependent session resolution is a
+spoofable authentication bypass, and non-HTTP callers — tests, migrations, the
+in-memory fixture — drive this contract directly. For multi-tenancy, close over
+the tenant when you construct the server.
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthDb" />
+
+## The rules that are easy to get wrong
+
+These are not enforced by types, so they are worth reading once:
+
+- **`upsertUser` has three shapes.** An identifier with no `id` looks up and
+  merges. No identifier at all always inserts — that is guest creation. An `id`
+  targets exactly that row, which is guest conversion and profile updates.
+- **`type` and `additionalFields` are insert-only** on the identifier-keyed path.
+  Merging them would demote an administrator on their next sign-in, and let any
+  sign-in body rewrite profile columns.
+- **`deleteUser` must remove the user's sessions.** A cascade does this for free.
+  An account that keeps a live refresh token is still a working login.
+- **`deleteSession({ id, userId })` must filter on both columns**, so that
+  revoking another user's session id matches nothing.
+- **`deleteExpired` takes no arguments.** Expired means expired now, and your
+  database already knows the time — `expiresAt < now()` avoids any skew between
+  your application server and Postgres.
+
+## The entities
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthUser" />
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthSession" />
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthMagicCode" />
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthConnection" />
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthRateLimit" />
+
+## Testing your implementation
+
+The in-memory implementation the library's own test suite runs against is public:
+
+```ts
+import { createMemoryDb } from "@auth-ts/server/testing"
+
+const db = createMemoryDb()
+```
+
+Testing against it means testing against the same semantics the library verifies
+itself with, rather than a simplified mock that agrees with your assumptions.
