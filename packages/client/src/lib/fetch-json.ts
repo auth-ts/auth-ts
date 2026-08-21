@@ -1,0 +1,68 @@
+import type { AuthErrorBody } from "@auth-ts/server"
+import type { ResolvedAuthClientOptions } from "../core/auth-client-options.ts"
+import { AuthError, AuthNetworkError } from "./auth-error.ts"
+
+/** Per-request options. */
+export interface FetchJsonOptions {
+  method: "GET" | "POST" | "PATCH" | "DELETE"
+  path: string
+  body?: unknown
+}
+
+/** Issues authenticated requests to the auth server and unwraps its responses. */
+export type FetchJson = <Result>(options: FetchJsonOptions) => Promise<Result>
+
+/**
+ * Builds the request function every client method uses.
+ *
+ * `credentials: "include"` is what makes the refresh cookie travel, and is the
+ * reason a cross-origin server must answer with an explicit origin rather than a
+ * wildcard.
+ *
+ * A failed request and a refused one are turned into different errors on
+ * purpose: the caller must be able to tell "your session is gone" from "the
+ * train went into a tunnel", because only one of those should clear local state.
+ */
+export function createFetchJson(
+  options: ResolvedAuthClientOptions,
+  getLocale: () => string | undefined
+): FetchJson {
+  const base = `${options.baseURL}${options.basePath}`
+
+  return async <Result>({ method, path, body }: FetchJsonOptions) => {
+    const headers = new Headers()
+    const locale = getLocale()
+    if (locale) headers.set("accept-language", locale)
+    if (body !== undefined) headers.set("content-type", "application/json")
+
+    let response: Response
+    try {
+      response = await fetch(`${base}${path}`, {
+        method,
+        headers,
+        credentials: "include",
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      })
+    } catch (cause) {
+      throw new AuthNetworkError(cause)
+    }
+
+    if (!response.ok) {
+      const parsed = (await response
+        .json()
+        .catch(() => null)) as AuthErrorBody | null
+      const error = parsed?.error
+
+      throw new AuthError(
+        error?.code ?? "internalError",
+        response.status,
+        error?.message ?? `Request failed with status ${response.status}.`,
+        error?.retryAfter
+      )
+    }
+
+    if (response.status === 204) return undefined as Result
+
+    return (await response.json().catch(() => undefined)) as Result
+  }
+}
