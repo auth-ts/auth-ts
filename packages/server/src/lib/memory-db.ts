@@ -234,15 +234,17 @@ export function createMemoryDb(): MemoryDb {
       }
     },
 
-    async deleteExpired(where) {
+    async deleteExpired() {
+      const now = new Date()
+
       for (const [identifier, magicCode] of magicCodes) {
-        if (magicCode.expiresAt < where.before) magicCodes.delete(identifier)
+        if (magicCode.expiresAt < now) magicCodes.delete(identifier)
       }
       for (const [tokenHash, session] of sessions) {
-        if (session.expiresAt < where.before) sessions.delete(tokenHash)
+        if (session.expiresAt < now) sessions.delete(tokenHash)
       }
       for (const [key, rateLimit] of rateLimits) {
-        if (rateLimit.resetAt < where.before) rateLimits.delete(key)
+        if (rateLimit.resetAt < now) rateLimits.delete(key)
       }
     },
 

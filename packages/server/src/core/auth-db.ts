@@ -282,12 +282,17 @@ export interface AuthDb {
   /**
    * Deletes expired magic codes, sessions, and rate-limit counters.
    *
-   * Three one-line deletes: `magicCodes.expiresAt < before`,
-   * `sessions.expiresAt < before`, `rateLimits.resetAt < before`. Core calls this
+   * Three one-line deletes: `magicCodes.expiresAt < now()`,
+   * `sessions.expiresAt < now()`, `rateLimits.resetAt < now()`. Core calls this
    * fire-and-forget after mutating flows, so index those columns.
    *
-   * This is hygiene, never a security boundary — expiry is enforced on read
-   * everywhere regardless of whether a sweep has run.
+   * It takes no arguments deliberately. "Expired" means expired *now*, and your
+   * database already knows what time it is — using its clock avoids the skew
+   * between an application server and the database that a passed-in timestamp
+   * would introduce, and makes the natural SQL the correct SQL.
+   *
+   * This is hygiene, never a security boundary: expiry is enforced on read
+   * everywhere regardless of whether a sweep has ever run.
    */
-  deleteExpired(where: { before: Date }): Promise<void>
+  deleteExpired(): Promise<void>
 }
