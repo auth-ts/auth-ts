@@ -27,7 +27,13 @@ describe("validateRedirect", () => {
     // "/\t/evil.com" passes a naive "//" check, then the parser drops the tab
     // and the browser is sent to evil.com. Tab, newline, and carriage return are
     // the three the WHATWG parser strips; the whole C0 range and DEL are refused.
-    for (const smuggled of ["/\t/evil.com", "/\n/evil.com", "/\r/evil.com", "/\u0000/evil.com", "/\u007f/evil.com"]) {
+    for (const smuggled of [
+      "/\t/evil.com",
+      "/\n/evil.com",
+      "/\r/evil.com",
+      "/\u0000/evil.com",
+      "/\u007f/evil.com"
+    ]) {
       expect(validateRedirect(smuggled)).toBe("/")
     }
   })
