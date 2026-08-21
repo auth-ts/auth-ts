@@ -43,7 +43,8 @@ export const github: OAuthProvider = {
   async exchangeCode({
     credentials,
     redirectURI,
-    code
+    code,
+    signal
   }: ExchangeCodeInput): Promise<ProviderIdentity> {
     const tokenResponse = await fetch(
       "https://github.com/login/oauth/access_token",
@@ -58,7 +59,8 @@ export const github: OAuthProvider = {
           client_secret: credentials.clientSecret,
           redirect_uri: redirectURI,
           code
-        })
+        }),
+        signal
       }
     )
 
@@ -73,13 +75,15 @@ export const github: OAuthProvider = {
     }
 
     const profileResponse = await fetch("https://api.github.com/user", {
-      headers: authorization
+      headers: authorization,
+      signal
     })
     if (!profileResponse.ok) throw new AuthApiError("unauthenticated", 401)
     const profile = (await profileResponse.json()) as GitHubUser
 
     const emailResponse = await fetch("https://api.github.com/user/emails", {
-      headers: authorization
+      headers: authorization,
+      signal
     })
     const emails = emailResponse.ok
       ? ((await emailResponse.json()) as GitHubEmail[])

@@ -32,6 +32,8 @@ export type AuthErrorCode =
   | "methodNotAllowed"
   /** A guest has no email or phone number, so no code can be sent to them. */
   | "guestCannotReceiveCode"
+  /** The OAuth provider timed out or failed while the code was being exchanged. */
+  | "providerUnavailable"
   /** Something threw that this library did not anticipate. */
   | "internalError"
 

@@ -36,7 +36,8 @@ export const google: OAuthProvider = {
   async exchangeCode({
     credentials,
     redirectURI,
-    code
+    code,
+    signal
   }: ExchangeCodeInput): Promise<ProviderIdentity> {
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -47,7 +48,8 @@ export const google: OAuthProvider = {
         redirect_uri: redirectURI,
         grant_type: "authorization_code",
         code
-      })
+      }),
+      signal
     })
 
     const token = (await tokenResponse.json().catch(() => ({}))) as {
