@@ -64,8 +64,12 @@ provider identity already linked elsewhere is never re-pointed.
 
 The browser receives the refresh token only as an `HttpOnly`, `Secure`,
 `SameSite=Lax`, path-scoped cookie with **no `Domain` attribute**, so it is never
-broadcast to sibling subdomains. The database sees only the hash. A leak of
-either one alone is useless.
+broadcast to sibling subdomains. The database sees only the hash, so a leaked
+table yields nothing replayable. The cookie is not the symmetric case: it *is*
+the credential. `HttpOnly` keeps script from reading it, but whatever does
+obtain it — a stolen browser profile, a device backup, a proxy terminating
+TLS — holds the session until that session is revoked or expires. Hashing
+protects the database, not a stolen token.
 
 Revoking a session filters on both the session id and the user id **in the
 query**, so revoking someone else's session is structurally impossible rather
