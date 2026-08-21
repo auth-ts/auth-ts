@@ -61,7 +61,11 @@ export async function signToken(
   context: SignTokenContext,
   claims: SignTokenClaims = {}
 ) {
-  const { userId, ...rest } = claims
+  // `sub` is taken out along with `userId`, not just typed away: the `never`
+  // holds at compile time, but a widened `Record<string, unknown>` payload can
+  // still carry one, and `setSubject` only runs when `userId` is given — so
+  // without this a smuggled `sub` would reach the token unchanged.
+  const { userId, sub: _sub, ...rest } = claims
   // Configured values are defaults under the caller's claims. The setters below
   // run after this and overwrite, so `iat` and `exp` are the server's alone.
   const payload = {
