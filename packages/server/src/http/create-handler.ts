@@ -52,6 +52,10 @@ export function createHandler(
       )
       const status = result.status ?? 200
 
+      if (result.body !== undefined) {
+        return new Response(result.body, { status, headers })
+      }
+
       if (status === 204 || result.data === undefined) {
         return new Response(null, { status, headers })
       }
@@ -120,9 +124,7 @@ function toErrorResponse(
 function sweepExpired(internals: AuthServerInternals) {
   if (!internals.options.cleanup) return
 
-  void Promise.resolve(
-    internals.db.deleteExpired({ before: new Date() })
-  ).catch((error: unknown) => {
+  void Promise.resolve(internals.db.deleteExpired()).catch((error: unknown) => {
     internals.log.error("deleteExpired failed", { error: String(error) })
   })
 }

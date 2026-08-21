@@ -10,6 +10,14 @@ export interface EndpointResult<Data> {
   status?: number
   /** Extra response headers — `Set-Cookie` from a sign-in, `Location` for a redirect. */
   headers?: Headers
+  /**
+   * A pre-rendered body, sent instead of JSON.
+   *
+   * Exists for the OAuth callback, which is a top-level navigation: whatever it
+   * returns is what the person is looking at, and a JSON envelope would be a wall
+   * of braces. Set `content-type` in `headers` alongside it.
+   */
+  body?: string
 }
 
 /** What `parse` is given: the request, its dynamic segments, and the internals. */

@@ -232,7 +232,7 @@ describe("deleteExpired", () => {
     await db.upsertRateLimit({ key: "old", count: 3, resetAt: past })
     await db.upsertRateLimit({ key: "live", count: 3, resetAt: future })
 
-    await db.deleteExpired({ before: new Date() })
+    await db.deleteExpired()
 
     expect(await db.getMagicCode({ identifier: "old@example.com" })).toBeNull()
     expect(
