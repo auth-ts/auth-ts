@@ -195,7 +195,10 @@ describe("oauth callback", () => {
     for (const status of [
       { token: 503 },
       { profile: 502 },
-      { emails: 500 }
+      { emails: 500 },
+      // Throttling is "try again", not "you are not who you say you are".
+      { token: 429 },
+      { emails: 429 }
     ] as const) {
       const { stateCookie, state } = await startSignIn(authServer)
       stubGitHub({

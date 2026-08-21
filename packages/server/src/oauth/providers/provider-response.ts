@@ -1,14 +1,25 @@
 import { AuthApiError } from "../../http/auth-api-error.ts"
 
 /**
+ * Whether a provider response means "try again later" rather than "no".
+ *
+ * A 5xx is the provider being down; a 429 is the provider throttling us. In
+ * neither case has anything been decided about the person signing in, so both
+ * are reported as the provider being unavailable. Anything else — a rejected
+ * code, a revoked token, a missing scope — is a verdict, and is reported as one.
+ */
+export function isProviderUnavailable(response: Response) {
+  return response.status >= 500 || response.status === 429
+}
+
+/**
  * Turns a non-2xx provider response into the failure it actually represents.
  *
- * A 5xx is the provider being down, and the person signing in should be told
- * to try again, not that their sign-in was refused. Anything else — a rejected
- * code, a revoked token, a missing scope — is a refusal, and is reported as one.
+ * The person signing in should be told to try again when the provider is down
+ * or throttling, and told they were refused only when they actually were.
  */
 export function providerRejected(response: Response) {
-  return response.status >= 500
+  return isProviderUnavailable(response)
     ? new AuthApiError("providerUnavailable", 502)
     : new AuthApiError("unauthenticated", 401)
 }
