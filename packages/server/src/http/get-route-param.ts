@@ -12,9 +12,18 @@ export function splitPathSegments(pathname: string, basePath: string) {
   if (pathname !== normalizedBase && !pathname.startsWith(`${normalizedBase}/`))
     return null
 
-  return pathname
+  const rawSegments = pathname
     .slice(normalizedBase.length)
     .split("/")
     .filter((segment) => segment.length > 0)
-    .map((segment) => decodeURIComponent(segment))
+
+  // decodeURIComponent throws on a malformed sequence — "%zz", a trailing "%",
+  // a truncated multibyte escape — and a URL pathname keeps those verbatim, so
+  // they arrive here from any client. That is not a route we serve, not an
+  // internal error: return null and let the caller answer 404.
+  try {
+    return rawSegments.map((segment) => decodeURIComponent(segment))
+  } catch {
+    return null
+  }
 }
