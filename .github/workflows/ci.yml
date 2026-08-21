@@ -9,6 +9,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  # nx-set-shas queries the workflow run history through the API to find the
+  # last successful commit on main, which needs read access to actions. Without
+  # it, `nx affected` loses its base and silently treats everything as affected.
+  actions: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -17,6 +24,10 @@ jobs:
         with:
           # Nx compares against the base commit to decide what is affected.
           fetch-depth: 0
+          # Do not leave the job's token in .git/config, where any later step —
+          # including anything that runs during dependency installation — could
+          # read it and push with it.
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:

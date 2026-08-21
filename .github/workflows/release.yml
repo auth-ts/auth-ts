@@ -8,7 +8,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      # Read-only: this job publishes to npm and touches nothing in the
+      # repository. Versioning, tagging, and the changelog happen locally via
+      # `nx release`, and the tag push is what triggers this. If a step is ever
+      # added that creates a GitHub release, that step needs contents: write —
+      # give it its own job rather than widening this one.
+      contents: read
       # Required for npm provenance, which links the published package to this
       # workflow run so consumers can verify where it came from.
       id-token: write
@@ -16,6 +21,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Publishing uses NPM_TOKEN, never the git remote, so the job's token
+          # has no reason to persist into .git/config.
+          persist-credentials: false
 
       - uses: oven-sh/setup-bun@v2
         with:
