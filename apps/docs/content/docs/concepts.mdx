@@ -9,7 +9,9 @@ icon: Lightbulb
 **The refresh token** is the session. It is 32 random bytes, delivered to the
 browser only as an `HttpOnly`, `Secure`, `SameSite=Lax` cookie scoped to the auth
 mount. Your database stores nothing but `sha256` of it, so a leaked table cannot
-be replayed and a leaked token cannot be found in the table.
+be replayed as a session. That is the whole of what hashing buys. The token
+itself is a bearer credential: whoever holds it holds the session until it is
+revoked or expires, and hashing does nothing to change that.
 
 **The access token** is a JWT, and it is the data-plane credential — the thing
 PostgREST verifies. It lives in a JavaScript variable for at most ten minutes and
