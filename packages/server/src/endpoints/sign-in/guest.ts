@@ -43,7 +43,7 @@ export const signInGuest = defineEndpoint({
     const headers = input.headers ?? new Headers()
 
     if (options.rateLimit !== false) {
-      const clientIp = getClientIp(headers)
+      const clientIp = getClientIp(headers, options.clientIp)
       if (clientIp)
         await checkRateLimit(
           internals,

@@ -2,6 +2,11 @@ import { AuthConfigError } from "../http/auth-config-error.ts"
 import type { LocalizationOptions } from "../http/get-error-message.ts"
 import { assertNoReservedFields } from "../http/validate-additional-fields.ts"
 import type { JwtAlgorithm } from "../jwt/import-signing-key.ts"
+import type {
+  ClientIpOptions,
+  ResolvedClientIpOptions
+} from "../lib/get-client-ip.ts"
+import { resolveClientIpOptions } from "../lib/get-client-ip.ts"
 import type { Logger, LogLevel } from "../lib/logger.ts"
 import type { Duration } from "../lib/parse-duration.ts"
 import { parseDuration } from "../lib/parse-duration.ts"
@@ -240,6 +245,12 @@ export interface AuthServerOptions {
   cleanup?: boolean
   /** Server-side localization of error messages. Codes stay stable; only messages translate. */
   localization?: LocalizationOptions
+  /**
+   * How the client IP is derived from proxy headers — the rate-limit key and
+   * the stored `ipAddress`. Defaults to deriving nothing until you declare how
+   * many proxies you run; see {@link ClientIpOptions.trustedProxies}.
+   */
+  clientIp?: ClientIpOptions
   /** Cross-origin access, needed when the client is configured with a different `baseURL`. */
   cors?: CorsOptions
   /** @default "warn" */
@@ -278,6 +289,7 @@ export interface ResolvedAuthServerOptions {
   multiAccount: boolean
   cleanup: boolean
   localization?: LocalizationOptions
+  clientIp: ResolvedClientIpOptions
   cors?: CorsOptions
   logLevel: LogLevel
   logger?: Logger
@@ -462,6 +474,7 @@ export function resolveAuthServerOptions(
     multiAccount: options.multiAccount ?? false,
     cleanup: options.cleanup ?? true,
     ...(options.localization ? { localization: options.localization } : {}),
+    clientIp: resolveClientIpOptions(options.clientIp),
     ...(options.cors ? { cors: options.cors } : {}),
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {})

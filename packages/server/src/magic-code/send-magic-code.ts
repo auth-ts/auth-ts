@@ -69,7 +69,7 @@ export async function sendMagicCode(
       perIdentifier
     )
 
-    const clientIp = getClientIp(headers)
+    const clientIp = getClientIp(headers, internals.options.clientIp)
     if (clientIp)
       await checkRateLimit(
         internals,

@@ -138,9 +138,11 @@ ownership — two users, each seeing only their own rows, with `userId` derived
 from the verified token rather than sent by the client. A new deployment still
 has to do the things that are easy to skip:
 
-- **Confirm which header your platform sets for the client IP.** If neither
-  `X-Forwarded-For` nor `X-Real-IP` arrives, every visitor shares one rate-limit
-  bucket, which is a denial of service on your own sign-in page.
+- **Set `clientIp.trustedProxies` to your proxy count.** IP-keyed rate limits
+  derive nothing until you declare your topology — the forwarded header is
+  client-controlled, so the real address is read from a fixed offset from the
+  right rather than the spoofable leftmost entry, and only after validating it
+  as an IP. Default zero means no IP limiting (per-identifier limits still hold).
 - **Check what your database grants by default.** Neon gives the `authenticated`
   role full access to everything in `public` when the Data API is enabled, so the
   auth tables have to be explicitly protected. The demo enables row-level
