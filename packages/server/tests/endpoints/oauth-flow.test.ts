@@ -394,9 +394,10 @@ describe("oauth callback", () => {
   })
 
   it("revalidates additionalFields from the state cookie instead of trusting them", async () => {
-    // The cookie is plain JSON. Anything that can set cookies for the host can
-    // rewrite it after /sign-in/:provider validated the fields, so the callback
-    // has to check again or an undeclared column rides into user creation.
+    // The signature proves the payload came from this server, not that the
+    // fields are still declared. Any path that signs a payload without running
+    // /sign-in/:provider's validation would ride an undeclared column into user
+    // creation, so the callback checks again where the write happens.
     const { authServer, db } = await createTestServer({
       ...OAUTH_OPTIONS,
       user: { additionalFields: { plan: "string" } }

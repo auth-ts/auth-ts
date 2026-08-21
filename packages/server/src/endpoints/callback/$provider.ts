@@ -73,10 +73,11 @@ export const callbackProvider = defineEndpoint({
       return errorPage(internals, "unauthenticated", locale, clearState)
     }
 
-    // Validated again here, not trusted from the cookie. `/sign-in/:provider`
-    // checked these fields on a different request, and the state cookie is plain
-    // JSON that anything able to set cookies for this host can rewrite — so
-    // without this, an undeclared column could ride into user creation.
+    // Validated again here, not trusted from the cookie. The signature proves
+    // the payload came from this server; it does not prove the fields are still
+    // declared, or that every path able to sign a payload validated them first.
+    // The write is what matters, so the check sits next to it rather than a
+    // request away — otherwise an undeclared column rides into user creation.
     let additionalFields: AdditionalFieldValues
     try {
       additionalFields = validateAdditionalFields(
