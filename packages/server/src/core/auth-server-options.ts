@@ -328,12 +328,33 @@ function readEnvironmentVariable(name: string) {
   return process.env?.[name]
 }
 
+/**
+ * Validates a duration option, returning it unchanged.
+ *
+ * `parseDuration` accepts a leading `-`, which is right for a general parser but
+ * never right here: a negative TTL issues sessions and tokens that expired
+ * before they were handed out, and a negative rate-limit window puts the window
+ * start in the future. Both fail at runtime rather than at startup, which is
+ * the trade this function exists to reverse.
+ *
+ * Zero is left alone deliberately. It is a documented value for
+ * {@link UserOptions.deleteFreshWindow}, where it means no session is ever
+ * fresh enough to skip the emailed code.
+ */
 function requireDuration(value: Duration, optionName: string) {
+  let milliseconds: number
   try {
-    parseDuration(value)
+    milliseconds = parseDuration(value)
   } catch (error) {
     throw new AuthConfigError(`${optionName}: ${(error as Error).message}`)
   }
+
+  if (milliseconds < 0) {
+    throw new AuthConfigError(
+      `${optionName}: must not be negative. ${JSON.stringify(value)} would place every expiry it governs in the past.`
+    )
+  }
+
   return value
 }
 

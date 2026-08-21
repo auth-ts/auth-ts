@@ -128,6 +128,44 @@ describe("construction failures", () => {
     ).toThrow(/rateLimit.sendCodeCooldown/)
   })
 
+  it("rejects a negative duration, which parses but expires everything at birth", () => {
+    // The duration grammar accepts a leading `-`, so these are well-formed and
+    // used to pass. A negative TTL hands out sessions and tokens that expired
+    // before they were issued; a negative window starts in the future.
+    expect(() =>
+      createAuthServer({ ...baseOptions(), session: { ttl: "-30d" } })
+    ).toThrow(/session\.ttl/)
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        jwt: { ...baseOptions().jwt, ttl: "-10m" }
+      })
+    ).toThrow(/jwt\.ttl/)
+    expect(() =>
+      createAuthServer({ ...baseOptions(), user: { deleteFreshWindow: "-1m" } })
+    ).toThrow(/user\.deleteFreshWindow/)
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { sendCodePerIP: { max: 30, window: "-10m" } }
+      })
+    ).toThrow(/rateLimit\.sendCodePerIP\.window/)
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { sendCodeCooldown: "-60s" }
+      })
+    ).toThrow(/rateLimit\.sendCodeCooldown/)
+  })
+
+  it("still accepts a zero duration, which deleteFreshWindow documents", () => {
+    // `"0s"` means no session is ever fresh enough to skip the emailed code —
+    // a real setting, not a mistake, so the negative check must stop at zero.
+    expect(() =>
+      createAuthServer({ ...baseOptions(), user: { deleteFreshWindow: "0s" } })
+    ).not.toThrow()
+  })
+
   it("rejects a non-positive or fractional rate-limit max", () => {
     expect(() =>
       createAuthServer({
