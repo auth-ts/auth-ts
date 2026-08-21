@@ -1,9 +1,3 @@
-/** A sign-in identifier after normalization, tagged with the channel it belongs to. */
-export interface Identifier {
-  kind: "email" | "phoneNumber"
-  value: string
-}
-
 /**
  * Normalizes an email address: trimmed and lowercased.
  *
