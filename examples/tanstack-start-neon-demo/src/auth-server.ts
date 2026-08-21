@@ -301,9 +301,6 @@ const authDb: AuthDb = {
   }
 }
 
-const githubClientId = process.env.GITHUB_CLIENT_ID
-const googleClientId = process.env.GOOGLE_CLIENT_ID
-
 /**
  * The demo's auth server.
  *
@@ -331,31 +328,19 @@ export const authServer = createAuthServer({
   // you set with curl exercise the per-IP limits. Without it, IP limiting is
   // off by design — see ClientIpOptions.trustedProxies.
   clientIp: { trustedProxies: 1 },
-  baseURL: process.env.AUTH_BASE_URL,
+  baseURL: process.env.AUTH_BASE_URL as string,
   cookie: { path: "/" },
   logLevel: "info",
-  ...(githubClientId || googleClientId
-    ? {
-        providers: {
-          ...(githubClientId
-            ? {
-                github: {
-                  clientId: githubClientId,
-                  clientSecret: process.env.GITHUB_CLIENT_SECRET ?? ""
-                }
-              }
-            : {}),
-          ...(googleClientId
-            ? {
-                google: {
-                  clientId: googleClientId,
-                  clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? ""
-                }
-              }
-            : {})
-        }
-      }
-    : {})
+  providers: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID as string,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET as string
+    },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string
+    }
+  }
 })
 
 /** The type the browser client imports, type-only, to infer its own surface. */
