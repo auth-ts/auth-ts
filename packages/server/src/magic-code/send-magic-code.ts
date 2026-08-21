@@ -88,6 +88,9 @@ export async function sendMagicCode(
   })
 
   await deliver(internals, identifier, code, locale, purpose, headers)
+  // Channel and purpose only: the address is personal data and the code is a
+  // credential, so neither is ever handed to a log sink.
+  internals.log.info("magic code sent", { channel: identifier.kind, purpose })
 }
 
 /** Hands the code to the configured sender for its channel. */

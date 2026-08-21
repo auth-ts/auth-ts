@@ -1,7 +1,7 @@
 {
   "name": "@auth-ts/server",
   "version": "0.1.0",
-  "description": "Free forever JWT auth in TypeScript — callbacks to write into any database.",
+  "description": "Free forever JWT auth in TypeScript \u2014 callbacks to write into any database.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -22,11 +22,14 @@
     }
   },
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.build.json",
+    "build": "vite build && tsc -p tsconfig.build.json && bun scripts/check-edge-safety.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "jose": "6.2.9"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
   }
 }

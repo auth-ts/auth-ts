@@ -55,6 +55,7 @@ export const logout = defineEndpoint({
 
     const { options } = internals
     const scope = input.scope ?? "local"
+    internals.log.info("signing out", { scope })
 
     if (scope === "others") {
       // The current session and its cookie survive: this is the "sign out my

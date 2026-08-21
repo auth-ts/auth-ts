@@ -104,7 +104,14 @@ export interface UpsertUserInput {
   imageURL?: string
   type?: UserType
   primaryUserId?: string
-  /** Declared `additionalFields`, applied on insert. Spread them into your insert. */
+  /**
+   * Declared `additionalFields`. Spread them into your insert.
+   *
+   * Applied **on insert**, and on the id-targeted form — which is how
+   * `PATCH /user` edits them. They must be **ignored when merging into a row
+   * found by identifier**, exactly like `type`: that path is a sign-in, and a
+   * sign-in request that could rewrite profile columns is mass assignment.
+   */
   additionalFields?: Record<string, string | number | boolean>
 }
 

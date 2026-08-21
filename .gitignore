@@ -10,3 +10,4 @@ coverage
 .env.local
 .DS_Store
 routeTree.gen.ts
+dist

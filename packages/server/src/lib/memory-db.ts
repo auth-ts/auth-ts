@@ -59,13 +59,24 @@ export function createMemoryDb(): MemoryDb {
     return undefined
   }
 
-  /** Copies only the keys that were actually provided, so undefined means "leave alone". */
-  const mergeDefined = (target: StoredUser, input: UpsertUserInput) => {
+  /**
+   * Copies only the keys that were actually provided, so undefined means "leave alone".
+   *
+   * `applyAdditionalFields` is false on the identifier-keyed path: that is a
+   * sign-in, and letting a sign-in body rewrite profile columns would be mass
+   * assignment. The id-targeted path sets it, because that is how PATCH edits.
+   */
+  const mergeDefined = (
+    target: StoredUser,
+    input: UpsertUserInput,
+    applyAdditionalFields: boolean
+  ) => {
     const { id, type, additionalFields, ...fields } = input
     for (const [key, value] of Object.entries(fields)) {
       if (value !== undefined) target[key] = value
     }
-    if (additionalFields) Object.assign(target, additionalFields)
+    if (applyAdditionalFields && additionalFields)
+      Object.assign(target, additionalFields)
   }
 
   return {
@@ -74,7 +85,7 @@ export function createMemoryDb(): MemoryDb {
         const existing = users.get(input.id)
         if (!existing) throw new Error(`No user with id ${input.id}`)
 
-        mergeDefined(existing, input)
+        mergeDefined(existing, input, true)
         // The one place type may change: core converting a guest into a real user.
         if (input.type === "user" && existing.type === "guest")
           existing.type = "user"
@@ -86,9 +97,10 @@ export function createMemoryDb(): MemoryDb {
 
       const existing = findUserByIdentifier(input.email, input.phoneNumber)
       if (existing) {
-        // type is insert-only for identifier-keyed writes, or every admin would
-        // be demoted to "user" the next time they signed in.
-        mergeDefined(existing, input)
+        // type and additionalFields are both insert-only here: otherwise every
+        // admin would be demoted on their next sign-in, and any sign-in body
+        // could overwrite profile columns.
+        mergeDefined(existing, input, false)
         return { ...existing }
       }
 

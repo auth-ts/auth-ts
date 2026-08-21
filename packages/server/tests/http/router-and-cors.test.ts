@@ -1,0 +1,162 @@
+import { describe, expect, it } from "vitest"
+import { createTestServer } from "../helpers/create-test-server.ts"
+import { request } from "../helpers/request.ts"
+
+describe("matchRoute", () => {
+  it("dispatches every documented endpoint through the catch-all", async () => {
+    const { authServer } = await createTestServer({ guest: true })
+
+    // Unauthenticated is fine here — what matters is that none of these 404.
+    const probes: Array<[string, string]> = [
+      ["POST", "/api/auth/send-code"],
+      ["POST", "/api/auth/verify-code"],
+      ["POST", "/api/auth/token"],
+      ["POST", "/api/auth/logout"],
+      ["GET", "/api/auth/user"],
+      ["PATCH", "/api/auth/user"],
+      ["DELETE", "/api/auth/user"],
+      ["GET", "/api/auth/sessions"],
+      ["DELETE", "/api/auth/sessions/abc"],
+      ["POST", "/api/auth/sign-in/guest"],
+      ["GET", "/api/auth/connections"],
+      ["GET", "/api/auth/jwks.json"]
+    ]
+
+    for (const [method, path] of probes) {
+      const response = await authServer.handler(request(method, path))
+      expect([method, path, response.status]).not.toEqual([method, path, 404])
+    }
+  })
+
+  it("tolerates a trailing slash", async () => {
+    const { authServer } = await createTestServer()
+    expect(
+      (await authServer.handler(request("GET", "/api/auth/jwks.json/"))).status
+    ).toBe(200)
+  })
+
+  it("answers 405 for a known path with the wrong method, not 404", async () => {
+    const { authServer } = await createTestServer()
+    const response = await authServer.handler(
+      request("GET", "/api/auth/send-code")
+    )
+
+    expect(response.status).toBe(405)
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code
+    ).toBe("methodNotAllowed")
+  })
+
+  it("404s an unknown path inside the mount and anything outside it", async () => {
+    const { authServer } = await createTestServer()
+
+    expect(
+      (await authServer.handler(request("GET", "/api/auth/nope"))).status
+    ).toBe(404)
+    expect(
+      (await authServer.handler(request("GET", "/somewhere-else"))).status
+    ).toBe(404)
+  })
+
+  it("prefers the literal sign-in/guest route over the dynamic provider route", async () => {
+    const { authServer } = await createTestServer({
+      guest: true,
+      baseURL: "https://app.example.com",
+      providers: { github: { clientId: "id", clientSecret: "secret" } }
+    })
+
+    // POST reaches the guest endpoint; GET reaches the provider route, which has
+    // no provider called "guest" and so 404s rather than starting a flow.
+    expect(
+      (await authServer.handler(request("POST", "/api/auth/sign-in/guest")))
+        .status
+    ).toBe(200)
+    expect(
+      (await authServer.handler(request("GET", "/api/auth/sign-in/guest")))
+        .status
+    ).toBe(404)
+  })
+
+  it("keeps a percent-encoded slash inside one segment", async () => {
+    const { authServer } = await createTestServer()
+
+    // %2F must not split into two segments, or an id could smuggle a path.
+    const response = await authServer.handler(
+      request("DELETE", "/api/auth/sessions/abc%2Fdef")
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it("honours a custom basePath, including one written with a trailing slash", async () => {
+    const { authServer } = await createTestServer({ basePath: "/auth/" })
+
+    expect(authServer.options.basePath).toBe("/auth")
+    expect(
+      (await authServer.handler(request("GET", "/auth/jwks.json"))).status
+    ).toBe(200)
+    expect(
+      (await authServer.handler(request("GET", "/api/auth/jwks.json"))).status
+    ).toBe(404)
+  })
+})
+
+describe("cors", () => {
+  it("adds no CORS headers and does not answer preflights when unset", async () => {
+    const { authServer } = await createTestServer()
+
+    const response = await authServer.handler(
+      request("GET", "/api/auth/jwks.json")
+    )
+    expect(response.headers.get("access-control-allow-origin")).toBeNull()
+
+    const preflight = await authServer.handler(
+      request("OPTIONS", "/api/auth/token")
+    )
+    expect(preflight.status).not.toBe(204)
+  })
+
+  it("answers preflights and echoes an explicit origin, never a wildcard", async () => {
+    const { authServer } = await createTestServer({
+      cors: { origin: "https://app.example.com" }
+    })
+
+    const preflight = await authServer.handler(
+      request("OPTIONS", "/api/auth/token")
+    )
+    expect(preflight.status).toBe(204)
+    expect(preflight.headers.get("access-control-allow-origin")).toBe(
+      "https://app.example.com"
+    )
+    expect(preflight.headers.get("access-control-allow-credentials")).toBe(
+      "true"
+    )
+    expect(preflight.headers.get("access-control-allow-methods")).toContain(
+      "PATCH"
+    )
+    expect(preflight.headers.get("access-control-allow-methods")).toContain(
+      "DELETE"
+    )
+
+    const response = await authServer.handler(
+      request("GET", "/api/auth/jwks.json")
+    )
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "https://app.example.com"
+    )
+    expect(response.headers.get("access-control-allow-origin")).not.toBe("*")
+  })
+
+  it("keeps CORS headers on error responses too", async () => {
+    const { authServer } = await createTestServer({
+      cors: { origin: "https://app.example.com" }
+    })
+    const response = await authServer.handler(
+      request("POST", "/api/auth/token")
+    )
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "https://app.example.com"
+    )
+  })
+})

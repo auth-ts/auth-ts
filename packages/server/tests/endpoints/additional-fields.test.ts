@@ -1,0 +1,150 @@
+import { describe, expect, it } from "vitest"
+import { createTestServer } from "../helpers/create-test-server.ts"
+import { readSetCookies, request } from "../helpers/request.ts"
+import { required } from "../helpers/required.ts"
+
+const options = {
+  guest: true,
+  user: {
+    additionalFields: {
+      referralCode: "string",
+      seats: "number",
+      betaOptIn: "boolean"
+    } as const
+  }
+}
+
+type TestContext = Awaited<ReturnType<typeof createTestServer>>
+
+async function verifyWith(
+  context: TestContext,
+  email: string,
+  additionalFields?: Record<string, unknown>
+) {
+  await context.authServer.handler(
+    request("POST", "/api/auth/send-code", { body: { email } })
+  )
+
+  return context.authServer.handler(
+    request("POST", "/api/auth/verify-code", {
+      body: {
+        email,
+        code: required(context.sentCodes.at(-1), "code").code,
+        additionalFields
+      }
+    })
+  )
+}
+
+describe("additionalFields on sign-up", () => {
+  it("stores declared fields flat on the user when the account is created", async () => {
+    const context = await createTestServer(options)
+
+    const response = await verifyWith(context, "ada@example.com", {
+      referralCode: "ADA10",
+      seats: 3,
+      betaOptIn: true
+    })
+    const body = (await response.json()) as { user: Record<string, unknown> }
+
+    expect(body.user.referralCode).toBe("ADA10")
+    expect(body.user.seats).toBe(3)
+    expect(body.user.betaOptIn).toBe(true)
+  })
+
+  it("ignores them when the user already exists, which is the mass-assignment guard", async () => {
+    const context = await createTestServer(options)
+    await verifyWith(context, "ada@example.com", { referralCode: "ADA10" })
+
+    const second = await verifyWith(context, "ada@example.com", {
+      referralCode: "STOLEN"
+    })
+    const body = (await second.json()) as { user: Record<string, unknown> }
+
+    expect(body.user.referralCode).toBe("ADA10")
+  })
+
+  it("rejects an undeclared key", async () => {
+    const context = await createTestServer(options)
+    const response = await verifyWith(context, "ada@example.com", {
+      isAdmin: true
+    })
+
+    expect(response.status).toBe(400)
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code
+    ).toBe("invalidField")
+  })
+
+  it("rejects a declared key of the wrong primitive type", async () => {
+    const context = await createTestServer(options)
+    const response = await verifyWith(context, "ada@example.com", {
+      seats: "three"
+    })
+
+    expect(response.status).toBe(400)
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code
+    ).toBe("invalidField")
+  })
+
+  it("accepts them on guest sign-in too", async () => {
+    const context = await createTestServer(options)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/sign-in/guest", {
+        body: { additionalFields: { referralCode: "GUEST1" } }
+      })
+    )
+    const body = (await response.json()) as { user: Record<string, unknown> }
+
+    expect(body.user.referralCode).toBe("GUEST1")
+  })
+})
+
+describe("additionalFields on PATCH", () => {
+  it("accepts declared fields flat, beside name and imageURL", async () => {
+    const context = await createTestServer(options)
+    const signInResponse = await verifyWith(context, "ada@example.com")
+    const cookies = {
+      "auth-ts.refresh": required(
+        readSetCookies(signInResponse).get("auth-ts.refresh"),
+        "refresh"
+      ).value
+    }
+
+    const response = await context.authServer.handler(
+      request("PATCH", "/api/auth/user", {
+        cookies,
+        body: { name: "Ada", referralCode: "UPDATED", seats: 9 }
+      })
+    )
+    const body = (await response.json()) as { user: Record<string, unknown> }
+
+    expect(body.user.name).toBe("Ada")
+    expect(body.user.referralCode).toBe("UPDATED")
+    expect(body.user.seats).toBe(9)
+  })
+
+  it("still rejects identity fields and undeclared keys", async () => {
+    const context = await createTestServer(options)
+    const signInResponse = await verifyWith(context, "ada@example.com")
+    const cookies = {
+      "auth-ts.refresh": required(
+        readSetCookies(signInResponse).get("auth-ts.refresh"),
+        "refresh"
+      ).value
+    }
+
+    for (const body of [
+      { type: "admin" },
+      { email: "new@example.com" },
+      { somethingElse: 1 }
+    ]) {
+      const response = await context.authServer.handler(
+        request("PATCH", "/api/auth/user", { cookies, body })
+      )
+      expect(response.status).toBe(400)
+    }
+  })
+})
