@@ -433,6 +433,9 @@ export function resolveAuthServerOptions(
   const rateLimit =
     options.rateLimit === false ? false : resolveRateLimit(options.rateLimit)
 
+  // Resolved once: `accountsName` is derived from it, and the two must agree.
+  const cookieName = options.cookie?.name ?? "auth-ts.refresh"
+
   return {
     db: options.db,
     ...(options.email ? { email: options.email } : {}),
@@ -458,9 +461,9 @@ export function resolveAuthServerOptions(
       sliding: options.session?.sliding ?? true
     },
     cookie: {
-      name: options.cookie?.name ?? "auth-ts.refresh",
+      name: cookieName,
       path: options.cookie?.path ?? basePath,
-      accountsName: `${options.cookie?.name ?? "auth-ts.refresh"}.accounts`,
+      accountsName: `${cookieName}.accounts`,
       stateName: "auth-ts.state"
     },
     user: {
