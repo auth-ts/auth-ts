@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": [
+      "default",
+      "!{projectRoot}/tests/**/*",
+      "!{projectRoot}/**/*.test.ts",
+      "!{projectRoot}/**/*.test-d.ts"
+    ],
+    "sharedGlobals": [
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/biome.json"
+    ]
+  },
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist"],
+      "cache": true
+    },
+    "test": {
+      "inputs": ["default", "^production"],
+      "cache": true
+    },
+    "typecheck": {
+      "inputs": ["default", "^production"],
+      "cache": true
+    }
+  },
+  "release": {
+    "projects": ["packages/*"],
+    "projectsRelationship": "fixed",
+    "version": {
+      "conventionalCommits": true
+    },
+    "changelog": {
+      "workspaceChangelog": {
+        "createRelease": "github"
+      },
+      "projectChangelogs": false
+    }
+  }
+}

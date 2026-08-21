@@ -1,0 +1,63 @@
+const textEncoder = new TextEncoder()
+
+function toHex(buffer: ArrayBuffer) {
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+/**
+ * Hashes a value with SHA-256 and returns lowercase hex.
+ *
+ * Refresh tokens are stored this way: the database only ever sees the hash, so
+ * a leaked table cannot be replayed as a session, and a leaked token cannot be
+ * found in the table without also knowing it.
+ */
+export async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    textEncoder.encode(value)
+  )
+  return toHex(digest)
+}
+
+/**
+ * Signs a value with HMAC-SHA-256 under the server secret and returns lowercase hex.
+ *
+ * Magic codes are stored this way rather than as a bare hash. Six digits is only
+ * a million possibilities, so a plain SHA-256 of a code is reversible from a
+ * database read in about a second; keying the hash with a secret the database
+ * never holds means a database leak alone does not yield working codes.
+ */
+export async function hmacSha256Hex(value: string, secret: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  )
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    textEncoder.encode(value)
+  )
+  return toHex(signature)
+}
+
+/**
+ * Compares two hex digests in time that does not depend on where they differ.
+ *
+ * A `===` here would return as soon as it found a mismatching character, and the
+ * timing of that return leaks how much of a guess was correct.
+ */
+export function timingSafeEqualHex(left: string, right: string) {
+  if (left.length !== right.length) return false
+
+  let difference = 0
+  for (let index = 0; index < left.length; index++) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index)
+  }
+
+  return difference === 0
+}
