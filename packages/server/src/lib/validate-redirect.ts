@@ -17,6 +17,14 @@ export function validateRedirect(
 ) {
   if (!redirect) return "/"
 
+  // Reject C0 controls and DEL before any structural check. The URL parser
+  // strips tab, newline, and carriage return before parsing, so "/\t/evil.com"
+  // slips past the "//" test below and then resolves to evil.com anyway. No
+  // legitimate path contains these, so the whole range is refused rather than
+  // just the three known to be stripped today.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting them is the point
+  if (/[\u0000-\u001f\u007f]/.test(redirect)) return "/"
+
   const isRelativePath =
     redirect.startsWith("/") &&
     !redirect.startsWith("//") &&
