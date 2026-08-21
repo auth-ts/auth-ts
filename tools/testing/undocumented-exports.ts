@@ -49,6 +49,33 @@ const EXPORTED_DECLARATION =
 const DEFAULT_EXPORT = /^export default(?: |$)/
 
 /**
+ * Whether the comment block ending on the line above `index` is a doc comment.
+ *
+ * A doc comment opens with `/**`, and only that — a plain `/* note *\/` above an
+ * export is not documentation, and the gate would be weaker than it looks if
+ * it counted one. The opener is found by walking up from the closing `*\/`:
+ * the line above an export is just ` *\/` for a multi-line comment, so the
+ * closing line alone cannot tell the two apart. Body lines start with `*`, so
+ * the first line that *opens* a comment decides; a `/*` inside a body line is
+ * text, not an opener.
+ */
+function hasDocComment(lines: string[], index: number) {
+  if (!(lines[index - 1]?.trim() ?? "").endsWith("*/")) return false
+
+  for (let cursor = index - 1; cursor >= 0; cursor--) {
+    const candidate = lines[cursor]?.trim() ?? ""
+    // `/**\/` is an empty block comment, not a doc comment with nothing in it.
+    if (candidate.startsWith("/**")) return !candidate.startsWith("/**/")
+    if (candidate.startsWith("/*")) return false
+    // Still inside the block; keep walking up to its opener.
+    if (candidate.startsWith("*") || candidate.endsWith("*/")) continue
+    return false
+  }
+
+  return false
+}
+
+/**
  * Finds exported declarations with no doc comment immediately above them.
  *
  * These comments are not decoration. The documentation site renders API
@@ -57,7 +84,12 @@ const DEFAULT_EXPORT = /^export default(?: |$)/
  * option would simply not exist anywhere a reader can find it.
  */
 export function undocumentedExports(filePath: string) {
-  const lines = readFileSync(filePath, "utf8").split("\n")
+  return undocumentedExportsInSource(readFileSync(filePath, "utf8"))
+}
+
+/** The check behind {@link undocumentedExports}, on source text — so the gate itself can be tested. */
+export function undocumentedExportsInSource(source: string) {
+  const lines = source.split("\n")
   const undocumented: string[] = []
 
   for (const [index, line] of lines.entries()) {
@@ -65,8 +97,7 @@ export function undocumentedExports(filePath: string) {
     const name = matched?.[1] ?? (DEFAULT_EXPORT.test(line) ? "default" : null)
     if (name === null) continue
 
-    const previous = lines[index - 1]?.trim() ?? ""
-    if (!previous.endsWith("*/")) undocumented.push(name)
+    if (!hasDocComment(lines, index)) undocumented.push(name)
   }
 
   return undocumented

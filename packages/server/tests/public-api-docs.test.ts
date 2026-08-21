@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import {
   sourceFiles,
-  undocumentedExports
+  undocumentedExports,
+  undocumentedExportsInSource
 } from "../../../tools/testing/undocumented-exports.ts"
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../src")
@@ -89,6 +90,52 @@ describe("public API documentation", () => {
     }
 
     expect(undocumented).toEqual([])
+  })
+
+  it("accepts only a doc comment, not any comment, above an export", () => {
+    // Each of these used to pass because the line above ended with `*/`.
+    expect(
+      undocumentedExportsInSource(
+        [
+          "/* temporary note */",
+          "export const plainBlock = 1",
+          "/*",
+          " * Looks like a doc comment from the closing line alone.",
+          " */",
+          "export const multiLinePlainBlock = 2",
+          "/**/",
+          "export const emptyBlock = 3",
+          "// line comment",
+          "export const lineComment = 4",
+          "export const nothing = 5"
+        ].join("\n")
+      )
+    ).toEqual([
+      "plainBlock",
+      "multiLinePlainBlock",
+      "emptyBlock",
+      "lineComment",
+      "nothing"
+    ])
+
+    // And every real doc-comment shape still counts, including a body line that
+    // happens to contain `/*`, which must not be mistaken for the opener.
+    expect(
+      undocumentedExportsInSource(
+        [
+          "/** One line. */",
+          "export const oneLine = 1",
+          "/**",
+          " * Several lines.",
+          " *",
+          " * Mount once at `<basePath>/*` and it dispatches.",
+          " */",
+          "export function multiLine() {}",
+          "  /** Indented, inside a namespace or class body. */",
+          "  export type Indented = string"
+        ].join("\n")
+      )
+    ).toEqual([])
   })
 
   it("fails loudly when a sentinel is renamed, instead of scanning nothing", () => {
