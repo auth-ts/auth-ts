@@ -473,6 +473,30 @@ describe("oauth callback", () => {
     expect(db.users()).toHaveLength(0)
   })
 
+  it("refuses a state cookie at a different provider's callback, even a genuine one", async () => {
+    // Path scoping keeps a browser from sending this, but the writer the
+    // signature defends against can plant a cookie at any path. The provider
+    // is signed in, so a GitHub start cannot complete a Google callback.
+    const { authServer, db } = await createTestServer({
+      ...OAUTH_OPTIONS,
+      providers: {
+        ...OAUTH_OPTIONS.providers,
+        google: { clientId: "client-id", clientSecret: "client-secret" }
+      }
+    })
+    const { stateCookie, state } = await startSignIn(authServer)
+    expect(decodeState(stateCookie).provider).toBe("github")
+
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/google?code=abc&state=${state}`, {
+        cookies: { "auth-ts.state": stateCookie }
+      })
+    )
+
+    expect(response.status).toBe(401)
+    expect(db.users()).toHaveLength(0)
+  })
+
   it("rejects a mismatched state, which is the CSRF guard", async () => {
     const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie } = await startSignIn(authServer)
