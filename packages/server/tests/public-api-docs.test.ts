@@ -107,7 +107,10 @@ describe("public API documentation", () => {
           "export const emptyBlock = 3",
           "// line comment",
           "export const lineComment = 4",
-          "export const nothing = 5"
+          "export const nothing = 5",
+          "declare module \"augmented\" {",
+          "  export interface IndentedNothing {}",
+          "}"
         ].join("\n")
       )
     ).toEqual([
@@ -115,7 +118,8 @@ describe("public API documentation", () => {
       "multiLinePlainBlock",
       "emptyBlock",
       "lineComment",
-      "nothing"
+      "nothing",
+      "IndentedNothing"
     ])
 
     // And every real doc-comment shape still counts, including a body line that
@@ -131,8 +135,10 @@ describe("public API documentation", () => {
           " * Mount once at `<basePath>/*` and it dispatches.",
           " */",
           "export function multiLine() {}",
-          "  /** Indented, inside a namespace or class body. */",
-          "  export type Indented = string"
+          "declare module \"augmented\" {",
+          "  /** Indented, inside a declare-module or namespace block. */",
+          "  export type Indented = string",
+          "}"
         ].join("\n")
       )
     ).toEqual([])

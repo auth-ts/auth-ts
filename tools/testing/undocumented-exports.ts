@@ -41,12 +41,16 @@ export function sourceFiles(directory: string): string[] {
  * The name is required, which is what keeps re-export lines — `export {` and
  * `export type {` — out of the check. An anonymous `export default` has no
  * name to require, so it is matched separately below.
+ *
+ * Leading whitespace is allowed so exports nested in a `declare module` or
+ * `namespace` block are scanned like top-level ones; indentation is not a
+ * reason for an export to ship undocumented.
  */
 const EXPORTED_DECLARATION =
-  /^export (?:declare )?(?:default )?(?:abstract )?(?:async )?(?:function\*?|const|let|var|enum|class|interface|type) ([A-Za-z0-9_$]+)/
+  /^\s*export (?:declare )?(?:default )?(?:abstract )?(?:async )?(?:function\*?|const|let|var|enum|class|interface|type) ([A-Za-z0-9_$]+)/
 
 /** Any remaining default export, which may be anonymous and so unnamed. */
-const DEFAULT_EXPORT = /^export default(?: |$)/
+const DEFAULT_EXPORT = /^\s*export default(?: |$)/
 
 /**
  * Whether the comment block ending on the line above `index` is a doc comment.
