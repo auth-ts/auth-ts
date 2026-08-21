@@ -26,7 +26,7 @@ function LandingPage() {
   return (
     <main className="mx-auto flex max-w-3xl flex-1 flex-col justify-center gap-10 px-6 py-24">
       <div className="space-y-4">
-        <h1 className="text-4xl font-semibold tracking-tight">auth-ts</h1>
+        <h1 className="text-4xl font-semibold tracking-tight">Auth.ts</h1>
         <p className="text-fd-muted-foreground text-lg">
           Free forever JWT auth in TypeScript — callbacks to write into any
           database. No adapters, no service, no company.
