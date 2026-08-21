@@ -104,10 +104,17 @@ export const callbackProvider = defineEndpoint({
       )
     }
 
-    if (payload.intent === "connect") {
+    const active = await resolveSession(internals, input.headers)
+
+    // Linking only means linking for a real user. A guest who "connects" a
+    // provider is really signing in: the identity decides whether they upgrade
+    // in place or merge into the account it already belongs to, and they get a
+    // session for the result — exactly what `/sign-in/:provider` would do.
+    if (payload.intent === "connect" && active?.user.type !== "guest") {
       return connectIdentity(
         internals,
         input,
+        active,
         payload.userId,
         identity,
         locale,
@@ -120,7 +127,6 @@ export const callbackProvider = defineEndpoint({
     // lives inside resolveOAuthUser so the guest path runs the same
     // connection-first cascade as everyone else — a provider account already
     // linked to an account is never silently re-pointed at the guest.
-    const active = await resolveSession(internals, input.headers)
     const user = await resolveOAuthUser(internals, input.provider, identity, {
       additionalFields: payload.additionalFields ?? {},
       ...(active?.user.type === "guest" ? { guest: active.user } : {})
@@ -151,13 +157,13 @@ export const callbackProvider = defineEndpoint({
 async function connectIdentity(
   internals: AuthServerInternalsAlias,
   input: CallbackProviderInput,
+  resolved: Awaited<ReturnType<typeof resolveSession>>,
   expectedUserId: string | undefined,
   identity: ProviderIdentity,
   locale: string,
   clearState: string,
   redirect: string
 ) {
-  const resolved = await resolveSession(internals, input.headers)
   if (!resolved || !expectedUserId || resolved.user.id !== expectedUserId) {
     return errorPage(internals, "unauthenticated", locale, clearState)
   }

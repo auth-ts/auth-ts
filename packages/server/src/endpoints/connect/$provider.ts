@@ -15,6 +15,10 @@ export interface ConnectProviderInput extends SignInProviderInput {}
  *
  * Requires a session up front, and records that user's id in the state so the
  * callback can insist the same person is still signed in when they come back.
+ *
+ * For a guest this is a sign-in wearing a different URL: there is no account to
+ * link to yet, so the callback upgrades or merges them exactly as
+ * `/sign-in/:provider` would.
  */
 export const connectProvider = defineEndpoint({
   method: "GET",
