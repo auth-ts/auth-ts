@@ -116,8 +116,14 @@ export interface UpsertSessionInput {
   tokenHash: string
   createdAt: Date
   expiresAt: Date
-  userAgent?: string
-  ipAddress?: string
+  /**
+   * Nullable rather than merely optional so that a session read from your table
+   * can be written straight back without reshaping. Unlike `upsertUser`, this is
+   * a whole-row write, so there is no "leave this field alone" case to confuse
+   * `null` with.
+   */
+  userAgent?: string | null
+  ipAddress?: string | null
 }
 
 /** Fields written by {@link AuthDb.upsertMagicCode}. */

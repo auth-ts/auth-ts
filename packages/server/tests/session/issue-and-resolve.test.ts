@@ -4,6 +4,7 @@ import { issueSession } from "../../src/session/issue-session.ts"
 import { resolveSession } from "../../src/session/resolve-session.ts"
 import { createTestInternals } from "../helpers/create-test-internals.ts"
 import { readSetCookies } from "../helpers/request.ts"
+import { required } from "../helpers/required.ts"
 
 const REQUEST_URL = "https://app.example.com/api/auth/verify-code"
 
@@ -132,7 +133,7 @@ describe("issueSession", () => {
     const converted = await db.getUser({ id: guest.id })
 
     const issued = await issueSession(internals, {
-      user: converted!,
+      user: required(converted, "converted guest"),
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -245,7 +246,9 @@ describe("resolveSession", () => {
       mode: "token"
     })
     const [stored] = db.sessions()
-    await db.deleteSession({ tokenHash: stored!.tokenHash })
+    await db.deleteSession({
+      tokenHash: required(stored, "stored session").tokenHash
+    })
 
     const headers = new Headers({
       cookie: `auth-ts.refresh=${issued.refreshToken}`
@@ -267,7 +270,7 @@ describe("resolveSession", () => {
 
     const [stored] = db.sessions()
     await db.upsertSession({
-      ...stored!,
+      ...required(stored, "stored session"),
       expiresAt: new Date(Date.now() - 1000)
     })
 
@@ -288,7 +291,10 @@ describe("resolveSession", () => {
     })
 
     const [stored] = db.sessions()
-    await db.upsertSession({ ...stored!, userId: "vanished-user" })
+    await db.upsertSession({
+      ...required(stored, "stored session"),
+      userId: "vanished-user"
+    })
 
     const headers = new Headers({
       cookie: `auth-ts.refresh=${issued.refreshToken}`
