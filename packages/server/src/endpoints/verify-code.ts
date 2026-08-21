@@ -51,7 +51,7 @@ export const verifyCode = defineEndpoint({
     }
 
     if (internals.options.rateLimit !== false) {
-      const clientIp = getClientIp(headers)
+      const clientIp = getClientIp(headers, internals.options.clientIp)
       if (clientIp) {
         await checkRateLimit(
           internals,

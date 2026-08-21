@@ -27,6 +27,17 @@ import { readRefreshToken } from "./resolve-session.ts"
  */
 export type IssueMode = "cookie" | "token"
 
+/** User-agent and validated client IP for a session row, from the request headers. */
+function sessionStamp(internals: AuthServerInternals, headers: Headers) {
+  const userAgent = headers.get("user-agent")
+  const ipAddress = getClientIp(headers, internals.options.clientIp)
+
+  return {
+    ...(userAgent ? { userAgent } : {}),
+    ...(ipAddress ? { ipAddress } : {})
+  }
+}
+
 /** What issuing a session produced. */
 export interface IssueResult {
   accessToken: string
@@ -72,12 +83,7 @@ export async function issueSession(
     tokenHash,
     createdAt: now,
     expiresAt: new Date(now.getTime() + parseDuration(options.session.ttl)),
-    ...(headers.get("user-agent")
-      ? { userAgent: headers.get("user-agent") as string }
-      : {}),
-    ...(getClientIp(headers)
-      ? { ipAddress: getClientIp(headers) as string }
-      : {})
+    ...sessionStamp(internals, headers)
   })
 
   const responseHeaders = new Headers()
@@ -184,11 +190,6 @@ export async function slideSession(
     expiresAt: new Date(
       Date.now() + parseDuration(internals.options.session.ttl)
     ),
-    ...(headers.get("user-agent")
-      ? { userAgent: headers.get("user-agent") as string }
-      : {}),
-    ...(getClientIp(headers)
-      ? { ipAddress: getClientIp(headers) as string }
-      : {})
+    ...sessionStamp(internals, headers)
   })
 }

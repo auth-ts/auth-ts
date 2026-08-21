@@ -270,7 +270,9 @@ describe("sendMagicCode", () => {
   })
 
   it("counts per-ip sends from the proxy header", async () => {
-    const { internals, db } = await createTestInternals()
+    const { internals, db } = await createTestInternals({
+      clientIp: { trustedProxies: 1 }
+    })
     const headers = new Headers({ "x-forwarded-for": "203.0.113.7" })
 
     await sendMagicCode(internals, {

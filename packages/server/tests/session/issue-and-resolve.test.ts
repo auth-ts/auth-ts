@@ -76,11 +76,14 @@ describe("issueSession", () => {
   })
 
   it("stamps user agent and the client ip from proxy headers", async () => {
-    const { internals, db } = await createTestInternals()
+    // Two entries with one trusted proxy: the rightmost is what the proxy wrote.
+    const { internals, db } = await createTestInternals({
+      clientIp: { trustedProxies: 1 }
+    })
     const user = await db.upsertUser({ email: "ada@example.com" })
     const headers = new Headers({
       "user-agent": "TestBrowser/1.0",
-      "x-forwarded-for": "203.0.113.7, 10.0.0.1"
+      "x-forwarded-for": "9.9.9.9, 203.0.113.7"
     })
 
     await issueSession(internals, { user, headers, requestURL: REQUEST_URL })

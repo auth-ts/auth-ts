@@ -90,9 +90,14 @@ code cannot sign anyone in.
 
 ## Deploying
 
-Confirm which header your platform sets for the client IP. If neither
-`X-Forwarded-For` nor `X-Real-IP` arrives, every visitor shares one rate-limit
-bucket, which is a self-inflicted denial of service on your own sign-in page.
+Declare your proxy topology with `clientIp.trustedProxies`. The forwarded
+header is written by whoever talks to your outermost proxy, and a client sets it
+freely — so IP-keyed limits derive nothing until you say how many proxies you
+run, and the real client is read from that fixed position in the chain rather
+than the spoofable leftmost entry. Set it wrong-low and you get no IP limiting
+(the per-identifier limits still hold); leave it at the default zero and the
+same is true. The extracted value is validated as an IP, so an oversized or
+forged header can never become a rate-limit key or a stored column.
 
 If your database exposes a REST API, check what it grants by default. Neon, for
 example, grants the `authenticated` role full access to everything in `public`
