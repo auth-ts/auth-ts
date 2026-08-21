@@ -1,5 +1,5 @@
-import type { AuthUser } from "../core/auth-db.ts";
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
+import type { AuthUser } from "../core/auth-db.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 /**
  * Where the refresh token goes.
  *
@@ -8,22 +8,22 @@ import type { AuthServerInternals } from "../core/auth-server-internals.ts";
  * cookie jar — with the consequence, documented loudly, that the client is then
  * responsible for storing a long-lived credential safely.
  */
-export type IssueMode = "cookie" | "token";
+export type IssueMode = "cookie" | "token"
 /** What issuing a session produced. */
 export interface IssueResult {
-    accessToken: string;
-    user: AuthUser;
-    /** Present only in `"token"` mode. */
-    refreshToken?: string;
-    /** `Set-Cookie` headers the caller must send. */
-    headers: Headers;
+  accessToken: string
+  user: AuthUser
+  /** Present only in `"token"` mode. */
+  refreshToken?: string
+  /** `Set-Cookie` headers the caller must send. */
+  headers: Headers
 }
 /** Everything issuing needs from the request. */
 export interface IssueSessionInput {
-    user: AuthUser;
-    headers: Headers;
-    requestURL: string;
-    mode?: IssueMode;
+  user: AuthUser
+  headers: Headers
+  requestURL: string
+  mode?: IssueMode
 }
 /**
  * Creates a session and mints an access token — the single path every sign-in
@@ -37,7 +37,10 @@ export interface IssueSessionInput {
  * identity; the stored hash proves nothing on its own, so a leaked table cannot
  * be replayed and a leaked token cannot be located in the table.
  */
-export declare function issueSession(internals: AuthServerInternals, { user, headers, requestURL, mode }: IssueSessionInput): Promise<IssueResult>;
+export declare function issueSession(
+  internals: AuthServerInternals,
+  { user, headers, requestURL, mode }: IssueSessionInput
+): Promise<IssueResult>
 /**
  * Signs an access token for a user.
  *
@@ -46,7 +49,10 @@ export declare function issueSession(internals: AuthServerInternals, { user, hea
  * is deliberately never included — it describes a pending data migration, not who
  * is signed in.
  */
-export declare function mintAccessToken(internals: AuthServerInternals, user: AuthUser): Promise<string>;
+export declare function mintAccessToken(
+  internals: AuthServerInternals,
+  user: AuthUser
+): Promise<string>
 /**
  * Extends a session's expiry on refresh, when sliding is enabled.
  *
@@ -54,10 +60,14 @@ export declare function mintAccessToken(internals: AuthServerInternals, user: Au
  * which is what account deletion checks. Sliding it would let a browser left open
  * for a month look freshly authenticated.
  */
-export declare function slideSession(internals: AuthServerInternals, session: {
-    id: string;
-    userId: string;
-    tokenHash: string;
-    createdAt: Date;
-}, headers: Headers): Promise<void>;
+export declare function slideSession(
+  internals: AuthServerInternals,
+  session: {
+    id: string
+    userId: string
+    tokenHash: string
+    createdAt: Date
+  },
+  headers: Headers
+): Promise<void>
 //# sourceMappingURL=issue-session.d.ts.map

@@ -1,24 +1,24 @@
-import type { UserType } from "../core/auth-db.ts";
-import type { JwtAlgorithm } from "./import-signing-key.ts";
+import type { UserType } from "../core/auth-db.ts"
+import type { JwtAlgorithm } from "./import-signing-key.ts"
 /** A verified token's claims. */
 export interface TokenClaims {
-    /** The user id, absent on service tokens minted without one. */
-    sub?: string;
-    type?: UserType;
-    role?: string;
-    iss?: string;
-    aud?: string | string[];
-    iat: number;
-    exp: number;
-    [claim: string]: unknown;
+  /** The user id, absent on service tokens minted without one. */
+  sub?: string
+  type?: UserType
+  role?: string
+  iss?: string
+  aud?: string | string[]
+  iat: number
+  exp: number
+  [claim: string]: unknown
 }
 /** What {@link verifyToken} needs, resolved from the server options. */
 export interface VerifyTokenContext {
-    /** The public key. Web Crypto cannot verify with a private key. */
-    verificationKey: CryptoKey;
-    algorithm: JwtAlgorithm;
-    issuer?: string;
-    audience?: string;
+  /** The public key. Web Crypto cannot verify with a private key. */
+  verificationKey: CryptoKey
+  algorithm: JwtAlgorithm
+  issuer?: string
+  audience?: string
 }
 /**
  * Verifies a token locally — no database, no network.
@@ -38,5 +38,8 @@ export interface VerifyTokenContext {
  * algorithm, wrong audience or issuer, expired, or malformed. Callers get one
  * thing to check rather than a taxonomy of ways to be unauthenticated.
  */
-export declare function verifyToken(context: VerifyTokenContext, token: string): Promise<TokenClaims | null>;
+export declare function verifyToken(
+  context: VerifyTokenContext,
+  token: string
+): Promise<TokenClaims | null>
 //# sourceMappingURL=verify-token.d.ts.map

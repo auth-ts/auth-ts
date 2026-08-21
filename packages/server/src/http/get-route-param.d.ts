@@ -7,5 +7,8 @@
  *
  * @returns The segments, or `null` when the path is outside the mount.
  */
-export declare function splitPathSegments(pathname: string, basePath: string): string[] | null;
+export declare function splitPathSegments(
+  pathname: string,
+  basePath: string
+): string[] | null
 //# sourceMappingURL=get-route-param.d.ts.map

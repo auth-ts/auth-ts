@@ -1,14 +1,14 @@
-import type { HeadersInput } from "../session/resolve-session.ts";
+import type { HeadersInput } from "../session/resolve-session.ts"
 /** One entry in the "your devices" list. */
 export interface SessionInfo {
-    /** The browser-safe address of this session. */
-    id: string;
-    createdAt: Date;
-    expiresAt: Date;
-    userAgent?: string | null;
-    ipAddress?: string | null;
-    /** Whether this is the session making the request. */
-    current: boolean;
+  /** The browser-safe address of this session. */
+  id: string
+  createdAt: Date
+  expiresAt: Date
+  userAgent?: string | null
+  ipAddress?: string | null
+  /** Whether this is the session making the request. */
+  current: boolean
 }
 /**
  * Lists the signed-in user's sessions.
@@ -20,7 +20,10 @@ export interface SessionInfo {
  * path-scoped to the auth mount, so an application route cannot see it and
  * therefore cannot tell which session is the current one.
  */
-export declare const listSessions: import("../http/define-endpoint.ts").EndpointDefinition<HeadersInput, {
-    sessions: SessionInfo[];
-}>;
+export declare const listSessions: import("../http/define-endpoint.ts").EndpointDefinition<
+  HeadersInput,
+  {
+    sessions: SessionInfo[]
+  }
+>
 //# sourceMappingURL=sessions.d.ts.map

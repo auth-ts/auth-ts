@@ -6,5 +6,8 @@
  * document can point at a sibling rather than fighting over the root of the
  * domain.
  */
-export declare const getJwks: import("../http/define-endpoint.ts").EndpointDefinition<unknown, import("../jwt/build-jwks.ts").Jwks>;
+export declare const getJwks: import("../http/define-endpoint.ts").EndpointDefinition<
+  unknown,
+  import("../jwt/build-jwks.ts").Jwks
+>
 //# sourceMappingURL=jwks.json.d.ts.map

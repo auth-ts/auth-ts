@@ -12,6 +12,6 @@
  * clue.
  */
 export declare class AuthConfigError extends Error {
-    constructor(message: string);
+  constructor(message: string)
 }
 //# sourceMappingURL=auth-config-error.d.ts.map

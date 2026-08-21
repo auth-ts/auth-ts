@@ -1,16 +1,16 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
-import type { AnyEndpoint } from "./define-endpoint.ts";
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import type { AnyEndpoint } from "./define-endpoint.ts"
 /** A matched endpoint plus the dynamic segments pulled out of the path. */
 export interface RouteMatch {
-    endpoint: AnyEndpoint;
-    params: Record<string, string>;
+  endpoint: AnyEndpoint
+  params: Record<string, string>
 }
 /** One endpoint's path split into segments once, at construction. */
 interface CompiledRoute {
-    endpoint: AnyEndpoint;
-    segments: string[];
-    /** Literal routes are tried first, so `/sign-in/guest` beats `/sign-in/$provider`. */
-    isDynamic: boolean;
+  endpoint: AnyEndpoint
+  segments: string[]
+  /** Literal routes are tried first, so `/sign-in/guest` beats `/sign-in/$provider`. */
+  isDynamic: boolean
 }
 /**
  * Precompiles the endpoint registry into a matchable table.
@@ -18,7 +18,9 @@ interface CompiledRoute {
  * Built from the same registry the handlers and callables come from, so a route
  * cannot exist in one and be missing from another.
  */
-export declare function compileRoutes(registry: Readonly<Record<string, AnyEndpoint>>): CompiledRoute[];
+export declare function compileRoutes(
+  registry: Readonly<Record<string, AnyEndpoint>>
+): CompiledRoute[]
 /**
  * Finds the endpoint for a request within the mount.
  *
@@ -31,7 +33,11 @@ export declare function compileRoutes(registry: Readonly<Record<string, AnyEndpo
  * @throws {AuthApiError} `notFound` when nothing matches the path, or
  * `methodNotAllowed` when the path exists but the method does not.
  */
-export declare function matchRoute(internals: AuthServerInternals, request: Request, routes: CompiledRoute[]): RouteMatch;
+export declare function matchRoute(
+  internals: AuthServerInternals,
+  request: Request,
+  routes: CompiledRoute[]
+): RouteMatch
 /**
  * Extracts one endpoint's dynamic segments from a request URL.
  *
@@ -40,6 +46,9 @@ export declare function matchRoute(internals: AuthServerInternals, request: Requ
  * line up, which leaves the endpoint to reject a missing parameter with its own
  * error rather than the router guessing.
  */
-export declare function matchEndpointParams(internals: AuthServerInternals, request: Request, path: string): Record<string, string>;
-export {};
+export declare function matchEndpointParams(
+  internals: AuthServerInternals,
+  request: Request,
+  path: string
+): Record<string, string>
 //# sourceMappingURL=match-route.d.ts.map

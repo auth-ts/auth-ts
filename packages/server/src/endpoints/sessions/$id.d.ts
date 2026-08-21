@@ -1,8 +1,8 @@
 /** Input for revoking one session. */
 export interface RevokeSessionInput {
-    id: string;
-    headers?: Headers;
-    requestURL?: string;
+  id: string
+  headers?: Headers
+  requestURL?: string
 }
 /**
  * Revokes one of the signed-in user's sessions.
@@ -12,5 +12,8 @@ export interface RevokeSessionInput {
  * someone else's session is structurally impossible instead of depending on a
  * check being present.
  */
-export declare const revokeSession: import("../../http/define-endpoint.ts").EndpointDefinition<RevokeSessionInput, undefined>;
+export declare const revokeSession: import("../../http/define-endpoint.ts").EndpointDefinition<
+  RevokeSessionInput,
+  undefined
+>
 //# sourceMappingURL=$id.d.ts.map

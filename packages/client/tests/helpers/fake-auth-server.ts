@@ -59,6 +59,7 @@ export function fakeAccessToken({
 export function fakeAuthServer(): FakeAuthServer {
   const requests: RecordedRequest[] = []
   const replies = new Map<string, Array<StubbedReply | (() => StubbedReply)>>()
+  const served = new Map<string, number>()
 
   const key = (method: string, path: string) => `${method} ${path}`
 
@@ -84,8 +85,14 @@ export function fakeAuthServer(): FakeAuthServer {
         acceptLanguage: headers.get("accept-language")
       })
 
-      const queue = replies.get(key(method, url.pathname)) ?? []
-      const next = queue.length > 1 ? queue.shift() : queue[0]
+      // Replies are consumed in the order they were queued; once the queue runs
+      // out the last one repeats, so a test scripts only what it cares about.
+      const replyKey = key(method, url.pathname)
+      const queue = replies.get(replyKey) ?? []
+      const alreadyServed = served.get(replyKey) ?? 0
+      served.set(replyKey, alreadyServed + 1)
+
+      const next = queue[Math.min(alreadyServed, queue.length - 1)]
       const reply = typeof next === "function" ? next() : next
 
       if (!reply) {

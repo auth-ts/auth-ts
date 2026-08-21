@@ -1,4 +1,4 @@
-import type { LocalizationOptions } from "./get-error-message.ts";
+import type { LocalizationOptions } from "./get-error-message.ts"
 /**
  * Picks the locale for a request.
  *
@@ -14,5 +14,8 @@ import type { LocalizationOptions } from "./get-error-message.ts";
  * @param acceptLanguage - Raw `Accept-Language` header, if any.
  * @param localization - Configured locales and default.
  */
-export declare function resolveLocale(acceptLanguage: string | null | undefined, localization?: LocalizationOptions): string;
+export declare function resolveLocale(
+  acceptLanguage: string | null | undefined,
+  localization?: LocalizationOptions
+): string
 //# sourceMappingURL=resolve-locale.d.ts.map

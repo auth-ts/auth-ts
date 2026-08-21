@@ -12,11 +12,14 @@
  * @throws {AuthApiError} `notFound` when no `baseURL` is configured, since
  * without one there is no issuer to advertise.
  */
-export declare const getDiscovery: import("../../http/define-endpoint.ts").EndpointDefinition<unknown, {
-    issuer: string;
-    jwks_uri: string;
-    response_types_supported: string[];
-    subject_types_supported: string[];
-    id_token_signing_alg_values_supported: import("../../index.ts").JwtAlgorithm[];
-}>;
+export declare const getDiscovery: import("../../http/define-endpoint.ts").EndpointDefinition<
+  unknown,
+  {
+    issuer: string
+    jwks_uri: string
+    response_types_supported: string[]
+    subject_types_supported: string[]
+    id_token_signing_alg_values_supported: import("../../index.ts").JwtAlgorithm[]
+  }
+>
 //# sourceMappingURL=openid-configuration.d.ts.map

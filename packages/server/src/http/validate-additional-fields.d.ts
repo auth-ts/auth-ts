@@ -1,6 +1,6 @@
-import type { AdditionalFieldsSchema } from "../core/auth-server-options.ts";
+import type { AdditionalFieldsSchema } from "../core/auth-server-options.ts"
 /** A validated set of additional-field values. */
-export type AdditionalFieldValues = Record<string, string | number | boolean>;
+export type AdditionalFieldValues = Record<string, string | number | boolean>
 /**
  * Rejects a schema that redeclares a field core owns.
  *
@@ -11,7 +11,10 @@ export type AdditionalFieldValues = Record<string, string | number | boolean>;
  *
  * @throws {AuthConfigError} When a reserved name is declared.
  */
-export declare function assertNoReservedFields(schema: AdditionalFieldsSchema, reserved: readonly string[]): void;
+export declare function assertNoReservedFields(
+  schema: AdditionalFieldsSchema,
+  reserved: readonly string[]
+): void
 /**
  * Validates request-supplied additional fields against the declared schema.
  *
@@ -24,5 +27,8 @@ export declare function assertNoReservedFields(schema: AdditionalFieldsSchema, r
  * @param value - The untrusted `additionalFields` object from a request body.
  * @throws {AuthApiError} `invalidField` for undeclared keys or wrong types.
  */
-export declare function validateAdditionalFields(schema: AdditionalFieldsSchema, value: unknown): AdditionalFieldValues;
+export declare function validateAdditionalFields(
+  schema: AdditionalFieldsSchema,
+  value: unknown
+): AdditionalFieldValues
 //# sourceMappingURL=validate-additional-fields.d.ts.map

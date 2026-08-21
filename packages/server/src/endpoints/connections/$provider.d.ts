@@ -1,7 +1,7 @@
 /** Input for unlinking a provider. */
 export interface DisconnectProviderInput {
-    provider: string;
-    headers?: Headers;
+  provider: string
+  headers?: Headers
 }
 /**
  * Unlinks a provider from the signed-in user.
@@ -12,5 +12,8 @@ export interface DisconnectProviderInput {
  * GitHub and never added an email can remove GitHub and lock themselves out of
  * their own data permanently.
  */
-export declare const disconnectProvider: import("../../http/define-endpoint.ts").EndpointDefinition<DisconnectProviderInput, undefined>;
+export declare const disconnectProvider: import("../../http/define-endpoint.ts").EndpointDefinition<
+  DisconnectProviderInput,
+  undefined
+>
 //# sourceMappingURL=$provider.d.ts.map

@@ -1,10 +1,10 @@
-import type { IssueMode } from "../../session/issue-session.ts";
+import type { IssueMode } from "../../session/issue-session.ts"
 /** Body accepted by `POST /sign-in/guest`. */
 export interface SignInGuestInput {
-    additionalFields?: Record<string, unknown>;
-    mode?: IssueMode;
-    headers?: Headers;
-    requestURL?: string;
+  additionalFields?: Record<string, unknown>
+  mode?: IssueMode
+  headers?: Headers
+  requestURL?: string
 }
 /**
  * Signs in an anonymous user.
@@ -18,9 +18,12 @@ export interface SignInGuestInput {
  * asks. Worth telling users: a guest who loses the cookie loses the account,
  * until they connect a provider or verify an identifier.
  */
-export declare const signInGuest: import("../../http/define-endpoint.ts").EndpointDefinition<SignInGuestInput, {
-    accessToken: string;
-    user: import("../../index.ts").AuthUser;
-    refreshToken?: string | undefined;
-}>;
+export declare const signInGuest: import("../../http/define-endpoint.ts").EndpointDefinition<
+  SignInGuestInput,
+  {
+    accessToken: string
+    user: import("../../index.ts").AuthUser
+    refreshToken?: string | undefined
+  }
+>
 //# sourceMappingURL=guest.d.ts.map

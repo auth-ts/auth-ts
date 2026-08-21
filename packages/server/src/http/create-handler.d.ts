@@ -1,7 +1,7 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
-import type { AnyEndpoint } from "./define-endpoint.ts";
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import type { AnyEndpoint } from "./define-endpoint.ts"
 /** A mounted endpoint: what the consumer's framework calls. */
-export type AuthHandler = (request: Request) => Promise<Response>;
+export type AuthHandler = (request: Request) => Promise<Response>
 /**
  * Turns an endpoint declaration into an HTTP handler.
  *
@@ -14,7 +14,15 @@ export type AuthHandler = (request: Request) => Promise<Response>;
  * driven by configuration, so reading this function tells you everything that
  * happens around every endpoint.
  */
-export declare function createHandler(internals: AuthServerInternals, endpoint: AnyEndpoint): AuthHandler;
+export declare function createHandler(
+  internals: AuthServerInternals,
+  endpoint: AnyEndpoint
+): AuthHandler
 /** Mounts every endpoint in a registry, keyed by name. */
-export declare function createHandlers<Registry extends Record<string, AnyEndpoint>>(internals: AuthServerInternals, registry: Registry): Record<keyof Registry, AuthHandler>;
+export declare function createHandlers<
+  Registry extends Record<string, AnyEndpoint>
+>(
+  internals: AuthServerInternals,
+  registry: Registry
+): Record<keyof Registry, AuthHandler>
 //# sourceMappingURL=create-handler.d.ts.map

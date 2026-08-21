@@ -1,4 +1,4 @@
-import type { AuthErrorCode } from "./error-response.ts";
+import type { AuthErrorCode } from "./error-response.ts"
 /**
  * The built-in English message for every error code.
  *
@@ -11,15 +11,15 @@ import type { AuthErrorCode } from "./error-response.ts";
  * error text is the one part of a failed request that reliably reaches a screen,
  * a screenshot, or a support ticket.
  */
-export declare const builtInErrorMessages: Record<AuthErrorCode, string>;
+export declare const builtInErrorMessages: Record<AuthErrorCode, string>
 /** Consumer message overrides: a partial overlay per locale. */
-export type LocaleMessages = Partial<Record<AuthErrorCode, string>>;
+export type LocaleMessages = Partial<Record<AuthErrorCode, string>>
 /** Server-side message localization. */
 export interface LocalizationOptions {
-    /** Falls back to this locale when the request matches none. Defaults to `"en"`. */
-    defaultLocale?: string;
-    /** Per-locale overrides. Partial — anything missing falls through, never blank. */
-    messages?: Record<string, LocaleMessages>;
+  /** Falls back to this locale when the request matches none. Defaults to `"en"`. */
+  defaultLocale?: string
+  /** Per-locale overrides. Partial — anything missing falls through, never blank. */
+  messages?: Record<string, LocaleMessages>
 }
 /**
  * Resolves the message for a code in a locale.
@@ -31,7 +31,12 @@ export interface LocalizationOptions {
  * `{retryAfter}` is the only interpolation, and it applies to consumer overrides
  * too.
  */
-export declare function getErrorMessage(code: AuthErrorCode, locale: string | undefined, localization: LocalizationOptions | undefined, values?: {
-    retryAfter?: number;
-}): string;
+export declare function getErrorMessage(
+  code: AuthErrorCode,
+  locale: string | undefined,
+  localization: LocalizationOptions | undefined,
+  values?: {
+    retryAfter?: number
+  }
+): string
 //# sourceMappingURL=get-error-message.d.ts.map

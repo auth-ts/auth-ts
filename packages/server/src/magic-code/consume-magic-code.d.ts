@@ -1,5 +1,5 @@
-import type { MagicCodePurpose } from "../core/auth-db.ts";
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
+import type { MagicCodePurpose } from "../core/auth-db.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 /**
  * How many wrong guesses a code survives before it is burned.
  *
@@ -7,12 +7,12 @@ import type { AuthServerInternals } from "../core/auth-server-internals.ts";
  * digits needs a hundred thousand attempts on average, and this bounds an
  * attacker to five per code and three codes per ten minutes.
  */
-export declare const MAX_CODE_ATTEMPTS = 5;
+export declare const MAX_CODE_ATTEMPTS = 5
 /** What verifying a code needs to know. */
 export interface ConsumeMagicCodeInput {
-    identifier: string;
-    code: string;
-    purpose: MagicCodePurpose;
+  identifier: string
+  code: string
+  purpose: MagicCodePurpose
 }
 /**
  * Verifies and burns a magic code.
@@ -27,5 +27,8 @@ export interface ConsumeMagicCodeInput {
  *
  * @throws {AuthApiError} `invalidCode` on any failure.
  */
-export declare function consumeMagicCode(internals: AuthServerInternals, input: ConsumeMagicCodeInput): Promise<void>;
+export declare function consumeMagicCode(
+  internals: AuthServerInternals,
+  input: ConsumeMagicCodeInput
+): Promise<void>
 //# sourceMappingURL=consume-magic-code.d.ts.map

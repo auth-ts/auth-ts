@@ -1,21 +1,21 @@
-import type { AuthUser } from "../core/auth-db.ts";
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
+import type { AuthUser } from "../core/auth-db.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 /** Identity details learned during a sign-in that a guest is completing. */
 export interface GuestIdentity {
-    email?: string;
-    phoneNumber?: string;
-    name?: string;
-    imageURL?: string;
+  email?: string
+  phoneNumber?: string
+  name?: string
+  imageURL?: string
 }
 /** The outcome of converting a guest. */
 export interface GuestConversion {
-    /** The user the new session belongs to. */
-    user: AuthUser;
-    /**
-     * `"upgraded"` — the guest row became a real user, keeping its id.
-     * `"merged"` — the identifier already belonged to someone, so the guest points at them.
-     */
-    outcome: "upgraded" | "merged";
+  /** The user the new session belongs to. */
+  user: AuthUser
+  /**
+   * `"upgraded"` — the guest row became a real user, keeping its id.
+   * `"merged"` — the identifier already belonged to someone, so the guest points at them.
+   */
+  outcome: "upgraded" | "merged"
 }
 /**
  * Completes a sign-in performed by someone currently signed in as a guest.
@@ -33,5 +33,9 @@ export interface GuestConversion {
  * even desirable. The guest's session is replaced rather than parked, because
  * leaving a stranded anonymous account in an account switcher helps nobody.
  */
-export declare function convertGuest(internals: AuthServerInternals, guest: AuthUser, identity: GuestIdentity): Promise<GuestConversion>;
+export declare function convertGuest(
+  internals: AuthServerInternals,
+  guest: AuthUser,
+  identity: GuestIdentity
+): Promise<GuestConversion>
 //# sourceMappingURL=convert-guest.d.ts.map

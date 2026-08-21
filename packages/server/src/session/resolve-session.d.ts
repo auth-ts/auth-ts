@@ -1,5 +1,5 @@
-import type { AuthSession, AuthUser } from "../core/auth-db.ts";
-import type { AuthServerInternals } from "../core/auth-server-internals.ts";
+import type { AuthSession, AuthUser } from "../core/auth-db.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 /**
  * The minimal carrier for anything that reads the refresh cookie.
  *
@@ -10,14 +10,14 @@ import type { AuthServerInternals } from "../core/auth-server-internals.ts";
  * `cookie` cannot become a bug.
  */
 export interface HeadersInput {
-    headers: Headers;
+  headers: Headers
 }
 /** A resolved session together with its user and the hash that found it. */
 export interface ResolvedSession {
-    session: AuthSession;
-    user: AuthUser;
-    /** The lookup key. Never sent to the browser — `session.id` is the safe address. */
-    tokenHash: string;
+  session: AuthSession
+  user: AuthUser
+  /** The lookup key. Never sent to the browser — `session.id` is the safe address. */
+  tokenHash: string
 }
 /**
  * Extracts the raw refresh token from a request.
@@ -26,7 +26,10 @@ export interface ResolvedSession {
  * browser whose cookie is authoritative, and preferring a header there would let
  * a caller downgrade to a token they supplied.
  */
-export declare function readRefreshToken(internals: AuthServerInternals, headers: Headers): string | undefined;
+export declare function readRefreshToken(
+  internals: AuthServerInternals,
+  headers: Headers
+): string | undefined
 /**
  * Resolves the caller's session from the refresh cookie or bearer token.
  *
@@ -36,5 +39,8 @@ export declare function readRefreshToken(internals: AuthServerInternals, headers
  *
  * @returns The session and user, or `null` if there is no live session.
  */
-export declare function resolveSession(internals: AuthServerInternals, headers: Headers): Promise<ResolvedSession | null>;
+export declare function resolveSession(
+  internals: AuthServerInternals,
+  headers: Headers
+): Promise<ResolvedSession | null>
 //# sourceMappingURL=resolve-session.d.ts.map

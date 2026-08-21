@@ -1,8 +1,8 @@
 /** Body accepted by `POST /accounts/switch`. */
 export interface SwitchAccountInput {
-    userId: string;
-    headers?: Headers;
-    requestURL?: string;
+  userId: string
+  headers?: Headers
+  requestURL?: string
 }
 /**
  * Makes one of this browser's parked accounts the active one.
@@ -12,8 +12,11 @@ export interface SwitchAccountInput {
  * that changes is which cookie holds which token, so the tokens never become
  * readable by JavaScript at any point in the swap.
  */
-export declare const switchAccount: import("../../http/define-endpoint.ts").EndpointDefinition<SwitchAccountInput, {
-    accessToken: string;
-    user: import("../../index.ts").AuthUser;
-}>;
+export declare const switchAccount: import("../../http/define-endpoint.ts").EndpointDefinition<
+  SwitchAccountInput,
+  {
+    accessToken: string
+    user: import("../../index.ts").AuthUser
+  }
+>
 //# sourceMappingURL=switch.d.ts.map

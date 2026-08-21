@@ -1,14 +1,14 @@
-import type { IdentifierBody } from "../magic-code/resolve-code-identifier.ts";
-import type { IssueMode } from "../session/issue-session.ts";
+import type { IdentifierBody } from "../magic-code/resolve-code-identifier.ts"
+import type { IssueMode } from "../session/issue-session.ts"
 /** Body accepted by `POST /verify-code`. */
 export interface VerifyCodeInput extends IdentifierBody {
-    code: string;
-    /** `"token"` returns the refresh token in the body, for native clients. */
-    mode?: IssueMode;
-    /** Values for fields declared in `user.additionalFields`, applied on creation only. */
-    additionalFields?: Record<string, unknown>;
-    headers?: Headers;
-    requestURL?: string;
+  code: string
+  /** `"token"` returns the refresh token in the body, for native clients. */
+  mode?: IssueMode
+  /** Values for fields declared in `user.additionalFields`, applied on creation only. */
+  additionalFields?: Record<string, unknown>
+  headers?: Headers
+  requestURL?: string
 }
 /**
  * Verifies a code and starts a session.
@@ -20,9 +20,12 @@ export interface VerifyCodeInput extends IdentifierBody {
  * upgrading the guest row in place or attaching it to the account that already
  * owns the identifier.
  */
-export declare const verifyCode: import("../http/define-endpoint.ts").EndpointDefinition<VerifyCodeInput, {
-    accessToken: string;
-    user: import("../index.ts").AuthUser;
-    refreshToken?: string | undefined;
-}>;
+export declare const verifyCode: import("../http/define-endpoint.ts").EndpointDefinition<
+  VerifyCodeInput,
+  {
+    accessToken: string
+    user: import("../index.ts").AuthUser
+    refreshToken?: string | undefined
+  }
+>
 //# sourceMappingURL=verify-code.d.ts.map

@@ -11,5 +11,8 @@
  * @param redirect - Untrusted `?redirect=` value.
  * @param allowlist - Optional exact paths; when given, the value must be one of them.
  */
-export declare function validateRedirect(redirect: string | null | undefined, allowlist?: readonly string[]): string;
+export declare function validateRedirect(
+  redirect: string | null | undefined,
+  allowlist?: readonly string[]
+): string
 //# sourceMappingURL=validate-redirect.d.ts.map

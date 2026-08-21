@@ -1,4 +1,4 @@
-import type { JWK } from "jose";
+import type { JWK } from "jose"
 /**
  * The signing algorithm.
  *
@@ -7,20 +7,20 @@ import type { JWK } from "jose";
  * switch to. Symmetric algorithms are structurally impossible here — a JWKS
  * endpoint cannot publish an HMAC secret without publishing the ability to forge.
  */
-export type JwtAlgorithm = "RS256" | "ES256";
+export type JwtAlgorithm = "RS256" | "ES256"
 /** An imported key pair: what signs, what verifies, and what gets published. */
 export interface SigningKeyMaterial {
-    /** Private key — signs tokens, never leaves the server. */
-    signingKey: CryptoKey;
-    /**
-     * Public key — verifies tokens.
-     *
-     * Separate from {@link SigningKeyMaterial.signingKey} because Web Crypto
-     * requires it to be: `verify` rejects a private key outright.
-     */
-    verificationKey: CryptoKey;
-    /** The public JWK, already carrying `kid`, `alg`, and `use`. */
-    publicJwk: JWK;
+  /** Private key — signs tokens, never leaves the server. */
+  signingKey: CryptoKey
+  /**
+   * Public key — verifies tokens.
+   *
+   * Separate from {@link SigningKeyMaterial.signingKey} because Web Crypto
+   * requires it to be: `verify` rejects a private key outright.
+   */
+  verificationKey: CryptoKey
+  /** The public JWK, already carrying `kid`, `alg`, and `use`. */
+  publicJwk: JWK
 }
 /**
  * Imports a PKCS#8 private key and derives the public JWK to serve from JWKS.
@@ -32,7 +32,11 @@ export interface SigningKeyMaterial {
  *
  * @throws {Error} If the PEM cannot be parsed as a key for this algorithm.
  */
-export declare function importSigningKey(privateKeyPem: string, algorithm: JwtAlgorithm, kid: string): Promise<SigningKeyMaterial>;
+export declare function importSigningKey(
+  privateKeyPem: string,
+  algorithm: JwtAlgorithm,
+  kid: string
+): Promise<SigningKeyMaterial>
 /**
  * Imports an additional public key (SPKI PEM) to publish alongside the current one.
  *
@@ -41,5 +45,8 @@ export declare function importSigningKey(privateKeyPem: string, algorithm: JwtAl
  * so a stable value derived from the key itself is both sufficient and impossible
  * to get wrong.
  */
-export declare function importAdditionalPublicKey(publicKeyPem: string, algorithm: JwtAlgorithm): Promise<JWK>;
+export declare function importAdditionalPublicKey(
+  publicKeyPem: string,
+  algorithm: JwtAlgorithm
+): Promise<JWK>
 //# sourceMappingURL=import-signing-key.d.ts.map
