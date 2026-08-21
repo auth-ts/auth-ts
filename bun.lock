@@ -15,6 +15,13 @@
         "vitest": "4.1.11",
       },
     },
+    "packages/client": {
+      "name": "@auth-ts/client",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@auth-ts/server": "workspace:*",
+      },
+    },
     "packages/server": {
       "name": "@auth-ts/server",
       "version": "0.1.0",
@@ -27,6 +34,8 @@
     },
   },
   "packages": {
+    "@auth-ts/client": ["@auth-ts/client@workspace:packages/client"],
+
     "@auth-ts/server": ["@auth-ts/server@workspace:packages/server"],
 
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
