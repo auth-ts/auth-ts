@@ -302,6 +302,25 @@ const authDb: AuthDb = {
 }
 
 /**
+ * Reads `AUTH_TRUSTED_PROXIES` as a whole number of hops, or 0 when unset.
+ *
+ * Only a plain decimal string is accepted. `Number()` alone would turn `" "`
+ * into 0 and `"0x10"` or `"1e1"` into counts nobody wrote — each a silent
+ * change to which forwarded entry is trusted, which is exactly the knob this
+ * variable exists to set deliberately.
+ */
+function trustedProxiesFromEnv() {
+  const raw = process.env.AUTH_TRUSTED_PROXIES
+  if (raw === undefined) return 0
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(
+      `AUTH_TRUSTED_PROXIES must be a whole number of proxies, not ${JSON.stringify(raw)}. Leave it unset when the app is reached directly.`
+    )
+  }
+  return Number(raw)
+}
+
+/**
  * The demo's auth server.
  *
  * `cookie.path` is `"/"` because the loaders read the session during
@@ -334,11 +353,7 @@ export const authServer = createAuthServer({
   // it choose its own rate-limit key. Unset means 0, which leaves per-IP
   // limiting off rather than keying it on a spoofable header — see
   // ClientIpOptions.trustedProxies. A non-integer here fails at startup.
-  clientIp: {
-    trustedProxies: process.env.AUTH_TRUSTED_PROXIES
-      ? Number(process.env.AUTH_TRUSTED_PROXIES)
-      : 0
-  },
+  clientIp: { trustedProxies: trustedProxiesFromEnv() },
   baseURL: process.env.AUTH_BASE_URL as string,
   cookie: { path: "/" },
   logLevel: "info",
