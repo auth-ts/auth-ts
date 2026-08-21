@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { AuthConfigError } from "../../src/http/auth-config-error.ts"
 import { createTestServer } from "../helpers/create-test-server.ts"
 import { readSetCookies, request } from "../helpers/request.ts"
@@ -59,6 +59,60 @@ describe("getToken as a function", () => {
       )?.sub
     ).toBe(result?.user.id)
     expect(after).toBeGreaterThanOrEqual(before)
+  })
+
+  it("reports the expiry sliding just persisted, not the one it read", async () => {
+    vi.useFakeTimers()
+    try {
+      const context = await createTestServer({
+        cookie: { path: "/" },
+        session: { ttl: "30d" }
+      })
+      const refreshToken = await signIn(context)
+      const before = required(context.db.sessions()[0], "session").expiresAt
+
+      vi.advanceTimersByTime(60 * 60_000)
+      const result = required(
+        await context.authServer.getToken({
+          headers: cookieHeaders(refreshToken)
+        }),
+        "result"
+      )
+      const stored = required(context.db.sessions()[0], "session").expiresAt
+
+      // Regression: this returned `before` — the row as it was before the slide.
+      expect(stored.getTime()).toBeGreaterThan(before.getTime())
+      expect(result.session.expiresAt.getTime()).toBe(stored.getTime())
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("reports the unchanged expiry when sliding is off", async () => {
+    vi.useFakeTimers()
+    try {
+      const context = await createTestServer({
+        cookie: { path: "/" },
+        session: { ttl: "30d", sliding: false }
+      })
+      const refreshToken = await signIn(context)
+      const before = required(context.db.sessions()[0], "session").expiresAt
+
+      vi.advanceTimersByTime(60 * 60_000)
+      const result = required(
+        await context.authServer.getToken({
+          headers: cookieHeaders(refreshToken)
+        }),
+        "result"
+      )
+
+      expect(result.session.expiresAt.getTime()).toBe(before.getTime())
+      expect(
+        required(context.db.sessions()[0], "session").expiresAt.getTime()
+      ).toBe(before.getTime())
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("accepts a Request directly, since it satisfies the headers shape", async () => {
