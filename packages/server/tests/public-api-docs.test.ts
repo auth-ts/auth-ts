@@ -22,6 +22,35 @@ function sourceFiles(directory: string): string[] {
   })
 }
 
+/**
+ * Slices the block a check should scan, refusing to guess when a marker moved.
+ *
+ * `indexOf` answers -1 for text that has been renamed, and `slice(-1)` quietly
+ * returns the final character — a scan over nothing, which passes. These checks
+ * exist to fail when documentation is missing, so a sentinel that no longer
+ * matches has to be louder than the thing it was guarding. The end marker is
+ * searched from `start` so a coincidental earlier match cannot produce an empty
+ * block either.
+ */
+function sliceBetweenMarkers(
+  source: string,
+  startMarker: string,
+  endMarker?: string
+) {
+  const start = source.indexOf(startMarker)
+  if (start === -1) {
+    throw new Error(`Marker no longer present in source: ${startMarker}`)
+  }
+  if (endMarker === undefined) return source.slice(start)
+
+  const end = source.indexOf(endMarker, start)
+  if (end === -1) {
+    throw new Error(`Marker no longer present in source: ${endMarker}`)
+  }
+
+  return source.slice(start, end)
+}
+
 /** Declarations that must carry a doc comment: an exported value or type. */
 const EXPORTED_DECLARATION =
   /^export (?:async function|function|const|class|interface|type|abstract class) ([A-Za-z0-9_]+)/
@@ -63,7 +92,7 @@ describe("public API documentation", () => {
 
   it("documents every field of the database contract, which consumers implement by hand", () => {
     const source = readFileSync(join(sourceRoot, "core/auth-db.ts"), "utf8")
-    const contract = source.slice(source.indexOf("export interface AuthDb {"))
+    const contract = sliceBetweenMarkers(source, "export interface AuthDb {")
     const lines = contract.split("\n")
 
     const undocumented: string[] = []
@@ -83,9 +112,10 @@ describe("public API documentation", () => {
       join(sourceRoot, "core/auth-server-options.ts"),
       "utf8"
     )
-    const optionsBlock = source.slice(
-      source.indexOf("export interface AuthServerOptions {"),
-      source.indexOf("/** Options after defaults")
+    const optionsBlock = sliceBetweenMarkers(
+      source,
+      "export interface AuthServerOptions {",
+      "/** Options after defaults"
     )
     const lines = optionsBlock.split("\n")
 
@@ -99,5 +129,25 @@ describe("public API documentation", () => {
     }
 
     expect(undocumented).toEqual([])
+  })
+
+  it("fails loudly when a sentinel is renamed, instead of scanning nothing", () => {
+    const source = "export interface AuthDb {\n  getUser(): void\n}\n"
+
+    // Without the guard this returns "\n" and every check below it passes.
+    expect(() =>
+      sliceBetweenMarkers(source, "export interface Renamed {")
+    ).toThrow(/Renamed/)
+    expect(() =>
+      sliceBetweenMarkers(source, "export interface AuthDb {", "/** reworded")
+    ).toThrow(/reworded/)
+
+    // And the happy path still returns the block it was asked for.
+    expect(sliceBetweenMarkers(source, "export interface AuthDb {")).toContain(
+      "getUser"
+    )
+    expect(
+      sliceBetweenMarkers(source, "export interface AuthDb {", "  getUser")
+    ).toBe("export interface AuthDb {\n")
   })
 })
