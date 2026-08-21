@@ -7,7 +7,6 @@ import { getProvider } from "../../oauth/providers/get-provider.ts"
 import type { ProviderIdentity } from "../../oauth/providers/oauth-provider.ts"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user.ts"
 import { clearStateCookie, readStateCookie } from "../../oauth/state-cookie.ts"
-import { convertGuest } from "../../session/convert-guest.ts"
 import { issueSession } from "../../session/issue-session.ts"
 import { resolveSession } from "../../session/resolve-session.ts"
 
@@ -117,33 +116,15 @@ export const callbackProvider = defineEndpoint({
       )
     }
 
+    // A signed-in guest converts rather than creating a new user. The lookup
+    // lives inside resolveOAuthUser so the guest path runs the same
+    // connection-first cascade as everyone else — a provider account already
+    // linked to an account is never silently re-pointed at the guest.
     const active = await resolveSession(internals, input.headers)
-    const user =
-      active?.user.type === "guest" && identity.email
-        ? (
-            await convertGuest(internals, active.user, {
-              email: identity.email,
-              ...(identity.name ? { name: identity.name } : {}),
-              ...(identity.imageURL ? { imageURL: identity.imageURL } : {})
-            })
-          ).user
-        : await resolveOAuthUser(
-            internals,
-            input.provider,
-            identity,
-            payload.additionalFields ?? {}
-          )
-
-    // A guest converting through OAuth still needs the connection recorded, or
-    // their next sign-in would not find them by provider id.
-    if (active?.user.type === "guest") {
-      await internals.db.upsertConnection({
-        userId: user.id,
-        provider: input.provider,
-        providerAccountId: identity.providerAccountId,
-        ...(identity.email ? { email: identity.email } : {})
-      })
-    }
+    const user = await resolveOAuthUser(internals, input.provider, identity, {
+      additionalFields: payload.additionalFields ?? {},
+      ...(active?.user.type === "guest" ? { guest: active.user } : {})
+    })
 
     const issued = await issueSession(internals, {
       user,

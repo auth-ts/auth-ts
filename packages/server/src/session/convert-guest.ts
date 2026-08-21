@@ -48,10 +48,7 @@ export async function convertGuest(
       : null
 
   if (existing && existing.id !== guest.id) {
-    await internals.db.upsertUser({ id: guest.id, primaryUserId: existing.id })
-    internals.log.info("guest sign-in resolved to an existing account")
-
-    return { user: existing, outcome: "merged" }
+    return mergeGuestInto(internals, guest, existing)
   }
 
   const upgraded = await internals.db.upsertUser({
@@ -65,4 +62,22 @@ export async function convertGuest(
   internals.log.info("guest upgraded in place, keeping its id and its rows")
 
   return { user: upgraded, outcome: "upgraded" }
+}
+
+/**
+ * Points a guest at the account that turned out to be theirs.
+ *
+ * Shared with OAuth, where the account is found by provider connection rather
+ * than by identifier, so that every way a guest can resolve to an existing user
+ * leaves the same `primaryUserId` breadcrumb for the application to act on.
+ */
+export async function mergeGuestInto(
+  internals: AuthServerInternals,
+  guest: AuthUser,
+  existing: AuthUser
+): Promise<GuestConversion> {
+  await internals.db.upsertUser({ id: guest.id, primaryUserId: existing.id })
+  internals.log.info("guest sign-in resolved to an existing account")
+
+  return { user: existing, outcome: "merged" }
 }

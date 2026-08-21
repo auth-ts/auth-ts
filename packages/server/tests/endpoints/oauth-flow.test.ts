@@ -169,6 +169,116 @@ describe("oauth callback", () => {
     expect(response.headers.get("content-type")).toContain("text/html")
   })
 
+  it("merges a guest into the account a provider identity is already linked to, without moving the link", async () => {
+    const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
+    const { authServer, db } = context
+    const owner = await db.upsertUser({
+      email: "owner@example.com",
+      type: "user"
+    })
+    await db.upsertConnection({
+      userId: owner.id,
+      provider: "github",
+      providerAccountId: "4242"
+    })
+    // A different account holds the email GitHub now reports — the exact
+    // situation where resolving by email alone would re-point the link.
+    const other = await db.upsertUser({
+      email: "other@example.com",
+      type: "user"
+    })
+    const guestResponse = await authServer.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const guestRefresh = required(
+      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      "refresh"
+    ).value
+    const guest = ((await guestResponse.json()) as { user: { id: string } })
+      .user
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({ id: 4242, emails: verifiedEmails("other@example.com") })
+
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: {
+          "auth-ts.state": stateCookie,
+          "auth-ts.refresh": guestRefresh
+        }
+      })
+    )
+
+    expect(response.status).toBe(302)
+    expect(
+      (
+        await db.getConnection({
+          provider: "github",
+          providerAccountId: "4242"
+        })
+      )?.userId
+    ).toBe(owner.id)
+    expect((await db.getUser({ id: guest.id }))?.primaryUserId).toBe(owner.id)
+    expect(await db.listConnections({ userId: other.id })).toEqual([])
+
+    const whoami = await authServer.handler(
+      request("GET", "/api/auth/user", {
+        cookies: {
+          "auth-ts.refresh": required(
+            readSetCookies(response).get("auth-ts.refresh"),
+            "refresh"
+          ).value
+        }
+      })
+    )
+    expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
+      owner.id
+    )
+  })
+
+  it("upgrades a guest in place for a new provider identity and records the link", async () => {
+    const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
+    const { authServer, db } = context
+    const guestResponse = await authServer.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const guestRefresh = required(
+      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      "refresh"
+    ).value
+    const guest = ((await guestResponse.json()) as { user: { id: string } })
+      .user
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({
+      id: 5555,
+      name: "Ada",
+      emails: verifiedEmails("ada@example.com")
+    })
+
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: {
+          "auth-ts.state": stateCookie,
+          "auth-ts.refresh": guestRefresh
+        }
+      })
+    )
+
+    expect(response.status).toBe(302)
+    const upgraded = await db.getUser({ id: guest.id })
+    expect(upgraded?.type).toBe("user")
+    expect(upgraded?.email).toBe("ada@example.com")
+    expect(upgraded?.primaryUserId).toBeNull()
+    expect(
+      (
+        await db.getConnection({
+          provider: "github",
+          providerAccountId: "5555"
+        })
+      )?.userId
+    ).toBe(guest.id)
+    expect(db.users()).toHaveLength(1)
+  })
+
   it("rejects a mismatched state, which is the CSRF guard", async () => {
     const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie } = await startSignIn(authServer)
