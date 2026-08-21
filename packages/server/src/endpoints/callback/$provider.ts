@@ -1,3 +1,4 @@
+import type { AuthServerInternals } from "../../core/auth-server-internals.ts"
 import { isAuthApiError, notFound } from "../../http/auth-api-error.ts"
 import { defineEndpoint } from "../../http/define-endpoint.ts"
 import type { AuthErrorCode } from "../../http/error-response.ts"
@@ -155,7 +156,7 @@ export const callbackProvider = defineEndpoint({
  * whenever they liked.
  */
 async function connectIdentity(
-  internals: AuthServerInternalsAlias,
+  internals: AuthServerInternals,
   input: CallbackProviderInput,
   resolved: Awaited<ReturnType<typeof resolveSession>>,
   expectedUserId: string | undefined,
@@ -202,7 +203,7 @@ async function connectIdentity(
  * localized string the API would have returned.
  */
 function errorPage(
-  internals: AuthServerInternalsAlias,
+  internals: AuthServerInternals,
   code: AuthErrorCode,
   locale: string,
   clearState: string,
@@ -223,6 +224,3 @@ function errorPage(
     body: `<!doctype html><meta charset="utf-8"><title>Sign-in failed</title><p>${escaped}</p>`
   }
 }
-
-type AuthServerInternalsAlias =
-  import("../../core/auth-server-internals.ts").AuthServerInternals
