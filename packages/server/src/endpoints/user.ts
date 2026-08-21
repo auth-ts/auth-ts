@@ -143,8 +143,11 @@ export const deleteUser = defineEndpoint({
       return finishDeletion()
     }
 
+    // Strictly less than, so that a window of "0s" means what it says: always
+    // require the code. With `<=`, a session created in the same millisecond as
+    // the request would satisfy a zero-length window and delete outright.
     const authenticatedAgo = Date.now() - session.createdAt.getTime()
-    if (authenticatedAgo <= parseDuration(options.user.deleteFreshWindow)) {
+    if (authenticatedAgo < parseDuration(options.user.deleteFreshWindow)) {
       return finishDeletion()
     }
 
