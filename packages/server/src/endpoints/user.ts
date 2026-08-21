@@ -67,6 +67,16 @@ export const updateUser = defineEndpoint({
     if (!resolved) throw unauthenticated()
 
     const { headers: _headers, name, imageURL, ...rest } = input
+    for (const [field, value] of [
+      ["name", name],
+      ["imageURL", imageURL]
+    ] as const) {
+      if (value !== undefined && typeof value !== "string") {
+        throw new AuthApiError("invalidField", 400, {
+          message: `${field} must be a string.`
+        })
+      }
+    }
     for (const rejected of [
       "email",
       "phoneNumber",
