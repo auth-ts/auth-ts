@@ -19,6 +19,30 @@ describe("resolveCodeIdentifier", () => {
     })
   })
 
+  it("rejects a malformed or oversized email before it becomes a key or a row", async () => {
+    const { internals } = await createTestInternals()
+    const invalid = expect.objectContaining({
+      code: "invalidField",
+      status: 400
+    })
+
+    for (const email of ["ada", "ada@", "@example.com", "ada@example"]) {
+      expect(() => resolveCodeIdentifier(internals, { email }), email).toThrow(
+        invalid
+      )
+    }
+
+    // RFC 5321 caps a deliverable address at 254 characters. The phone side is
+    // bounded by E.164 already; without this the email side was unbounded.
+    const atLimit = `${"a".repeat(254 - "@example.com".length)}@example.com`
+    expect(resolveCodeIdentifier(internals, { email: atLimit }).value).toBe(
+      atLimit
+    )
+    expect(() =>
+      resolveCodeIdentifier(internals, { email: `a${atLimit}` })
+    ).toThrow(invalid)
+  })
+
   it("requires exactly one identifier", async () => {
     const { internals } = await createTestInternals()
 
