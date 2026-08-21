@@ -3,6 +3,14 @@ import { AuthApiError } from "../http/auth-api-error.ts"
 import { normalizeEmail, normalizePhone } from "../lib/normalize-identifiers.ts"
 
 /**
+ * The longest an email address can be and still be deliverable — RFC 5321's
+ * path limit. Phone numbers are bounded by E.164 inside `normalizePhone`; this
+ * is the email side of the same fence, so an identifier is never an unbounded
+ * string by the time it becomes a rate-limit key or a stored column.
+ */
+const MAX_EMAIL_LENGTH = 254
+
+/**
  * A sign-in identifier after normalization, tagged with the channel it arrived on.
  *
  * Tagged rather than a bare string because the channel decides which sender runs
@@ -49,7 +57,10 @@ export function resolveCodeIdentifier(
     if (!internals.options.email)
       throw new AuthApiError("channelNotConfigured", 400)
     const value = normalizeEmail(body.email as string)
-    if (!/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value)) {
+    if (
+      value.length > MAX_EMAIL_LENGTH ||
+      !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value)
+    ) {
       throw new AuthApiError("invalidField", 400, {
         message: "Provide a valid email address."
       })
