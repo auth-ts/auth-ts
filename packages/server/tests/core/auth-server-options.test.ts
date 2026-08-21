@@ -1,10 +1,42 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { createAuthServer } from "../../src/core/create-auth-server.ts"
 import { AuthConfigError } from "../../src/http/auth-config-error.ts"
 import { createMemoryDb } from "../../src/lib/memory-db.ts"
 import { generateTestKeys } from "../helpers/generate-test-keys.ts"
 
 const keys = await generateTestKeys("RS256")
+
+/** The variables `createAuthServer` falls back to when an option is missing. */
+const SECRET_ENVIRONMENT_KEYS = ["JWT_PRIVATE_KEY", "AUTH_SECRET"] as const
+
+/**
+ * Runs every test against a known-empty environment, and hands the real one back
+ * afterwards.
+ *
+ * Half this file asserts that construction *fails* when a secret is missing, and
+ * a developer working on an auth library is exactly the person likely to have
+ * `AUTH_SECRET` exported in their shell — which would satisfy the fallback and
+ * turn those tests green for the wrong reason.
+ */
+beforeEach(() => {
+  for (const key of SECRET_ENVIRONMENT_KEYS) {
+    previousEnvironment[key] = process.env[key]
+    // `delete`, never `= undefined`: Node coerces an assigned value to a string,
+    // so the variable would survive as the literal "undefined" and read back as
+    // a perfectly usable secret.
+    delete process.env[key]
+  }
+})
+
+afterEach(() => {
+  for (const key of SECRET_ENVIRONMENT_KEYS) {
+    const previous = previousEnvironment[key]
+    if (previous === undefined) delete process.env[key]
+    else process.env[key] = previous
+  }
+})
+
+const previousEnvironment: Record<string, string | undefined> = {}
 const baseOptions = () => ({
   db: createMemoryDb(),
   email: { sendCode: () => {} },
@@ -205,13 +237,19 @@ describe("resolved defaults", () => {
     process.env.JWT_PRIVATE_KEY = keys.privateKeyPem
     process.env.AUTH_SECRET = "environment-secret"
 
-    try {
-      expect(createAuthServer(fromEnvironment).options.secret).toBe(
-        "environment-secret"
-      )
-    } finally {
-      process.env.JWT_PRIVATE_KEY = undefined
-      process.env.AUTH_SECRET = undefined
-    }
+    // Cleanup belongs to afterEach, so a failure here cannot leave the variables
+    // set for whatever runs next.
+    expect(createAuthServer(fromEnvironment).options.secret).toBe(
+      "environment-secret"
+    )
+  })
+
+  it("starts each test with the fallback variables genuinely absent", () => {
+    // The invariant the whole file's missing-secret assertions rest on. It fails
+    // if the guard is removed and the developer running the suite exports either
+    // variable, or if cleanup ever goes back to assigning `undefined` — which
+    // Node stringifies into a perfectly usable secret.
+    expect("AUTH_SECRET" in process.env).toBe(false)
+    expect("JWT_PRIVATE_KEY" in process.env).toBe(false)
   })
 })
