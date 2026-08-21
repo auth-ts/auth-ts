@@ -1,5 +1,6 @@
 import { AuthConfigError } from "../http/auth-config-error.ts"
 import type { LocalizationOptions } from "../http/get-error-message.ts"
+import { assertNoReservedFields } from "../http/validate-additional-fields.ts"
 import type { JwtAlgorithm } from "../jwt/import-signing-key.ts"
 import type { Logger, LogLevel } from "../lib/logger.ts"
 import type { Duration } from "../lib/parse-duration.ts"
@@ -370,13 +371,7 @@ export function resolveAuthServerOptions(
   }
 
   const additionalFields = options.user?.additionalFields ?? {}
-  for (const fieldName of Object.keys(additionalFields)) {
-    if ((RESERVED_USER_FIELDS as readonly string[]).includes(fieldName)) {
-      throw new AuthConfigError(
-        `user.additionalFields cannot declare "${fieldName}" — core owns that field. Reserved: ${RESERVED_USER_FIELDS.join(", ")}.`
-      )
-    }
-  }
+  assertNoReservedFields(additionalFields, RESERVED_USER_FIELDS)
 
   const rateLimit =
     options.rateLimit === false

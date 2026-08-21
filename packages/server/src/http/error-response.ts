@@ -32,6 +32,8 @@ export type AuthErrorCode =
   | "methodNotAllowed"
   /** A guest has no email or phone number, so no code can be sent to them. */
   | "guestCannotReceiveCode"
+  /** Something threw that this library did not anticipate. */
+  | "internalError"
 
 /** The single shape of every non-2xx JSON body. */
 export interface AuthErrorBody {

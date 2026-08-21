@@ -41,10 +41,7 @@ export interface EndpointDefinition<Input, Data> {
    * This is the only place that touches the request body, which is what keeps
    * `run` callable in-process.
    */
-  parse?: (
-    request: Request,
-    internals: AuthServerInternals
-  ) => Promise<Input> | Input
+  parse?: (context: ParseContext) => Promise<Input> | Input
   /**
    * The endpoint's actual work.
    *
@@ -73,5 +70,21 @@ export function defineEndpoint<Input, Data>(
   return definition
 }
 
-/** Any endpoint, for the registry and the router. */
-export type AnyEndpoint = EndpointDefinition<never, unknown>
+/**
+ * Any endpoint, for the registry, the router, and the handler factory.
+ *
+ * Written out rather than `EndpointDefinition<never, unknown>` because of
+ * variance: `parse` returns its input, so a concrete endpoint is only assignable
+ * to something whose `parse` returns `unknown`, while `run` consumes its input,
+ * so it is only assignable to something whose `run` accepts `never`. One
+ * parameter cannot be both, which is why this is a separate shape.
+ */
+export interface AnyEndpoint {
+  method: EndpointMethod
+  path: string
+  parse?: (context: ParseContext) => Promise<unknown> | unknown
+  run: (
+    internals: AuthServerInternals,
+    input: never
+  ) => Promise<EndpointResult<unknown>>
+}

@@ -27,7 +27,8 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   notFound: "Not found.",
   methodNotAllowed: "That method is not allowed here.",
   guestCannotReceiveCode:
-    "Add an email address or phone number before continuing."
+    "Add an email address or phone number before continuing.",
+  internalError: "Something went wrong."
 }
 
 /** Consumer message overrides: a partial overlay per locale. */

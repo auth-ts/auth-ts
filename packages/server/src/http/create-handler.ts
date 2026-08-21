@@ -1,7 +1,7 @@
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 import { applyCorsHeaders, preflightResponse } from "./apply-cors.ts"
 import { isAuthApiError } from "./auth-api-error.ts"
-import type { AnyEndpoint, EndpointDefinition } from "./define-endpoint.ts"
+import type { AnyEndpoint } from "./define-endpoint.ts"
 import { errorResponse } from "./error-response.ts"
 import { getErrorMessage } from "./get-error-message.ts"
 import { matchEndpointParams } from "./match-route.ts"
@@ -22,9 +22,9 @@ export type AuthHandler = (request: Request) => Promise<Response>
  * driven by configuration, so reading this function tells you everything that
  * happens around every endpoint.
  */
-export function createHandler<Input, Data>(
+export function createHandler(
   internals: AuthServerInternals,
-  endpoint: EndpointDefinition<Input, Data>
+  endpoint: AnyEndpoint
 ): AuthHandler {
   return async (request) => {
     const { options } = internals
@@ -40,10 +40,11 @@ export function createHandler<Input, Data>(
     )
 
     try {
+      const params = matchEndpointParams(internals, request, endpoint.path)
       const input = endpoint.parse
-        ? await endpoint.parse(request, internals)
-        : (undefined as Input)
-      const result = await endpoint.run(internals, input)
+        ? await endpoint.parse({ request, params, internals })
+        : undefined
+      const result = await endpoint.run(internals, input as never)
 
       const headers = applyCorsHeaders(
         new Headers(result.headers),
@@ -97,14 +98,13 @@ function toErrorResponse(
     error: String(error)
   })
 
+  headers.set("content-type", "application/json")
+
   return new Response(
     JSON.stringify({
-      error: { code: "notFound", message: "Something went wrong." }
+      error: { code: "internalError", message: "Something went wrong." }
     }),
-    {
-      status: 500,
-      headers: (headers.set("content-type", "application/json"), headers)
-    }
+    { status: 500, headers }
   )
 }
 
