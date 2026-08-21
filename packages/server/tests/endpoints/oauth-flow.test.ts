@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { sha256Hex } from "../../src/lib/hash.ts"
+import { createMemoryDb } from "../../src/lib/memory-db.ts"
 import { createTestServer } from "../helpers/create-test-server.ts"
 import { readSetCookies, request } from "../helpers/request.ts"
 import { required } from "../helpers/required.ts"
@@ -682,5 +684,62 @@ describe("connect and disconnect", () => {
     expect(
       ((await response.json()) as { error: { code: string } }).error.code
     ).toBe("lastSignInMethod")
+  })
+
+  it("cannot be raced into removing every sign-in method", async () => {
+    // Two disconnects for different providers, in flight at once, for a user
+    // whose connections are all they have. Each alone sees the other provider
+    // still linked; without an atomic guard in the store both go through. The
+    // in-memory store hides this by accident — nothing in it yields, so the two
+    // requests run back to back — so every call is made to cross an event-loop
+    // turn here, the way a network round-trip does.
+    const memory = createMemoryDb()
+    const db = new Proxy(memory, {
+      get(target, key) {
+        const value = Reflect.get(target, key)
+        if (typeof value !== "function") return value
+        return async (...args: unknown[]) => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+          return (value as (...a: unknown[]) => unknown).apply(target, args)
+        }
+      }
+    })
+    const { authServer } = await createTestServer({ ...OAUTH_OPTIONS, db })
+
+    const user = await db.upsertUser({ type: "guest" })
+    await db.upsertUser({ id: user.id, type: "user" })
+    await db.upsertConnection({
+      userId: user.id,
+      provider: "github",
+      providerAccountId: "1"
+    })
+    await db.upsertConnection({
+      userId: user.id,
+      provider: "google",
+      providerAccountId: "2"
+    })
+    const token = "t".repeat(32)
+    await db.upsertSession({
+      id: "s1",
+      userId: user.id,
+      tokenHash: await sha256Hex(token),
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000)
+    })
+    const cookies = { "auth-ts.refresh": token }
+
+    const responses = await Promise.all([
+      authServer.handler(
+        request("DELETE", "/api/auth/connections/github", { cookies })
+      ),
+      authServer.handler(
+        request("DELETE", "/api/auth/connections/google", { cookies })
+      )
+    ])
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      204, 409
+    ])
+    expect(await db.listConnections({ userId: user.id })).toHaveLength(1)
   })
 })

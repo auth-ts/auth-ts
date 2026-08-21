@@ -265,6 +265,52 @@ describe("every delete returns what it removed", () => {
     ).toBeNull()
   })
 
+  it("deleteConnection with unlessLast refuses the only connection and leaves it in place", async () => {
+    await db.upsertConnection({
+      userId: "u1",
+      provider: "github",
+      providerAccountId: "42"
+    })
+    expect(
+      await db.deleteConnection({
+        userId: "u1",
+        provider: "github",
+        unlessLast: true
+      })
+    ).toBeNull()
+    expect(await db.listConnections({ userId: "u1" })).toHaveLength(1)
+
+    // A second connection makes it removable again: the flag guards the last.
+    await db.upsertConnection({
+      userId: "u1",
+      provider: "google",
+      providerAccountId: "7"
+    })
+    expect(
+      (
+        await db.deleteConnection({
+          userId: "u1",
+          provider: "github",
+          unlessLast: true
+        })
+      )?.provider
+    ).toBe("github")
+
+    // Another user's connection does not count toward this one's total.
+    await db.upsertConnection({
+      userId: "u2",
+      provider: "github",
+      providerAccountId: "99"
+    })
+    expect(
+      await db.deleteConnection({
+        userId: "u1",
+        provider: "google",
+        unlessLast: true
+      })
+    ).toBeNull()
+  })
+
   it("deleteMagicCode with codeHash deletes only a matching row — the one-time gate", async () => {
     const row = {
       identifier: "ada@example.com",
