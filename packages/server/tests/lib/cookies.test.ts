@@ -42,6 +42,25 @@ describe("parseCookies", () => {
     expect(cookies.has("garbage")).toBe(false)
   })
 
+  it("drops a name sent twice with different values rather than guessing", () => {
+    // A tossed cookie from a sibling subdomain arrives beside the real one, and
+    // the header says nothing about which is which.
+    const cookies = parseCookies(
+      "auth-ts.refresh=mine; a=1; auth-ts.refresh=theirs"
+    )
+    expect(cookies.has("auth-ts.refresh")).toBe(false)
+    expect(cookies.get("a")).toBe("1")
+
+    // Three copies, and the name stays gone — a later copy cannot resurrect it.
+    expect(parseCookies("s=one; s=two; s=one").has("s")).toBe(false)
+  })
+
+  it("keeps a name repeated with the same value, which is unambiguous", () => {
+    expect(parseCookies("s=same; s=same").get("s")).toBe("same")
+    // Equality is on the decoded value, since that is what the caller reads.
+    expect(parseCookies("s=a%20b; s=a b").get("s")).toBe("a b")
+  })
+
   it("reads a named cookie off Headers regardless of header case", () => {
     const headers = new Headers({ Cookie: "auth-ts.refresh=abc" })
     expect(readCookie(headers, "auth-ts.refresh")).toBe("abc")
