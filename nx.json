@@ -42,5 +42,6 @@
       "projectChangelogs": false
     }
   },
-  "nxCloudId": "6a883a3eebe13be7a23631ff"
+  "nxCloudId": "6a883a3eebe13be7a23631ff",
+  "analytics": false
 }
