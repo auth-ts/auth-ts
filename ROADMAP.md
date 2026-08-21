@@ -277,9 +277,18 @@ from a cache, which is a 1am phone call waiting to happen. Server-side code call
 ## Known constraints worth remembering
 
 **TypeScript 7 ships no compiler API.** The native package exports `version` and
-nothing else. Anything needing `ts.createProgram` — the documentation type-table
-generator, most codemods — needs TypeScript 5.x pinned for that package alone.
-`apps/docs` does exactly this; the rest of the workspace builds on 7.
+nothing else, so anything reaching for `ts.createProgram` — most codemods, the
+public-API doc checks — has to get that API from somewhere else. Two places
+provide it: `@typescript/typescript6` publishes the 6.x API for side-by-side
+use, and `ts-morph` vendors its own copy.
+
+The workspace needs neither. It is on 7.0.2 everywhere, including `apps/docs`:
+the type tables come from `fumadocs-typescript`, which reaches the compiler
+through `ts-morph`'s bundled TypeScript rather than through whatever the
+workspace has installed. `apps/docs` pinned 5.9.3 for a while on the assumption
+that the generator needed it; removing the pin changed no output, and the doc
+checks in `tools/testing` read source text precisely so they need no compiler
+at all.
 
 **Attempt counting on magic codes is not atomic.** Verification reads the row,
 then writes `attempts + 1`, so two simultaneous wrong guesses can undercount by
