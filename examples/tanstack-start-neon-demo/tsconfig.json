@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["node", "vite/client"],
+    "noEmit": true
+  },
+  "include": ["src", "scripts", "vite.config.ts", "drizzle.config.ts"]
+}

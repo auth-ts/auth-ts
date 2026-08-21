@@ -1,5 +1,11 @@
 import type { JWK } from "jose"
-import { exportJWK, importJWK, importPKCS8, importSPKI } from "jose"
+import {
+  calculateJwkThumbprint,
+  exportJWK,
+  importJWK,
+  importPKCS8,
+  importSPKI
+} from "jose"
 
 /**
  * The signing algorithm.
@@ -72,7 +78,6 @@ export async function importAdditionalPublicKey(
   publicKeyPem: string,
   algorithm: JwtAlgorithm
 ): Promise<JWK> {
-  const { calculateJwkThumbprint } = await import("jose")
   const key = await importSPKI(publicKeyPem, algorithm, { extractable: true })
   const jwk = await exportJWK(key)
 
