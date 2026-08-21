@@ -82,11 +82,19 @@ export const google: OAuthProvider = {
     // verification proves it, and also catches the mundane failures the
     // transport cannot: a token minted for a different client id, or one that
     // has already expired.
+    //
+    // `exp`, `iat`, and `sub` are required, not merely checked when present:
+    // jose validates an expiry it finds but accepts a token without one, and
+    // an OIDC ID token without any of the three is not one Google issued. The
+    // same 60 s tolerance as this library's own verifier, for the same reason.
     let claims: GoogleIdTokenClaims
     try {
       const verified = await jwtVerify(token.id_token, googleKeys, {
+        algorithms: ["RS256"],
         issuer: GOOGLE_ISSUERS,
-        audience: credentials.clientId
+        audience: credentials.clientId,
+        requiredClaims: ["exp", "iat", "sub"],
+        clockTolerance: "60s"
       })
       claims = verified.payload as GoogleIdTokenClaims
     } catch (error) {

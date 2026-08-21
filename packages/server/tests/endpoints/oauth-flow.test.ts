@@ -830,8 +830,13 @@ describe("google", () => {
       { audience: "someone-elses-client-id" },
       { issuer: "https://accounts.evil.example" },
       { expiresIn: -60 },
-      { malformed: true }
-    ]) {
+      { malformed: true },
+      // Correctly signed but incomplete: jose only validates an exp it finds,
+      // so without requiredClaims a token with none would live forever.
+      { omit: ["exp"] },
+      { omit: ["iat"] },
+      { omit: ["sub"] }
+    ] as const) {
       const response = await callback(authServer, {
         sub: "g-1",
         email: "ada@example.com",
