@@ -1,3 +1,4 @@
+import type { AuthUser } from "../core/auth-db.ts"
 import { unauthenticated } from "../http/auth-api-error.ts"
 import { defineEndpoint } from "../http/define-endpoint.ts"
 import { mintAccessToken, slideSession } from "../session/issue-session.ts"
@@ -24,7 +25,7 @@ export interface TokenSession {
 /** What `POST /token` and `authServer.getToken` return. */
 export interface AuthTokenResult {
   accessToken: string
-  user: import("../core/auth-db.ts").AuthUser
+  user: AuthUser
   session: TokenSession
 }
 

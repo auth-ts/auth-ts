@@ -10,11 +10,17 @@ import { compileRoutes, matchRoute } from "../http/match-route.ts"
 import { decodeToken } from "../jwt/decode-token.ts"
 import type { SignTokenClaims } from "../jwt/sign-token.ts"
 import { signToken } from "../jwt/sign-token.ts"
+import type { TokenClaims } from "../jwt/verify-token.ts"
 import { verifyToken } from "../jwt/verify-token.ts"
 import type { HeadersInput } from "../session/resolve-session.ts"
 import { readRefreshToken, resolveSession } from "../session/resolve-session.ts"
+import type { AuthSession, AuthUser } from "./auth-db.ts"
+import type { AuthServerInternals } from "./auth-server-internals.ts"
 import { createAuthServerInternals } from "./auth-server-internals.ts"
-import type { AuthServerOptions } from "./auth-server-options.ts"
+import type {
+  AuthServerOptions,
+  ResolvedAuthServerOptions
+} from "./auth-server-options.ts"
 import { resolveAuthServerOptions } from "./auth-server-options.ts"
 import type { EndpointRegistry } from "./endpoint-registry.ts"
 import { endpointRegistry } from "./endpoint-registry.ts"
@@ -35,14 +41,14 @@ export type AuthHandlers = { [Name in keyof EndpointRegistry]: AuthHandler }
 
 /** What `authServer.getSession` resolves to. */
 export interface AuthSessionResult {
-  session: import("./auth-db.ts").AuthSession
-  user: import("./auth-db.ts").AuthUser
+  session: AuthSession
+  user: AuthUser
 }
 
 /** The configured server. */
 export interface AuthServer extends AuthCallables {
   /** The resolved options, useful for tests and for reading back defaults. */
-  options: import("./auth-server-options.ts").ResolvedAuthServerOptions
+  options: ResolvedAuthServerOptions
   /**
    * The catch-all handler. Mount once at `<basePath>/*` and it dispatches
    * everything.
@@ -51,9 +57,7 @@ export interface AuthServer extends AuthCallables {
   /** Individual handlers, for mounting routes explicitly instead. */
   handlers: AuthHandlers
   /** Verifies a token locally — no database, no network. */
-  verifyToken: (
-    token: string
-  ) => Promise<import("../jwt/verify-token.ts").TokenClaims | null>
+  verifyToken: (token: string) => Promise<TokenClaims | null>
   /** Signs an arbitrary payload. The private key with a function signature. */
   signToken: (claims?: SignTokenClaims) => Promise<string>
   /** Decodes without verifying. Never authorize with this. */
@@ -190,9 +194,9 @@ function notFoundEndpoint(error: AuthApiError): AnyEndpoint {
  * choice, so it throws with the fix in the message instead.
  */
 function assertCookieReachable(
-  resolved: import("./auth-server-options.ts").ResolvedAuthServerOptions,
+  resolved: ResolvedAuthServerOptions,
   headers: Headers | undefined,
-  internals: import("./auth-server-internals.ts").AuthServerInternals
+  internals: AuthServerInternals
 ) {
   if (resolved.cookie.path === "/") return
   if (headers && readRefreshToken(internals, headers)) return
