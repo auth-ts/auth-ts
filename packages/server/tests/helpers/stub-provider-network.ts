@@ -77,7 +77,7 @@ export interface StubGoogleIdentity {
     /** Hand back something that is not a JWT at all. */
     malformed?: boolean
     /** Leave these claims out, for tokens that are signed but incomplete. */
-    omit?: Array<"exp" | "iat" | "sub">
+    omit?: ReadonlyArray<"exp" | "iat" | "sub">
   }
   /** HTTP statuses to answer with instead of 200, per endpoint. */
   status?: { token?: number; jwks?: number }
