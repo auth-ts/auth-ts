@@ -18,6 +18,15 @@ export const OAUTH_STATE_TTL = "10m"
 export interface OAuthStatePayload {
   /** The random value echoed back as `?state=` — the CSRF guard. */
   state: string
+  /**
+   * The provider the flow started against, so the cookie completes only that
+   * provider's callback. The cookie is already path-scoped to it, but a path is
+   * a browser courtesy, not a boundary against the writer the signature guards
+   * against — a sibling subdomain or injected script sets a cookie at any path
+   * it likes. Signing the provider in is what makes a provider-A cookie
+   * worthless at provider B's callback, whatever intent or redirect it carries.
+   */
+  provider: string
   /** Whether the callback should sign someone in or link to the current user. */
   intent: "signIn" | "connect"
   /** Validated same-origin path to return to. */
@@ -77,14 +86,14 @@ async function verifyStatePayload(
 export async function createStateCookie(
   internals: AuthServerInternals,
   provider: string,
-  payload: Omit<OAuthStatePayload, "state">,
+  payload: Omit<OAuthStatePayload, "state" | "provider">,
   secure: boolean
 ) {
   const state = randomBytesBase64url(32)
   const setCookie = serializeCookie({
     name: internals.options.cookie.stateName,
     value: await signStatePayload(
-      { ...payload, state } satisfies OAuthStatePayload,
+      { ...payload, state, provider } satisfies OAuthStatePayload,
       internals.options.secret
     ),
     // Scoped to the exact callback path: this cookie is only ever read there, so
@@ -111,12 +120,14 @@ export async function createStateCookie(
  * indistinguishable from a missing one.
  *
  * @throws {AuthApiError} `unauthenticated` when the cookie is missing, was not
- * signed by this server, or does not match the parameter.
+ * signed by this server, does not match the parameter, or was issued for a
+ * different provider's callback.
  */
 export async function readStateCookie(
   internals: AuthServerInternals,
   headers: Headers,
-  stateParameter: string | null
+  stateParameter: string | null,
+  provider: string
 ) {
   const raw = readCookie(headers, internals.options.cookie.stateName)
   if (!raw || !stateParameter) throw new AuthApiError("unauthenticated", 401)
@@ -129,6 +140,11 @@ export async function readStateCookie(
 
   if (typeof payload.state !== "string" || payload.state !== stateParameter) {
     internals.log.warn("oauth state mismatch")
+    throw new AuthApiError("unauthenticated", 401)
+  }
+
+  if (payload.provider !== provider) {
+    internals.log.warn("oauth state presented at another provider's callback")
     throw new AuthApiError("unauthenticated", 401)
   }
 

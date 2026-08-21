@@ -66,7 +66,12 @@ export const callbackProvider = defineEndpoint({
 
     // Verified before anything else is trusted, and the cookie is cleared
     // whichever way this goes so a state value is never replayable.
-    const payload = await readStateCookie(internals, input.headers, input.state)
+    const payload = await readStateCookie(
+      internals,
+      input.headers,
+      input.state,
+      input.provider
+    )
     const locale = payload.locale ?? options.localization?.defaultLocale ?? "en"
 
     if (input.providerError || !input.code) {
