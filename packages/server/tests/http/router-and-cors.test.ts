@@ -47,6 +47,32 @@ describe("matchRoute", () => {
     ).toBe("methodNotAllowed")
   })
 
+  it("refuses the wrong method on a directly mounted handler before parsing", async () => {
+    // The router is not in front of `authServer.handlers.*`, so the handler has
+    // to enforce its own method. Without this a GET fell into `parse` and `run`.
+    const { authServer } = await createTestServer()
+    const response = await authServer.handlers.sendCode(
+      request("GET", "/api/auth/send-code")
+    )
+
+    expect(response.status).toBe(405)
+    expect(
+      ((await response.json()) as { error: { code: string } }).error.code
+    ).toBe("methodNotAllowed")
+  })
+
+  it("keeps the router's 404 for an unknown path, whatever the method", async () => {
+    // Regression guard for the handler's method check: the fallback endpoint
+    // behind the catch-all must not turn a routing 404 into a 405.
+    const { authServer } = await createTestServer()
+    for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
+      const response = await authServer.handler(
+        request(method, "/api/auth/nope")
+      )
+      expect(response.status, method).toBe(404)
+    }
+  })
+
   it("404s an unknown path inside the mount and anything outside it", async () => {
     const { authServer } = await createTestServer()
 
@@ -134,6 +160,13 @@ describe("cors", () => {
       request("OPTIONS", "/api/auth/token")
     )
     expect(preflight.status).not.toBe(204)
+
+    // And on a directly mounted handler an OPTIONS is a method mismatch, not a
+    // request that reaches the endpoint's logic.
+    const direct = await authServer.handlers.getToken(
+      request("OPTIONS", "/api/auth/token")
+    )
+    expect(direct.status).toBe(405)
   })
 
   it("answers preflights and echoes an explicit origin, never a wildcard", async () => {
