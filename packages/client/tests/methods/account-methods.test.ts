@@ -165,8 +165,18 @@ describe("sessions and accounts", () => {
     server.on("GET", "/api/auth/sessions", {
       body: {
         sessions: [
-          { id: "a", current: true },
-          { id: "b", current: false }
+          {
+            id: "a",
+            current: true,
+            createdAt: "2026-08-01T10:00:00.000Z",
+            expiresAt: "2026-08-31T10:00:00.000Z"
+          },
+          {
+            id: "b",
+            current: false,
+            createdAt: "2026-08-02T10:00:00.000Z",
+            expiresAt: "2026-09-01T10:00:00.000Z"
+          }
         ]
       }
     })
@@ -178,7 +188,16 @@ describe("sessions and accounts", () => {
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    expect(await client.listSessions()).toHaveLength(2)
+    const sessions = await client.listSessions()
+    expect(sessions).toHaveLength(2)
+    // Dates are revived, so `SessionInfo` is honest on the client too.
+    expect(sessions[0]?.createdAt).toBeInstanceOf(Date)
+    expect(sessions[0]?.createdAt.toISOString()).toBe(
+      "2026-08-01T10:00:00.000Z"
+    )
+    expect(sessions[1]?.expiresAt.getTime()).toBe(
+      Date.parse("2026-09-01T10:00:00.000Z")
+    )
     await client.revokeSession({ id: "b" })
 
     expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
