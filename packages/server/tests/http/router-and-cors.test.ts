@@ -87,6 +87,27 @@ describe("matchRoute", () => {
     expect(response.status).toBe(401)
   })
 
+  it("answers 404 for malformed percent-encoding instead of throwing or 500ing", async () => {
+    // decodeURIComponent throws URIError on these. Before the guard, the
+    // catch-all re-threw it out of authServer.handler entirely, and a directly
+    // mounted handler turned it into a 500.
+    const { authServer } = await createTestServer()
+
+    for (const path of [
+      "/api/auth/%zz",
+      "/api/auth/sessions/%",
+      "/api/auth/%E0%A4%A"
+    ]) {
+      const viaCatchAll = await authServer.handler(request("GET", path))
+      expect(viaCatchAll.status, `catch-all ${path}`).toBe(404)
+
+      const viaRoute = await authServer.handlers.revokeSession(
+        request("DELETE", path)
+      )
+      expect(viaRoute.status, `per-route ${path}`).toBeLessThan(500)
+    }
+  })
+
   it("honours a custom basePath, including one written with a trailing slash", async () => {
     const { authServer } = await createTestServer({ basePath: "/auth/" })
 
