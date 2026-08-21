@@ -81,14 +81,15 @@ export function parseDuration(duration: Duration) {
   }
 
   const milliseconds = Number(amount) * millisecondsPerUnit
+  const signedMilliseconds = sign === "-" ? -milliseconds : milliseconds
   // `>` rather than `isFinite`: an amount long enough to overflow to Infinity
   // is only the extreme case of one too large for a Date to represent.
-  if (!(milliseconds <= MAX_DURATION_MS)) {
+  if (!(Math.abs(Date.now() + signedMilliseconds) <= MAX_DURATION_MS)) {
     throw new TypeError(
       `Duration out of range: ${JSON.stringify(duration)}. The largest supported span is about 273,000 years.`
     )
   }
-  return sign === "-" ? -milliseconds : milliseconds
+  return signedMilliseconds
 }
 
 /** Parses a {@link Duration} into whole seconds, rounding down. */
