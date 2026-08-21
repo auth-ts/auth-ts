@@ -113,17 +113,29 @@ export function createDeleteUser(internals: AuthClientInternals) {
   }
 }
 
+/** `SessionInfo` as JSON delivers it: dates arrive as ISO strings. */
+type SessionInfoWire = Omit<SessionInfo, "createdAt" | "expiresAt"> & {
+  createdAt: string
+  expiresAt: string
+}
+
 /** Lists this user's sessions — the devices screen. */
 export function createListSessions(internals: AuthClientInternals) {
   return async function listSessions(): Promise<SessionInfo[]> {
-    const { sessions } = await internals.fetchJson<{ sessions: SessionInfo[] }>(
-      {
-        method: "GET",
-        path: "/sessions"
-      }
-    )
+    const { sessions } = await internals.fetchJson<{
+      sessions: SessionInfoWire[]
+    }>({
+      method: "GET",
+      path: "/sessions"
+    })
 
-    return sessions
+    // Revived here so `SessionInfo` means the same thing on both sides: the
+    // server type promises `Date`, and JSON cannot keep that promise on its own.
+    return sessions.map((session) => ({
+      ...session,
+      createdAt: new Date(session.createdAt),
+      expiresAt: new Date(session.expiresAt)
+    }))
   }
 }
 

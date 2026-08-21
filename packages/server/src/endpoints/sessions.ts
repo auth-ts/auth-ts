@@ -3,7 +3,14 @@ import { defineEndpoint } from "../http/define-endpoint.ts"
 import type { HeadersInput } from "../session/resolve-session.ts"
 import { resolveSession } from "../session/resolve-session.ts"
 
-/** One entry in the "your devices" list. */
+/**
+ * One entry in the "your devices" list.
+ *
+ * The dates are `Date` on both sides of the wire: JSON carries them as ISO
+ * strings, and `@auth-ts/client` revives them, so application code never has to
+ * know they were ever serialized. Anyone calling `GET /sessions` without the
+ * client receives the ISO strings.
+ */
 export interface SessionInfo {
   /** The browser-safe address of this session. */
   id: string
