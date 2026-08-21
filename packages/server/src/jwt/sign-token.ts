@@ -66,10 +66,14 @@ export async function signToken(
   // still carry one, and `setSubject` only runs when `userId` is given — so
   // without this a smuggled `sub` would reach the token unchanged.
   const { userId, sub: _sub, ...rest } = claims
+  // The configured defaults get the same treatment: `jwt.claims` is refused a
+  // `sub` at startup, but this function is also reachable with a hand-built
+  // context, and `setSubject` only runs when `userId` is given.
+  const { sub: _configuredSub, ...configuredClaims } = context.claims
   // Configured values are defaults under the caller's claims. The setters below
   // run after this and overwrite, so `iat` and `exp` are the server's alone.
   const payload = {
-    ...context.claims,
+    ...configuredClaims,
     ...(context.issuer ? { iss: context.issuer } : {}),
     ...(context.audience ? { aud: context.audience } : {}),
     ...rest
