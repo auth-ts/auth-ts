@@ -1,4 +1,4 @@
-import { notFound } from "../../http/auth-api-error.ts"
+import { isAuthApiError, notFound } from "../../http/auth-api-error.ts"
 import { defineEndpoint } from "../../http/define-endpoint.ts"
 import type { AuthErrorCode } from "../../http/error-response.ts"
 import { getErrorMessage } from "../../http/get-error-message.ts"
@@ -10,6 +10,15 @@ import { clearStateCookie, readStateCookie } from "../../oauth/state-cookie.ts"
 import { convertGuest } from "../../session/convert-guest.ts"
 import { issueSession } from "../../session/issue-session.ts"
 import { resolveSession } from "../../session/resolve-session.ts"
+
+/**
+ * How long the provider gets to answer the whole code exchange.
+ *
+ * Generous next to the sub-second responses GitHub and Google normally give, but
+ * bounded: without it a stalled provider holds the callback request open for as
+ * long as the platform allows, and a burst of those is a sign-in outage.
+ */
+const PROVIDER_DEADLINE_MS = 10_000
 
 /** Input for finishing an OAuth flow. */
 export interface CallbackProviderInput {
@@ -62,11 +71,39 @@ export const callbackProvider = defineEndpoint({
       return errorPage(internals, "unauthenticated", locale, clearState)
     }
 
-    const identity = await configured.provider.exchangeCode({
-      credentials: configured.credentials,
-      redirectURI: `${options.baseURL}${options.basePath}/callback/${input.provider}`,
-      code: input.code
-    })
+    let identity: ProviderIdentity
+    try {
+      identity = await configured.provider.exchangeCode({
+        credentials: configured.credentials,
+        redirectURI: `${options.baseURL}${options.basePath}/callback/${input.provider}`,
+        code: input.code,
+        signal: AbortSignal.timeout(PROVIDER_DEADLINE_MS)
+      })
+    } catch (error) {
+      // Still a top-level navigation, so a provider failure is a page, not a
+      // JSON envelope. A rejected code is the provider's verdict; anything else
+      // — the deadline, a DNS failure — is the provider being unreachable.
+      if (isAuthApiError(error)) {
+        return errorPage(
+          internals,
+          error.code,
+          locale,
+          clearState,
+          error.status
+        )
+      }
+      internals.log.error("oauth provider request failed", {
+        provider: input.provider,
+        error: String(error)
+      })
+      return errorPage(
+        internals,
+        "providerUnavailable",
+        locale,
+        clearState,
+        502
+      )
+    }
 
     if (payload.intent === "connect") {
       return connectIdentity(

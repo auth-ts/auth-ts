@@ -127,6 +127,48 @@ describe("oauth callback", () => {
     expect(user?.type).toBe("user")
   })
 
+  it("gives the provider a deadline and renders a page when it is not met", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer)
+    const signals: unknown[] = []
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      signals.push(init?.signal)
+      // What fetch throws when the signal from AbortSignal.timeout fires.
+      throw new DOMException("The operation was aborted", "TimeoutError")
+    })
+
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: { "auth-ts.state": stateCookie }
+      })
+    )
+
+    expect(signals).toHaveLength(1)
+    expect(signals[0]).toBeInstanceOf(AbortSignal)
+    expect(response.status).toBe(502)
+    expect(response.headers.get("content-type")).toContain("text/html")
+    expect(await response.text()).toContain("did not respond")
+    // The state cookie is cleared whichever way the callback ends.
+    expect(
+      required(readSetCookies(response).get("auth-ts.state"), "state").value
+    ).toBe("")
+  })
+
+  it("renders a page, not a JSON envelope, when the provider rejects the code", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({ id: 4242, accessToken: null })
+
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=bad&state=${state}`, {
+        cookies: { "auth-ts.state": stateCookie }
+      })
+    )
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get("content-type")).toContain("text/html")
+  })
+
   it("rejects a mismatched state, which is the CSRF guard", async () => {
     const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie } = await startSignIn(authServer)

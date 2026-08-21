@@ -34,6 +34,12 @@ export interface ExchangeCodeInput {
   credentials: ProviderCredentials
   redirectURI: string
   code: string
+  /**
+   * Deadline for the whole exchange, owned by the callback endpoint. Every
+   * network call a provider makes must pass it to `fetch`, so a stalled provider
+   * cannot hold the callback request open indefinitely.
+   */
+  signal: AbortSignal
 }
 
 /**

@@ -28,6 +28,8 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   methodNotAllowed: "That method is not allowed here.",
   guestCannotReceiveCode:
     "Add an email address or phone number before continuing.",
+  providerUnavailable:
+    "The sign-in provider did not respond. Please try again.",
   internalError: "Something went wrong."
 }
 
