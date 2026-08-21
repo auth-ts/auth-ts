@@ -32,7 +32,6 @@ describe("construction", () => {
 
   it("works where there is no window at all, as during server rendering", () => {
     const savedLocalStorage = globalThis.localStorage
-    // biome-ignore lint/performance/noDelete: restoring the global afterwards requires deleting it
     delete (globalThis as { localStorage?: Storage }).localStorage
 
     try {

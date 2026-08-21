@@ -1,0 +1,112 @@
+---
+title: Neon Data API
+description: Pointing Neon at your own JWKS, and the grant that will surprise you.
+---
+
+Neon's Data API is PostgREST. It verifies a JWT against a JWKS URL and runs the
+query as the `authenticated` role, so your policies decide what comes back.
+
+## 1. Point Neon at your keys
+
+In the Neon console, set the JWKS URL to:
+
+```
+https://your.app/api/auth/jwks.json
+```
+
+Localhost is not reachable from Neon. For local development, publish the key set
+somewhere public — a gist works — and use that URL. It is a snapshot, so
+regenerate it whenever the signing key changes.
+
+Leave the audience blank unless you set `jwt.audience`. This library omits `aud`
+by default precisely so there is nothing to mismatch.
+
+## 2. Derive the owner from the token, never from the client
+
+```sql
+create table "todos" (
+  "id" uuid primary key default uuidv7(),
+  "userId" uuid not null default (auth.user_id()::uuid),
+  "title" text not null
+);
+```
+
+The default comes from the verified token, so a client that sends its own
+`userId` is simply overwritten.
+
+## 3. Write the policy
+
+```sql
+alter table "todos" enable row level security;
+alter table "todos" force row level security;
+
+create policy "own todos" on "todos" to authenticated
+  using ("userId" = (auth.user_id())::uuid)
+  with check ("userId" = (auth.user_id())::uuid);
+
+grant select, insert, update, delete on "todos" to authenticated;
+```
+
+`force` matters because policies do not apply to the table owner. Without it, a
+query on your owner connection silently sees everything.
+
+## 4. Protect the auth tables — this one bites
+
+**Neon grants the `authenticated` role full access to everything in `public` when
+the Data API is enabled.** Your `users`, `sessions`, and `magicCodes` tables are
+not private by default, which means any signed-in user could read every account
+and every session hash straight from the REST endpoint.
+
+Enable row-level security on them with **no policy**. That denies every role
+except the owner, so your server keeps working and the Data API sees nothing:
+
+```sql
+alter table "users" enable row level security;
+alter table "sessions" enable row level security;
+alter table "magicCodes" enable row level security;
+alter table "rateLimits" enable row level security;
+alter table "connections" enable row level security;
+```
+
+Do not force it here — the server connects as the owner and must still read them.
+
+Verify rather than assume:
+
+```sql
+set local role authenticated;
+select count(*) from users;  -- must be 0
+```
+
+## 5. Lock CORS
+
+Set the allowed origins on the Data API to your own domain. Empty means anyone
+can query it with a stolen token.
+
+## Using it
+
+```ts
+const response = await fetch(`${DATA_API_URL}/todos`, {
+  headers: { authorization: `Bearer ${await authClient.getToken()}` }
+})
+```
+
+Note what is missing: any filter on the user. The query asks for every row and
+the database returns only yours.
+
+## If you are on Postgres 17
+
+`uuidv7()` is native in Postgres 18. On 17, install the `pg_uuidv7` extension —
+Neon supports it — or use `gen_random_uuid()`.
+
+## If you use drizzle-kit push
+
+Constrain it to your own schema:
+
+```ts
+export default defineConfig({
+  schemaFilter: ["public"]
+})
+```
+
+Without this it compares against the whole database and proposes dropping Neon's
+`auth` schema — the one providing `auth.user_id()` to your policies.

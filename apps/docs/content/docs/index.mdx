@@ -1,0 +1,91 @@
+---
+title: auth-ts
+description: Free forever JWT auth in TypeScript — callbacks to write into any database.
+---
+
+A library for applications that issue **their own** RS256 or ES256 tokens, for
+PostgREST and row-level-security backends — Neon's Data API, Supabase,
+self-hosted PostgREST — or anything that trusts a JWKS URL.
+
+The library owns the authentication logic. You own the routing, the database, and
+email delivery, through callbacks.
+
+## What it is not
+
+An OAuth authorization server, a hosted service, or the owner of your schema.
+There are no database adapters and there never will be: the callback interface
+*is* the integration point, which is why the library never needs to know what
+your tables look like.
+
+## Five steps
+
+### 1. Install
+
+```bash
+bun add @auth-ts/server @auth-ts/client
+```
+
+### 2. Generate a signing key
+
+```bash
+bun run keys
+```
+
+Put the private key in `JWT_PRIVATE_KEY` and a separate random string in
+`AUTH_SECRET`. They must be different values: one signs tokens, the other keys
+the magic-code HMAC, and they have different blast radiuses.
+
+### 3. Write the callbacks
+
+```ts
+import { createAuthServer } from "@auth-ts/server"
+
+export const authServer = createAuthServer({
+  db: {
+    /* the callbacks — see the AuthDb reference */
+  },
+  email: {
+    sendCode: async ({ email, code }) => {
+      await yourEmailProvider.send({ to: email, subject: "Your code", text: code })
+    }
+  }
+})
+
+export type AuthServer = typeof authServer
+```
+
+### 4. Mount one route
+
+```ts
+// routes/api/auth/$.ts
+export const Route = createFileRoute("/api/auth/$")({
+  server: {
+    handlers: {
+      GET: ({ request }) => authServer.handler(request),
+      POST: ({ request }) => authServer.handler(request),
+      PATCH: ({ request }) => authServer.handler(request),
+      DELETE: ({ request }) => authServer.handler(request)
+    }
+  }
+})
+```
+
+### 5. Point your database at it
+
+Neon takes the JWKS URL directly: `https://your.app/api/auth/jwks.json`.
+Supabase third-party auth takes the issuer instead —
+`https://your.app/api/auth` — and discovers the keys itself.
+
+## Then, in the browser
+
+```ts
+import { createAuthClient } from "@auth-ts/client"
+
+export const authClient = createAuthClient()
+
+await authClient.sendCode({ email })
+await authClient.verifyCode({ email, code })
+
+// Hand this to your PostgREST client as its access token.
+const token = await authClient.getToken()
+```

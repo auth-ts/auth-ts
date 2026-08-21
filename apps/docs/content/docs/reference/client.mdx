@@ -1,0 +1,86 @@
+---
+title: createAuthClient
+description: The browser client. Zero dependencies, token in memory only.
+---
+
+```ts
+import { createAuthClient } from "@auth-ts/client"
+
+export const authClient = createAuthClient()
+```
+
+Construction performs no network request and touches no storage, so importing the
+module is free and safe during server-side rendering. Everything reconciles on
+the first read.
+
+<auto-type-table path="../../../../../packages/client/src/core/auth-client-options.ts" name="AuthClientOptions" />
+
+## The two reads
+
+`getToken()` returns a valid access token, refreshing only when the current one
+is within sixty seconds of expiring. Concurrent callers share a single request, so
+a page mounting ten components makes one round-trip and they all see the same
+token. Hand it to your PostgREST client as its access token.
+
+`getUser()` returns the signed-in user or `null`. It is gated on the token rather
+than a separate cache, so it costs nothing while the token is valid. On a network
+failure it resolves to the **last known user** rather than `null` — being offline
+is not being signed out, and an application that forgets who you are whenever the
+connection drops is worse than one that is briefly optimistic.
+
+## React
+
+The subscribe bridge is not optional. Without it the store and your query cache
+become two sources of truth, and signing out updates one while the other keeps
+serving stale data.
+
+```tsx
+export function useUser() {
+  const queryClient = useQueryClient()
+
+  useEffect(
+    () => authClient.subscribe((user) => queryClient.setQueryData(["session"], user)),
+    [queryClient]
+  )
+
+  return useQuery({
+    queryKey: ["session"],
+    queryFn: authClient.getUser,
+    refetchOnWindowFocus: true,
+    staleTime: 60_000
+  })
+}
+```
+
+## Errors
+
+Every failure is an `AuthError` carrying a stable `code`. Switch on the code,
+never on the message — messages are localized and free to change.
+
+```ts
+import { isAuthError } from "@auth-ts/client"
+
+try {
+  await authClient.sendCode({ email })
+} catch (error) {
+  if (isAuthError(error) && error.code === "cooldown") {
+    // error.retryAfter is in seconds. Render a countdown; "try again later"
+    // with no number is the least useful message in software.
+  }
+}
+```
+
+A dropped connection raises `AuthNetworkError` instead, because only one of those
+two should clear local state.
+
+## Retrying a data request
+
+On a 401 from your data API, drop the token, fetch a new one, and retry **once**.
+Never loop: if the second attempt is refused too, the session is genuinely gone.
+
+```ts
+if (response.status === 401) {
+  authClient.clearToken()
+  response = await send()
+}
+```

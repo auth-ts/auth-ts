@@ -1,0 +1,64 @@
+---
+title: FAQ
+description: Why the design is shaped like this.
+---
+
+## Why no database adapters?
+
+Because adapters are where this kind of library goes to die. Each one is a
+promise to track someone else's schema conventions forever, and they always leak —
+your table has an extra required column, or a different id type, or a naming
+convention the adapter cannot express.
+
+The callbacks are the same amount of code an adapter would generate, except you
+can read them, and they are already in the language your database queries are
+written in.
+
+## Why not store the token in localStorage?
+
+Because then any cross-site scripting flaw yields a credential the attacker can
+exfiltrate and keep using after the tab closes. In memory, the token dies with the
+page, and the long-lived thing — the cookie — is unreadable from JavaScript.
+
+## Why isn't the refresh token rotated?
+
+The cookie is `HttpOnly`, path-scoped, and never crosses an origin. Rotation
+mostly defends against theft that requires a compromise defeating rotation anyway,
+while reliably causing a race between concurrent tabs. If you store the refresh
+token somewhere else, rotation becomes mandatory — which is why that mode is not
+supported.
+
+## How is this different from Better Auth or Auth.js?
+
+They own your session and hand your application a session object. This library
+issues a JWT your **database** verifies, so authorization happens in Postgres via
+row-level security rather than in your application code.
+
+If your backend is not PostgREST-shaped, they are probably the better fit. If it
+is, this removes an entire tier: the browser talks to the database directly, and
+the policy is the access control.
+
+## Why a code and not a magic link?
+
+Codes work when the link opens in a different browser than the one you started
+in, which is most of the time on a phone. Links need one-time URLs and different
+email templates; they may come later.
+
+## Can I use this without PostgREST?
+
+Yes. Anything that trusts a JWKS URL works, and the server-side functions
+(`verifyToken`, `getSession`, `getToken`) are enough to protect ordinary API
+routes with no data-plane story at all.
+
+## Does it work on edge runtimes?
+
+Yes — Web Crypto and `jose` only, no `node:` imports, and the build fails if one
+appears.
+
+## What is "guest" for?
+
+Letting someone use your application before they sign up. A guest is a full user
+with a real id, so when they later add an email the row is **upgraded in place** —
+same id, so everything they created is still theirs with no migration. If the
+address already belongs to someone, the guest row records a pointer to that
+account and your application decides what merging means.

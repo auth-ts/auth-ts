@@ -1,0 +1,44 @@
+---
+title: Rotating keys
+description: A four-step runbook with no downtime.
+---
+
+Rotation fails when a verifier is still holding a key you have stopped signing
+with, or has not yet seen the one you have started signing with. The fix is to
+overlap them.
+
+## The runbook
+
+**1. Generate the new pair.** Keep the old one exactly where it is.
+
+**2. Publish both.** Add the new *public* key to `jwt.additionalPublicKeys` and
+deploy. Your JWKS now serves two keys; the new one gets its JWK thumbprint as its
+`kid`. You are still signing with the old key, and nothing has changed for anyone.
+
+```ts
+createAuthServer({
+  jwt: {
+    privateKey: process.env.JWT_PRIVATE_KEY,
+    additionalPublicKeys: [process.env.JWT_NEXT_PUBLIC_KEY]
+  }
+})
+```
+
+**3. Wait out the access-token lifetime,** plus however long your verifier caches
+the JWKS. Ten minutes plus the cache is typical. This step is the whole point: it
+guarantees every verifier has seen the new key before any token is signed with it.
+
+**4. Switch and clean up.** Make the new key `jwt.privateKey`, move the *old*
+public key into `additionalPublicKeys`, and deploy. Wait one more token lifetime,
+then remove the old key entirely.
+
+## Why the overlap is not optional
+
+Skip step 2 and there is a window where you are signing with a key no verifier
+has fetched yet. Every request fails with a signature error, and the cause is
+invisible from the application logs — the rejection happens inside the database.
+
+## Sessions survive
+
+Rotation affects access tokens only. Refresh tokens are random bytes checked
+against your own table, so nobody is signed out.
