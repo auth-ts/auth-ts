@@ -127,15 +127,6 @@ function LoginPage() {
         </button>
         <button
           type="button"
-          onClick={() =>
-            authClient.signIn({ provider: "google", redirect: "/" })
-          }
-          className="w-full rounded border border-neutral-300 px-4 py-2"
-        >
-          Continue with Google
-        </button>
-        <button
-          type="button"
           onClick={async () => {
             await authClient.signInAsGuest()
             await navigate({ to: "/" })

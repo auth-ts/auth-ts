@@ -141,15 +141,6 @@ function AccountPage() {
           >
             Link GitHub
           </button>
-          <button
-            type="button"
-            onClick={() =>
-              authClient.connect({ provider: "google", redirect: "/account" })
-            }
-            className="rounded border border-neutral-300 px-3 py-1.5 text-sm"
-          >
-            Link Google
-          </button>
         </div>
       </div>
 
