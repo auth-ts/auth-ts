@@ -2,17 +2,36 @@ import { jwtVerify } from "jose"
 import type { UserType } from "../core/auth-db.ts"
 import type { JwtAlgorithm } from "./import-signing-key.ts"
 
-/** A verified token's claims. */
-export interface TokenClaims {
+/**
+ * Claims as a token states them, before anything has been checked.
+ *
+ * Every field is optional because a well-formed JWT may omit any of them — this
+ * is what {@link decodeToken} returns, and it promises nothing more than "this
+ * is what the token says".
+ */
+export interface UnverifiedClaims {
   /** The user id, absent on service tokens minted without one. */
   sub?: string
   type?: UserType
   role?: string
   iss?: string
   aud?: string | string[]
+  iat?: number
+  exp?: number
+  [claim: string]: unknown
+}
+
+/**
+ * A verified token's claims.
+ *
+ * `iat` and `exp` are required here because {@link verifyToken} requires them:
+ * a token without an expiry never expires, and a signature alone does not make
+ * that acceptable. Narrowing the type is honest only because verification
+ * enforces it.
+ */
+export interface TokenClaims extends UnverifiedClaims {
   iat: number
   exp: number
-  [claim: string]: unknown
 }
 
 /** What {@link verifyToken} needs, resolved from the server options. */
@@ -38,6 +57,12 @@ export interface VerifyTokenContext {
  * expired tokens: it acknowledges that two servers rarely agree on the second,
  * and without it a valid token fails on whichever host is running slightly fast.
  *
+ * `iat` and `exp` are required, not merely checked when present. jose validates
+ * an expiry it finds and says nothing about one it does not, so without this a
+ * token minted elsewhere — under one of `additionalPublicKeys`, say — that
+ * simply omits `exp` would verify and never expire. Core's own tokens always
+ * carry both, so nothing it signs is affected.
+ *
  * @returns The claims, or `null` for any failure at all — bad signature, wrong
  * algorithm, wrong audience or issuer, expired, or malformed. Callers get one
  * thing to check rather than a taxonomy of ways to be unauthenticated.
@@ -50,6 +75,7 @@ export async function verifyToken(
     const { payload } = await jwtVerify(token, context.verificationKey, {
       algorithms: [context.algorithm],
       clockTolerance: "60s",
+      requiredClaims: ["iat", "exp"],
       ...(context.issuer ? { issuer: context.issuer } : {}),
       ...(context.audience ? { audience: context.audience } : {})
     })
