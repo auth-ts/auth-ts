@@ -158,6 +158,15 @@ describe("construction failures", () => {
     ).toThrow(/rateLimit\.sendCodeCooldown/)
   })
 
+  it("rejects a duration too large for a Date, naming the option", () => {
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        session: { ttl: `1${"0".repeat(400)}d` }
+      })
+    ).toThrow(/session\.ttl.*out of range/)
+  })
+
   it("still accepts a zero duration, which deleteFreshWindow documents", () => {
     // `"0s"` means no session is ever fresh enough to skip the emailed code —
     // a real setting, not a mistake, so the negative check must stop at zero.

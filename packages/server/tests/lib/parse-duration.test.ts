@@ -35,6 +35,15 @@ describe("parseDuration", () => {
     expect(() => parseDuration("")).toThrow(TypeError)
   })
 
+  it("rejects a span too large for a Date, including one that overflows to Infinity", () => {
+    // Both would have been accepted: the first is a finite number that still
+    // puts every expiry at Invalid Date, the second parses straight to Infinity.
+    expect(() => parseDuration("99999999999999999999d")).toThrow(/out of range/)
+    expect(() => parseDuration(`1${"0".repeat(400)}s`)).toThrow(/out of range/)
+    // And the bound is the Date range, not something tighter.
+    expect(parseDuration("100000d")).toBe(8.64e12)
+  })
+
   it("rejects months, whose length is ambiguous", () => {
     expect(() => parseDuration("1 month")).toThrow(/Months are not supported/)
   })
