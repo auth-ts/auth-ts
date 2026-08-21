@@ -53,12 +53,23 @@ export async function consumeMagicCode(
     const attempts = stored.attempts + 1
 
     if (attempts >= MAX_CODE_ATTEMPTS) {
-      await internals.db.deleteMagicCode({ identifier: input.identifier })
-      internals.log.warn("magic code burned after too many attempts")
+      // Match on the hash here too. This request decided to burn the code it
+      // read; if a resend replaced that row in the meantime, the fresh code has
+      // no attempts against it and must survive — the conditional delete then
+      // matches nothing and leaves it alone.
+      const burned = await internals.db.deleteMagicCode({
+        identifier: input.identifier,
+        codeHash: stored.codeHash
+      })
+      if (burned) {
+        internals.log.warn("magic code burned after too many attempts")
+      }
     } else {
-      // Read-then-write, so two simultaneous wrong guesses can undercount by one.
-      // Accepted: the HMAC, the ten-minute window, and the per-IP verify limit are
-      // the real throttles, and InstantDB and Auth.js ship no attempt counter at all.
+      // Read-then-write, so two simultaneous wrong guesses can undercount by one,
+      // and one that races a resend writes the row it read back over the fresh
+      // one. Accepted — see ROADMAP: the HMAC, the ten-minute window, and the
+      // per-IP verify limit are the real throttles, and closing either race means
+      // a new callback every consumer has to implement correctly.
       await internals.db.upsertMagicCode({ ...stored, attempts })
     }
 
