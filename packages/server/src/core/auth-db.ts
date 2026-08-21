@@ -70,6 +70,11 @@ export interface AuthMagicCode {
   identifier: string
   codeHash: string
   expiresAt: Date
+  /**
+   * Always `0`. Core counts wrong guesses through {@link AuthDb.upsertRateLimit},
+   * keyed on `codeHash` — that increment is atomic, and a field here could not
+   * be without a callback to make it so. Nothing reads this field.
+   */
   attempts: number
   purpose: MagicCodePurpose
 }
@@ -138,6 +143,7 @@ export interface UpsertMagicCodeInput {
   identifier: string
   codeHash: string
   expiresAt: Date
+  /** Always `0`; see {@link AuthMagicCode.attempts}. */
   attempts: number
   purpose: MagicCodePurpose
 }
@@ -331,7 +337,11 @@ export interface AuthDb {
    * without conditional upsert expressions does the same thing inside a
    * transaction.
    *
-   * Never called when `rateLimit: false`.
+   * The same increment carries the per-code guess cap on magic codes, keyed on
+   * the code's hash, so it is called on a wrong guess **even when
+   * `rateLimit: false`**. That flag turns off the volume windows and the
+   * cooldown; five guesses per code is a hard limit that has to be atomic and
+   * stays on.
    */
   upsertRateLimit(rateLimit: UpsertRateLimitInput): Promise<AuthRateLimit>
 

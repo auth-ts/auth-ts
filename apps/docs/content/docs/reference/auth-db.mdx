@@ -45,7 +45,9 @@ These are not enforced by types, so they are worth reading once:
   otherwise add one and keep the existing `resetAt` — in one statement
   (`ON CONFLICT … DO UPDATE SET count = CASE …`). Core never reads the counter
   first: a read-then-write lets ten parallel requests each see the same value
-  and register as one, which is exactly the burst a limiter exists to stop.
+  and register as one, which is exactly the burst a limiter exists to stop. The
+  same increment carries the five-guess cap on magic codes, keyed on the code's
+  hash, so it is called on a wrong guess even with `rateLimit: false`.
 - **`deleteSession({ id, userId })` must filter on both columns**, so that
   revoking another user's session id matches nothing.
 - **`deleteExpired` takes no arguments.** Expired means expired now, and your

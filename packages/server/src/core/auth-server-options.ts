@@ -226,7 +226,14 @@ export interface AuthServerOptions {
   cookie?: CookieOptions
   /** Additional user fields and the account-deletion freshness window. */
   user?: UserOptions
-  /** Set `false` to disable the built-in limiter and bring your own. */
+  /**
+   * Set `false` to disable the built-in limiter and bring your own.
+   *
+   * That turns off the per-IP and per-identifier windows and the send cooldown.
+   * The five-guess cap on each magic code is not a rate and stays on: it is
+   * counted through `upsertRateLimit` regardless, since nothing in front of this
+   * server can enforce a per-code limit.
+   */
   rateLimit?: RateLimitOptions | false
   /**
    * Google-style account switching: several users signed in to one browser.

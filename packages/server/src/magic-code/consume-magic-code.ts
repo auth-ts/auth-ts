@@ -1,4 +1,4 @@
-import type { MagicCodePurpose } from "../core/auth-db.ts"
+import type { AuthMagicCode, MagicCodePurpose } from "../core/auth-db.ts"
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 import { AuthApiError } from "../http/auth-api-error.ts"
 import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash.ts"
@@ -17,6 +17,44 @@ export interface ConsumeMagicCodeInput {
   identifier: string
   code: string
   purpose: MagicCodePurpose
+}
+
+/**
+ * Counts a wrong guess against a code, and burns the code at the cap.
+ *
+ * The counter is a rate-limit row, not a field on the code row, and that is the
+ * whole point. `upsertRateLimit` is the one increment the contract requires to
+ * be atomic, so fifty parallel wrong guesses count as fifty. A read-then-write
+ * on the code row let them count as one — and with the default
+ * `trustedProxies: 0` deriving no client IP, nothing stood behind the cap.
+ *
+ * Keyed on the hash rather than the identifier: a resend is a new code with a
+ * fresh budget, and a guess against a superseded code counts only against that
+ * code. The window ends when the code does, so the counter is swept with it.
+ *
+ * This runs even under `rateLimit: false`. That flag turns off the per-IP and
+ * per-identifier windows and the cooldown — volume limits a deployment may
+ * enforce in front of this server. Five guesses per code is a hard limit on the
+ * code's life that nothing in front can enforce, so it is not optional.
+ */
+async function countWrongGuess(
+  internals: AuthServerInternals,
+  identifier: string,
+  stored: AuthMagicCode
+) {
+  const counted = await internals.db.upsertRateLimit({
+    key: `magicCode:attempts:${stored.codeHash}`,
+    resetAt: stored.expiresAt
+  })
+  if (counted.count < MAX_CODE_ATTEMPTS) return
+
+  // Match on the hash here too: a resend that landed after the row was read
+  // is a fresh code with its own budget, and this delete then matches nothing.
+  const burned = await internals.db.deleteMagicCode({
+    identifier,
+    codeHash: stored.codeHash
+  })
+  if (burned) internals.log.warn("magic code burned after too many attempts")
 }
 
 /**
@@ -50,29 +88,7 @@ export async function consumeMagicCode(
 
   const presented = await hmacSha256Hex(input.code, internals.options.secret)
   if (!timingSafeEqualHex(presented, stored.codeHash)) {
-    const attempts = stored.attempts + 1
-
-    if (attempts >= MAX_CODE_ATTEMPTS) {
-      // Match on the hash here too. This request decided to burn the code it
-      // read; if a resend replaced that row in the meantime, the fresh code has
-      // no attempts against it and must survive — the conditional delete then
-      // matches nothing and leaves it alone.
-      const burned = await internals.db.deleteMagicCode({
-        identifier: input.identifier,
-        codeHash: stored.codeHash
-      })
-      if (burned) {
-        internals.log.warn("magic code burned after too many attempts")
-      }
-    } else {
-      // Read-then-write, so two simultaneous wrong guesses can undercount by one,
-      // and one that races a resend writes the row it read back over the fresh
-      // one. Accepted — see ROADMAP: the HMAC, the ten-minute window, and the
-      // per-IP verify limit are the real throttles, and closing either race means
-      // a new callback every consumer has to implement correctly.
-      await internals.db.upsertMagicCode({ ...stored, attempts })
-    }
-
+    await countWrongGuess(internals, input.identifier, stored)
     throw new AuthApiError("invalidCode", 401)
   }
 
