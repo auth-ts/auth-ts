@@ -32,7 +32,8 @@ export interface ClientIpOptions {
    * real hop count — the per-identifier limits and the cooldown, which are what
    * actually protect a target inbox, are unaffected.
    *
-   * `true` is shorthand for 1.
+   * `true` is shorthand for 1. Anything other than a whole number of hops is
+   * refused at construction, since it could never address an entry.
    *
    * @default 0
    */

@@ -205,8 +205,8 @@ export interface AuthServerOptions {
   /** Token signing, lifetime, claims, and key publication. */
   jwt?: JwtOptions
   /**
-   * Server secret that keys the magic-code HMAC. Defaults to the `AUTH_SECRET`
-   * environment variable.
+   * Server secret that keys the magic-code HMAC and signs the OAuth state
+   * cookie. Defaults to the `AUTH_SECRET` environment variable.
    *
    * Must not be the JWT key: different type, different blast radius, rotated
    * independently.
@@ -366,6 +366,27 @@ function requireDuration(value: Duration, optionName: string) {
 }
 
 /**
+ * Resolves `clientIp` and refuses a proxy count that cannot index the chain.
+ *
+ * `getClientIp` reads the entry `trustedProxies` from the right, so a fractional,
+ * negative, or non-finite count matches no entry at all. That would not error —
+ * it would derive no address and silently switch off every per-IP limit, which
+ * is exactly the failure mode that is easiest to miss in production.
+ */
+function requireClientIp(options: ClientIpOptions | undefined) {
+  const resolved = resolveClientIpOptions(options)
+  if (
+    !Number.isSafeInteger(resolved.trustedProxies) ||
+    resolved.trustedProxies < 0
+  ) {
+    throw new AuthConfigError(
+      `clientIp.trustedProxies must be a non-negative integer or a boolean, not ${String(options?.trustedProxies)}. A count that cannot address an entry in the forwarded chain would derive no client IP and silently disable every per-IP limit.`
+    )
+  }
+  return resolved
+}
+
+/**
  * Merges rate-limit overrides over the defaults and validates the result.
  *
  * Two things a plain spread gets wrong. An explicit `undefined` — easy to
@@ -505,7 +526,7 @@ export function resolveAuthServerOptions(
     multiAccount: options.multiAccount ?? false,
     cleanup: options.cleanup ?? true,
     ...(options.localization ? { localization: options.localization } : {}),
-    clientIp: resolveClientIpOptions(options.clientIp),
+    clientIp: requireClientIp(options.clientIp),
     ...(options.cors ? { cors: options.cors } : {}),
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {})

@@ -181,6 +181,36 @@ describe("construction failures", () => {
     ).toThrow(/rateLimit.verifyCodePerIP.max/)
   })
 
+  it("rejects a trustedProxies count that could never address an entry", () => {
+    // Each of these would not error at request time — getClientIp would index
+    // the chain at a position that does not exist, derive nothing, and every
+    // per-IP limit would be silently off.
+    for (const trustedProxies of [1.5, -1, Infinity, Number.NaN]) {
+      expect(
+        () =>
+          createAuthServer({
+            ...baseOptions(),
+            clientIp: { trustedProxies }
+          }),
+        String(trustedProxies)
+      ).toThrow(/clientIp\.trustedProxies/)
+    }
+  })
+
+  it("accepts whole proxy counts and the boolean shorthand", () => {
+    for (const [trustedProxies, expected] of [
+      [0, 0],
+      [2, 2],
+      [true, 1],
+      [false, 0]
+    ] as const) {
+      expect(
+        createAuthServer({ ...baseOptions(), clientIp: { trustedProxies } })
+          .options.clientIp.trustedProxies
+      ).toBe(expected)
+    }
+  })
+
   it("treats an explicit undefined override as absent, keeping the default", () => {
     // Regression: a spread copied `undefined` over the default, so the limiter
     // read `.max` off `undefined` and every send failed with internalError.
