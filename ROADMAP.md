@@ -292,9 +292,14 @@ at all.
 
 **Attempt counting on magic codes is not atomic.** Verification reads the row,
 then writes `attempts + 1`, so two simultaneous wrong guesses can undercount by
-one. Accepted deliberately: the HMAC, the ten-minute lifetime, and the per-IP
-verify limit are the real throttles, and making it atomic would mean a new
-callback every consumer has to implement correctly.
+one — and a wrong guess that races a resend writes the row it read back over
+the fresh one, so the superseded code works again and the new one does not,
+until the next resend. Neither helps an attacker: the restored code is still
+secret and keeps its attempt count. Accepted deliberately: the HMAC, the
+ten-minute lifetime, and the per-IP verify limit are the real throttles, and
+closing either race would mean a new callback every consumer has to implement
+correctly. Burning a code at the cap does match on the hash, so that path can
+never take a resend's code with it.
 
 **Revocation latency is the access-token lifetime.** The database checks a
 signature and an expiry; it does not call you. "Signed out everywhere" means

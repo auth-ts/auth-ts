@@ -447,6 +447,63 @@ describe("consumeMagicCode", () => {
     })
   })
 
+  it("does not burn a resend's fresh code when a stale request hits the attempt cap", async () => {
+    // Four wrong guesses against code A. The fifth reads A; before it acts, a
+    // resend replaces the row with B. The fifth decides to burn — but it read A,
+    // so it must burn A and only A. B has no attempts against it and survives.
+    // The resend is injected into the read itself, the narrowest interleaving
+    // there is: no sleep, no luck. Limits off so the resend is not stopped by
+    // the cooldown before it reaches the store.
+    const { internals, db, sentCodes } = await createTestInternals({
+      rateLimit: false
+    })
+    const send = () =>
+      sendMagicCode(internals, {
+        identifier: emailIdentifier,
+        purpose: "signIn",
+        locale: "en",
+        headers: new Headers()
+      })
+    await send()
+    const codeA = required(sentCodes[0], "first code").code
+    const wrongCode = codeA === "000000" ? "111111" : "000000"
+    const guessWrong = () =>
+      expect(
+        consumeMagicCode(internals, {
+          identifier: "ada@example.com",
+          code: wrongCode,
+          purpose: "signIn"
+        })
+      ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+
+    for (let attempt = 0; attempt < 4; attempt++) await guessWrong()
+
+    const realGet = db.getMagicCode.bind(db)
+    const readThenResend = vi
+      .spyOn(db, "getMagicCode")
+      .mockImplementationOnce(async (where) => {
+        const row = await realGet(where)
+        await send()
+        return row
+      })
+    await guessWrong()
+    readThenResend.mockRestore()
+
+    const codeB = required(sentCodes.at(-1), "resent code").code
+    expect(codeB).not.toBe(codeA)
+    // B is still there and untouched: the burn matched A's hash and found nothing.
+    const fresh = required(
+      await db.getMagicCode({ identifier: "ada@example.com" }),
+      "the resend's row"
+    )
+    expect(fresh.attempts).toBe(0)
+    await consumeMagicCode(internals, {
+      identifier: "ada@example.com",
+      code: codeB,
+      purpose: "signIn"
+    })
+  })
+
   it("rejects an expired code", async () => {
     const { internals, db, code } = await sendAndRead()
     const stored = required(

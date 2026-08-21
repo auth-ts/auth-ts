@@ -285,8 +285,10 @@ export interface AuthDb {
    * also means a code sent *before* a resend can never consume the row the
    * resend created, since the hashes differ.
    *
-   * Without `codeHash` it deletes by identifier alone — used when the attempt
-   * cap is reached and the code is burned regardless.
+   * Without `codeHash` it deletes by identifier alone. Core always passes the
+   * hash — including when it burns a code at the attempt cap, so a resend that
+   * landed after the row was read keeps its fresh code. The bare form is there
+   * for your own use.
    */
   deleteMagicCode(where: {
     identifier: string
