@@ -23,7 +23,7 @@ interface CompiledRoute {
  * Built from the same registry the handlers and callables come from, so a route
  * cannot exist in one and be missing from another.
  */
-export function compileRoutes(registry: Record<string, AnyEndpoint>) {
+export function compileRoutes(registry: Readonly<Record<string, AnyEndpoint>>) {
   return Object.values(registry)
     .map<CompiledRoute>((endpoint) => {
       const segments = endpoint.path
