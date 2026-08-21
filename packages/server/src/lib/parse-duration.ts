@@ -60,8 +60,11 @@ export function parseDuration(duration: Duration) {
   }
 
   const [, sign = "", amount = "0", unit = ""] = matched
-  const millisecondsPerUnit = MILLISECONDS_PER_UNIT[unit.toLowerCase()]
-  if (millisecondsPerUnit === undefined) {
+  const normalized = unit.toLowerCase()
+  const millisecondsPerUnit = Object.hasOwn(MILLISECONDS_PER_UNIT, normalized)
+    ? MILLISECONDS_PER_UNIT[normalized]
+    : undefined
+  if (typeof millisecondsPerUnit !== "number") {
     throw new TypeError(
       `Unknown duration unit: ${JSON.stringify(unit)}. Months are not supported.`
     )
