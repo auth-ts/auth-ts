@@ -134,6 +134,7 @@ export function createMemoryDb(): MemoryDb {
     },
 
     async deleteUser(where) {
+      const user = users.get(where.id)
       users.delete(where.id)
       // Contract: a deleted account must not keep a live refresh token.
       for (const [tokenHash, session] of sessions) {
@@ -142,6 +143,7 @@ export function createMemoryDb(): MemoryDb {
       for (const [key, connection] of connections) {
         if (connection.userId === where.id) connections.delete(key)
       }
+      return user ? { ...user } : null
     },
 
     async upsertSession(session: UpsertSessionInput) {
@@ -168,18 +170,23 @@ export function createMemoryDb(): MemoryDb {
 
     async deleteSession(where: DeleteSessionWhere) {
       if ("tokenHash" in where) {
+        const session = sessions.get(where.tokenHash)
         sessions.delete(where.tokenHash)
-        return
+        return session ? { ...session } : null
       }
 
       for (const [tokenHash, session] of sessions) {
         // Ownership is part of the query, so another user's id matches nothing.
-        if (session.id === where.id && session.userId === where.userId)
+        if (session.id === where.id && session.userId === where.userId) {
           sessions.delete(tokenHash)
+          return { ...session }
+        }
       }
+      return null
     },
 
     async deleteSessions(where) {
+      const deleted: AuthSession[] = []
       for (const [tokenHash, session] of sessions) {
         if (session.userId !== where.userId) continue
         if (
@@ -188,7 +195,9 @@ export function createMemoryDb(): MemoryDb {
         )
           continue
         sessions.delete(tokenHash)
+        deleted.push({ ...session })
       }
+      return deleted
     },
 
     async upsertMagicCode(magicCode: UpsertMagicCodeInput) {
@@ -201,7 +210,15 @@ export function createMemoryDb(): MemoryDb {
     },
 
     async deleteMagicCode(where) {
+      const magicCode = magicCodes.get(where.identifier)
+      // The hash is part of the match, so a stale code cannot consume a row a
+      // resend has since replaced, and only one of two racing consumers wins.
+      if (!magicCode) return null
+      if (where.codeHash !== undefined && magicCode.codeHash !== where.codeHash)
+        return null
+
       magicCodes.delete(where.identifier)
+      return { ...magicCode }
     },
 
     async getRateLimit(where) {
@@ -241,9 +258,12 @@ export function createMemoryDb(): MemoryDb {
         if (
           connection.userId === where.userId &&
           connection.provider === where.provider
-        )
+        ) {
           connections.delete(key)
+          return { ...connection }
+        }
       }
+      return null
     },
 
     async deleteExpired() {

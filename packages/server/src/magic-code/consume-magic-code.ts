@@ -58,13 +58,21 @@ export async function consumeMagicCode(
     } else {
       // Read-then-write, so two simultaneous wrong guesses can undercount by one.
       // Accepted: the HMAC, the ten-minute window, and the per-IP verify limit are
-      // the real throttles; making this atomic would mean a new callback for every
-      // consumer to implement correctly.
+      // the real throttles, and InstantDB and Auth.js ship no attempt counter at all.
       await internals.db.upsertMagicCode({ ...stored, attempts })
     }
 
     throw new AuthApiError("invalidCode", 401)
   }
 
-  await internals.db.deleteMagicCode({ identifier: input.identifier })
+  // The conditional delete is what makes the code usable exactly once. Two
+  // requests can both read the row and both pass the check above, but the store
+  // lets only one delete a row matching this identifier AND this hash — the
+  // other gets null and is rejected. Matching on the hash also means a code
+  // issued before a resend can never consume the row the resend created.
+  const consumed = await internals.db.deleteMagicCode({
+    identifier: input.identifier,
+    codeHash: stored.codeHash
+  })
+  if (!consumed) throw new AuthApiError("invalidCode", 401)
 }

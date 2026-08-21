@@ -372,6 +372,79 @@ describe("consumeMagicCode", () => {
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
 
+  it("lets exactly one of two concurrent valid submissions succeed", async () => {
+    // Regression for the double-consume race: both requests read the row and
+    // pass the HMAC check, so the conditional delete has to be the gate. A real
+    // database has latency between read and delete — model it with a yield.
+    const { internals, db, code } = await sendAndRead()
+    const originalDelete = db.deleteMagicCode.bind(db)
+    db.deleteMagicCode = async (where) => {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      return originalDelete(where)
+    }
+
+    const results = await Promise.allSettled([
+      consumeMagicCode(internals, {
+        identifier: "ada@example.com",
+        code,
+        purpose: "signIn"
+      }),
+      consumeMagicCode(internals, {
+        identifier: "ada@example.com",
+        code,
+        purpose: "signIn"
+      })
+    ])
+
+    expect(
+      results.filter((result) => result.status === "fulfilled")
+    ).toHaveLength(1)
+    expect(
+      results.filter((result) => result.status === "rejected")
+    ).toHaveLength(1)
+  })
+
+  it("refuses a code issued before a resend, even if its row was read before the resend landed", async () => {
+    // The hash is part of the delete's where clause, so the old code cannot
+    // consume the row the resend created. Limits off so the resend is not
+    // stopped by the cooldown before it ever reaches the store.
+    const { internals, db, sentCodes } = await createTestInternals({
+      rateLimit: false
+    })
+    await sendMagicCode(internals, {
+      identifier: emailIdentifier,
+      purpose: "signIn",
+      locale: "en",
+      headers: new Headers()
+    })
+    const oldCode = required(sentCodes[0], "first code").code
+    await sendMagicCode(internals, {
+      identifier: emailIdentifier,
+      purpose: "signIn",
+      locale: "en",
+      headers: new Headers()
+    })
+    const newCode = required(sentCodes.at(-1), "resent code").code
+    expect(newCode).not.toBe(oldCode)
+
+    await expect(
+      consumeMagicCode(internals, {
+        identifier: "ada@example.com",
+        code: oldCode,
+        purpose: "signIn"
+      })
+    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    expect(
+      await db.getMagicCode({ identifier: "ada@example.com" })
+    ).not.toBeNull()
+
+    await consumeMagicCode(internals, {
+      identifier: "ada@example.com",
+      code: newCode,
+      purpose: "signIn"
+    })
+  })
+
   it("rejects an expired code", async () => {
     const { internals, db, code } = await sendAndRead()
     const stored = required(

@@ -31,6 +31,15 @@ These are not enforced by types, so they are worth reading once:
   sign-in body rewrite profile columns.
 - **`deleteUser` must remove the user's sessions.** A cascade does this for free.
   An account that keeps a live refresh token is still a working login.
+- **Every `delete*` returns what it deleted** — `DELETE … RETURNING *`,
+  `findOneAndDelete`, `OUTPUT deleted.*` — or `null` when nothing matched. Core
+  relies on that: it is how a revoke answers 404 without a second query, and how
+  a magic code becomes usable exactly once.
+- **`deleteMagicCode` must match on `codeHash` when it is given**, in one
+  statement. Two requests can both read the row and both pass the HMAC check;
+  the database lets only one of them delete it. That single conditional delete
+  is the whole one-time guarantee — it is exactly what Better Auth's
+  `consumeOne`, Auth.js's `useVerificationToken`, and InstantDB's `consume!` do.
 - **`deleteSession({ id, userId })` must filter on both columns**, so that
   revoking another user's session id matches nothing.
 - **`deleteExpired` takes no arguments.** Expired means expired now, and your
