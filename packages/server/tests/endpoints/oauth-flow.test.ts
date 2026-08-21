@@ -235,6 +235,62 @@ describe("oauth callback", () => {
     )
   })
 
+  it("treats a guest's connect as a sign-in: merges into the linked account rather than refusing", async () => {
+    const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
+    const { authServer, db } = context
+    const owner = await db.upsertUser({
+      email: "owner@example.com",
+      type: "user"
+    })
+    await db.upsertConnection({
+      userId: owner.id,
+      provider: "github",
+      providerAccountId: "4242"
+    })
+    const guestResponse = await authServer.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const guestRefresh = required(
+      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      "refresh"
+    ).value
+    const guest = ((await guestResponse.json()) as { user: { id: string } })
+      .user
+    const startResponse = await authServer.handler(
+      request("GET", "/api/auth/connect/github", {
+        cookies: { "auth-ts.refresh": guestRefresh }
+      })
+    )
+    const stateCookie = required(
+      readSetCookies(startResponse).get("auth-ts.state"),
+      "state"
+    ).value
+    const { state } = JSON.parse(stateCookie) as { state: string }
+    stubGitHub({ id: 4242, emails: verifiedEmails("owner@example.com") })
+
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: {
+          "auth-ts.state": stateCookie,
+          "auth-ts.refresh": guestRefresh
+        }
+      })
+    )
+
+    // Not the connect branch's 409: a session is issued for the owner.
+    expect(response.status).toBe(302)
+    expect(readSetCookies(response).has("auth-ts.refresh")).toBe(true)
+    expect((await db.getUser({ id: guest.id }))?.primaryUserId).toBe(owner.id)
+    expect(
+      (
+        await db.getConnection({
+          provider: "github",
+          providerAccountId: "4242"
+        })
+      )?.userId
+    ).toBe(owner.id)
+  })
+
   it("upgrades a guest in place for a new provider identity and records the link", async () => {
     const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
     const { authServer, db } = context
