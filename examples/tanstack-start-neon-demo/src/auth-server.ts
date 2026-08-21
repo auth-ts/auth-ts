@@ -327,12 +327,18 @@ export const authServer = createAuthServer({
   },
   guest: true,
   multiAccount: true,
-  // Declare how many proxies sit in front of the app so the client IP can be
-  // trusted for rate limiting. On a hosted platform this is that platform's
-  // proxy count (Vercel and most PaaS: 1); locally it lets an X-Forwarded-For
-  // you set with curl exercise the per-IP limits. Without it, IP limiting is
-  // off by design — see ClientIpOptions.trustedProxies.
-  clientIp: { trustedProxies: 1 },
+  // How many proxies sit between the public internet and this app. This is a
+  // fact about the deployment, not a constant to ship: Vercel and most PaaS put
+  // one in front of you; a bare `bun run start` has none. Declare too many and
+  // the entry picked from X-Forwarded-For is one the client wrote, which lets
+  // it choose its own rate-limit key. Unset means 0, which leaves per-IP
+  // limiting off rather than keying it on a spoofable header — see
+  // ClientIpOptions.trustedProxies. A non-integer here fails at startup.
+  clientIp: {
+    trustedProxies: process.env.AUTH_TRUSTED_PROXIES
+      ? Number(process.env.AUTH_TRUSTED_PROXIES)
+      : 0
+  },
   baseURL: process.env.AUTH_BASE_URL as string,
   cookie: { path: "/" },
   logLevel: "info",
