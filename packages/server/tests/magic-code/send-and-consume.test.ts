@@ -115,6 +115,60 @@ describe("sendMagicCode", () => {
     ).not.toBeNull()
   })
 
+  it("leaves the identifier resendable at once when racing sends end with a failed delivery", async () => {
+    // A stores code A, B stores code B over it, A delivers, B's delivery
+    // fails. Code A was already superseded by B's store — one live code per
+    // identifier — so nothing verifiable reaches the inbox, and the question
+    // is only what the person can do about it. The rollback leaves no row, so
+    // asking again works immediately rather than after a cooldown for a code
+    // nobody received.
+    let deliveries = 0
+    const { internals, db, sentCodes } = await createTestInternals({
+      email: {
+        sendCode: ({ email, code, locale, purpose, headers }) => {
+          deliveries += 1
+          if (deliveries === 2) throw new Error("SMTP blip")
+          sentCodes.push({
+            channel: "email",
+            destination: email,
+            code,
+            locale,
+            purpose,
+            headers
+          })
+        }
+      }
+    })
+    const send = () =>
+      sendMagicCode(internals, {
+        identifier: emailIdentifier,
+        purpose: "signIn",
+        locale: "en",
+        headers: new Headers()
+      })
+
+    const outcomes = await Promise.allSettled([send(), send()])
+    expect(outcomes.map((outcome) => outcome.status)).toEqual([
+      "fulfilled",
+      "rejected"
+    ])
+    // The code that did arrive belonged to the superseded send.
+    await expect(
+      consumeMagicCode(internals, {
+        identifier: "ada@example.com",
+        code: required(sentCodes[0], "delivered code").code,
+        purpose: "signIn"
+      })
+    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    expect(await db.getMagicCode({ identifier: "ada@example.com" })).toBeNull()
+
+    // And the immediate retry is not in cooldown.
+    await expect(send()).resolves.toBeUndefined()
+    expect(
+      await db.getMagicCode({ identifier: "ada@example.com" })
+    ).not.toBeNull()
+  })
+
   it("delivers a six-digit code and stores only its HMAC", async () => {
     const { internals, db, sentCodes } = await createTestInternals()
 
