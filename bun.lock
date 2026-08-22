@@ -54,13 +54,13 @@
         "react-dom": "19.2.8",
       },
       "devDependencies": {
+        "@auth-ts/cli": "workspace:*",
         "@cloudflare/vite-plugin": "1.53.1",
         "@tailwindcss/vite": "4.3.3",
         "@types/react": "19.2.18",
         "@types/react-dom": "19.2.4",
         "@vitejs/plugin-react": "6.1.0",
         "drizzle-kit": "1.0.0-rc.4",
-        "jose": "6.2.9",
         "tailwindcss": "4.3.3",
         "wrangler": "4.125.0",
       },
@@ -72,8 +72,10 @@
         "auth-ts": "./dist/cli.js",
       },
       "dependencies": {
-        "@auth-ts/server": "workspace:*",
         "jose": "6.2.9",
+      },
+      "devDependencies": {
+        "@auth-ts/server": "workspace:*",
       },
     },
     "packages/client": {

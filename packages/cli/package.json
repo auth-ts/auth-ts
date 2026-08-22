@@ -1,0 +1,45 @@
+{
+  "name": "@auth-ts/cli",
+  "version": "0.1.0",
+  "description": "Command line for @auth-ts/server: generate signing keys and the JWKS to publish.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "auth-ts": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "jose": "6.2.9"
+  },
+  "devDependencies": {
+    "@auth-ts/server": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/auth-ts/auth-ts.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://authts.dev",
+  "bugs": "https://github.com/auth-ts/auth-ts/issues",
+  "keywords": [
+    "auth",
+    "authentication",
+    "jwt",
+    "jwks",
+    "keygen",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
