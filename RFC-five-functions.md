@@ -83,14 +83,32 @@ has to be keyed on the code and run regardless, and the edge cannot do it.
 ## The contract
 
 ```ts
-interface AuthDB {
-  select<T extends Table>(input: { table: T; where: Where<T>; limit?: number }): Promise<Row<T>[]>
-  insert<T extends Table>(input: { table: T; row: Insert<T> }): Promise<Row<T>>
-  update<T extends Table>(input: { table: T; where: Where<T>; fields: Partial<Row<T>> }): Promise<Row<T>[]>
-  delete<T extends Table>(input: { table: T; where: Where<T> }): Promise<Row<T>[]>
+interface AuthDB<S extends AdditionalFieldsSchema = AdditionalFieldsSchema> {
+  select<T extends Table>(input: { table: T; where: Where<S, T>; limit: number }): Promise<Row<S, T>[]>
+  insert<T extends Table>(input: { table: T; row: Insert<S, T> }): Promise<Row<S, T>>
+  update<T extends Table>(input: { table: T; where: Where<S, T>; fields: Partial<Row<S, T>> }): Promise<void>
+  delete<T extends Table>(input: { table: T; where: Where<S, T> }): Promise<Row<S, T>[]>
   deleteExpired(): Promise<void>
 }
 ```
+
+- **`limit` is required.** An unbounded read is a type error. Every list core
+  makes has a ceiling — the devices list, the connections list, the
+  append-and-count check (`max + 1`), the single-row lookups (`1`).
+- **`update` returns `void`.** Core always holds the row it is updating — it
+  just selected it, or it came from the resolved session — so the result is
+  `{ ...existing, ...fields }` composed in core, and `AuthUser` has no
+  database-generated columns the store would know better. Returning rows would
+  only buy detection of a row deleted between the select and the update (the
+  following session insert fails on the FK anyway) and would cost one extra
+  call on stores that do not return representations. `delete` returns rows
+  because there the returned row *is* the proof (single-use codes); the
+  asymmetry is deliberate.
+- **Additional fields** ride flat on `users` exactly as today: `AuthDB<S>` is
+  generic over the declared schema and `Tables<S>` makes `users` an
+  `AuthUser<S>`, so `Row<S, "users">`, `Insert<S, "users">` and
+  `Where<S, "users">` all carry them. Type plumbing, not a design change; the
+  exported `SelectInput<S>`-style unions take the same parameter.
 
 - **`where` is equality only** — a plain object of column/value pairs, all of
   which must match. No operators. This is the property that makes the four
@@ -103,8 +121,8 @@ interface AuthDB {
 - **No `orderBy`.** On send, core deletes the identifier's existing codes and
   inserts; on verify it selects by identifier and, in the rare race where two
   rows exist, picks the newest in JS.
-- **No `count`.** `select` with `limit` and `.length` is all append-and-count
-  needs, and not every store has a cheap count.
+- **No `count`.** `select` with `limit: max + 1` and `.length` is all
+  append-and-count needs, and not every store has a cheap count.
 - **`delete` returns what it removed, atomically.** This is the one
   concurrency property the contract requires of the store, and it carries
   single-use codes (`consumeMagicCode` deletes by `identifier + codeHash` and
@@ -238,6 +256,49 @@ only defence against duplicate accounts. They go in the `AuthDB` reference as a
 table, and the conformance suite should at least try a duplicate insert and
 expect it to throw.
 
+## Cleanup
+
+Everything cleans itself up. There is no `cleanup: false`.
+
+Three tables carry an `expiresAt` and need sweeping — `sessions`, `magicCodes`,
+`attempts`. `connections` does not expire. (Orphaned guest users are the one
+thing without an `expiresAt`; parked for now, and not part of this RFC.)
+
+**Today's sweep is broken on Workers.** `create-handler.ts` fires
+`deleteExpired()` after every request with `void Promise.resolve(…)` and never
+awaits it. On Cloudflare Workers an unawaited promise is not guaranteed to run
+once the response is returned — that needs `ctx.waitUntil`, which a
+framework-agnostic library never sees. So on the platform the example deploys
+to, the sweep may silently never happen. The strategy below fixes that as a
+side effect.
+
+The strategy, in layers:
+
+1. **Delete on read where the row is already in hand — free.** An expired
+   session read by `resolveSession` is deleted, not just refused. A code past
+   its expiry read by `consumeMagicCode` is deleted. Sending a code deletes the
+   identifier's previous codes (latest wins does this anyway). None of this
+   costs a round trip core was not already making.
+2. **A throttled, awaited global sweep — the backstop.** `deleteExpired()` stays
+   in the contract (the store knows the time). Core calls it at most once per
+   `cleanup.every` (default `"1m"`) per process, tracked by an in-memory
+   timestamp, **awaited**, on mutating flows only. Awaited means it works on
+   Workers with no `waitUntil`; throttled means the cost is one extra round
+   trip per minute per instance, not per request; mutating-only means a
+   read-heavy deployment is not paying for it on every `getToken`. A fresh
+   serverless instance sweeps on its first mutating request and then once a
+   minute — cheap when nothing has expired, which is the steady state.
+3. **`attempts` gets no exception and needs none.** The window is in the key,
+   so an expired window's rows are never read again; they simply wait for the
+   next sweep. Under a flood the table grows for at most one window plus one
+   sweep interval. That bound is what `cleanup.every` controls.
+
+The only knob is the interval: `cleanup: { every: Duration }`. Someone running
+their own cron sets it long; nobody can turn it off, because with
+append-and-count "off" means "grows until you notice". Stores may implement
+`deleteExpired` in batches if a large backlog after an outage is a concern;
+the contract does not require a single statement.
+
 ## What this does to the rest of the repo
 
 - **`/testing`:** `createMemoryDb` becomes a generic in-memory table store —
@@ -246,6 +307,9 @@ expect it to throw.
   check.
 - **The example:** `auth-db.ts` becomes a Drizzle table map. The `CASE`
   upsert, the `excluded` reference, and the `updatedAt` workaround all go.
+- **`createAuthServer` options:** `cleanup: boolean` becomes
+  `cleanup?: { every?: Duration }`; `check-rate-limit.ts` and the
+  `create-handler.ts` sweep are rewritten per the cleanup section.
 - **Docs:** `reference/auth-db.mdx` is rewritten around five functions, the
   table/uniqueness matrix, the two implementer styles, and the append-and-count
   caveats. The rate-limit concept page gets the edge-posture paragraph.
@@ -264,15 +328,13 @@ expect it to throw.
    that still works; three extra deletes cost nothing and remove the
    requirement entirely. Guest merge (`primaryUserId`) is not a cascade — the
    merged guest row stays, as today.
-2. `update` returning rows vs `void` — rows are useful for `upsertUser`'s
-   return and cost nothing in SQL; confirm for the Data API / InstantDB.
-3. Should `select`'s `limit` be required rather than optional, to make the
-   unbounded read a type error?
-4. Does the `attempts` sweep need to be unconditional even under
-   `cleanup: false`?
-5. Additional fields: they ride on `users` rows as before — confirm `Where`
-   and `Insert` for `users` include them (generic parameter on `AuthDB`, as
-   today).
+2. ~~`update` returning rows vs `void`?~~ **Decided: `void`.** See "The
+   contract".
+3. ~~Should `limit` be required?~~ **Decided: required.**
+4. ~~Does the `attempts` sweep need to be unconditional?~~ **Decided: there is
+   no off switch for cleanup at all.** See "Cleanup".
+5. ~~Additional fields through `Where`/`Insert`?~~ **Decided: flat on `users`
+   via `Tables<S>`, as today.**
 6. ~~Do the two incremental pieces first, or go straight to five?~~
    **Decided: straight to five.** An intermediate append-and-count inside the
    current eighteen would touch the same files twice for nothing.
