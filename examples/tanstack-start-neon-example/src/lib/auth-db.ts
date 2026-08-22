@@ -11,15 +11,24 @@ import {
 
 export const authDB: AuthDB = {
   async upsertUser({ id, ...user }) {
-    const [upserted] = await db
-      .insert(users)
-      .values({ id, ...user })
-      .onConflictDoUpdate({
-        target: id ? users.id : user.email ? users.email : users.phoneNumber,
-        // Merging by identifier is a sign-in: only the profile fields move.
-        set: id ? user : { name: user.name, imageURL: user.imageURL }
-      })
-      .returning()
+    const target = id
+      ? users.id
+      : user.email
+        ? users.email
+        : user.phoneNumber
+          ? users.phoneNumber
+          : null
+    const insert = db.insert(users).values({ id, ...user })
+    // No identifier means the contract always inserts — that is what guest
+    // creation is, a brand new row rather than a lookup.
+    const [upserted] = await (target
+      ? insert.onConflictDoUpdate({
+          target,
+          // Merging by identifier is a sign-in: only the profile fields move.
+          set: id ? user : { name: user.name, imageURL: user.imageURL }
+        })
+      : insert
+    ).returning()
 
     if (!upserted) throw new Error("Failed to upsert user")
     return upserted
