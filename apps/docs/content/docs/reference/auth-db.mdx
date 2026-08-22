@@ -121,15 +121,28 @@ import { defineAuthDB } from "@auth-ts/server"
 
 const tables = { users, sessions, verificationCodes, attempts, connections }
 
+// `Object.entries` types its keys as `string`, which is the one thing here
+// that is not true: `where` and `orderBy` are keyed by column name.
+type Columns = ReturnType<typeof getColumns<(typeof tables)[AuthTable]>>
+type Filters = [keyof Columns, never][]
+
 export const authDB = defineAuthDB({
   async select({ table, where, limit, offset, orderBy }) {
+    const columns = getColumns(tables[table])
+
     return db
       .select()
       .from(tables[table])
-      .where(matches(table, where))
+      .where(
+        and(
+          ...(Object.entries(where) as Filters).map(([name, value]) =>
+            eq(columns[name], value)
+          )
+        )
+      )
       .orderBy(
-        ...Object.entries(orderBy).map(([name, direction]) =>
-          (direction === "asc" ? asc : desc)(columnOf(table, name))
+        ...(Object.entries(orderBy) as Ordering).map(([name, direction]) =>
+          (direction === "asc" ? asc : desc)(columns[name])
         )
       )
       .limit(limit)
@@ -145,6 +158,12 @@ Record<AuthTable, AnyPgTable>`, or a `tableOf()` helper returning `AnyPgTable`
 means an erased row type, so the query no longer returns anything the contract
 recognizes. Left alone, `tables[table]` is the union of your five concrete
 tables and the rows come back typed.
+
+The same goes for the column names. `Object.entries` types its keys as
+`string`, and a `string` index into your columns is a lookup that might miss —
+which is where the `!` and the "does this column exist" guards come from. The
+keys really are column names, so say that once and every lookup after it is an
+ordinary property.
 
 A **`switch` per table** is the shape to reach for with raw SQL, where each
 table's query is genuinely different. The input narrows with the table name:

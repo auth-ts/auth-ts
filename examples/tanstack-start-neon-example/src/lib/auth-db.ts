@@ -1,6 +1,6 @@
+import type { AuthDirection } from "@auth-ts/server"
 import { defineAuthDB } from "@auth-ts/server"
 import { and, asc, desc, eq, getColumns, lt, sql } from "drizzle-orm"
-import type { PgColumn } from "drizzle-orm/pg-core"
 import { db } from "../db/db"
 import {
   attempts,
@@ -26,39 +26,39 @@ import {
 const tables = { users, sessions, verificationCodes, attempts, connections }
 
 /**
- * The column a name from the contract refers to.
+ * `Object.entries` types its keys as `string`, which is the one thing here that
+ * is not true: `where` and `orderBy` are keyed by column name. Saying so gives
+ * the lookups below real properties to find rather than an index that might
+ * miss, which is why nothing in this file has to assert a column exists.
  *
- * `where` and `orderBy` arrive as column names, because the library has no way
- * to hold a reference to your schema. This is the translation, and the only
- * place the two vocabularies meet.
+ * The value is `never` because `eq` takes whatever the column on its left
+ * holds, and the column is a union of five tables' worth — so the type it will
+ * accept is the intersection of theirs. The value came out of that row to
+ * begin with.
  */
-const columnOf = (table: keyof typeof tables, name: string) => {
-  const columns: Record<string, PgColumn> = getColumns(tables[table])
-  const column = columns[name]
-  // Only reachable if this schema is missing a column the library names, which
-  // is worth saying out loud rather than leaving to a confusing failure later.
-  if (!column) throw new Error(`${table} has no ${name} column`)
-
-  return column
-}
-
-/** Every column/value pair in a `where`, as one `AND` — the only filter the contract has. */
-const matches = (table: keyof typeof tables, where: object) =>
-  and(
-    ...Object.entries(where).map(([name, value]) =>
-      eq(columnOf(table, name), value)
-    )
-  )
+type Columns = ReturnType<
+  typeof getColumns<(typeof tables)[keyof typeof tables]>
+>
+type Filters = [keyof Columns, never][]
+type Ordering = [keyof Columns, AuthDirection][]
 
 export const authDB = defineAuthDB({
   async select({ table, where, limit, offset, orderBy }) {
+    const columns = getColumns(tables[table])
+
     return db
       .select()
       .from(tables[table])
-      .where(matches(table, where))
+      .where(
+        and(
+          ...(Object.entries(where) as Filters).map(([name, value]) =>
+            eq(columns[name], value)
+          )
+        )
+      )
       .orderBy(
-        ...Object.entries(orderBy).map(([name, direction]) =>
-          (direction === "asc" ? asc : desc)(columnOf(table, name))
+        ...(Object.entries(orderBy) as Ordering).map(([name, direction]) =>
+          (direction === "asc" ? asc : desc)(columns[name])
         )
       )
       .limit(limit)
@@ -75,11 +75,33 @@ export const authDB = defineAuthDB({
   },
 
   async update({ table, where, values }) {
-    await db.update(tables[table]).set(values).where(matches(table, where))
+    const columns = getColumns(tables[table])
+
+    await db
+      .update(tables[table])
+      .set(values)
+      .where(
+        and(
+          ...(Object.entries(where) as Filters).map(([name, value]) =>
+            eq(columns[name], value)
+          )
+        )
+      )
   },
 
   async delete({ table, where }) {
-    return db.delete(tables[table]).where(matches(table, where)).returning()
+    const columns = getColumns(tables[table])
+
+    return db
+      .delete(tables[table])
+      .where(
+        and(
+          ...(Object.entries(where) as Filters).map(([name, value]) =>
+            eq(columns[name], value)
+          )
+        )
+      )
+      .returning()
   },
 
   async cleanup() {
