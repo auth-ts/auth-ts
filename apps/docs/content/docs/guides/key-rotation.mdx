@@ -22,12 +22,9 @@ the new key set — Neon and Supabase cache it briefly, and in-process
 under the new key, so the visible effect is one failed request at most, inside a
 window no longer than the access-token lifetime: ten minutes by default.
 
-If you want no window at all, publish both keys for one token lifetime before
-switching: the old and new public JWKs together in `public/jwks.json`, and the
-new public key in `jwt.additionalPublicKeys` so local verification knows it too.
-Every key's `kid` is its thumbprint, so a key keeps the same `kid` whether it is
-signing or only listed, and a verifier that cached the two-key document already
-holds the new key under the `kid` new tokens carry.
+The new key carries a new `kid` — its thumbprint — which is what makes a
+verifier holding a cached `jwks.json` fetch it again rather than check new
+tokens against the key it knows by the old name.
 
 ## Sessions survive
 

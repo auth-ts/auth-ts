@@ -1,11 +1,7 @@
-import { calculateJwkThumbprint, decodeJwt, importSPKI, SignJWT } from "jose"
+import { calculateJwkThumbprint, decodeJwt, SignJWT } from "jose"
 import { beforeAll, describe, expect, it } from "vitest"
-import { buildJwks } from "../../src/jwt/build-jwks"
 import { decodeToken } from "../../src/jwt/decode-token"
-import {
-  importAdditionalPublicKey,
-  importSigningKey
-} from "../../src/jwt/import-signing-key"
+import { importSigningKey } from "../../src/jwt/import-signing-key"
 import type { SignTokenContext } from "../../src/jwt/sign-token"
 import { signToken } from "../../src/jwt/sign-token"
 import type { VerifyTokenContext } from "../../src/jwt/verify-token"
@@ -37,7 +33,7 @@ beforeAll(async () => {
     audience: "authenticated"
   }
   verifyContext = {
-    keys: createVerificationKeySet(buildJwks(publicJwk)),
+    keys: createVerificationKeySet(publicJwk),
     algorithm: "RS256",
     issuer: "https://app.example.com/api/auth",
     audience: "authenticated"
@@ -327,7 +323,7 @@ describe("ES256", () => {
     )
     const claims = await verifyToken(
       {
-        keys: createVerificationKeySet(buildJwks(publicJwk)),
+        keys: createVerificationKeySet(publicJwk),
         algorithm: "ES256"
       },
       token
@@ -339,61 +335,36 @@ describe("ES256", () => {
   })
 })
 
-describe("buildJwks", () => {
-  it("publishes only public material", async () => {
+describe("importSigningKey", () => {
+  it("derives a public JWK with only public material, under a thumbprint kid", async () => {
     const keys = await generateTestKeys("RS256")
     const { kid, publicJwk } = await importSigningKey(
       keys.privateKeyPem,
       "RS256"
     )
-    const jwks = buildJwks(publicJwk)
 
-    expect(jwks.keys).toHaveLength(1)
-    expect(jwks.keys[0]).toMatchObject({
+    expect(publicJwk).toMatchObject({
       kty: "RSA",
       use: "sig",
       alg: "RS256",
       kid
     })
     for (const privateComponent of ["d", "p", "q", "dp", "dq", "qi"]) {
-      expect(jwks.keys[0]).not.toHaveProperty(privateComponent)
+      expect(publicJwk).not.toHaveProperty(privateComponent)
     }
   })
 
-  it("publishes rotation keys alongside the signing key, each with a thumbprint kid", async () => {
+  it("gives a new key a new kid", async () => {
+    // What lets a verifier holding a cached jwks.json notice a rotation: the
+    // first token under the new key names a kid the cached document lacks, so
+    // it fetches again instead of checking the token against the old key.
     const current = await generateTestKeys("RS256")
     const next = await generateTestKeys("RS256")
-    const { kid, publicJwk } = await importSigningKey(
-      current.privateKeyPem,
-      "RS256"
-    )
-    const additional = await importAdditionalPublicKey(
-      next.publicKeyPem,
-      "RS256"
-    )
-    const jwks = buildJwks(publicJwk, [additional])
 
-    expect(jwks.keys).toHaveLength(2)
-    expect(jwks.keys[0]?.kid).toBe(kid)
-    expect(jwks.keys[1]?.kid).toBe(await calculateJwkThumbprint(additional))
-    expect(jwks.keys[1]?.kid).not.toBe(kid)
-    await expect(importSPKI(next.publicKeyPem, "RS256")).resolves.toBeDefined()
-  })
+    const asCurrent = await importSigningKey(current.privateKeyPem, "RS256")
+    const asNext = await importSigningKey(next.privateKeyPem, "RS256")
 
-  it("gives a key the same kid whether it is signing or merely published", async () => {
-    // This is the property rotation depends on: a token minted before the
-    // switch names a kid the JWKS still serves after it, and a verifier that
-    // cached the JWKS before the switch already knows the new key by the kid
-    // new tokens will carry.
-    const keys = await generateTestKeys("RS256")
-    const asSigner = await importSigningKey(keys.privateKeyPem, "RS256")
-    const asAdditional = await importAdditionalPublicKey(
-      keys.publicKeyPem,
-      "RS256"
-    )
-
-    expect(asAdditional.kid).toBe(asSigner.kid)
-    expect(asAdditional).toEqual(asSigner.publicJwk)
+    expect(asNext.kid).not.toBe(asCurrent.kid)
   })
 })
 

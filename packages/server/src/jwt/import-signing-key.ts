@@ -1,10 +1,5 @@
 import type { JWK } from "jose"
-import {
-  calculateJwkThumbprint,
-  exportJWK,
-  importPKCS8,
-  importSPKI
-} from "jose"
+import { calculateJwkThumbprint, exportJWK, importPKCS8 } from "jose"
 
 /**
  * The signing algorithm.
@@ -30,13 +25,10 @@ export interface SigningKeyMaterial {
  * Strips the private components and stamps the public JWK with its `kid`.
  *
  * The `kid` is the RFC 7638 thumbprint of the key itself, never a configured
- * name. That is what makes rotation work: a key carries the same `kid` whether
- * it is currently signing or merely published in `additionalPublicKeys`, so a
- * token minted before the switch still names a key the JWKS serves after it,
- * and a verifier that cached the JWKS before the switch already holds the new
- * key under the `kid` new tokens will carry. A fixed name like `"main"` would
- * instead move from the old key to the new one at the switch, and every cached
- * verifier would be wrong in both directions at once.
+ * name. A new key therefore carries a new `kid`, which is what tells a verifier
+ * holding a cached `jwks.json` to fetch it again rather than check the new
+ * token against the old key it knows by that name. And there is nothing to
+ * keep in step between the server and the file: both derive it from the key.
  */
 async function toPublicJwk(jwk: JWK, algorithm: JwtAlgorithm): Promise<JWK> {
   const published: JWK =
@@ -70,20 +62,4 @@ export async function importSigningKey(
   // The thumbprint is always set by `toPublicJwk`; the fallback only satisfies
   // jose's `JWK` type, where `kid` is optional.
   return { signingKey, kid: publicJwk.kid ?? "", publicJwk }
-}
-
-/**
- * Imports an additional public key (SPKI PEM) to publish alongside the current one.
- *
- * Used during rotation. It gets the same thumbprint `kid` it would have as the
- * signing key, so moving a key between the two roles changes nothing a
- * verifier can see except which one is signing.
- */
-export async function importAdditionalPublicKey(
-  publicKeyPem: string,
-  algorithm: JwtAlgorithm
-): Promise<JWK> {
-  const key = await importSPKI(publicKeyPem, algorithm, { extractable: true })
-
-  return toPublicJwk(await exportJWK(key), algorithm)
 }

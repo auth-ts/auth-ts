@@ -1,7 +1,6 @@
-import type { JWTVerifyGetKey } from "jose"
+import type { JWK, JWTVerifyGetKey } from "jose"
 import { createLocalJWKSet, jwtVerify } from "jose"
 import type { UserType } from "../core/auth-db"
-import type { Jwks } from "./build-jwks"
 import type { JwtAlgorithm } from "./import-signing-key"
 
 /**
@@ -37,25 +36,23 @@ export interface TokenClaims extends UnverifiedClaims {
 }
 
 /**
- * Resolves a token's header to one of the published public keys.
+ * Resolves a token's header to the published public key.
  *
  * This is the local twin of what a remote verifier does against `jwks.json`:
- * the key is picked by the header's `kid` from the whole set — the signing key
- * and every `additionalPublicKeys` entry — so local verification follows the
- * same rotation runbook as Neon or Supabase. A token signed by the
- * previous key, with its `kid`, keeps verifying for as long as that key is
- * still published, and stops the moment it is removed.
+ * the key is picked by the header's `kid` and `alg` from the published set, so
+ * a token a remote verifier would refuse — one naming a `kid` the key set does
+ * not carry — is refused here too, rather than verified by signature alone.
  */
 export type VerificationKeySet = JWTVerifyGetKey
 
-/** Builds a {@link VerificationKeySet} from a JWKS document. */
-export function createVerificationKeySet(jwks: Jwks): VerificationKeySet {
-  return createLocalJWKSet(jwks)
+/** Builds a {@link VerificationKeySet} from the public JWK `jwks.json` publishes. */
+export function createVerificationKeySet(publicJwk: JWK): VerificationKeySet {
+  return createLocalJWKSet({ keys: [publicJwk] })
 }
 
 /** What {@link verifyToken} needs, resolved from the server options. */
 export interface VerifyTokenContext {
-  /** Every public key a token may be verified against, selected by `kid`. */
+  /** The published public key, selected by `kid`. */
   keys: VerificationKeySet
   algorithm: JwtAlgorithm
   issuer?: string
@@ -78,9 +75,9 @@ export interface VerifyTokenContext {
  *
  * `iat` and `exp` are required, not merely checked when present. jose validates
  * an expiry it finds and says nothing about one it does not, so without this a
- * token minted elsewhere — under one of `additionalPublicKeys`, say — that
- * simply omits `exp` would verify and never expire. Core's own tokens always
- * carry both, so nothing it signs is affected.
+ * token minted elsewhere with the same key that simply omits `exp` would verify
+ * and never expire. Core's own tokens always carry both, so nothing it signs is
+ * affected.
  *
  * @returns The claims, or `null` for any failure at all — bad signature, unknown
  * `kid`, wrong algorithm, wrong audience or issuer, expired, or malformed.

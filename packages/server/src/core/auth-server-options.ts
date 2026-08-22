@@ -85,16 +85,6 @@ export interface JwtOptions {
    * and a default value only creates a mismatch to debug.
    */
   audience?: string
-  /**
-   * SPKI PEM public keys that local `verifyToken` also accepts — for keeping a
-   * previous key's tokens valid through a rotation, alongside listing both keys
-   * in the published `jwks.json`.
-   *
-   * Every key's `kid` is its JWK thumbprint, so a key keeps the same `kid`
-   * whether it is signing or listed here, and moving it between the two roles
-   * is invisible to verifiers.
-   */
-  additionalPublicKeys?: string[]
 }
 
 /**

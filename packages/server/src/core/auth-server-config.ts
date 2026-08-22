@@ -38,7 +38,7 @@ export interface AuthServerConfig {
   guest: boolean
   providers: ProvidersOptions
   jwt: Required<Pick<JwtOptions, "privateKey" | "alg" | "ttl" | "claims">> &
-    Pick<JwtOptions, "audience" | "additionalPublicKeys">
+    Pick<JwtOptions, "audience">
   jwks?: JwksOptions
   secret: string
   basePath: string
@@ -366,10 +366,7 @@ export function resolveAuthServerConfig(
       alg: options.jwt?.alg ?? "RS256",
       ttl: requireLifetime(options.jwt?.ttl ?? "10m", "jwt.ttl"),
       claims: requireClaims(options.jwt?.claims),
-      ...(options.jwt?.audience ? { audience: options.jwt.audience } : {}),
-      ...(options.jwt?.additionalPublicKeys
-        ? { additionalPublicKeys: options.jwt.additionalPublicKeys }
-        : {})
+      ...(options.jwt?.audience ? { audience: options.jwt.audience } : {})
     },
     ...(options.jwks ? { jwks: requireJwks(options.jwks) } : {}),
     secret,

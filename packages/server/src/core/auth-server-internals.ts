@@ -1,10 +1,5 @@
-import type { JWK } from "jose"
-import { buildJwks } from "../jwt/build-jwks"
 import type { SigningKeyMaterial } from "../jwt/import-signing-key"
-import {
-  importAdditionalPublicKey,
-  importSigningKey
-} from "../jwt/import-signing-key"
+import { importSigningKey } from "../jwt/import-signing-key"
 import type { VerificationKeySet } from "../jwt/verify-token"
 import { createVerificationKeySet } from "../jwt/verify-token"
 import type { LeveledLogger } from "../lib/logger"
@@ -14,12 +9,10 @@ import type { AuthServerConfig } from "./auth-server-config"
 
 /** Key material, imported once on first use. */
 export interface KeyMaterial extends SigningKeyMaterial {
-  /** Public keys published alongside the signing key during rotation. */
-  additionalPublicJwks: JWK[]
   /**
-   * Every key local verification accepts: the signing key and the additional
-   * public keys, as one JWKS — the same shape the published `jwks.json` has,
-   * so the two are kept in step by the same rotation runbook.
+   * What local verification accepts: the signing key's public half, as the
+   * one-key set the published `jwks.json` is — so what the server accepts and
+   * what it tells remote verifiers to accept cannot drift apart.
    */
   verificationKeys: VerificationKeySet
 }
@@ -72,36 +65,11 @@ export function createAuthServerInternals(
         config.jwt.privateKey,
         config.jwt.alg
       )
-      const imported = await Promise.all(
-        (config.jwt.additionalPublicKeys ?? []).map((publicKeyPem) =>
-          importAdditionalPublicKey(publicKeyPem, config.jwt.alg)
-        )
-      )
 
-      // One entry per key. The kid is the key's thumbprint, so the signing key
-      // listed again in `additionalPublicKeys` — the easy slip at the rotation
-      // switch — or the same key pasted twice would publish duplicate kids, and
-      // jose refuses to pick between two matching keys: every local
-      // verification would fail. Keys import lazily, after construction, so
-      // this cannot be a startup error; it is dropped and said out loud instead.
-      const published = new Set([material.kid])
-      const additionalPublicJwks: JWK[] = []
-      for (const jwk of imported) {
-        if (jwk.kid && published.has(jwk.kid)) {
-          log.warn("ignoring a duplicate key in jwt.additionalPublicKeys", {
-            kid: jwk.kid
-          })
-          continue
-        }
-        if (jwk.kid) published.add(jwk.kid)
-        additionalPublicJwks.push(jwk)
+      return {
+        ...material,
+        verificationKeys: createVerificationKeySet(material.publicJwk)
       }
-
-      const verificationKeys = createVerificationKeySet(
-        buildJwks(material.publicJwk, additionalPublicJwks)
-      )
-
-      return { ...material, additionalPublicJwks, verificationKeys }
     })()
 
     return keyMaterial
