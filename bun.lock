@@ -70,9 +70,6 @@
       "peerDependencies": {
         "@auth-ts/server": "workspace:*",
       },
-      "optionalPeers": [
-        "@auth-ts/server",
-      ],
     },
     "packages/server": {
       "name": "@auth-ts/server",
