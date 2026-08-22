@@ -124,7 +124,7 @@ function Hero() {
            */}
           <h1 className="flex flex-col gap-4">
             <span className="flex items-center gap-2 text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
-              <Logo className="text-fd-primary size-14 md:size-20" />
+              <Logo className="text-fd-primary size-15 md:size-22" />
               Auth.ts
             </span>
             <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl">
