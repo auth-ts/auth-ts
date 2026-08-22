@@ -30,13 +30,17 @@ doing; nothing here is blocked on anything in the later sections.
 
 The one part of the build with no real-world evidence behind it.
 
-- [ ] Register a **GitHub OAuth app**; callback
-      `<origin>/api/auth/callback/github`.
+- [x] Register a **GitHub OAuth app**; callback
+      `<origin>/api/auth/callback/github`. Done 2026-08-22 — the callback URL
+      must include the provider segment; GitHub rejects the bare `/callback`.
 - [ ] Register a **Google OAuth client**; callback
       `<origin>/api/auth/callback/google`.
-- [ ] Put the four credentials in the demo's `.env`.
+- [ ] Put the four credentials in the demo's `.env`. (GitHub's two are in.)
 - [ ] Run each provider through: sign in, connect from the account page,
       disconnect, and sign in again to confirm the stable-id match holds.
+      GitHub: sign-in from a guest session completed live, converting the
+      guest in place with name and avatar. Connect, disconnect, and the
+      repeat sign-in are still unexercised; Google entirely so.
 
 ### The JWKS gist, if you keep using one for local development
 
@@ -120,21 +124,24 @@ long-lived npm token once the first release is out.
 
 ## Before v0.1.0 is real
 
-### OAuth has never talked to GitHub or Google
+### OAuth has completed one live round trip, with GitHub
 
 The flows are covered end to end, including the four scenarios that are account
 takeovers if they regress: state mismatch, unverified email, non-primary email,
-and a connect callback arriving without the session that started it. But those
-tests fake the network beneath the real provider modules — **no live provider has
-ever completed a round trip.**
+and a connect callback arriving without the session that started it. Those tests
+fake the network beneath the real provider modules. On 2026-08-22 GitHub
+sign-in ran live for the first time: the token exchange, `/user`, and
+`/user/emails` all answered in the shapes the module expects, and a guest
+session converted in place with email, name, and avatar.
 
-What could still be wrong is exactly what a fake cannot catch: a changed response
-shape, a scope that no longer returns what it used to, a redirect URI mismatch
-the provider reports differently than expected.
+Still unproven against a live provider: Google entirely, and for GitHub the
+connect, disconnect, and repeat-sign-in paths. The first live run also surfaced
+a database the schema had drifted from (a plain index where `upsertConnection`
+needs a unique one) — the kind of thing only a real round trip catches.
 
-To close it: register a GitHub app and a Google client, point the callback at
-`<origin>/api/auth/callback/<provider>`, and run both flows plus a connect
-and a disconnect against the demo.
+To close it: register a Google client, point the callback at
+`<origin>/api/auth/callback/google`, and run both providers through connect and
+disconnect against the demo.
 
 ### Publishing
 
