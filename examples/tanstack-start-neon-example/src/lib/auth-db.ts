@@ -1,11 +1,26 @@
 import type { AuthDirection, AuthTable } from "@auth-ts/server"
 import { defineAuthDB } from "@auth-ts/server"
-import { and, asc, desc, eq, getColumns, lt, sql } from "drizzle-orm"
+import { and, asc, desc, eq, getColumns, is, lt, sql } from "drizzle-orm"
+import { PgTable } from "drizzle-orm/pg-core"
 import { db } from "../db/db"
 import * as schema from "../db/schema"
 
-/** The schema module, as a dictionary the contract's table names index. */
-const tables = { ...schema }
+/**
+ * The schema module, as a dictionary the contract's table names index.
+ *
+ * Only the tables, so the schema is free to hold anything else — a helper, an
+ * enum, a relation — without it turning up where a table is expected. The
+ * assertion is the one step TypeScript cannot take on its own: it has no way to
+ * see that the predicate keeps exactly the keys the type keeps.
+ */
+type Tables = {
+  [K in keyof typeof schema as (typeof schema)[K] extends PgTable
+    ? K
+    : never]: (typeof schema)[K]
+}
+const tables = Object.fromEntries(
+  Object.entries(schema).filter(([, value]) => is(value, PgTable))
+) as Tables
 
 /**
  * `Object.entries` types its keys as `string`, which is the one thing here that

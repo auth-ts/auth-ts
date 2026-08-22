@@ -121,7 +121,16 @@ import { defineAuthDB } from "@auth-ts/server"
 
 import * as schema from "./db/schema"
 
-const tables = { ...schema }
+// The schema module is the dictionary — only its tables, so it is free to
+// export anything else without that turning up where a table is expected.
+type Tables = {
+  [K in keyof typeof schema as (typeof schema)[K] extends PgTable
+    ? K
+    : never]: (typeof schema)[K]
+}
+const tables = Object.fromEntries(
+  Object.entries(schema).filter(([, value]) => is(value, PgTable))
+) as Tables
 
 // `Object.entries` types its keys as `string`, which is the one thing here
 // that is not true: `where` and `orderBy` are keyed by column name.
