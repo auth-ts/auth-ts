@@ -336,3 +336,42 @@ describe("multiAccount enabled", () => {
     ).toContain("Max-Age=0")
   })
 })
+
+describe("guest conversion under multiAccount", () => {
+  it("replaces the guest session instead of parking it", async () => {
+    // A guest who signs in is not adding an account — they are finishing one.
+    // Parking the anonymous session would leave a stranded guest in the
+    // switcher, and its refresh token would stay valid.
+    const context = await createTestServer({ multiAccount: true, guest: true })
+    const guestResponse = await context.authServer.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const guestCookies: Record<string, string> = {}
+    for (const [name, cookie] of readSetCookies(guestResponse))
+      guestCookies[name] = cookie.value
+    const guestToken = required(guestCookies["auth-ts.refresh"], "guest token")
+
+    const { cookies } = await signIn(context, "ada@example.com", guestCookies)
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/accounts", { cookies })
+    )
+    const body = (await response.json()) as {
+      accounts: Array<{ user: { email: string | null }; current: boolean }>
+    }
+
+    expect(body.accounts).toHaveLength(1)
+    expect(body.accounts[0]?.user.email).toBe("ada@example.com")
+    expect(cookies["auth-ts.refresh.accounts"]).not.toContain(guestToken)
+    expect(context.db.sessions()).toHaveLength(1)
+    expect(
+      (
+        await context.authServer.handler(
+          request("GET", "/api/auth/user", {
+            cookies: { "auth-ts.refresh": guestToken }
+          })
+        )
+      ).status
+    ).toBe(401)
+  })
+})

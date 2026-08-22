@@ -109,6 +109,16 @@ describe("guest conversion", () => {
     expect(body.user.type).toBe("user")
     expect(body.user.email).toBe("ada@example.com")
     expect(context.db.users()).toHaveLength(1)
+
+    // The guest session is replaced, not left beside the new one.
+    expect(context.db.sessions()).toHaveLength(1)
+    expect(
+      (
+        await context.authServer.handler(
+          request("GET", "/api/auth/user", { cookies })
+        )
+      ).status
+    ).toBe(401)
   })
 
   it("points the guest at the existing account when the identifier is taken", async () => {
@@ -143,6 +153,18 @@ describe("guest conversion", () => {
     const guestRow = await context.db.getUser({ id: guest.id })
     expect(guestRow?.primaryUserId).toBe(existing.id)
     expect(guestRow?.type).toBe("guest")
+
+    // The anonymous session does not outlive the merge: its refresh token is
+    // dead, so nothing can keep acting as the guest from this browser.
+    expect(context.db.sessions()).toHaveLength(1)
+    expect(context.db.sessions()[0]?.userId).toBe(existing.id)
+    expect(
+      (
+        await context.authServer.handler(
+          request("GET", "/api/auth/user", { cookies })
+        )
+      ).status
+    ).toBe(401)
   })
 
   it("never converts a real user — signing in again just replaces the session", async () => {

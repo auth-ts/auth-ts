@@ -33,8 +33,13 @@ export interface GuestConversion {
  * **The identifier already belongs to someone** — that account wins, and the
  * guest row records `primaryUserId` pointing at it. Core does not move any data:
  * only the application knows what a guest's rows mean or whether merging them is
- * even desirable. The guest's session is replaced rather than parked, because
- * leaving a stranded anonymous account in an account switcher helps nobody.
+ * even desirable.
+ *
+ * In both cases the guest's session is replaced rather than parked: callers pass
+ * its token hash as `issueSession`'s `replaces`, which deletes the row and keeps
+ * it out of the account switcher. A stranded anonymous account in a switcher
+ * helps nobody, and a still-valid refresh token for it is a session nobody can
+ * see to revoke.
  */
 export async function convertGuest(
   internals: AuthServerInternals,

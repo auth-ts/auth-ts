@@ -321,6 +321,16 @@ describe("oauth callback", () => {
     expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
       owner.id
     )
+    // The guest session was replaced by the callback, not left live beside it.
+    expect(
+      (
+        await authServer.handler(
+          request("GET", "/api/auth/user", {
+            cookies: { "auth-ts.refresh": guestRefresh }
+          })
+        )
+      ).status
+    ).toBe(401)
   })
 
   it("treats a guest's connect as a sign-in: merges into the linked account rather than refusing", async () => {

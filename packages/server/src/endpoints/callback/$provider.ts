@@ -159,7 +159,9 @@ export const callbackProvider = defineEndpoint({
     const issued = await issueSession(internals, {
       user,
       headers: input.headers,
-      requestURL: input.requestURL
+      requestURL: input.requestURL,
+      // The guest's session has done its job either way — see `convertGuest`.
+      ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
     })
 
     const headers = new Headers(issued.headers)
