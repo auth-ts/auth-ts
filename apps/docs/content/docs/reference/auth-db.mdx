@@ -131,7 +131,6 @@ const authTables = Object.fromEntries(
   Object.entries(schema).filter(([, value]) => is(value, PgTable))
 ) as Pick<typeof schema, AuthTable>
 
-// The keys are cast so the lookups stay properties; `unknown` for the value does not compile.
 const buildWhere = (table: AuthTable, where: AuthWhere) => {
   const columns = getColumns(authTables[table])
   const entries = Object.entries(where) as [keyof typeof columns, never][]
