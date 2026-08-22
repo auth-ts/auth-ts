@@ -108,7 +108,7 @@ describe("public API documentation", () => {
           "// line comment",
           "export const lineComment = 4",
           "export const nothing = 5",
-          "declare module \"augmented\" {",
+          'declare module "augmented" {',
           "  export interface IndentedNothing {}",
           "}"
         ].join("\n")
@@ -135,7 +135,7 @@ describe("public API documentation", () => {
           " * Mount once at `<basePath>/*` and it dispatches.",
           " */",
           "export function multiLine() {}",
-          "declare module \"augmented\" {",
+          'declare module "augmented" {',
           "  /** Indented, inside a declare-module or namespace block. */",
           "  export type Indented = string",
           "}"
