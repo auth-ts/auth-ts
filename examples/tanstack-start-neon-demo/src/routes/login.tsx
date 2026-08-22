@@ -1,7 +1,7 @@
 import { isAuthError } from "@auth-ts/client"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
-import { authClient } from "../auth-client.ts"
+import { authClient } from "../lib/auth-client.ts"
 
 export const Route = createFileRoute("/login")({ component: LoginPage })
 

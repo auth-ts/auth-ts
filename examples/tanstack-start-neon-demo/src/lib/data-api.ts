@@ -1,4 +1,4 @@
-import { authClient } from "../auth-client.ts"
+import { authClient } from "./auth-client.ts"
 
 const DATA_API_URL = import.meta.env.VITE_NEON_DATA_API_URL ?? ""
 
