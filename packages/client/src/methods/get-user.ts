@@ -11,9 +11,10 @@ import { AuthError } from "../lib/auth-error.ts"
  * the user from that response — the token itself carries only `sub` and is never
  * decoded into a user.
  *
- * Only the server answering `unauthenticated` resolves to `null`. Anything
+ * Only the server answering `unauthenticated` is a verdict of `null`. Anything
  * else — the network failing, the server erroring, a proxy answering for it —
- * resolves to the last known user. Being offline is not being signed out, and
+ * resolves to the last known user, which is `null` only on a device that has
+ * never signed in. Being offline is not being signed out, and
  * neither is the auth server being mid-deploy; an application that forgets who
  * you are whenever something between it and the server hiccups is worse than
  * one that is briefly optimistic. Server failures are logged at `warn` so they
