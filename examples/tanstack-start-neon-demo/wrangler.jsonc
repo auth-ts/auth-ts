@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tanstack-start-neon-demo",
+  "compatibility_date": "2026-08-21",
+  // `nodejs_compat` is what lets the Neon driver and the auth server run
+  // unchanged here. With a compatibility date after 2025-04-01 it also
+  // populates `process.env` from vars and secrets, so the same
+  // `process.env.DATABASE_URL` reads work in the Worker and in Node.
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": { "enabled": true }
+}

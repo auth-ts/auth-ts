@@ -1,7 +1,7 @@
-import type { AuthDb } from "@auth-ts/server"
+import type { AuthDB } from "@auth-ts/server"
 import { createAuthServer } from "@auth-ts/server"
 import { and, eq, lt, sql } from "drizzle-orm"
-import { db } from "./db/client.ts"
+import { db } from "./db/db.ts"
 import {
   connections,
   magicCodes,
@@ -17,7 +17,7 @@ import {
  * you would have written anyway. Each one is `ON CONFLICT`, so create-or-merge
  * stays a single atomic statement rather than a read followed by a write.
  */
-const authDb: AuthDb = {
+const authDb: AuthDB = {
   async upsertUser(user) {
     // Id-targeted: update exactly this row. Guest conversion, and PATCH.
     if (user.id) {

@@ -3,13 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --env-file=.env x vite dev",
-    "build": "bun --env-file=.env x vite build",
-    "start": "node .output/server/index.mjs",
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "bun run build && wrangler deploy",
     "typecheck": "tsc -p tsconfig.json",
-    "db:push": "drizzle-kit push && bun -e 'await new (await import(\"bun\")).SQL(process.env.DATABASE_URL).file(\"src/db/permissions.sql\")'",
-    "keys": "bun scripts/generate-keys.ts",
-    "jwks": "bun --env-file=.env scripts/print-jwks.ts"
+    "cf-typegen": "wrangler types",
+    "db:push": "drizzle-kit push && bun run scripts/apply-permissions.ts",
+    "keys": "bun run scripts/generate-keys.ts",
+    "jwks": "bun run scripts/print-jwks.ts"
   },
   "dependencies": {
     "@auth-ts/client": "workspace:*",
@@ -18,17 +20,20 @@
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-router": "1.170.31",
     "@tanstack/react-start": "1.168.48",
+    "dotenv": "17.4.2",
     "drizzle-orm": "1.0.0-rc.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1.53.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.1.0",
     "drizzle-kit": "1.0.0-rc.4",
+    "jose": "6.2.9",
     "tailwindcss": "4.3.3",
-    "jose": "6.2.9"
+    "wrangler": "4.125.0"
   }
 }

@@ -2,6 +2,7 @@ node_modules
 dist
 .output
 .nitro
+.wrangler
 .source
 .nx
 coverage
