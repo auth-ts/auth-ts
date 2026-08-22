@@ -76,4 +76,40 @@ describe("key rotation", () => {
     expect((await cleaned.authServer.verifyToken(newToken))?.sub).toBe("user-1")
     await expect(cleaned.authServer.verifyToken(oldToken)).resolves.toBeNull()
   })
+
+  it("publishes a key once even when additionalPublicKeys repeats it, so verification keeps working", async () => {
+    // The easy slip at the switch: the new key's public half ends up in
+    // additionalPublicKeys alongside being the signing key, or an old one is
+    // pasted twice. Two entries with one kid would make jose refuse to choose
+    // and fail every local verification; the duplicates are dropped and logged.
+    const current = await generateTestKeys("RS256")
+    const old = await generateTestKeys("RS256")
+    const context = await createTestServer({
+      jwt: {
+        privateKey: current.privateKeyPem,
+        additionalPublicKeys: [
+          current.publicKeyPem,
+          old.publicKeyPem,
+          old.publicKeyPem
+        ]
+      }
+    })
+
+    const jwks = await context.authServer.getJwks(undefined as never)
+    const token = await context.authServer.signToken({ userId: "user-1" })
+    const kids = jwks.keys.map((key) => key.kid)
+
+    expect(kids).toHaveLength(2)
+    expect(new Set(kids).size).toBe(2)
+    expect(kids[0]).toBe(decodeProtectedHeader(token).kid)
+    expect((await context.authServer.verifyToken(token))?.sub).toBe("user-1")
+    expect(
+      context.logCalls.filter(
+        (call) =>
+          call.level === "warn" &&
+          call.message ===
+            "ignoring a duplicate key in jwt.additionalPublicKeys"
+      )
+    ).toHaveLength(2)
+  })
 })
