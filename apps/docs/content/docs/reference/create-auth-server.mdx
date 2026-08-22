@@ -56,6 +56,30 @@ Plus the JWT-plane functions:
 
 <auto-type-table path="../../../../../packages/server/src/jwt/sign-token.ts" name="SignTokenClaims" />
 
+## Additional fields
+
+`user.additionalFields` declares the extra columns on your users table that
+sign-up may set and `PATCH /user` may edit — a name → type map, and the source
+of truth for types as well as validation. Declare a field and every user this
+server returns carries it, typed:
+
+```ts
+const authServer = createAuthServer({
+  db,
+  user: { additionalFields: { plan: "string", seats: "number" } }
+})
+
+const result = await authServer.getToken({ headers })
+result.user.plan // string | null | undefined
+```
+
+Optional and nullable on the way out, because nothing guarantees a row has set
+them; optional and never null on the way in, because core only writes a value
+that validated against its declared type. Requests that send an undeclared key
+or the wrong primitive are rejected with `invalidField`, and declared fields are
+applied on insert only — signing in cannot overwrite an existing profile. Typing
+your `AuthDB` against the same schema is covered in [AuthDB](/docs/reference/auth-db#typing-your-implementation).
+
 ## Client IP
 
 `ipAddress` decides how the client's address is read from proxy headers — the

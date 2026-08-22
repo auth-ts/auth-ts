@@ -3,7 +3,7 @@ import type { JwtAlgorithm } from "../jwt/import-signing-key"
 import type { IpAddressOptions } from "../lib/ip-address"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
-import type { AuthDB } from "./auth-db"
+import type { AdditionalFieldsSchema, AuthDB } from "./auth-db"
 
 // The shapes `createAuthServer` accepts — and nothing else. Options are the
 // partial, human-written input; what they resolve to is `AuthServerConfig`, in
@@ -156,22 +156,21 @@ export interface CookieOptions {
   path?: string
 }
 
-/** The primitive types an additional field may hold. */
-export type AdditionalFieldType = "string" | "number" | "boolean"
-
-/** Declared additional fields, as a name → type map. */
-export type AdditionalFieldsSchema = Record<string, AdditionalFieldType>
-
 /** User-record behaviour. */
-export interface UserOptions {
+export interface UserOptions<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> {
   /**
-   * Extra fields your table has that sign-up may set and `PATCH /user` may edit.
+   * Extra columns your users table has that sign-up may set and `PATCH /user`
+   * may edit, as a name → type map: `{ plan: "string", seats: "number" }`.
    *
-   * An allowlist, not a schema: undeclared keys in a request are rejected, and
-   * declared fields are applied **on insert only** so that signing in cannot
-   * overwrite an existing profile.
+   * An allowlist as much as a schema: undeclared keys in a request are
+   * rejected, and declared fields are applied **on insert only**, so signing in
+   * cannot overwrite an existing profile. It is also where the types come from —
+   * declare `plan` and every user this server returns carries `plan`, typed,
+   * and so does what your `upsertUser` receives.
    */
-  additionalFields?: AdditionalFieldsSchema
+  additionalFields?: S
   /**
    * How recently the session must have authenticated for `DELETE /user` to act
    * immediately; older sessions are challenged with an emailed code.
@@ -233,10 +232,18 @@ export interface CorsOptions {
   origin: string
 }
 
-/** Options accepted by `createAuthServer`. */
-export interface AuthServerOptions {
+/**
+ * Options accepted by `createAuthServer`.
+ *
+ * `S` is inferred from `user.additionalFields` and is what every user the server
+ * hands back is typed with; `db` is checked against it rather than inferred
+ * from it, so the schema you declare is the one source of truth.
+ */
+export interface AuthServerOptions<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> {
   /** The callbacks that read and write your database. */
-  db: AuthDB
+  db: AuthDB<NoInfer<S>>
   /** Sign-in method: magic codes over email. */
   email?: EmailOptions
   /** Sign-in method: magic codes over SMS. */
@@ -286,7 +293,7 @@ export interface AuthServerOptions {
   /** Refresh-cookie name and scope. Security attributes are fixed, not options. */
   cookie?: CookieOptions
   /** Additional user fields and the account-deletion freshness window. */
-  user?: UserOptions
+  user?: UserOptions<S>
   /**
    * Set `false` to disable the built-in limiter and bring your own.
    *

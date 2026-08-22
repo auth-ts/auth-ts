@@ -26,9 +26,13 @@ These are not enforced by types, so they are worth reading once:
 - **`upsertUser` has three shapes.** An identifier with no `id` looks up and
   merges. No identifier at all always inserts — that is guest creation. An `id`
   targets exactly that row, which is guest conversion and profile updates.
-- **`type` and `additionalFields` are insert-only** on the identifier-keyed path.
-  Merging them would demote an administrator on their next sign-in, and let any
-  sign-in body rewrite profile columns.
+- **On the identifier-keyed path, merge `name` and `imageURL` only.** That call
+  is a sign-in. `type` and your declared fields are insert-only there: merging
+  `type` would demote an administrator on their next sign-in, and merging your
+  fields would let any sign-in body rewrite profile columns. The id-targeted
+  form applies everything it is given — that is how `PATCH /user` edits.
+- **Your declared fields arrive flat**, beside the core ones, exactly as they sit
+  on the row — `values({ id, ...user })` is the whole insert.
 - **`deleteUser` must remove the user's sessions.** A cascade does this for free.
   An account that keeps a live refresh token is still a working login.
 - **The single-row deletes return what they deleted** — `deleteUser`,
@@ -57,9 +61,41 @@ These are not enforced by types, so they are worth reading once:
   database already knows the time — `expiresAt < now()` avoids any skew between
   your application server and Postgres.
 
+## Typing your implementation
+
+`AuthDB` takes your declared additional fields as a type parameter. Declare the
+schema once, and both sides agree:
+
+```ts
+import type { AdditionalFieldsSchema, AuthDB } from "@auth-ts/server"
+
+export const additionalFields = {
+  plan: "string",
+  seats: "number"
+} satisfies AdditionalFieldsSchema
+
+export const authDB: AuthDB<typeof additionalFields> = {
+  async upsertUser({ id, ...user }) {
+    // user.plan is string | undefined here, and the row you return
+    // is checked for plan?: string | null
+  }
+  // ...
+}
+
+createAuthServer({ db: authDB, user: { additionalFields } })
+```
+
+The bare `AuthDB` is accepted by any server: it sees the fields as an open map,
+which is what a `select *` returns anyway. A server checks a typed adapter
+against the schema it was given rather than inferring the schema from it, so
+`user.additionalFields` stays the one source of truth.
+
 ## The entities
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthUser" />
+The core fields of a user. Your declared additional fields sit beside them on
+`AuthUser`, typed from the schema you declare.
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="CoreUserFields" />
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthSession" />
 

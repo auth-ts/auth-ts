@@ -1,10 +1,17 @@
 export type {
+  AdditionalFields,
+  AdditionalFieldsInput,
+  AdditionalFieldsSchema,
+  AdditionalFieldType,
+  AdditionalFieldValue,
   AuthConnection,
   AuthDB,
   AuthMagicCode,
   AuthRateLimit,
   AuthSession,
   AuthUser,
+  CoreUserFields,
+  CoreUserInput,
   DeleteSessionWhere,
   GetUserWhere,
   MagicCodePurpose,
@@ -17,8 +24,6 @@ export type {
 } from "./core/auth-db"
 export type { AuthServerConfig } from "./core/auth-server-config"
 export type {
-  AdditionalFieldsSchema,
-  AdditionalFieldType,
   AuthServerOptions,
   CookieOptions,
   CorsOptions,

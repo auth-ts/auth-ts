@@ -91,9 +91,7 @@ export async function resolveOAuthUser(
         type: "user",
         ...(identity.name ? { name: identity.name } : {}),
         ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
-        ...(Object.keys(additionalFields).length > 0
-          ? { additionalFields }
-          : {})
+        ...additionalFields
       })
 
   await internals.db.upsertConnection({

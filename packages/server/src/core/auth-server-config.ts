@@ -6,9 +6,8 @@ import { isTrustedProxyEntry, resolveIpAddressConfig } from "../lib/ip-address"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
 import { parseDuration } from "../lib/parse-duration"
-import type { AuthDB } from "./auth-db"
+import type { AdditionalFieldsSchema, AuthDB } from "./auth-db"
 import type {
-  AdditionalFieldsSchema,
   AuthServerOptions,
   CorsOptions,
   EmailOptions,

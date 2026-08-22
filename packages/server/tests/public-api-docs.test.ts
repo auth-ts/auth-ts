@@ -53,7 +53,7 @@ describe("public API documentation", () => {
 
   it("documents every field of the database contract, which consumers implement by hand", () => {
     const source = readFileSync(join(sourceRoot, "core/auth-db.ts"), "utf8")
-    const contract = sliceBetweenMarkers(source, "export interface AuthDB {")
+    const contract = sliceBetweenMarkers(source, "export interface AuthDB<")
     const lines = contract.split("\n")
 
     const undocumented: string[] = []
@@ -77,7 +77,7 @@ describe("public API documentation", () => {
     // and the resulting `AuthServerConfig` live in auth-server-config.ts.
     const optionsBlock = sliceBetweenMarkers(
       source,
-      "export interface AuthServerOptions {"
+      "export interface AuthServerOptions<"
     )
     const lines = optionsBlock.split("\n")
 

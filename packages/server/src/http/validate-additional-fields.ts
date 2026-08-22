@@ -1,4 +1,4 @@
-import type { AdditionalFieldsSchema } from "../core/auth-server-options"
+import type { AdditionalFieldsSchema } from "../core/auth-db"
 import { AuthApiError } from "./auth-api-error"
 import { AuthConfigError } from "./auth-config-error"
 

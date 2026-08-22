@@ -66,7 +66,6 @@ export async function convertGuest(
     return mergeGuestInto(internals, guest, existing)
   }
 
-  const additionalFields = identity.additionalFields ?? {}
   const upgraded = await internals.db.upsertUser({
     id: guest.id,
     type: "user",
@@ -74,7 +73,7 @@ export async function convertGuest(
     ...(identity.phoneNumber ? { phoneNumber: identity.phoneNumber } : {}),
     ...(identity.name ? { name: identity.name } : {}),
     ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
-    ...(Object.keys(additionalFields).length > 0 ? { additionalFields } : {})
+    ...identity.additionalFields
   })
   internals.log.info("guest upgraded in place, keeping its id and its rows")
 

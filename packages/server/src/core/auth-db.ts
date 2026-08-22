@@ -6,24 +6,46 @@
  */
 export type UserType = "guest" | "user" | "admin"
 
+/** The primitive types an additional field may hold. */
+export type AdditionalFieldType = "string" | "number" | "boolean"
+
 /**
- * A user row, as core reads it.
+ * Declared additional fields, as a name → type map: `{ plan: "string" }`.
  *
- * Declared `additionalFields` are **flat on this type**, not nested under a
- * property: your row already has them as columns, so `AuthUser & YourFields` is
- * what a `select *` actually returns and what application code wants to read.
- * Structural typing means returning a richer object is always fine.
- *
- * Note the deliberate asymmetry with {@link UpsertUserInput}, which nests them:
- * on the way *in* they are an allowlisted payload that must stay visibly
- * separate from the fields core owns, and writing `...user.additionalFields` in
- * your insert is the line that makes mass assignment impossible to do by
- * accident. On the way *out* there is nothing to separate — it is just your row.
- *
- * This is also the `user` returned to the browser on sign-in and refresh, so
- * nothing sensitive belongs on it.
+ * This is the source of truth twice over. At runtime it is the allowlist a
+ * request's fields are validated against; at compile time it is what
+ * {@link AuthUser} and {@link UpsertUserInput} are typed from, so declaring
+ * `plan` is what makes `user.plan` exist.
  */
-export interface AuthUser {
+export type AdditionalFieldsSchema = Record<string, AdditionalFieldType>
+
+/** The TypeScript type a declared field type stands for. */
+export type AdditionalFieldValue<T extends AdditionalFieldType> =
+  T extends "string" ? string : T extends "number" ? number : boolean
+
+/**
+ * Declared fields as they come **out** of your table — each optional and
+ * nullable, because nothing guarantees a row has set them.
+ *
+ * A schema with no statically known keys — the bare `AuthDB`, the client —
+ * declares nothing about the row, so the row is an open map: your columns
+ * are there, whatever they are, and TypeScript is not told otherwise.
+ */
+export type AdditionalFields<S extends AdditionalFieldsSchema> =
+  string extends keyof S
+    ? { [field: string]: unknown }
+    : { [K in keyof S]?: AdditionalFieldValue<S[K]> | null }
+
+/**
+ * Declared fields as core passes them **in** — each optional, never null, since
+ * core only writes a value that validated against its declared type.
+ */
+export type AdditionalFieldsInput<S extends AdditionalFieldsSchema> = {
+  [K in keyof S]?: AdditionalFieldValue<S[K]>
+}
+
+/** The user fields core owns. Your declared fields sit beside these on {@link AuthUser}. */
+export interface CoreUserFields {
   id: string
   /** Null for guests; unique when present. */
   email?: string | null
@@ -42,6 +64,24 @@ export interface AuthUser {
    */
   primaryUserId?: string | null
 }
+
+/**
+ * A user row, as core reads it.
+ *
+ * Your declared `additionalFields` are part of this type, flat, beside the
+ * fields core owns — typed from the schema you gave `createAuthServer`, so
+ * `{ plan: "string" }` makes `user.plan` a `string | null | undefined`:
+ * optional and nullable, because nothing guarantees a row has set it. Where no
+ * schema is in scope — the client, or an adapter written against the bare
+ * contract — the row is an open map rather than a closed one, which is what
+ * a `select *` actually returns.
+ *
+ * This is also the `user` returned to the browser on sign-in and refresh, so
+ * nothing sensitive belongs on it.
+ */
+export type AuthUser<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = CoreUserFields & AdditionalFields<S>
 
 /** A refresh-token row. Core stores only the hash of the token, never the token. */
 export interface AuthSession {
@@ -96,11 +136,11 @@ export interface AuthConnection {
   email?: string | null
 }
 
-/** Fields accepted by {@link AuthDB.upsertUser}. */
-export interface UpsertUserInput {
+/** The core-owned fields {@link AuthDB.upsertUser} may be given. */
+export interface CoreUserInput {
   /**
    * When present, targets that exact row by id instead of looking up by
-   * identifier — used for guest conversion.
+   * identifier — used for guest conversion and `PATCH /user`.
    */
   id?: string
   email?: string
@@ -109,16 +149,19 @@ export interface UpsertUserInput {
   imageURL?: string
   type?: UserType
   primaryUserId?: string
-  /**
-   * Declared `additionalFields`. Spread them into your insert.
-   *
-   * Applied **on insert**, and on the id-targeted form — which is how
-   * `PATCH /user` edits them. They must be **ignored when merging into a row
-   * found by identifier**, exactly like `type`: that path is a sign-in, and a
-   * sign-in request that could rewrite profile columns is mass assignment.
-   */
-  additionalFields?: Record<string, string | number | boolean>
 }
+
+/**
+ * Fields accepted by {@link AuthDB.upsertUser}.
+ *
+ * Your declared `additionalFields` arrive **flat on this object**, beside the
+ * fields core owns, exactly as they sit on {@link AuthUser} — so
+ * `values({ id, ...user })` writes the row. Which of them may be applied
+ * depends on the shape of the call; see `upsertUser`.
+ */
+export type UpsertUserInput<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = CoreUserInput & AdditionalFieldsInput<S>
 
 /** Fields written by {@link AuthDB.upsertSession}. */
 export interface UpsertSessionInput {
@@ -197,31 +240,39 @@ export type DeleteSessionWhere =
  * callers (tests, migrations, the in-memory fixture) drive this contract
  * directly. For multi-tenancy, close over the tenant when constructing the
  * server instead.
+ *
+ * `S` is your declared `additionalFields`. Type an implementation as
+ * `AuthDB<typeof additionalFields>` and `upsertUser` receives them typed and
+ * every user it returns carries them; the bare `AuthDB` sees them as an open
+ * map of primitives, and any server accepts it.
  */
-export interface AuthDB {
+export interface AuthDB<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> {
   /**
    * Creates or merges a user.
    *
    * Keyed on whichever identifier is present — core normalizes it first, and
-   * passes exactly one for code flows, or email for OAuth. Three shapes:
+   * passes exactly one for code flows, or email for OAuth. Your declared
+   * fields arrive flat beside the core ones. Three shapes:
    *
-   * - **An identifier, no `id`** — look up by that identifier; insert if absent,
-   *   otherwise merge the provided fields. `undefined` fields mean "leave alone".
+   * - **An identifier, no `id`** — look up by that identifier. Insert the whole
+   *   object if absent; otherwise update **`name` and `imageURL` only**.
+   *   `type` and your declared fields are insert-only on this path: it is a
+   *   sign-in, and a sign-in that could rewrite `type` would demote an
+   *   administrator the next time they logged in, while one that could rewrite
+   *   profile columns is mass assignment. `undefined` means "leave alone".
    * - **No identifier at all** — always insert. This is guest creation.
-   * - **`id` present** — update that exact row, no identifier lookup. This is
-   *   guest conversion.
-   *
-   * `type` applies **on insert only** for identifier-keyed calls. Merging it on
-   * every sign-in would silently demote an admin the next time they logged in.
-   * The single exception is the id-targeted form, which may move `guest` to
-   * `user`. Core never passes `admin`.
+   * - **`id` present** — update that exact row with everything given, no
+   *   identifier lookup. This is guest conversion and `PATCH /user`, and the
+   *   one place `type` may change: `guest` to `user`. Core never passes `admin`.
    *
    * @returns The stored user, as core should see it.
    */
-  upsertUser(user: UpsertUserInput): Promise<AuthUser>
+  upsertUser(user: UpsertUserInput<S>): Promise<AuthUser<S>>
 
   /** Looks up one user by exactly one of id, email, or phone number. */
-  getUser(where: GetUserWhere): Promise<AuthUser | null>
+  getUser(where: GetUserWhere): Promise<AuthUser<S> | null>
 
   /**
    * Deletes a user and returns the deleted row, or `null` if none matched.
@@ -235,7 +286,7 @@ export interface AuthDB {
    * `ON DELETE CASCADE` or by calling your own `deleteSessions`. A deleted
    * account that keeps a live refresh token is still a working login.
    */
-  deleteUser(where: { id: string }): Promise<AuthUser | null>
+  deleteUser(where: { id: string }): Promise<AuthUser<S> | null>
 
   /** Creates or updates a session row, keyed by `tokenHash`. */
   upsertSession(session: UpsertSessionInput): Promise<void>

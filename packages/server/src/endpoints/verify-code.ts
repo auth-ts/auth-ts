@@ -86,9 +86,7 @@ export const verifyCode = defineEndpoint({
         : await internals.db.upsertUser({
             [identifier.kind]: identifier.value,
             type: "user",
-            ...(Object.keys(additionalFields).length > 0
-              ? { additionalFields }
-              : {})
+            ...additionalFields
           })
 
     const issued = await issueSession(internals, {

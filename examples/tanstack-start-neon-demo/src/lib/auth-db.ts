@@ -10,16 +10,14 @@ import {
 } from "../db/schema"
 
 export const authDB: AuthDB = {
-  async upsertUser({ id, additionalFields, ...user }) {
+  async upsertUser({ id, ...user }) {
     const [upserted] = await db
       .insert(users)
-      .values({ id, ...user, ...additionalFields })
+      .values({ id, ...user })
       .onConflictDoUpdate({
         target: id ? users.id : user.email ? users.email : users.phoneNumber,
-        // Merging by identifier is a sign-in: never rewrite type or additionalFields.
-        set: id
-          ? { ...user, ...additionalFields }
-          : { name: user.name, imageURL: user.imageURL }
+        // Merging by identifier is a sign-in: only the profile fields move.
+        set: id ? user : { name: user.name, imageURL: user.imageURL }
       })
       .returning()
 

@@ -56,7 +56,7 @@ export const signInGuest = defineEndpoint({
     // creation is: a brand new row every time, never a lookup.
     const user = await internals.db.upsertUser({
       type: "guest",
-      ...(Object.keys(additionalFields).length > 0 ? { additionalFields } : {})
+      ...additionalFields
     })
 
     const issued = await issueSession(internals, {

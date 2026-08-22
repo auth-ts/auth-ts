@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import type { AdditionalFieldsSchema } from "../../src/core/auth-db"
 import { createAuthServer } from "../../src/core/create-auth-server"
 import { AuthConfigError } from "../../src/http/auth-config-error"
 import { createMemoryDb } from "../../src/lib/memory-db"
@@ -172,7 +173,9 @@ describe("construction failures", () => {
       expect(() =>
         createAuthServer({
           ...baseOptions(),
-          user: { additionalFields: { [reserved]: "string" } }
+          user: {
+            additionalFields: { [reserved]: "string" } as AdditionalFieldsSchema
+          }
         })
       ).toThrow(/core owns that field/)
     }

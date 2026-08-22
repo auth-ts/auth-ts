@@ -9,8 +9,7 @@ import type {
   GetUserWhere,
   UpsertConnectionInput,
   UpsertMagicCodeInput,
-  UpsertSessionInput,
-  UpsertUserInput
+  UpsertSessionInput
 } from "../core/auth-db"
 import { randomUUID } from "./generate-random"
 
@@ -24,8 +23,8 @@ export interface MemoryDb extends AuthDB {
   reset(): void
 }
 
-/** A user row plus whatever additional fields the consumer declared. */
-type StoredUser = AuthUser & Record<string, unknown>
+/** A user row; the bare `AuthUser` already admits whatever fields the consumer declared. */
+type StoredUser = AuthUser
 
 /**
  * Creates a fully in-memory implementation of the database contract.
@@ -59,60 +58,52 @@ export function createMemoryDb(): MemoryDb {
     return undefined
   }
 
-  /**
-   * Copies only the keys that were actually provided, so undefined means "leave alone".
-   *
-   * `applyAdditionalFields` is false on the identifier-keyed path: that is a
-   * sign-in, and letting a sign-in body rewrite profile columns would be mass
-   * assignment. The id-targeted path sets it, because that is how PATCH edits.
-   */
-  const mergeDefined = (
+  /** Copies only the keys that were actually provided, so undefined means "leave alone". */
+  const applyDefined = (
     target: StoredUser,
-    input: UpsertUserInput,
-    applyAdditionalFields: boolean
+    fields: Partial<Record<string, string | number | boolean | null>>
   ) => {
-    const { id, type, additionalFields, ...fields } = input
     for (const [key, value] of Object.entries(fields)) {
       if (value !== undefined) target[key] = value
     }
-    if (applyAdditionalFields && additionalFields)
-      Object.assign(target, additionalFields)
   }
 
   return {
     async upsertUser(input) {
-      if (input.id !== undefined) {
-        const existing = users.get(input.id)
-        if (!existing) throw new Error(`No user with id ${input.id}`)
+      const { id, type, ...fields } = input
 
-        mergeDefined(existing, input, true)
+      if (id !== undefined) {
+        const existing = users.get(id)
+        if (!existing) throw new Error(`No user with id ${id}`)
+
+        // The id-targeted form applies everything it was given, the consumer's
+        // own fields included — it is how PATCH edits and how a guest converts.
+        applyDefined(existing, fields)
         // The one place type may change: core converting a guest into a real user.
-        if (input.type === "user" && existing.type === "guest")
-          existing.type = "user"
-        if (input.primaryUserId !== undefined)
-          existing.primaryUserId = input.primaryUserId
+        if (type === "user" && existing.type === "guest") existing.type = "user"
 
         return { ...existing }
       }
 
       const existing = findUserByIdentifier(input.email, input.phoneNumber)
       if (existing) {
-        // type and additionalFields are both insert-only here: otherwise every
-        // admin would be demoted on their next sign-in, and any sign-in body
-        // could overwrite profile columns.
-        mergeDefined(existing, input, false)
+        // A sign-in. Only the profile fields core owns may move; `type` and the
+        // consumer's own fields are insert-only here, otherwise every admin would
+        // be demoted on their next sign-in and any sign-in body could overwrite
+        // profile columns.
+        applyDefined(existing, { name: input.name, imageURL: input.imageURL })
         return { ...existing }
       }
 
       const created: StoredUser = {
+        ...fields,
         id: randomUUID(),
         email: input.email ?? null,
         phoneNumber: input.phoneNumber ?? null,
         name: input.name ?? null,
         imageURL: input.imageURL ?? null,
-        type: input.type ?? "user",
-        primaryUserId: input.primaryUserId ?? null,
-        ...(input.additionalFields ?? {})
+        type: type ?? "user",
+        primaryUserId: input.primaryUserId ?? null
       }
       users.set(created.id, created)
 

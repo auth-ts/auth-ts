@@ -11,7 +11,7 @@ import type { TokenClaims } from "../jwt/verify-token"
 import { verifyToken } from "../jwt/verify-token"
 import type { HeadersInput } from "../session/resolve-session"
 import { readRefreshToken, resolveSession } from "../session/resolve-session"
-import type { AuthSession, AuthUser } from "./auth-db"
+import type { AdditionalFieldsSchema, AuthSession, AuthUser } from "./auth-db"
 import type { AuthServerConfig } from "./auth-server-config"
 import { resolveAuthServerConfig } from "./auth-server-config"
 import type { AuthServerInternals } from "./auth-server-internals"
@@ -20,28 +20,55 @@ import type { AuthServerOptions } from "./auth-server-options"
 import type { EndpointRegistry } from "./endpoint-registry"
 import { endpointRegistry } from "./endpoint-registry"
 
+/**
+ * `T` with every user inside it carrying the declared additional fields.
+ *
+ * Endpoints are written once, against the erased `AuthUser`; this is what puts
+ * the schema back on the way out, so `getToken()` returns `user.plan` typed
+ * when `plan` was declared. Everything that is not a user passes through
+ * unchanged.
+ */
+export type WithUserFields<
+  T,
+  S extends AdditionalFieldsSchema
+> = T extends AuthUser
+  ? AuthUser<S>
+  : T extends ReadonlyArray<infer Item>
+    ? WithUserFields<Item, S>[]
+    : T extends Date | ((...args: never[]) => unknown)
+      ? T
+      : T extends object
+        ? { [K in keyof T]: WithUserFields<T[K], S> }
+        : T
+
 /** The callable form of an endpoint: its input in, its data out. */
-type EndpointCallable<Endpoint> =
+type EndpointCallable<Endpoint, S extends AdditionalFieldsSchema> =
   Endpoint extends EndpointDefinition<infer Input, infer Data>
-    ? (input: Input) => Promise<Data>
+    ? (input: Input) => Promise<WithUserFields<Data, S>>
     : never
 
 /** Every endpoint as a directly callable function. */
-export type AuthCallables = {
-  [Name in keyof EndpointRegistry]: EndpointCallable<EndpointRegistry[Name]>
+export type AuthCallables<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = {
+  [Name in keyof EndpointRegistry]: EndpointCallable<EndpointRegistry[Name], S>
 }
 
 /** Every endpoint as an HTTP handler. */
 export type AuthHandlers = { [Name in keyof EndpointRegistry]: AuthHandler }
 
 /** What `authServer.getSession` resolves to. */
-export interface AuthSessionResult {
+export interface AuthSessionResult<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> {
   session: AuthSession
-  user: AuthUser
+  user: AuthUser<S>
 }
 
-/** The configured server. */
-export interface AuthServer extends AuthCallables {
+/** The configured server. `S` is the declared additional fields; see {@link AuthServerOptions}. */
+export interface AuthServer<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> extends AuthCallables<S> {
   /**
    * The configuration this server runs on — the options after defaults and
    * validation. Read it back in tests, or to learn a default without guessing.
@@ -61,7 +88,7 @@ export interface AuthServer extends AuthCallables {
   /** Decodes without verifying. Never authorize with this. */
   decodeToken: typeof decodeToken
   /** Resolves the refresh cookie to a session and user. One database round-trip. */
-  getSession: (input: HeadersInput) => Promise<AuthSessionResult | null>
+  getSession: (input: HeadersInput) => Promise<AuthSessionResult<S> | null>
 }
 
 /**
@@ -78,7 +105,9 @@ export interface AuthServer extends AuthCallables {
  *
  * @throws {AuthConfigError} When the configuration is incomplete or contradictory.
  */
-export function createAuthServer(options: AuthServerOptions): AuthServer {
+export function createAuthServer<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+>(options: AuthServerOptions<S>): AuthServer<S> {
   const resolved = resolveAuthServerConfig(options)
   const internals = createAuthServerInternals(resolved)
   const routes = compileRoutes(endpointRegistry)
@@ -126,7 +155,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
   }
 
   return {
-    ...(callables as unknown as AuthCallables),
+    ...(callables as unknown as AuthCallables<S>),
     config: resolved,
     handler,
     handlers: handlers as AuthHandlers,
@@ -164,9 +193,14 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       assertCookieReachable(resolved, input.headers, internals)
 
       const resolvedSession = await resolveSession(internals, input.headers)
-      return resolvedSession
-        ? { session: resolvedSession.session, user: resolvedSession.user }
-        : null
+      if (!resolvedSession) return null
+
+      // Core reads users through the erased `AuthUser`; the schema is put back
+      // here, at the boundary, the same way the callables' return types are.
+      return {
+        session: resolvedSession.session,
+        user: resolvedSession.user as AuthUser<S>
+      }
     }
   }
 }

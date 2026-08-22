@@ -86,9 +86,9 @@ describe("upsertUser", () => {
   it("stores declared additional fields flat on the row", async () => {
     const user = await db.upsertUser({
       email: "ada@example.com",
-      additionalFields: { referralCode: "ABC" }
+      referralCode: "ABC"
     })
-    expect((user as { referralCode?: string }).referralCode).toBe("ABC")
+    expect(user.referralCode).toBe("ABC")
   })
 })
 

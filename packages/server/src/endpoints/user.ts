@@ -114,7 +114,7 @@ export const updateUser = defineEndpoint({
       id: resolved.user.id,
       ...(name === undefined ? {} : { name }),
       ...(imageURL === undefined ? {} : { imageURL }),
-      ...(Object.keys(additionalFields).length > 0 ? { additionalFields } : {})
+      ...additionalFields
     })
 
     return { data: { user } }
