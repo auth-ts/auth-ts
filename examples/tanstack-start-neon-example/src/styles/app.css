@@ -1,23 +1,9 @@
 @import "tailwindcss";
 
-/* The theme follows the operating system: light unless the OS asks for dark.
-   Each theme supplies its own `color-scheme`, which reaches the parts no
-   utility class can: the caret, scrollbars, checkboxes, and autofill.
-
-   Both themes are declared below rather than in `themes:` here. A theme block
-   merges into the built-in of the same name, so listing them in both places
-   emits each theme twice — and the copy the plugin writes for an explicit
-   `data-theme` is the more specific of the two, which would quietly undo the
-   indigo for anyone who pins the theme rather than following the OS. */
 @plugin "daisyui" {
   themes: false;
 }
 
-/* The docs site's indigo, so the demo and the documentation read as one
-   product. Only the primary tokens move; every base, neutral, and status
-   colour stays as daisyUI shipped it. The fill lightens in dark mode to hold
-   its contrast against the dark base, which flips what can sit on top of it:
-   `primary-content` is the page background in either theme. */
 @plugin "daisyui/theme" {
   name: "light";
   default: true;
