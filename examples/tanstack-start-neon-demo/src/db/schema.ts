@@ -14,27 +14,6 @@ import {
 } from "drizzle-orm/pg-core"
 
 /**
- * The demo's schema.
- *
- * Identifiers are camelCase and therefore quoted everywhere, which Postgres
- * requires once you use them: unquoted identifiers fold to lowercase, and mixing
- * the two conventions produces the memorable error where a column that is plainly
- * visible "does not exist".
- *
- * `uuidv7()` is native in Postgres 18. On 17, install the `pg_uuidv7` extension
- * (Neon supports it) or swap these defaults for `gen_random_uuid()`.
- */
-const primaryKey = () => uuid("id").primaryKey().default(sql`uuidv7()`)
-
-const createdAt = () =>
-  timestamp("createdAt", { withTimezone: true }).notNull().defaultNow()
-const updatedAt = () =>
-  timestamp("updatedAt", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date())
-
-/**
  * Users.
  *
  * Both identifiers are nullable because a guest has neither, and unique when
@@ -53,22 +32,27 @@ const updatedAt = () =>
  * constrained too.
  */
 export const users = pgTable.withRLS("users", {
-  id: primaryKey(),
+  id: uuid("id").primaryKey().default(sql`uuidv7()`),
   email: text("email").unique(),
   phoneNumber: text("phoneNumber").unique(),
   name: text("name"),
   imageURL: text("imageURL"),
   type: text("type").$type<UserType>().notNull().default("user"),
   primaryUserId: uuid("primaryUserId"),
-  createdAt: createdAt(),
-  updatedAt: updatedAt()
+  createdAt: timestamp("createdAt", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date())
 })
 
 /** Refresh tokens, stored only as hashes. */
 export const sessions = pgTable.withRLS(
   "sessions",
   {
-    id: primaryKey(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     userId: uuid("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -76,8 +60,13 @@ export const sessions = pgTable.withRLS(
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
     userAgent: text("userAgent"),
     ipAddress: text("ipAddress"),
-    createdAt: createdAt(),
-    updatedAt: updatedAt()
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
   (table) => [
     index("sessionsUserIdIndex").on(table.userId),
@@ -89,7 +78,7 @@ export const sessions = pgTable.withRLS(
 export const magicCodes = pgTable.withRLS(
   "magicCodes",
   {
-    id: primaryKey(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     identifier: text("identifier").notNull().unique(),
     codeHash: text("codeHash").notNull(),
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
@@ -98,8 +87,13 @@ export const magicCodes = pgTable.withRLS(
       .$type<MagicCodePurpose>()
       .notNull()
       .default("signIn"),
-    createdAt: createdAt(),
-    updatedAt: updatedAt()
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
   (table) => [index("magicCodesExpiresAtIndex").on(table.expiresAt)]
 )
@@ -108,12 +102,17 @@ export const magicCodes = pgTable.withRLS(
 export const rateLimits = pgTable.withRLS(
   "rateLimits",
   {
-    id: primaryKey(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     key: text("key").notNull().unique(),
     count: integer("count").notNull().default(0),
     resetAt: timestamp("resetAt", { withTimezone: true }).notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt()
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
   (table) => [index("rateLimitsResetAtIndex").on(table.resetAt)]
 )
@@ -122,15 +121,20 @@ export const rateLimits = pgTable.withRLS(
 export const connections = pgTable.withRLS(
   "connections",
   {
-    id: primaryKey(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     userId: uuid("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
     providerAccountId: text("providerAccountId").notNull(),
     email: text("email"),
-    createdAt: createdAt(),
-    updatedAt: updatedAt()
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
   (table) => [
     index("connectionsUserIdIndex").on(table.userId),
@@ -155,11 +159,17 @@ export const connections = pgTable.withRLS(
 export const todos = pgTable.withRLS(
   "todos",
   {
-    id: primaryKey(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     userId: uuid("userId").notNull().default(sql`(auth.user_id()::uuid)`),
     title: text("title").notNull(),
     completed: boolean("completed").notNull().default(false),
-    createdAt: createdAt()
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
   },
   () => [
     pgPolicy("own todos", {
