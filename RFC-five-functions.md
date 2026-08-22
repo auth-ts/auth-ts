@@ -84,7 +84,13 @@ has to be keyed on the code and run regardless, and the edge cannot do it.
 
 ```ts
 interface AuthDB<S extends AdditionalFieldsSchema = AdditionalFieldsSchema> {
-  select<T extends Table>(input: { table: T; where: Where<S, T>; limit: number; offset?: number }): Promise<Row<S, T>[]>
+  select<T extends Table>(input: {
+    table: T
+    where: Where<S, T>
+    limit: number
+    offset?: number
+    orderBy?: { column: keyof Row<S, T>; direction: "asc" | "desc" }
+  }): Promise<Row<S, T>[]>
   insert<T extends Table>(input: { table: T; row: Insert<S, T> }): Promise<Row<S, T>>
   update<T extends Table>(input: { table: T; where: Where<S, T>; fields: Partial<Row<S, T>> }): Promise<void>
   delete<T extends Table>(input: { table: T; where: Where<S, T> }): Promise<Row<S, T>[]>
@@ -92,14 +98,15 @@ interface AuthDB<S extends AdditionalFieldsSchema = AdditionalFieldsSchema> {
 }
 ```
 
-- **`limit` is required; `offset` is optional.** An unbounded read is a type
-  error. Every list core makes has a ceiling — the devices list, the
-  connections list, the append-and-count check (`max + 1`), the single-row
-  lookups (`1`). `offset` is in the contract from day one so that paging
-  (a long devices list, an admin view) never needs a contract change; core
-  does not use it yet. Without `orderBy` the pairing is only stable if the
-  store returns rows in a consistent order — implementers should page by
-  insertion order (the uuidv7 `id`), which is what the docs will say.
+- **`limit` is required; `offset` and `orderBy` are optional.** An unbounded
+  read is a type error. Every list core makes has a ceiling — the devices
+  list, the connections list, the append-and-count check (`max + 1`), the
+  single-row lookups (`1`). `offset` and `orderBy` are in the contract from
+  day one so that paging (a long devices list, an admin view) never needs a
+  contract change. `orderBy` is one column and a direction — enough for
+  paging and for "newest", and the smallest thing every store can express.
+  When `orderBy` is omitted the store returns rows in insertion order (the
+  uuidv7 `id`), which is what makes `offset` stable by default.
 - **`update` returns `void`.** Core always holds the row it is updating — it
   just selected it, or it came from the resolved session — so the result is
   `{ ...existing, ...fields }` composed in core, and `AuthUser` has no
@@ -123,9 +130,11 @@ interface AuthDB<S extends AdditionalFieldsSchema = AdditionalFieldsSchema> {
 - **`deleteExpired` stays named** rather than teaching `where` an `lt`. It is
   maintenance — one `delete where expiresAt < now()` per table — and "your
   database knows the time" was a deliberate choice worth keeping.
-- **No `orderBy`.** On send, core deletes the identifier's existing codes and
-  inserts; on verify it selects by identifier and, in the rare race where two
-  rows exist, picks the newest in JS.
+- **`orderBy` is used sparingly.** Core needs it once: the newest code for an
+  identifier (`orderBy: { column: "id", direction: "desc" }, limit: 1` —
+  uuidv7 ids sort by time). On send, core deletes the identifier's existing
+  codes and inserts, so the race that leaves two rows is rare; ordering makes
+  it correct without a JS sort.
 - **No `count`.** `select` with `limit: max + 1` and `.length` is all
   append-and-count needs, and not every store has a cheap count.
 - **`delete` returns what it removed, atomically.** This is the one
@@ -173,7 +182,10 @@ Verified on TypeScript 7.0.2 (scratch files compiled with `--strict`, caller
    exports the unions alongside the generic interface:
 
    ```ts
-   type SelectInput = { [K in Table]: { table: K; where: Where<K>; limit: number; offset?: number } }[Table]
+   type SelectInput = { [K in Table]: {
+     table: K; where: Where<K>; limit: number; offset?: number
+     orderBy?: { column: keyof Row<K>; direction: "asc" | "desc" }
+   } }[Table]
    type InsertInput = { [K in Table]: { table: K; row: Insert<K> } }[Table]
    // …UpdateInput, DeleteInput likewise
    ```
@@ -234,7 +246,7 @@ reference should show the switch.
 | `deleteSession` | `delete(sessions, {tokenHash})` or `delete(sessions, {id, userId})` |
 | `deleteSessions` (all / except current) | `select(sessions, {userId})` then `delete(sessions, {id})` per row ≠ current — N round trips on a devices list, fine; or `delete(sessions, {userId})` for "all" |
 | `upsertMagicCode` | `delete(magicCodes, {identifier})` then `insert` — latest wins |
-| `getMagicCode` | `select(magicCodes, {identifier})`, newest in JS |
+| `getMagicCode` | `select(magicCodes, {identifier}, {orderBy: id desc, limit: 1})` |
 | `deleteMagicCode` | `delete(magicCodes, {identifier, codeHash?})` — returned row is the proof |
 | `getRateLimit` | dropped (already unused) |
 | `upsertRateLimit` | `insert(attempts, {key, expiresAt})` then `select(attempts, {key}, {limit: max + 1})` |
