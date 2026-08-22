@@ -66,11 +66,11 @@ What it costs, stated next to what it buys:
   `key` and `expiresAt`.
 - **Upside nobody asked for:** the rows are a failed-sign-in log.
 
-Better Auth hit exactly this wall: its adapter-backed `rateLimit` table is
-read-then-write, and it had to add a dedicated `customStorage.consume` hook
-("must check and increment in one operation … separate get and set can allow
-concurrent requests to pass the same stale counter"). Append-and-count gets a
-correct, store-backed, serverless-safe limiter out of the same generic
+Adapter-based libraries hit exactly this wall: a rate-limit table behind a
+generic adapter is read-then-write, and the eventual fix is a dedicated
+"consume" hook that must check and increment in one operation — a carve-out
+outside the adapter, because the adapter cannot express it. Append-and-count
+gets a correct, store-backed, serverless-safe limiter out of the same generic
 functions with no carve-out.
 
 Rate limiting stays in the library, on by default, database-backed. Volume
