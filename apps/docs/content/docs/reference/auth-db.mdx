@@ -121,13 +121,16 @@ const tables = { users, sessions, verificationCodes, attempts, connections }
 
 export const authDB = defineAuthDB({
   async select({ table, where, limit, offset, orderBy }) {
+    const columns: Record<string, PgColumn> = getColumns(tables[table])
     const [[name = "id", direction = "asc"] = []] = Object.entries(orderBy)
+    const column = columns[name]
+    if (!column) throw new Error(`${table} has no ${name} column`)
 
     return db
       .select()
       .from(tables[table])
       .where(matches(table, where))
-      .orderBy((direction === "asc" ? asc : desc)(columnsOf(table)[name]))
+      .orderBy((direction === "asc" ? asc : desc)(column))
       .limit(limit)
       .offset(offset)
   }

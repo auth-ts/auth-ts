@@ -18,30 +18,30 @@ import {
  * dictionary and a `where` built from `eq` covers every query it makes. If your
  * schema names things differently, this is where you map them — that mapping is
  * the entire cost of not having an adapter package.
+ *
+ * Keep the dictionary's own types: widening it to `AnyPgTable` erases each
+ * table's row type along with it, and every function below would need a cast
+ * back to the contract.
  */
 const tables = { users, sessions, verificationCodes, attempts, connections }
 
 /**
- * The columns of a table, by name.
+ * Every column/value pair in a `where`, as one `AND` — the only filter the
+ * contract has.
  *
- * `where` and `orderBy` arrive as column names rather than as column objects,
- * because the library has no way to hold a reference to your schema. This is
- * the translation, and the only place a name from the contract meets a column
- * in this file.
+ * `where` arrives as column names rather than column objects, because the
+ * library has no way to hold a reference to your schema. This is the
+ * translation.
  */
-const columnsOf = (table: keyof typeof tables): Record<string, PgColumn> =>
-  getColumns(tables[table])
-
-/** Every column/value pair in a `where`, as one `AND` — the only filter the contract has. */
 const matches = (table: keyof typeof tables, where: object) => {
-  const columns = columnsOf(table)
+  const columns: Record<string, PgColumn> = getColumns(tables[table])
 
   return and(
     ...Object.entries(where).map(([name, value]) => {
       const column = columns[name]
       // Only reachable if this schema is missing a column the library names,
-      // which is worth saying out loud rather than turning into a confusing
-      // SQL error.
+      // which is worth saying out loud rather than leaving to a confusing
+      // failure further down.
       if (!column) throw new Error(`${table} has no ${name} column`)
 
       return eq(column, value)
@@ -51,8 +51,9 @@ const matches = (table: keyof typeof tables, where: object) => {
 
 export const authDB = defineAuthDB({
   async select({ table, where, limit, offset, orderBy }) {
+    const columns: Record<string, PgColumn> = getColumns(tables[table])
     const [[name = "id", direction = "asc"] = []] = Object.entries(orderBy)
-    const column = columnsOf(table)[name]
+    const column = columns[name]
     if (!column) throw new Error(`${table} has no ${name} column`)
 
     return db
