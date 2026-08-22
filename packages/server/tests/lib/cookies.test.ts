@@ -132,4 +132,11 @@ describe("shouldUseSecureCookies", () => {
     expect(shouldUseSecureCookies("http://127.0.0.1:3000/x")).toBe(false)
     expect(shouldUseSecureCookies("http://example.com/x")).toBe(true)
   })
+
+  it("assumes secure when there is no request to inspect", () => {
+    // An endpoint called in-process carries no URL. The only reason to drop
+    // `Secure` is a local development origin, and nothing here says it is one.
+    expect(shouldUseSecureCookies()).toBe(true)
+    expect(shouldUseSecureCookies(undefined)).toBe(true)
+  })
 })

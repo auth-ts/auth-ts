@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
+import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
 const guestOptions = { guest: true }
 
@@ -123,9 +124,8 @@ describe("guest conversion", () => {
 
   it("points the guest at the existing account when the identifier is taken", async () => {
     const context = await createTestServer(guestOptions)
-    const existing = await context.db.upsertUser({
-      email: "ada@example.com",
-      type: "user"
+    const existing = await insertUser(context.db, {
+      email: "ada@example.com"
     })
 
     const { refreshToken, user: guest } = await signInAsGuest(context)
@@ -150,7 +150,7 @@ describe("guest conversion", () => {
 
     expect(body.user.id).toBe(existing.id)
 
-    const guestRow = await context.db.getUser({ id: guest.id })
+    const guestRow = await selectRow(context.db, "users", { id: guest.id })
     expect(guestRow?.primaryUserId).toBe(existing.id)
     expect(guestRow?.type).toBe("guest")
 
@@ -253,6 +253,78 @@ describe("account deletion", () => {
       required(readSetCookies(response).get("auth-ts.refresh"), "cleared")
         .attributes
     ).toContain("Max-Age=0")
+  })
+
+  it("takes the user's verification codes with them, so none outlives the address", async () => {
+    // Core deletes the children itself rather than requiring ON DELETE CASCADE,
+    // and a code left behind would sign the address's next owner into nothing.
+    const context = await createTestServer()
+    const refreshToken = await signIn(context)
+    const cookies = { "auth-ts.refresh": refreshToken }
+
+    // An outstanding code, sent and never verified.
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" },
+        cookies
+      })
+    )
+    expect(
+      await selectRows(context.db, "verificationCodes", {
+        identifier: "ada@example.com"
+      })
+    ).not.toEqual([])
+
+    const response = await context.authServer.handler(
+      request("DELETE", "/api/auth/user", { cookies })
+    )
+
+    expect(response.status).toBe(204)
+    expect(
+      await selectRows(context.db, "verificationCodes", {
+        identifier: "ada@example.com"
+      })
+    ).toEqual([])
+  })
+
+  it("takes every session of theirs, on every device, and nobody else's", async () => {
+    const context = await createTestServer()
+    const refreshToken = await signIn(context)
+    const ada = required(
+      await selectRow(context.db, "users", { email: "ada@example.com" }),
+      "ada"
+    )
+    // A second device of Ada's, and a bystander who must be left alone.
+    const session = (userId: string, tokenHash: string) =>
+      context.db.insert({
+        table: "sessions",
+        values: {
+          userId,
+          tokenHash,
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 60_000),
+          userAgent: null,
+          ipAddress: null
+        }
+      })
+    await session(ada.id, "ada-other-device")
+    const grace = await insertUser(context.db, { email: "grace@example.com" })
+    await session(grace.id, "grace-laptop")
+
+    const response = await context.authServer.handler(
+      request("DELETE", "/api/auth/user", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+
+    expect(response.status).toBe(204)
+    expect(
+      await selectRows(context.db, "sessions", { userId: ada.id })
+    ).toEqual([])
+    expect(
+      await selectRows(context.db, "sessions", { userId: grace.id })
+    ).toHaveLength(1)
+    expect(await selectRow(context.db, "users", { id: ada.id })).toBeNull()
   })
 
   it("challenges a stale session with a code and answers 403, never a 2xx", async () => {
@@ -399,6 +471,10 @@ describe("account deletion", () => {
 
   it("rate limits repeated bare deletes rather than sending a storm of email", async () => {
     vi.useFakeTimers()
+    // Pinned to the start of a window: the limiter's windows are aligned to the
+    // clock rather than started by the first request, so a run that straddled a
+    // boundary would hand the fourth delete a fresh allowance.
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
     try {
       const context = await createTestServer({
         user: { deleteFreshWindow: "0s" }

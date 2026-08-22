@@ -1,5 +1,6 @@
 import { unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { listUserSessions } from "../session/list-user-sessions"
 import type { HeadersInput } from "../session/resolve-session"
 import { resolveSession } from "../session/resolve-session"
 
@@ -32,6 +33,10 @@ export interface SessionInfo {
  * current session means hashing the raw refresh token and comparing, and the
  * raw token is something application code never handles — and, once
  * `cookie.path` is narrowed to the auth mount, cannot even see.
+ *
+ * Newest first, capped at {@link SESSION_PAGE_SIZE}. A person with more live
+ * sessions than that has a device list nobody scrolls and a problem this screen
+ * is not going to solve.
  */
 export const listSessions = defineEndpoint({
   method: "GET",
@@ -41,9 +46,7 @@ export const listSessions = defineEndpoint({
     const resolved = await resolveSession(internals, input.headers)
     if (!resolved) throw unauthenticated()
 
-    const sessions = await internals.db.listSessions({
-      userId: resolved.user.id
-    })
+    const sessions = await listUserSessions(internals, resolved.user.id)
     const data: SessionInfo[] = sessions.map((session) => ({
       id: session.id,
       createdAt: session.createdAt,

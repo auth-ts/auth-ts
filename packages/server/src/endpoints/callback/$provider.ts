@@ -5,8 +5,10 @@ import type { AuthErrorCode } from "../../http/error-response"
 import { getErrorMessage } from "../../http/get-error-message"
 import type { AdditionalFieldValues } from "../../http/validate-additional-fields"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import { selectOne } from "../../lib/select-one"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import { getCallbackURL } from "../../oauth/callback-url"
+import { linkConnection } from "../../oauth/link-connection"
 import { getProvider } from "../../oauth/providers/get-provider"
 import type { ProviderIdentity } from "../../oauth/providers/oauth-provider"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user"
@@ -202,7 +204,7 @@ async function connectIdentity(
     return errorPage(internals, "unauthenticated", locale, clearState)
   }
 
-  const existing = await internals.db.getConnection({
+  const existing = await selectOne(internals, "connections", {
     provider: input.provider,
     providerAccountId: identity.providerAccountId
   })
@@ -213,7 +215,7 @@ async function connectIdentity(
     return errorPage(internals, "providerConflict", locale, clearState, 409)
   }
 
-  await internals.db.upsertConnection({
+  await linkConnection(internals, {
     userId: resolved.user.id,
     provider: input.provider,
     providerAccountId: identity.providerAccountId,

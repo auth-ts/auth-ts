@@ -3,7 +3,7 @@ import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
 
-describe("magic code sign-in over HTTP", () => {
+describe("verification code sign-in over HTTP", () => {
   it("signs a new user in end to end", async () => {
     const { authServer, sentCodes, db } = await createTestServer()
 

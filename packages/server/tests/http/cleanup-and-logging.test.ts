@@ -1,75 +1,97 @@
 import { describe, expect, it, vi } from "vitest"
+import { CLEANUP_INTERVAL_MS } from "../../src/http/sweep-expired"
 import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
 
-/** Waits for fire-and-forget work scheduled during a request. */
+/** Lets any work a request scheduled after its response settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe("cleanup", () => {
+  const sendCode = () =>
+    request("POST", "/api/auth/send-code", {
+      body: { email: "ada@example.com" }
+    })
+
   it("sweeps after a mutating request", async () => {
     const context = await createTestServer()
-    const deleteExpired = vi.spyOn(context.db, "deleteExpired")
+    const cleanup = vi.spyOn(context.db, "cleanup")
 
-    await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
-        body: { email: "ada@example.com" }
-      })
-    )
-    await settle()
+    await context.authServer.handler(sendCode())
 
-    expect(deleteExpired).toHaveBeenCalled()
+    expect(cleanup).toHaveBeenCalled()
   })
 
-  it("never sweeps when cleanup is disabled", async () => {
-    const context = await createTestServer({ cleanup: false })
-    const deleteExpired = vi.spyOn(context.db, "deleteExpired")
-
-    await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
-        body: { email: "ada@example.com" }
-      })
-    )
-    await settle()
-
-    expect(deleteExpired).not.toHaveBeenCalled()
-  })
-
-  it("does not let a slow sweep delay the response", async () => {
+  it("waits for the sweep rather than firing and forgetting it", async () => {
+    // An unawaited promise is not guaranteed to run on Workers once the
+    // response is returned, and a framework-agnostic library never sees
+    // `ctx.waitUntil` — so the sweep has to be finished before the handler is.
     const context = await createTestServer()
-    let released: (() => void) | undefined
-    vi.spyOn(context.db, "deleteExpired").mockImplementation(
-      () => new Promise<void>((resolve) => (released = resolve))
-    )
+    let swept = false
+    vi.spyOn(context.db, "cleanup").mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      swept = true
+    })
 
-    const response = await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
-        body: { email: "ada@example.com" }
-      })
-    )
+    await context.authServer.handler(sendCode())
+
+    expect(swept).toBe(true)
+  })
+
+  it("sweeps at most once an interval, however many requests arrive", async () => {
+    const context = await createTestServer()
+    const cleanup = vi.spyOn(context.db, "cleanup")
+
+    await context.authServer.handler(sendCode())
+    await context.authServer.handler(sendCode())
+    await context.authServer.handler(sendCode())
+
+    expect(cleanup).toHaveBeenCalledTimes(1)
+  })
+
+  it("sweeps again once the interval has passed", async () => {
+    const context = await createTestServer()
+    const cleanup = vi.spyOn(context.db, "cleanup")
+
+    await context.authServer.handler(sendCode())
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + CLEANUP_INTERVAL_MS + 1)
+    await context.authServer.handler(sendCode())
+    vi.restoreAllMocks()
+
+    expect(cleanup).toHaveBeenCalledTimes(2)
+  })
+
+  it("never sweeps on a read, because a read creates nothing to clean up", async () => {
+    const context = await createTestServer()
+    const cleanup = vi.spyOn(context.db, "cleanup")
+
+    await context.authServer.handler(request("GET", "/api/auth/jwks"))
+
+    expect(cleanup).not.toHaveBeenCalled()
+  })
+
+  it("never sweeps when the store does not implement cleanup", async () => {
+    // Leaving it off the contract is how a deployment says "my cron owns this".
+    const context = await createTestServer()
+    context.db.cleanup = undefined
+
+    const response = await context.authServer.handler(sendCode())
 
     expect(response.status).toBe(200)
-    released?.()
   })
 
   it("routes a failed sweep to the logger instead of an empty catch", async () => {
     const context = await createTestServer()
-    vi.spyOn(context.db, "deleteExpired").mockRejectedValue(
+    vi.spyOn(context.db, "cleanup").mockRejectedValue(
       new Error("connection lost")
     )
 
-    const response = await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
-        body: { email: "ada@example.com" }
-      })
-    )
-    await settle()
+    const response = await context.authServer.handler(sendCode())
 
     expect(response.status).toBe(200)
     expect(
       context.logCalls.some(
-        (call) =>
-          call.level === "error" && call.message.includes("deleteExpired")
+        (call) => call.level === "error" && call.message.includes("cleanup")
       )
     ).toBe(true)
   })

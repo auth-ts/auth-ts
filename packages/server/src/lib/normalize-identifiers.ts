@@ -1,7 +1,7 @@
 /**
  * Normalizes an email address: trimmed and lowercased.
  *
- * Every database callback receives the normalized form, so `Ada@Example.com` and
+ * Every database query uses the normalized form, so `Ada@Example.com` and
  * `ada@example.com` resolve to one account instead of silently becoming two.
  */
 export function normalizeEmail(email: string) {

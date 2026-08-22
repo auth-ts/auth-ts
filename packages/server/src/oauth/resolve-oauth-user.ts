@@ -1,7 +1,10 @@
 import type { AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
+import { selectOne } from "../lib/select-one"
 import { convertGuest, mergeGuestInto } from "../session/convert-guest"
+import { findOrCreateUser } from "../user/find-or-create-user"
+import { linkConnection } from "./link-connection"
 import type { ProviderIdentity } from "./providers/oauth-provider"
 
 /** What shapes how a provider identity resolves to a user. */
@@ -43,16 +46,18 @@ export async function resolveOAuthUser(
   identity: ProviderIdentity,
   { additionalFields = {}, guest }: ResolveOAuthUserOptions = {}
 ): Promise<AuthUser> {
-  const connection = await internals.db.getConnection({
+  const connection = await selectOne(internals, "connections", {
     provider,
     providerAccountId: identity.providerAccountId
   })
 
   if (connection) {
-    const linked = await internals.db.getUser({ id: connection.userId })
+    const linked = await selectOne(internals, "users", {
+      id: connection.userId
+    })
     if (linked) {
       // Refresh the recorded email, but never re-key on it.
-      await internals.db.upsertConnection({
+      await linkConnection(internals, {
         userId: linked.id,
         provider,
         providerAccountId: identity.providerAccountId,
@@ -75,7 +80,7 @@ export async function resolveOAuthUser(
     throw new AuthApiError("unauthenticated", 403)
   }
 
-  // Merge semantics: an existing magic-code user picks up a name and picture on
+  // Merge semantics: an existing verification-code user picks up a name and picture on
   // their first OAuth sign-in, without those overwriting anything already set.
   const user = guest
     ? (
@@ -86,15 +91,14 @@ export async function resolveOAuthUser(
           additionalFields
         })
       ).user
-    : await internals.db.upsertUser({
-        email: identity.email,
-        type: "user",
+    : await findOrCreateUser(internals, {
+        identifier: { kind: "email", value: identity.email },
         ...(identity.name ? { name: identity.name } : {}),
         ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
-        ...additionalFields
+        additionalFields
       })
 
-  await internals.db.upsertConnection({
+  await linkConnection(internals, {
     userId: user.id,
     provider,
     providerAccountId: identity.providerAccountId,

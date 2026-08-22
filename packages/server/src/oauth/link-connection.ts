@@ -1,0 +1,66 @@
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { insertRow } from "../lib/insert-row"
+import { selectOne } from "../lib/select-one"
+
+/**
+ * How many linked providers core reads at a time.
+ *
+ * The ceiling every read the contract accepts must have. Nobody links more
+ * providers than this; a `userId` that somehow matched more has a problem the
+ * connections screen is not going to solve.
+ */
+export const CONNECTION_PAGE_SIZE = 100
+
+/** A provider identity to record against a user. */
+export interface LinkConnectionInput {
+  userId: string
+  provider: string
+  providerAccountId: string
+  /** Metadata only. Recorded when present, left alone when the provider sent none. */
+  email?: string
+}
+
+/**
+ * Records a provider identity against a user, or refreshes the one on file.
+ *
+ * Keyed on the provider's stable account id rather than on email: people change
+ * their email at the provider, and matching on email alone quietly creates a
+ * second account for the same person.
+ *
+ * The email is written only when the provider actually sent one. A provider
+ * with no verified email would otherwise produce an update with nothing to set
+ * — an error in most query builders, and the one flow where it happens is a
+ * routine sign-in.
+ *
+ * The race between the read and the insert is settled by the uniqueness the
+ * contract requires on `(provider, providerAccountId)`: two callbacks for one
+ * provider account both find nothing, both insert, and the constraint refuses
+ * the loser rather than letting one identity link twice.
+ */
+export async function linkConnection(
+  internals: AuthServerInternals,
+  { userId, provider, providerAccountId, email }: LinkConnectionInput
+) {
+  const existing = await selectOne(internals, "connections", {
+    provider,
+    providerAccountId
+  })
+
+  if (existing) {
+    if (email !== undefined && email !== existing.email) {
+      await internals.db.update({
+        table: "connections",
+        where: { id: existing.id },
+        values: { email }
+      })
+    }
+    return
+  }
+
+  await insertRow(internals, "connections", {
+    userId,
+    provider,
+    providerAccountId,
+    email: email ?? null
+  })
+}

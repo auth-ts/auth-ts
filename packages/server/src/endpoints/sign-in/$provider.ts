@@ -80,9 +80,7 @@ export const signInProvider = defineEndpoint({
       config.user.additionalFields,
       input.additionalFields
     )
-    const secure = shouldUseSecureCookies(
-      input.requestURL ?? "https://localhost"
-    )
+    const secure = shouldUseSecureCookies(input.requestURL)
     const redirectURI = getCallbackURL(
       config,
       input.provider,

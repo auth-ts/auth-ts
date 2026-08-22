@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
+import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
 type TestContext = Awaited<ReturnType<typeof createTestServer>>
 
@@ -170,7 +171,9 @@ describe("multiAccount enabled", () => {
       context.db.users().find((user) => user.email === "one@example.com"),
       "evicted user"
     )
-    expect(await context.db.listSessions({ userId: evicted.id })).toEqual([])
+    expect(
+      await selectRows(context.db, "sessions", { userId: evicted.id })
+    ).toEqual([])
   })
 
   it("switches to a parked account and mints a token for it", async () => {
@@ -218,7 +221,7 @@ describe("multiAccount enabled", () => {
   it("404s a switch to an account this browser is not holding", async () => {
     const context = await createTestServer(options)
     const { cookies } = await signIn(context, "ada@example.com")
-    const stranger = await context.db.upsertUser({
+    const stranger = await insertUser(context.db, {
       email: "stranger@example.com"
     })
 
@@ -241,7 +244,7 @@ describe("multiAccount enabled", () => {
       context.db.users().find((user) => user.email === "ada@example.com"),
       "ada"
     )
-    await context.db.deleteSessions({ userId: ada.id })
+    await context.db.delete({ table: "sessions", where: { userId: ada.id } })
 
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies: second.cookies })
@@ -264,7 +267,11 @@ describe("multiAccount enabled", () => {
     // rather than turning a single request into a thousand sequential queries.
     const context = await createTestServer(options)
     const { cookies } = await signIn(context, "ada@example.com")
-    const getSession = vi.spyOn(context.db, "getSession")
+    // Every parked entry costs one read of `sessions`; the users the listing
+    // reads afterwards are not the cost being measured, so they are filtered out.
+    const select = vi.spyOn(context.db, "select")
+    const sessionReads = () =>
+      select.mock.calls.filter(([input]) => input.table === "sessions").length
 
     const forged = JSON.stringify(
       Array.from({ length: 1000 }, (_, index) => `forged-token-${index}`)
@@ -282,7 +289,7 @@ describe("multiAccount enabled", () => {
       "ada@example.com"
     ])
     // One lookup for the active session, none for the forged entries.
-    expect(getSession).toHaveBeenCalledTimes(1)
+    expect(sessionReads()).toBe(1)
     expect(
       readSetCookies(response).get("auth-ts.refresh.accounts")?.value
     ).toBe("[]")
@@ -291,7 +298,7 @@ describe("multiAccount enabled", () => {
     // one parked entry, so the endpoint's two lookups (resolve, prune — the
     // listing reuses what the prune read) rather than the four the un-deduped
     // list would cost.
-    getSession.mockClear()
+    select.mockClear()
     const active = cookies["auth-ts.refresh"]
     await context.authServer.handler(
       request("GET", "/api/auth/accounts", {
@@ -301,9 +308,9 @@ describe("multiAccount enabled", () => {
         }
       })
     )
-    expect(getSession).toHaveBeenCalledTimes(2)
+    expect(sessionReads()).toBe(2)
 
-    getSession.mockClear()
+    select.mockClear()
     await context.authServer.handler(
       request("GET", "/api/auth/accounts", {
         cookies: {
@@ -312,11 +319,12 @@ describe("multiAccount enabled", () => {
         }
       })
     )
-    expect(getSession).toHaveBeenCalledTimes(1)
+    expect(sessionReads()).toBe(1)
   })
 
   it("signs out every account in the browser by default, revoking each parked session", async () => {
-    // The Clerk default: "sign out" on a shared computer means everyone. The parked rows are deleted, not merely dropped from the cookie
+    // The default everywhere it matters: "sign out" on a shared computer means
+    // everyone. The parked rows are deleted, not merely dropped from the cookie
     // — a token the browser forgot but the database still honoured would be a
     // live session nobody can see to revoke.
     const context = await createTestServer(options)
@@ -444,7 +452,9 @@ describe("multiAccount enabled", () => {
     expect(body.switchedTo.email).toBe("ada@example.com")
     // Grace is gone everywhere, Ada is untouched.
     const remaining = context.db.sessions()
-    const ada = await context.db.getUser({ email: "ada@example.com" })
+    const ada = await selectRow(context.db, "users", {
+      email: "ada@example.com"
+    })
     expect(remaining).toHaveLength(1)
     expect(remaining[0]?.userId).toBe(ada?.id)
     expect(

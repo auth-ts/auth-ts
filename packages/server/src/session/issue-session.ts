@@ -1,8 +1,9 @@
 import type { AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { signToken } from "../jwt/sign-token"
-import { randomBytesBase64url, randomUUID } from "../lib/generate-random"
+import { randomBytesBase64url } from "../lib/generate-random"
 import { sha256Hex } from "../lib/hash"
+import { insertRow } from "../lib/insert-row"
 import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import {
@@ -53,7 +54,13 @@ export interface IssueResult {
 export interface IssueSessionInput {
   user: AuthUser
   headers: Headers
-  requestURL: string
+  /**
+   * The request's URL, when there is one.
+   *
+   * Read only to decide whether cookies carry `Secure`; absent for an endpoint
+   * called in-process, where {@link shouldUseSecureCookies} assumes they should.
+   */
+  requestURL?: string
   mode?: IssueMode
   /**
    * Token hash of a session this one supersedes.
@@ -76,7 +83,7 @@ export interface IssueSessionInput {
  * Creates a session and mints an access token — the single path every sign-in
  * method ends at.
  *
- * Magic code, guest, OAuth, and account switching all converge here, so cookie
+ * Verification code, guest, OAuth, and account switching all converge here, so cookie
  * attributes, session stamping, and multi-account behaviour are defined once
  * rather than re-implemented per method with slightly different mistakes.
  *
@@ -93,8 +100,7 @@ export async function issueSession(
   const tokenHash = await sha256Hex(rawToken)
   const now = new Date()
 
-  await internals.db.upsertSession({
-    id: randomUUID(),
+  await insertRow(internals, "sessions", {
     userId: user.id,
     tokenHash,
     createdAt: now,
@@ -114,7 +120,10 @@ export async function issueSession(
   // Only once the replacement exists: if creating it had failed, the caller
   // would still hold a working session rather than none.
   if (superseded && superseded !== tokenHash) {
-    await internals.db.deleteSession({ tokenHash: superseded })
+    await internals.db.delete({
+      table: "sessions",
+      where: { tokenHash: superseded }
+    })
     internals.log.debug("superseded session deleted")
   }
 
@@ -207,9 +216,9 @@ export async function mintAccessToken(
 /**
  * Extends a session's expiry on refresh, when sliding is enabled.
  *
- * `createdAt` is passed through unchanged: it records when identity was proven,
- * which is what account deletion checks. Sliding it would let a browser left open
- * for a month look freshly authenticated.
+ * `createdAt` is never named here, and that is the point: the update touches
+ * expiry and the stamp only, so the timestamp recording when identity was
+ * proven — the one account deletion checks — cannot be slid by accident.
  *
  * @returns The expiry now in effect — the one just persisted, or the existing
  * one when sliding is off — so a caller reports what the row actually says
@@ -217,13 +226,7 @@ export async function mintAccessToken(
  */
 export async function slideSession(
   internals: AuthServerInternals,
-  session: {
-    id: string
-    userId: string
-    tokenHash: string
-    createdAt: Date
-    expiresAt: Date
-  },
+  session: { id: string; expiresAt: Date },
   headers: Headers
 ): Promise<Date> {
   if (!internals.config.session.sliding) return session.expiresAt
@@ -232,13 +235,10 @@ export async function slideSession(
   const expiresAt = new Date(
     Date.now() + parseDuration(internals.config.session.ttl)
   )
-  await internals.db.upsertSession({
-    id: session.id,
-    userId: session.userId,
-    tokenHash: session.tokenHash,
-    createdAt: session.createdAt,
-    expiresAt,
-    ...sessionStamp(internals, headers)
+  await internals.db.update({
+    table: "sessions",
+    where: { id: session.id },
+    values: { expiresAt, ...sessionStamp(internals, headers) }
   })
 
   return expiresAt

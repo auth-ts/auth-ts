@@ -7,6 +7,7 @@ import { errorResponse } from "./error-response"
 import { getErrorMessage } from "./get-error-message"
 import { matchEndpointParams } from "./match-route"
 import { resolveLocale } from "./resolve-locale"
+import { sweepExpired } from "./sweep-expired"
 
 /** A mounted endpoint: what the consumer's framework calls. */
 export type AuthHandler = (request: Request) => Promise<Response>
@@ -97,7 +98,7 @@ export async function handleRequest(
   } catch (error) {
     return toErrorResponse(internals, error, locale)
   } finally {
-    sweepExpired(internals)
+    await sweepExpired(internals, request.method)
   }
 }
 
@@ -125,7 +126,7 @@ function toErrorResponse(
     })
   }
 
-  // An unexpected throw is a bug in the consumer's callbacks or in this library.
+  // An unexpected throw is a bug in the consumer's own code or in this library.
   // It is logged with its message but answered with a generic body, because an
   // internal error message is exactly the kind of thing that leaks a query or a
   // connection string to whoever is poking at the endpoint.
@@ -141,28 +142,6 @@ function toErrorResponse(
     }),
     { status: 500, headers }
   )
-}
-
-/**
- * Deletes expired rows without making the caller wait.
- *
- * Runs after every request that reaches an endpoint, reads included — a CORS
- * preflight is the only thing that returns before the sweep. Reads are not an
- * oversight: rows expire on a clock rather than on writes, so a read-heavy
- * deployment is exactly the one that would otherwise never clean up.
- *
- * Sweeping that often sounds wasteful and is the opposite: frequent sweeps each
- * delete almost nothing, and an indexed delete-where-expired on a nearly clean
- * table costs microseconds — far less than the bookkeeping needed to run it less
- * often. Failures go to the log rather than vanishing into an empty catch, and
- * never affect the response.
- */
-function sweepExpired(internals: AuthServerInternals) {
-  if (!internals.config.cleanup) return
-
-  void Promise.resolve(internals.db.deleteExpired()).catch((error: unknown) => {
-    internals.log.error("deleteExpired failed", { error: String(error) })
-  })
 }
 
 /** Mounts every endpoint in a registry, keyed by name. */

@@ -1,22 +1,61 @@
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import type { RateLimitWindow } from "../core/auth-server-options"
+import { insertRow } from "../lib/insert-row"
 import { getIpAddress, getIpAddressKey } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import { AuthApiError } from "./auth-api-error"
 
 /**
+ * Records one attempt against a key and reports how many that key now holds.
+ *
+ * Append-and-count: every attempt is an insert under a fresh id, and counting
+ * is a bounded read. Inserts never conflict, so nothing is read-modify-written
+ * and no attempt can be lost — which is what a counter column would need an
+ * atomic increment for, and what a generic `update` with literal values could
+ * never express.
+ *
+ * The read is capped at `limit + 1` because core never needs the exact number,
+ * only whether more than `limit` exist. That cap is also what keeps an attacker
+ * from turning every request into a ten-thousand-row read.
+ *
+ * @returns The number of attempts on record, saturating at `limit + 1`.
+ */
+export async function countAttempt(
+  internals: AuthServerInternals,
+  key: string,
+  expiresAt: Date,
+  limit: number
+) {
+  await insertRow(internals, "attempts", { key, expiresAt })
+
+  const attempts = await internals.db.select({
+    table: "attempts",
+    where: { key },
+    limit: limit + 1,
+    offset: 0,
+    orderBy: { id: "asc" }
+  })
+
+  return attempts.length
+}
+
+/**
  * Counts one request against a fixed window, throwing when the window is full.
  *
- * Fixed windows rather than a token bucket or sliding log: the counter is a
- * single row the consumer's database already knows how to upsert, and precision
- * at the window boundary buys nothing against the threats here — email flooding
- * and code guessing, both of which are about volume over minutes.
+ * Fixed windows rather than a token bucket or sliding log: precision at the
+ * window boundary buys nothing against the threats here — email flooding and
+ * code guessing, both of which are about volume over minutes. The window is
+ * part of the key rather than a column, so counting stays an equality read and
+ * a window that has passed is simply a set of old rows waiting for the sweep.
  *
- * The count is never read here. A read-then-write would let a burst of parallel
- * requests all see the same value and each write back `count + 1`, so ten
- * requests register as one — which is precisely the attack a limiter exists to
- * stop. Instead the store does the increment atomically in `upsertRateLimit`
- * and hands back the result; this function only compares it to the cap.
+ * What this does not promise is exactness. Each request's read sees every
+ * insert committed before it ran, so N *simultaneous* requests can each read a
+ * number below the cap in the instant before the others land. The overshoot is
+ * bounded by one burst's concurrency, it cannot be repeated — the moment the
+ * burst settles, the rest of the window is refused — and for the threats these
+ * windows exist to stop, "perhaps twenty sends instead of three, once" is not a
+ * different security posture. An exact counter would need an atomic increment
+ * the contract deliberately does not ask for.
  *
  * @throws {AuthApiError} `rateLimited` with the seconds until the window resets.
  */
@@ -28,19 +67,25 @@ export async function checkRateLimit(
   if (internals.config.rateLimit === false) return
 
   const now = Date.now()
-  const counted = await internals.db.upsertRateLimit({
-    key,
-    resetAt: new Date(now + parseDuration(window.window))
-  })
+  // Windows are aligned to the clock rather than started by the first request,
+  // so every caller counting the same key agrees on which window they are in
+  // without reading a stored `resetAt` first.
+  const windowMs = parseDuration(window.window)
+  const windowStart = Math.floor(now / windowMs) * windowMs
+  const endsAt = new Date(windowStart + windowMs)
 
-  // The returned count includes this request, so the cap is exceeded at
-  // max + 1 — and requests refused here are still counted, which is what a
-  // single atomic increment naturally gives.
-  if (counted.count > window.max) {
-    const retryAfter = Math.max(
-      1,
-      Math.ceil((counted.resetAt.getTime() - now) / 1000)
-    )
+  const counted = await countAttempt(
+    internals,
+    `${key}:${windowStart}`,
+    endsAt,
+    window.max
+  )
+
+  // The count includes this request, so the cap is exceeded at max + 1 — and a
+  // refused request is still counted, which is what stops a caller who is
+  // already over the limit from getting a fresh allowance by continuing.
+  if (counted > window.max) {
+    const retryAfter = Math.max(1, Math.ceil((endsAt.getTime() - now) / 1000))
     internals.log.warn("rate limit exceeded", { key: key.split(":")[0] })
 
     throw new AuthApiError("rateLimited", 429, { retryAfter })

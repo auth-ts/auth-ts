@@ -55,7 +55,7 @@ function hmacKey(secret: string) {
 /**
  * Signs a value with HMAC-SHA-256 under the server secret and returns lowercase hex.
  *
- * Magic codes are stored this way rather than as a bare hash. Six digits is only
+ * Verification codes are stored this way rather than as a bare hash. Six digits is only
  * a million possibilities, so a plain SHA-256 of a code is reversible from a
  * database read in about a second; keying the hash with a secret the database
  * never holds means a database leak alone does not yield working codes.

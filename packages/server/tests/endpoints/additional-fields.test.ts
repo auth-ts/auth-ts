@@ -223,9 +223,9 @@ describe("additionalFields on PATCH", () => {
 
   it("answers 400 for a body that changes nothing, without touching the database", async () => {
     // An UPDATE with no SET columns is an error in most query builders — the
-    // reference adapter's drizzle throws "No values to set" — so an empty PATCH
-    // used to surface as a 500. It is the client's mistake, and never reaches
-    // the callback now.
+    // in-memory store throws "no values to set", as a real one would — so an
+    // empty PATCH used to surface as a 500. It is the client's mistake, and it
+    // never reaches the store now.
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
     const cookies = {
@@ -234,7 +234,8 @@ describe("additionalFields on PATCH", () => {
         "refresh"
       ).value
     }
-    const upsertUser = vi.spyOn(context.db, "upsertUser")
+    const update = vi.spyOn(context.db, "update")
+    const insert = vi.spyOn(context.db, "insert")
 
     for (const body of [{}, { name: undefined }, { seats: undefined }]) {
       const response = await context.authServer.handler(
@@ -245,7 +246,8 @@ describe("additionalFields on PATCH", () => {
         ((await response.json()) as { error: { code: string } }).error.code
       ).toBe("invalidField")
     }
-    expect(upsertUser).not.toHaveBeenCalled()
+    expect(update).not.toHaveBeenCalled()
+    expect(insert).not.toHaveBeenCalled()
   })
 
   it("still rejects identity fields and undeclared keys", async () => {

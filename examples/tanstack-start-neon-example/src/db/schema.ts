@@ -1,10 +1,9 @@
-import type { MagicCodePurpose, UserType } from "@auth-ts/server"
+import type { UserType, VerificationCodePurpose } from "@auth-ts/server"
 import { sql } from "drizzle-orm"
 import { authenticatedRole } from "drizzle-orm/neon"
 import {
   boolean,
   index,
-  integer,
   pgPolicy,
   pgTable,
   text,
@@ -55,16 +54,15 @@ export const sessions = pgTable.withRLS(
   ]
 )
 
-export const magicCodes = pgTable.withRLS(
-  "magicCodes",
+export const verificationCodes = pgTable.withRLS(
+  "verificationCodes",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
-    identifier: text("identifier").notNull().unique(),
+    identifier: text("identifier").notNull(),
     codeHash: text("codeHash").notNull(),
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
-    attempts: integer("attempts").notNull().default(0),
     purpose: text("purpose")
-      .$type<MagicCodePurpose>()
+      .$type<VerificationCodePurpose>()
       .notNull()
       .default("signIn"),
     createdAt: timestamp("createdAt", { withTimezone: true })
@@ -75,25 +73,32 @@ export const magicCodes = pgTable.withRLS(
       .defaultNow()
       .$onUpdate(() => new Date())
   },
-  (table) => [index("magicCodesExpiresAtIndex").on(table.expiresAt)]
+  (table) => [
+    // Indexed, not unique: a send deletes this identifier's codes and inserts a
+    // new one, and two sends racing may leave both rows for an instant. The
+    // newest by `expiresAt` is the live one.
+    index("verificationCodesIdentifierIndex").on(table.identifier),
+    index("verificationCodesExpiresAtIndex").on(table.expiresAt)
+  ]
 )
 
-export const rateLimits = pgTable.withRLS(
-  "rateLimits",
+export const attempts = pgTable.withRLS(
+  "attempts",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
-    key: text("key").notNull().unique(),
-    count: integer("count").notNull().default(0),
-    resetAt: timestamp("resetAt", { withTimezone: true }).notNull(),
+    key: text("key").notNull(),
+    expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
-      .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
   },
-  (table) => [index("rateLimitsResetAtIndex").on(table.resetAt)]
+  (table) => [
+    // A log, not a counter: one row per counted request, read back by key. Both
+    // columns are indexed because both are read on every hot path — `key` to
+    // count a window, `expiresAt` to sweep it.
+    index("attemptsKeyIndex").on(table.key),
+    index("attemptsExpiresAtIndex").on(table.expiresAt)
+  ]
 )
 
 export const connections = pgTable.withRLS(
@@ -116,9 +121,10 @@ export const connections = pgTable.withRLS(
   },
   (table) => [
     index("connectionsUserIdIndex").on(table.userId),
-    // Unique, not merely indexed: `upsertConnection` names these two columns
-    // as its ON CONFLICT target, which Postgres only accepts against a unique
-    // index or constraint — and a provider identity belongs to one user.
+    // Unique, not merely indexed, and the contract says so: the library reads
+    // this pair before it inserts, so two concurrent sign-ins with one provider
+    // account both find nothing and both insert. This index is what refuses the loser
+    // instead of letting one identity link twice.
     uniqueIndex("connectionsProviderAccountIndex").on(
       table.provider,
       table.providerAccountId

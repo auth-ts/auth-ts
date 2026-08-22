@@ -3,7 +3,7 @@ import type { JwtAlgorithm } from "../jwt/import-signing-key"
 import type { IpAddressOptions } from "../lib/ip-address"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
-import type { AdditionalFieldsSchema, AuthDB } from "./auth-db"
+import type { AdditionalFieldsSchema, AuthDB, AuthTable } from "./auth-db"
 
 // The shapes `createAuthServer` accepts — and nothing else. Options are the
 // partial, human-written input; what they resolve to is `AuthServerConfig`, in
@@ -205,8 +205,8 @@ export interface RateLimitOptions {
   /**
    * Minimum spacing between sends to one identifier.
    *
-   * Windows cap volume; this caps rapid-fire. Derived from the live code's
-   * `expiresAt` minus the code TTL, so it adds no state and no callback.
+   * Windows cap volume; this caps rapid-fire. Derived from the newest code's
+   * `expiresAt` minus the code TTL, so it adds no state and no extra query.
    * @default "60s"
    */
   sendCodeCooldown?: Duration
@@ -232,11 +232,24 @@ export interface CorsOptions {
 export interface AuthServerOptions<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > {
-  /** The callbacks that read and write your database. */
+  /** The four table functions that read and write your database. */
   db: AuthDB<NoInfer<S>>
-  /** Sign-in method: magic codes over email. */
+  /**
+   * Generates the primary key for a row core is about to insert.
+   *
+   * Unset by default, and unset is the common case: the row goes to your store
+   * without an `id` and your own default fills it — a `uuidv7()` column
+   * default, a Drizzle `$defaultFn`, an identity column, whatever the table
+   * already does. `insert` returns the stored row, so core reads the id back
+   * either way.
+   *
+   * Set it when ids are the application's to mint: a store with no default, a
+   * prefixed id (`sess_…`), or an id you need to know before the write.
+   */
+  generateId?: (table: AuthTable) => string | Promise<string>
+  /** Sign-in method: verification codes over email. */
   email?: EmailOptions
-  /** Sign-in method: magic codes over SMS. */
+  /** Sign-in method: verification codes over SMS. */
   sms?: SmsOptions
   /**
    * Enables `POST /sign-in/guest`.
@@ -253,7 +266,7 @@ export interface AuthServerOptions<
   /** Where the public key set is hosted, or the document to serve it from. */
   jwks?: JwksOptions
   /**
-   * Server secret that keys the magic-code HMAC and signs the OAuth state
+   * Server secret that keys the verification-code HMAC and signs the OAuth state
    * cookie. Defaults to the `AUTH_SECRET` environment variable.
    *
    * Must not be the JWT key: different type, different blast radius, rotated
@@ -288,9 +301,14 @@ export interface AuthServerOptions<
    * Set `false` to disable the built-in limiter and bring your own.
    *
    * That turns off the per-IP and per-identifier windows and the send cooldown.
-   * The five-guess cap on each magic code is not a rate and stays on: it is
-   * counted through `upsertRateLimit` regardless, since nothing in front of this
-   * server can enforce a per-code limit.
+   * Turning them off is the recommended posture when something in front of this
+   * server already limits `/send-code` and `/verify-code` — a Cloudflare rule
+   * or a Durable Object counts a burst more precisely than a database round
+   * trip can, and stops it before it reaches you at all.
+   *
+   * The five-guess cap on each verification code is not a rate limit and stays on
+   * regardless: it is what makes six digits safe, it is keyed on the code
+   * rather than the caller, and nothing in front of this server can enforce it.
    */
   rateLimit?: RateLimitOptions | false
   /**
@@ -301,13 +319,6 @@ export interface AuthServerOptions<
    * @default false
    */
   multiAccount?: boolean
-  /**
-   * Sweep expired rows after every mutating flow, fire and forget.
-   *
-   * Hygiene, never a security boundary: expiry is enforced on read regardless.
-   * @default true
-   */
-  cleanup?: boolean
   /** Server-side localization of error messages. Codes stay stable; only messages translate. */
   localization?: LocalizationOptions
   /**

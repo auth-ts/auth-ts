@@ -54,7 +54,7 @@ export const getToken = defineEndpoint({
     // session that is already out of date.
     const expiresAt = await slideSession(
       internals,
-      { ...resolved.session, tokenHash: resolved.tokenHash },
+      resolved.session,
       input.headers
     )
 

@@ -31,11 +31,13 @@ export const disconnectProvider = defineEndpoint({
     )
     if (!resolved) throw unauthenticated()
 
-    const deleted = await internals.db.deleteConnection({
-      userId: resolved.user.id,
-      provider: input.provider
+    // Ownership is part of the query, so another user's provider matches
+    // nothing and the empty result is the 404.
+    const deleted = await internals.db.delete({
+      table: "connections",
+      where: { userId: resolved.user.id, provider: input.provider }
     })
-    if (!deleted) throw new AuthApiError("notFound", 404)
+    if (deleted.length === 0) throw new AuthApiError("notFound", 404)
 
     return { data: undefined, status: 204 }
   }

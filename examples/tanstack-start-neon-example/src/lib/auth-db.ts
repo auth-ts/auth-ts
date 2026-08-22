@@ -1,228 +1,109 @@
-import type { AuthDB } from "@auth-ts/server"
-import { and, eq, lt, ne, sql } from "drizzle-orm"
+import type { AuthDB, AuthTable } from "@auth-ts/server"
+import { and, asc, desc, eq, getColumns, lt, sql } from "drizzle-orm"
+import type { AnyPgTable } from "drizzle-orm/pg-core"
 import { db } from "../db/db"
 import {
+  attempts,
   connections,
-  magicCodes,
-  rateLimits,
   sessions,
-  users
+  users,
+  verificationCodes
 } from "../db/schema"
 
+/**
+ * The whole database contract, written once against Drizzle rather than once
+ * per table.
+ *
+ * The library names five tables and reads them by equality only, so a table
+ * dictionary and a `where` built from `eq` covers every query it makes. If your
+ * schema names things differently, this is where you map them — that mapping is
+ * the entire cost of not having an adapter package.
+ */
+const tables = {
+  users,
+  sessions,
+  verificationCodes,
+  attempts,
+  connections
+} satisfies Record<AuthTable, AnyPgTable>
+
+/**
+ * Widening to `AnyPgTable` is what makes the generic version compile: Drizzle
+ * cannot resolve `tables[table]` while `table` is still a type parameter, and
+ * every query below is the same query whatever the row shape is.
+ */
+const tableOf = (table: AuthTable): AnyPgTable => tables[table]
+
+const columnOf = (table: AuthTable, name: string) => {
+  const column = getColumns(tableOf(table))[name]
+  // Only reachable if this schema is missing a column the library names, which
+  // is worth saying out loud rather than turning into a confusing SQL error.
+  if (!column) throw new Error(`${table} has no ${name} column`)
+
+  return column
+}
+
+const matches = (table: AuthTable, where: object) =>
+  and(
+    ...Object.entries(where).map(([name, value]) =>
+      eq(columnOf(table, name), value)
+    )
+  )
+
 export const authDB: AuthDB = {
-  async upsertUser({ id, ...user }) {
-    const target = id
-      ? users.id
-      : user.email
-        ? users.email
-        : user.phoneNumber
-          ? users.phoneNumber
-          : null
-    const insert = db.insert(users).values({ id, ...user })
-    // No identifier means the contract always inserts — that is what guest
-    // creation is, a brand new row rather than a lookup.
-    //
-    // `updatedAt` is in every set on purpose. `$onUpdate` does not run inside
-    // ON CONFLICT, and a sign-in with no profile fields would otherwise leave
-    // nothing to SET once Drizzle drops the undefined values — a build error,
-    // not an empty update.
-    const [upserted] = await (target
-      ? insert.onConflictDoUpdate({
-          target,
-          // Merging by identifier is a sign-in: only the profile fields move.
-          set: id
-            ? { ...user, updatedAt: new Date() }
-            : {
-                name: user.name,
-                imageURL: user.imageURL,
-                updatedAt: new Date()
-              }
-        })
-      : insert
-    ).returning()
+  select: (async ({ table, where, limit, offset, orderBy }) => {
+    if (table === "users") {
+      return db
+        .select()
+        .from(users)
+        .where(matches("users", where))
+        .orderBy(asc(users.id))
+        .limit(limit)
+        .offset(offset)
+    }
 
-    if (!upserted) throw new Error("Failed to upsert user")
-    return upserted
-  },
+    const [[name, direction] = ["id", "asc"]] = Object.entries(orderBy)
+    const order = direction === "asc" ? asc : desc
 
-  async getUser(where) {
-    const condition =
-      "id" in where
-        ? eq(users.id, where.id)
-        : "email" in where
-          ? eq(users.email, where.email)
-          : eq(users.phoneNumber, where.phoneNumber)
-
-    const [user] = await db.select().from(users).where(condition).limit(1)
-    return user ?? null
-  },
-
-  async deleteUser(where) {
-    const [deleted] = await db
-      .delete(users)
-      .where(eq(users.id, where.id))
-      .returning()
-    return deleted ?? null
-  },
-
-  async upsertSession(session) {
-    await db
-      .insert(sessions)
-      .values(session)
-      .onConflictDoUpdate({
-        target: sessions.tokenHash,
-        set: {
-          expiresAt: session.expiresAt,
-          userAgent: session.userAgent,
-          ipAddress: session.ipAddress
-        }
-      })
-  },
-
-  async getSession(where) {
-    const [session] = await db
-      .select()
-      .from(sessions)
-      .where(eq(sessions.tokenHash, where.tokenHash))
-      .limit(1)
-    return session ?? null
-  },
-
-  async listSessions(where) {
-    return db.select().from(sessions).where(eq(sessions.userId, where.userId))
-  },
-
-  async deleteSession(where) {
-    const condition =
-      "tokenHash" in where
-        ? eq(sessions.tokenHash, where.tokenHash)
-        : and(eq(sessions.id, where.id), eq(sessions.userId, where.userId))
-
-    const [deleted] = await db.delete(sessions).where(condition).returning()
-    return deleted ?? null
-  },
-
-  async deleteSessions(where) {
-    return db
-      .delete(sessions)
-      .where(
-        and(
-          eq(sessions.userId, where.userId),
-          where.exceptTokenHash
-            ? ne(sessions.tokenHash, where.exceptTokenHash)
-            : undefined
-        )
-      )
-      .returning()
-  },
-
-  async upsertMagicCode(magicCode) {
-    await db
-      .insert(magicCodes)
-      .values(magicCode)
-      .onConflictDoUpdate({ target: magicCodes.identifier, set: magicCode })
-  },
-
-  async getMagicCode(where) {
-    const [magicCode] = await db
-      .select()
-      .from(magicCodes)
-      .where(eq(magicCodes.identifier, where.identifier))
-      .limit(1)
-    return magicCode ?? null
-  },
-
-  async deleteMagicCode(where) {
-    const [deleted] = await db
-      .delete(magicCodes)
-      .where(
-        and(
-          eq(magicCodes.identifier, where.identifier),
-          where.codeHash ? eq(magicCodes.codeHash, where.codeHash) : undefined
-        )
-      )
-      .returning()
-    return deleted ?? null
-  },
-
-  async getRateLimit(where) {
-    const [rateLimit] = await db
-      .select()
-      .from(rateLimits)
-      .where(eq(rateLimits.key, where.key))
-      .limit(1)
-    return rateLimit ?? null
-  },
-
-  async upsertRateLimit(rateLimit) {
-    const windowPassed = sql`${rateLimits.resetAt} <= now()`
-    const [counted] = await db
-      .insert(rateLimits)
-      .values({ ...rateLimit, count: 1 })
-      .onConflictDoUpdate({
-        target: rateLimits.key,
-        set: {
-          count: sql`CASE WHEN ${windowPassed} THEN 1 ELSE ${rateLimits.count} + 1 END`,
-          resetAt: sql`CASE WHEN ${windowPassed} THEN excluded."resetAt" ELSE ${rateLimits.resetAt} END`
-        }
-      })
-      .returning()
-
-    if (!counted) throw new Error("Failed to upsert rate limit")
-    return counted
-  },
-
-  async upsertConnection(connection) {
-    await db
-      .insert(connections)
-      .values(connection)
-      .onConflictDoUpdate({
-        target: [connections.provider, connections.providerAccountId],
-        // `updatedAt` for the same reason as in `upsertUser`: a provider with no
-        // verified email leaves `email` undefined, and the set must not be empty.
-        set: { email: connection.email, updatedAt: new Date() }
-      })
-  },
-
-  async getConnection(where) {
-    const [connection] = await db
-      .select()
-      .from(connections)
-      .where(
-        and(
-          eq(connections.provider, where.provider),
-          eq(connections.providerAccountId, where.providerAccountId)
-        )
-      )
-      .limit(1)
-    return connection ?? null
-  },
-
-  async listConnections(where) {
     return db
       .select()
-      .from(connections)
-      .where(eq(connections.userId, where.userId))
-  },
+      .from(tableOf(table))
+      .where(matches(table, where))
+      .orderBy(order(columnOf(table, name)))
+      .limit(limit)
+      .offset(offset)
+  }) as AuthDB["select"],
 
-  async deleteConnection(where) {
-    const [deleted] = await db
-      .delete(connections)
-      .where(
-        and(
-          eq(connections.userId, where.userId),
-          eq(connections.provider, where.provider)
-        )
-      )
+  insert: (async ({ table, values }) => {
+    // The row comes back as stored, which is how the library learns the id this
+    // schema's `uuidv7()` default just generated.
+    const [inserted] = await db
+      .insert(tableOf(table))
+      .values(values)
       .returning()
-    return deleted ?? null
+    if (!inserted) throw new Error(`insert into ${table} returned no row`)
+
+    return inserted
+  }) as AuthDB["insert"],
+
+  async update({ table, where, values }) {
+    await db.update(tableOf(table)).set(values).where(matches(table, where))
   },
 
-  async deleteExpired() {
-    await Promise.all([
-      db.delete(magicCodes).where(lt(magicCodes.expiresAt, sql`now()`)),
-      db.delete(sessions).where(lt(sessions.expiresAt, sql`now()`)),
-      db.delete(rateLimits).where(lt(rateLimits.resetAt, sql`now()`))
-    ])
+  delete: (async ({ table, where }) =>
+    db
+      .delete(tableOf(table))
+      .where(matches(table, where))
+      .returning()) as AuthDB["delete"],
+
+  async cleanup() {
+    // Optional on the contract. Implementing it hands the sweep to the library,
+    // which runs it at most once a minute after a mutating request; leaving it
+    // out would mean owning the schedule here instead.
+    await Promise.all(
+      [sessions, verificationCodes, attempts].map((table) =>
+        db.delete(table).where(lt(table.expiresAt, sql`now()`))
+      )
+    )
   }
 }

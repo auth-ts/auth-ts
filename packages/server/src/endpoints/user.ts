@@ -4,10 +4,13 @@ import { resolveLocale } from "../http/resolve-locale"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
 import { parseDuration } from "../lib/parse-duration"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
-import { consumeMagicCode } from "../magic-code/consume-magic-code"
-import { sendMagicCode } from "../magic-code/send-magic-code"
 import type { HeadersInput } from "../session/resolve-session"
 import { resolveSession } from "../session/resolve-session"
+// Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
+import { deleteUser as deleteUserAndRows } from "../user/delete-user"
+import { updateUser as updateUserFields } from "../user/update-user"
+import { consumeVerificationCode } from "../verification-code/consume-verification-code"
+import { sendVerificationCode } from "../verification-code/send-verification-code"
 
 /**
  * Reads the signed-in user.
@@ -97,9 +100,9 @@ export const updateUser = defineEndpoint({
     )
 
     // A PATCH that changes nothing is a client mistake, and saying so beats a
-    // 200 that looks like success. It also never reaches the callback: an
-    // `UPDATE … SET` with no columns is an error in most query builders, and
-    // there is nothing for a consumer to do about a write that asks for nothing.
+    // 200 that looks like success. Core would skip the write rather than send
+    // an empty `SET`, so this is about answering the caller honestly rather
+    // than about protecting the database.
     if (
       name === undefined &&
       imageURL === undefined &&
@@ -110,10 +113,9 @@ export const updateUser = defineEndpoint({
       })
     }
 
-    const user = await internals.db.upsertUser({
-      id: resolved.user.id,
-      ...(name === undefined ? {} : { name }),
-      ...(imageURL === undefined ? {} : { imageURL }),
+    const user = await updateUserFields(internals, resolved.user, {
+      name,
+      imageURL,
       ...additionalFields
     })
 
@@ -139,10 +141,10 @@ export interface DeleteUserInput {
  * success shape**, or a client that treats any 2xx as done will clear its state
  * and tell the user their account is gone while it very much is not.
  *
- * The deletion code shares the one-live-code-per-identifier row with sign-in
- * codes, so a stranger spamming `/send-code` at this address keeps the
- * challenge inside the send cooldown. Bounded nuisance, not a bypass: the
- * purpose is checked on verify, so a sign-in code never authorizes a deletion.
+ * The deletion code shares an identifier with sign-in codes, so a stranger
+ * spamming `/send-code` at this address keeps the challenge inside the send
+ * cooldown. Bounded nuisance, not a bypass: the purpose is checked on verify,
+ * so a sign-in code never authorizes a deletion.
  */
 export const deleteUser = defineEndpoint({
   method: "DELETE",
@@ -164,7 +166,7 @@ export const deleteUser = defineEndpoint({
       const identifier = user.email ?? user.phoneNumber
       if (!identifier) throw new AuthApiError("guestCannotReceiveCode", 409)
 
-      await consumeMagicCode(internals, {
+      await consumeVerificationCode(internals, {
         identifier,
         code: input.code,
         purpose: "deleteUser"
@@ -189,7 +191,7 @@ export const deleteUser = defineEndpoint({
 
     if (!identifier) throw new AuthApiError("guestCannotReceiveCode", 409)
 
-    await sendMagicCode(internals, {
+    await sendVerificationCode(internals, {
       identifier,
       purpose: "deleteUser",
       locale: resolveLocale(
@@ -202,12 +204,10 @@ export const deleteUser = defineEndpoint({
     throw new AuthApiError("codeSent", 403)
 
     async function finishDeletion() {
-      await internals.db.deleteUser({ id: user.id })
+      await deleteUserAndRows(internals, user)
 
       const responseHeaders = new Headers()
-      const secure = shouldUseSecureCookies(
-        input.requestURL ?? "https://localhost"
-      )
+      const secure = shouldUseSecureCookies(input.requestURL)
       responseHeaders.append(
         "set-cookie",
         clearCookie(config.cookie.name, config.cookie.path, secure)

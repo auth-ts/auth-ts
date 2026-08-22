@@ -1,7 +1,12 @@
-import type { AuthMagicCode, MagicCodePurpose } from "../core/auth-db"
+import type {
+  AuthVerificationCode,
+  VerificationCodePurpose
+} from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
+import { countAttempt } from "../http/check-rate-limit"
 import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash"
+import { selectOne } from "../lib/select-one"
 
 /**
  * How many wrong guesses a code survives before it is burned.
@@ -13,24 +18,23 @@ import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash"
 export const MAX_CODE_ATTEMPTS = 5
 
 /** What verifying a code needs to know. */
-export interface ConsumeMagicCodeInput {
+export interface ConsumeVerificationCodeInput {
   identifier: string
   code: string
-  purpose: MagicCodePurpose
+  purpose: VerificationCodePurpose
 }
 
 /**
  * Counts a wrong guess against a code, and burns the code at the cap.
  *
- * The counter is a rate-limit row, not a field on the code row, and that is the
- * whole point. `upsertRateLimit` is the one increment the contract requires to
- * be atomic, so fifty parallel wrong guesses count as fifty. A read-then-write
- * on the code row let them count as one — and with the default
- * `trustedProxies: 0` deriving no client IP, nothing stood behind the cap.
+ * The budget is a row per guess in `attempts`, not a field on the code row.
+ * Guesses only ever insert, so fifty parallel wrong guesses leave fifty rows
+ * and count as fifty; a counter on the code row would need a read and a write,
+ * and fifty parallel ones would count as one.
  *
  * Keyed on the hash rather than the identifier: a resend is a new code with a
  * fresh budget, and a guess against a superseded code counts only against that
- * code. The window ends when the code does, so the counter is swept with it.
+ * code. The rows expire when the code does, so they are swept with it.
  *
  * This runs even under `rateLimit: false`. That flag turns off the per-IP and
  * per-identifier windows and the cooldown — volume limits a deployment may
@@ -40,49 +44,62 @@ export interface ConsumeMagicCodeInput {
 async function countWrongGuess(
   internals: AuthServerInternals,
   identifier: string,
-  stored: AuthMagicCode
+  stored: AuthVerificationCode
 ) {
-  const counted = await internals.db.upsertRateLimit({
-    key: `magicCode:attempts:${stored.codeHash}`,
-    resetAt: stored.expiresAt
-  })
-  if (counted.count < MAX_CODE_ATTEMPTS) return
+  const counted = await countAttempt(
+    internals,
+    `verificationCode:attempts:${stored.codeHash}`,
+    stored.expiresAt,
+    MAX_CODE_ATTEMPTS
+  )
+  if (counted < MAX_CODE_ATTEMPTS) return
 
   // Match on the hash here too: a resend that landed after the row was read
   // is a fresh code with its own budget, and this delete then matches nothing.
-  const burned = await internals.db.deleteMagicCode({
-    identifier,
-    codeHash: stored.codeHash
+  const [burned] = await internals.db.delete({
+    table: "verificationCodes",
+    where: { identifier, codeHash: stored.codeHash }
   })
-  if (burned) internals.log.warn("magic code burned after too many attempts")
+  if (burned)
+    internals.log.warn("verification code burned after too many attempts")
 }
 
 /**
- * Verifies and burns a magic code.
+ * Verifies and burns a verification code.
  *
  * Every failure returns the same `invalidCode` error — missing, expired, wrong
  * purpose, or simply wrong. Distinguishing them would tell an attacker which
  * addresses have codes outstanding.
  *
  * The purpose check is what stops a sign-in code from authorizing account
- * deletion and vice versa; both live in the same row, so without it a code
- * obtained for one flow would silently work in the other.
+ * deletion and vice versa; both are codes for the same identifier, so without
+ * it a code obtained for one flow would silently work in the other.
  *
  * @throws {AuthApiError} `invalidCode` on any failure.
  */
-export async function consumeMagicCode(
+export async function consumeVerificationCode(
   internals: AuthServerInternals,
-  input: ConsumeMagicCodeInput
+  input: ConsumeVerificationCodeInput
 ) {
-  const stored = await internals.db.getMagicCode({
-    identifier: input.identifier
-  })
+  // Newest first: a resend leaves the previous code dead but not necessarily
+  // gone, and the code the person is holding is the one sent last.
+  const stored = await selectOne(
+    internals,
+    "verificationCodes",
+    { identifier: input.identifier },
+    { expiresAt: "desc" }
+  )
 
-  if (
-    !stored ||
-    stored.expiresAt.getTime() <= Date.now() ||
-    stored.purpose !== input.purpose
-  ) {
+  if (!stored || stored.purpose !== input.purpose) {
+    throw new AuthApiError("invalidCode", 401)
+  }
+
+  if (stored.expiresAt.getTime() <= Date.now()) {
+    // Already in hand, so delete it rather than leave it for the sweep.
+    await internals.db.delete({
+      table: "verificationCodes",
+      where: { id: stored.id }
+    })
     throw new AuthApiError("invalidCode", 401)
   }
 
@@ -95,11 +112,11 @@ export async function consumeMagicCode(
   // The conditional delete is what makes the code usable exactly once. Two
   // requests can both read the row and both pass the check above, but the store
   // lets only one delete a row matching this identifier AND this hash — the
-  // other gets null and is rejected. Matching on the hash also means a code
-  // issued before a resend can never consume the row the resend created.
-  const consumed = await internals.db.deleteMagicCode({
-    identifier: input.identifier,
-    codeHash: stored.codeHash
+  // other gets nothing back and is rejected. Matching on the hash also means a
+  // code issued before a resend can never consume the row the resend created.
+  const [consumed] = await internals.db.delete({
+    table: "verificationCodes",
+    where: { identifier: input.identifier, codeHash: stored.codeHash }
   })
   if (!consumed) throw new AuthApiError("invalidCode", 401)
 }

@@ -6,7 +6,7 @@ import { isTrustedProxyEntry, resolveIpAddressConfig } from "../lib/ip-address"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
 import { parseDuration } from "../lib/parse-duration"
-import type { AdditionalFieldsSchema, AuthDB } from "./auth-db"
+import type { AdditionalFieldsSchema, AuthDB, AuthTable } from "./auth-db"
 import type {
   AuthServerOptions,
   CorsOptions,
@@ -33,6 +33,7 @@ import type {
  */
 export interface AuthServerConfig {
   db: AuthDB
+  generateId?: (table: AuthTable) => string | Promise<string>
   email?: EmailOptions
   sms?: SmsOptions
   guest: boolean
@@ -57,7 +58,6 @@ export interface AuthServerConfig {
   }
   rateLimit: Required<RateLimitOptions> | false
   multiAccount: boolean
-  cleanup: boolean
   localization?: LocalizationOptions
   ipAddress: IpAddressConfig
   cors?: CorsOptions
@@ -357,6 +357,7 @@ export function resolveAuthServerConfig(
 
   return {
     db: options.db,
+    ...(options.generateId ? { generateId: options.generateId } : {}),
     ...(options.email ? { email: options.email } : {}),
     ...(options.sms ? { sms: options.sms } : {}),
     guest,
@@ -391,7 +392,6 @@ export function resolveAuthServerConfig(
     },
     rateLimit,
     multiAccount: options.multiAccount ?? false,
-    cleanup: options.cleanup ?? true,
     ...(options.localization ? { localization: options.localization } : {}),
     ipAddress: requireIpAddress(options.ipAddress),
     ...(options.cors ? { cors: options.cors } : {}),

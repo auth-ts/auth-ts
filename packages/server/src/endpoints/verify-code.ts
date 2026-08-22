@@ -2,13 +2,14 @@ import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
 import { defineEndpoint } from "../http/define-endpoint"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
-import { consumeMagicCode } from "../magic-code/consume-magic-code"
-import type { IdentifierBody } from "../magic-code/resolve-code-identifier"
-import { resolveCodeIdentifier } from "../magic-code/resolve-code-identifier"
 import { convertGuest } from "../session/convert-guest"
 import type { IssueMode } from "../session/issue-session"
 import { issueSession } from "../session/issue-session"
 import { resolveSession } from "../session/resolve-session"
+import { findOrCreateUser } from "../user/find-or-create-user"
+import { consumeVerificationCode } from "../verification-code/consume-verification-code"
+import type { IdentifierBody } from "../verification-code/resolve-code-identifier"
+import { resolveCodeIdentifier } from "../verification-code/resolve-code-identifier"
 
 /** Body accepted by `POST /verify-code`. */
 export interface VerifyCodeInput extends IdentifierBody {
@@ -68,7 +69,7 @@ export const verifyCode = defineEndpoint({
       }
     }
 
-    await consumeMagicCode(internals, {
+    await consumeVerificationCode(internals, {
       identifier: identifier.value,
       code: input.code,
       purpose: "signIn"
@@ -83,16 +84,12 @@ export const verifyCode = defineEndpoint({
               additionalFields
             })
           ).user
-        : await internals.db.upsertUser({
-            [identifier.kind]: identifier.value,
-            type: "user",
-            ...additionalFields
-          })
+        : await findOrCreateUser(internals, { identifier, additionalFields })
 
     const issued = await issueSession(internals, {
       user,
       headers,
-      requestURL: input.requestURL ?? "https://localhost",
+      requestURL: input.requestURL,
       ...(input.mode ? { mode: input.mode } : {}),
       // The guest's session has done its job either way — see `convertGuest`.
       ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})

@@ -131,8 +131,9 @@ describe("getToken as a function", () => {
     // a legitimate negative answer.
     const context = await createTestServer()
     const refreshToken = await signIn(context)
-    await context.db.deleteSessions({
-      userId: required(context.db.users()[0], "user").id
+    await context.db.delete({
+      table: "sessions",
+      where: { userId: required(context.db.users()[0], "user").id }
     })
 
     await expect(
@@ -169,8 +170,8 @@ describe("getSession", () => {
     expect(result?.user.email).toBe("ada@example.com")
     expect(result?.session.id).toBeTruthy()
     // The server-side primitive deliberately returns the full row, hash included:
-    // this has no HTTP route, and server code uses the hash (e.g. deleteSession).
-    // Only POST /token and getToken() project it away.
+    // this has no HTTP route, and server code addresses a session by its hash
+    // (a delete on `sessions`). Only POST /token and getToken() project it away.
     expect(result?.session.tokenHash).toBeTruthy()
   })
 
@@ -179,7 +180,10 @@ describe("getSession", () => {
     const refreshToken = await signIn(context)
     const session = required(context.db.sessions()[0], "session")
 
-    await context.db.deleteSession({ tokenHash: session.tokenHash })
+    await context.db.delete({
+      table: "sessions",
+      where: { tokenHash: session.tokenHash }
+    })
     expect(
       await context.authServer.getSession({
         headers: cookieHeaders(refreshToken)
@@ -226,7 +230,8 @@ describe("signToken and decodeToken", () => {
   it("performs no database work", async () => {
     const context = await createTestServer()
     const calls: string[] = []
-    for (const method of ["getUser", "getSession", "upsertUser"] as const) {
+    // The whole contract, not a sample of it: signing reaches for no table at all.
+    for (const method of ["select", "insert", "update", "delete"] as const) {
       const original = context.db[method].bind(context.db)
       // biome-ignore lint/suspicious/noExplicitAny: test spy over a heterogeneous method set
       ;(context.db as any)[method] = (...args: unknown[]) => {

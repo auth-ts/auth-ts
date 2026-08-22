@@ -2,6 +2,7 @@ import type { AuthSession } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { sha256Hex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"
+import { selectOne } from "../lib/select-one"
 
 /**
  * How many users may be parked in one browser.
@@ -74,7 +75,7 @@ export async function pruneDeadAccounts(
 ): Promise<ParkedAccount[]> {
   const resolved = await Promise.all(
     tokens.map(async (token) => {
-      const session = await internals.db.getSession({
+      const session = await selectOne(internals, "sessions", {
         tokenHash: await sha256Hex(token)
       })
       return session && session.expiresAt.getTime() > Date.now()
@@ -111,7 +112,10 @@ export async function demoteActive(
   while (next.length > PARKED_ACCOUNT_LIMIT) {
     const evicted = next.pop()
     if (!evicted) break
-    await internals.db.deleteSession({ tokenHash: await sha256Hex(evicted) })
+    await internals.db.delete({
+      table: "sessions",
+      where: { tokenHash: await sha256Hex(evicted) }
+    })
     internals.log.debug("evicted the oldest parked account")
   }
 

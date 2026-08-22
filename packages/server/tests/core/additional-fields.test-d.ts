@@ -2,8 +2,11 @@ import { describe, expectTypeOf, it } from "vitest"
 import type {
   AdditionalFieldsSchema,
   AuthDB,
+  AuthInsert,
+  AuthOrderBy,
+  AuthRow,
   AuthUser,
-  UpsertUserInput
+  AuthWhere
 } from "../../src/core/auth-db"
 import type { WithUserFields } from "../../src/core/create-auth-server"
 import { createAuthServer } from "../../src/core/create-auth-server"
@@ -42,11 +45,20 @@ describe("AuthUser carries the declared fields", () => {
   })
 
   it("types them optional and never null on the way in", () => {
-    expectTypeOf<UpsertUserInput<Declared>["plan"]>().toEqualTypeOf<
+    expectTypeOf<AuthInsert<Declared, "users">["plan"]>().toEqualTypeOf<
       string | undefined
     >()
-    expectTypeOf<UpsertUserInput<Declared>["seats"]>().toEqualTypeOf<
+    expectTypeOf<AuthInsert<Declared, "users">["seats"]>().toEqualTypeOf<
       number | undefined
+    >()
+    // `id` is optional on the way in, because the store fills it unless
+    // `generateId` is configured — and required on the way out, because by then
+    // it exists.
+    expectTypeOf<AuthInsert<Declared, "users">["id"]>().toEqualTypeOf<
+      string | undefined
+    >()
+    expectTypeOf<AuthRow<Declared, "users">>().toEqualTypeOf<
+      AuthUser<Declared>
     >()
   })
 
@@ -58,6 +70,61 @@ describe("AuthUser carries the declared fields", () => {
     // A row with extra columns of any type is a bare AuthUser.
     const row = { id: "1", type: "user" as const, createdAt: new Date() }
     expectTypeOf(row).toMatchTypeOf<AuthUser>()
+  })
+})
+
+describe("the table types the four functions take", () => {
+  /** A schema whose one declared field is deliberately not a string. */
+  type Numeric = { plan: "number" }
+
+  const usersWhere = (where: AuthWhere<Numeric, "users">) => where
+  const usersOrder = (orderBy: AuthOrderBy<Declared, "users">) => orderBy
+
+  it("queries a declared field at its declared type", () => {
+    expectTypeOf(usersWhere({ plan: 3 }).plan).toEqualTypeOf<
+      number | null | undefined
+    >()
+    // Core fields query the same way; there are no operators, only equality.
+    usersWhere({ email: "ada@example.com", type: "guest" })
+
+    // @ts-expect-error plan is declared a number, so a string cannot match it
+    usersWhere({ plan: "pro" })
+    // @ts-expect-error nothing declares `tier`, so nothing can query it
+    usersWhere({ tier: 1 })
+  })
+
+  it("orders by exactly one column", () => {
+    usersOrder({ id: "asc" })
+    // An optional column is still a key to sort on.
+    usersOrder({ plan: "desc" })
+
+    // @ts-expect-error one column and a direction — a second key is not a choice
+    usersOrder({ id: "asc", email: "desc" })
+    // @ts-expect-error nothing declares `tier`, so nothing can sort on it
+    usersOrder({ tier: "asc" })
+  })
+})
+
+describe("AuthDB measures the schema it is typed with", () => {
+  it("takes a bare implementation as any server's store", () => {
+    // No schema declared, so nothing is claimed about the columns and every
+    // server accepts it — including one that declares fields of its own.
+    const bare: AuthDB = createMemoryDb()
+    const declared: AuthDB<{ plan: "number" }> = createMemoryDb()
+
+    expectTypeOf(bare).toMatchTypeOf<AuthDB>()
+    expectTypeOf(declared).toMatchTypeOf<AuthDB<{ plan: "number" }>>()
+  })
+
+  it("keeps two declared schemas apart, which is what __schema is for", () => {
+    const stringly: AuthDB<{ plan: "string" }> = createMemoryDb()
+
+    // Without the phantom member the schema would count as unused and these
+    // two would be the same type, so a store that writes strings would satisfy
+    // a server that declared numbers.
+    // @ts-expect-error plan is a string there and a number here
+    const numeric: AuthDB<{ plan: "number" }> = stringly
+    expectTypeOf(numeric).toMatchTypeOf<AuthDB<{ plan: "number" }>>()
   })
 })
 

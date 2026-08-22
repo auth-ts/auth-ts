@@ -13,7 +13,7 @@ export function randomBytesBase64url(byteLength: number) {
 }
 
 /**
- * Generates a uniformly distributed six-digit magic code as a zero-padded string.
+ * Generates a uniformly distributed six-digit verification code as a zero-padded string.
  *
  * Rejection sampling, not `value % 1000000`: the modulo of a 32-bit draw favours
  * the low end of the range, and a biased code space is a smaller code space.
@@ -31,9 +31,4 @@ export function randomSixDigitCode() {
   }
 
   return String(value % LIMIT).padStart(6, "0")
-}
-
-/** Generates a RFC 4122 v4 UUID, used for session row ids. */
-export function randomUUID() {
-  return crypto.randomUUID()
 }

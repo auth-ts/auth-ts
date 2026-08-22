@@ -1,20 +1,17 @@
 import type {
-  AuthConnection,
+  AdditionalFieldsSchema,
   AuthDB,
-  AuthMagicCode,
-  AuthRateLimit,
+  AuthDirection,
+  AuthRow,
   AuthSession,
-  AuthUser,
-  DeleteSessionWhere,
-  GetUserWhere,
-  UpsertConnectionInput,
-  UpsertMagicCodeInput,
-  UpsertSessionInput
+  AuthTable,
+  AuthUser
 } from "../core/auth-db"
-import { randomUUID } from "./generate-random"
 
 /** An in-memory {@link AuthDB} plus a few helpers for inspecting it in tests. */
 export interface MemoryDb extends AuthDB {
+  /** Every stored row of a table, in insertion order. */
+  rows<T extends AuthTable>(table: T): AuthRow<AdditionalFieldsSchema, T>[]
   /** Every stored user, in insertion order. */
   users(): AuthUser[]
   /** Every stored session, in insertion order. */
@@ -23,8 +20,39 @@ export interface MemoryDb extends AuthDB {
   reset(): void
 }
 
-/** A user row; the bare `AuthUser` already admits whatever fields the consumer declared. */
-type StoredUser = AuthUser
+/** A stored row, as loosely typed as the bare contract's open map. */
+type StoredRow = Record<string, unknown> & { id: string }
+
+/**
+ * The columns that must be unique, per table.
+ *
+ * These are the constraints the contract asks your database for, enforced here
+ * so the library's own suite runs against the same arbiter a real store gives
+ * it: core reads before it inserts, and the unique index is what decides the
+ * race between two callers who both read nothing. A store without them does not
+ * fail a test — it creates two accounts for one person in production.
+ */
+const UNIQUE_COLUMNS: { [T in AuthTable]?: string[][] } = {
+  users: [["email"], ["phoneNumber"]],
+  sessions: [["tokenHash"]],
+  connections: [["provider", "providerAccountId"]]
+}
+
+/** The tables core sweeps, all keyed on `expiresAt`. */
+const EXPIRING_TABLES = ["sessions", "verificationCodes", "attempts"] as const
+
+/** Orders two column values, with nulls and undefined last in either direction. */
+function compare(left: unknown, right: unknown) {
+  if (left === right) return 0
+  if (left === null || left === undefined) return 1
+  if (right === null || right === undefined) return -1
+  if (left instanceof Date && right instanceof Date) {
+    return left.getTime() - right.getTime()
+  }
+  if (typeof left === "number" && typeof right === "number") return left - right
+
+  return String(left) < String(right) ? -1 : 1
+}
 
 /**
  * Creates a fully in-memory implementation of the database contract.
@@ -32,263 +60,127 @@ type StoredUser = AuthUser
  * This is public API, exported as `@auth-ts/server/testing`, on purpose: the
  * library's own suite runs against this exact object, so when you test your auth
  * flows against it you are testing against the same semantics the library
- * verifies itself with — not a simplified mock that agrees with your assumptions.
- *
- * It implements the documented upsert behaviour precisely, including the parts
- * that are easy to get wrong in a real adapter: `type` applied on insert only,
- * identifier-keyed versus id-targeted writes, and deletes that cascade to
- * sessions.
+ * verifies itself with — not a simplified mock that agrees with your
+ * assumptions. It is deliberately generic: five maps of rows, equality
+ * matching, and the uniqueness the contract requires. Everything that used to
+ * be easy to get wrong in an implementation now lives in core, tested once.
  */
 export function createMemoryDb(): MemoryDb {
-  const users = new Map<string, StoredUser>()
-  const sessions = new Map<string, AuthSession>()
-  const magicCodes = new Map<string, AuthMagicCode>()
-  const rateLimits = new Map<string, AuthRateLimit>()
-  const connections = new Map<string, AuthConnection>()
+  const tables = new Map<AuthTable, Map<string, StoredRow>>()
 
-  const connectionKey = (provider: string, providerAccountId: string) =>
-    `${provider}:${providerAccountId}`
-
-  const findUserByIdentifier = (email?: string, phoneNumber?: string) => {
-    for (const user of users.values()) {
-      if (email !== undefined && user.email === email) return user
-      if (phoneNumber !== undefined && user.phoneNumber === phoneNumber)
-        return user
+  const tableOf = (table: AuthTable) => {
+    let rows = tables.get(table)
+    if (!rows) {
+      rows = new Map()
+      tables.set(table, rows)
     }
-    return undefined
+    return rows
   }
 
-  /** Copies only the keys that were actually provided, so undefined means "leave alone". */
-  const applyDefined = (
-    target: StoredUser,
-    fields: Partial<Record<string, string | number | boolean | null>>
-  ) => {
-    for (const [key, value] of Object.entries(fields)) {
-      if (value !== undefined) target[key] = value
-    }
-  }
-
-  return {
-    async upsertUser(input) {
-      const { id, type, ...fields } = input
-
-      if (id !== undefined) {
-        const existing = users.get(id)
-        if (!existing) throw new Error(`No user with id ${id}`)
-
-        // The id-targeted form applies everything it was given, the consumer's
-        // own fields included — it is how PATCH edits and how a guest converts.
-        applyDefined(existing, fields)
-        // The one place type may change: core converting a guest into a real user.
-        if (type === "user" && existing.type === "guest") existing.type = "user"
-
-        return { ...existing }
+  const matches = (row: StoredRow, where: Record<string, unknown>) =>
+    Object.entries(where).every(([column, value]) => {
+      const stored = row[column]
+      if (stored instanceof Date && value instanceof Date) {
+        return stored.getTime() === value.getTime()
       }
+      return stored === value
+    })
 
-      const existing = findUserByIdentifier(input.email, input.phoneNumber)
-      if (existing) {
-        // A sign-in. Only the profile fields core owns may move; `type` and the
-        // consumer's own fields are insert-only here, otherwise every admin would
-        // be demoted on their next sign-in and any sign-in body could overwrite
-        // profile columns.
-        applyDefined(existing, { name: input.name, imageURL: input.imageURL })
-        return { ...existing }
-      }
+  const find = (table: AuthTable, where: Record<string, unknown>) =>
+    [...tableOf(table).values()].filter((row) => matches(row, where))
 
-      const created: StoredUser = {
-        ...fields,
-        id: randomUUID(),
-        email: input.email ?? null,
-        phoneNumber: input.phoneNumber ?? null,
-        name: input.name ?? null,
-        imageURL: input.imageURL ?? null,
-        type: type ?? "user",
-        primaryUserId: input.primaryUserId ?? null
-      }
-      users.set(created.id, created)
+  /** Rejects an insert that would duplicate a value the contract requires to be unique. */
+  const assertUnique = (table: AuthTable, row: StoredRow) => {
+    for (const columns of UNIQUE_COLUMNS[table] ?? []) {
+      const values = columns.map((column) => row[column])
+      if (values.some((value) => value === null || value === undefined))
+        continue
 
-      return { ...created }
-    },
-
-    async getUser(where: GetUserWhere) {
-      if ("id" in where) {
-        const user = users.get(where.id)
-        return user ? { ...user } : null
-      }
-
-      const user =
-        "email" in where
-          ? findUserByIdentifier(where.email)
-          : findUserByIdentifier(undefined, where.phoneNumber)
-
-      return user ? { ...user } : null
-    },
-
-    async deleteUser(where) {
-      const user = users.get(where.id)
-      users.delete(where.id)
-      // Contract: a deleted account must not keep a live refresh token.
-      for (const [tokenHash, session] of sessions) {
-        if (session.userId === where.id) sessions.delete(tokenHash)
-      }
-      for (const [key, connection] of connections) {
-        if (connection.userId === where.id) connections.delete(key)
-      }
-      return user ? { ...user } : null
-    },
-
-    async upsertSession(session: UpsertSessionInput) {
-      const existing = sessions.get(session.tokenHash)
-      sessions.set(session.tokenHash, {
-        ...session,
-        // createdAt is authentication time: a refresh slides expiry, never this.
-        createdAt: existing?.createdAt ?? session.createdAt,
-        userAgent: session.userAgent ?? null,
-        ipAddress: session.ipAddress ?? null
-      })
-    },
-
-    async getSession(where) {
-      const session = sessions.get(where.tokenHash)
-      return session ? { ...session } : null
-    },
-
-    async listSessions(where) {
-      return [...sessions.values()]
-        .filter((session) => session.userId === where.userId)
-        .map((session) => ({ ...session }))
-    },
-
-    async deleteSession(where: DeleteSessionWhere) {
-      if ("tokenHash" in where) {
-        const session = sessions.get(where.tokenHash)
-        sessions.delete(where.tokenHash)
-        return session ? { ...session } : null
-      }
-
-      for (const [tokenHash, session] of sessions) {
-        // Ownership is part of the query, so another user's id matches nothing.
-        if (session.id === where.id && session.userId === where.userId) {
-          sessions.delete(tokenHash)
-          return { ...session }
-        }
-      }
-      return null
-    },
-
-    async deleteSessions(where) {
-      const deleted: AuthSession[] = []
-      for (const [tokenHash, session] of sessions) {
-        if (session.userId !== where.userId) continue
-        if (
-          where.exceptTokenHash !== undefined &&
-          tokenHash === where.exceptTokenHash
+      const conflicting = [...tableOf(table).values()].some(
+        (stored) =>
+          stored.id !== row.id &&
+          columns.every((column, index) => stored[column] === values[index])
+      )
+      if (conflicting) {
+        throw new Error(
+          `duplicate key value violates unique constraint on ${table}(${columns.join(", ")})`
         )
-          continue
-        sessions.delete(tokenHash)
-        deleted.push({ ...session })
       }
-      return deleted
-    },
-
-    async upsertMagicCode(magicCode: UpsertMagicCodeInput) {
-      magicCodes.set(magicCode.identifier, { ...magicCode })
-    },
-
-    async getMagicCode(where) {
-      const magicCode = magicCodes.get(where.identifier)
-      return magicCode ? { ...magicCode } : null
-    },
-
-    async deleteMagicCode(where) {
-      const magicCode = magicCodes.get(where.identifier)
-      // The hash is part of the match, so a stale code cannot consume a row a
-      // resend has since replaced, and only one of two racing consumers wins.
-      if (!magicCode) return null
-      if (where.codeHash !== undefined && magicCode.codeHash !== where.codeHash)
-        return null
-
-      magicCodes.delete(where.identifier)
-      return { ...magicCode }
-    },
-
-    async getRateLimit(where) {
-      const rateLimit = rateLimits.get(where.key)
-      return rateLimit ? { ...rateLimit } : null
-    },
-
-    async upsertRateLimit(rateLimit) {
-      const existing = rateLimits.get(rateLimit.key)
-      // Same branch the SQL takes: a fresh window when the key is absent or its
-      // window has passed, otherwise one more on the existing count with the
-      // existing resetAt kept. Single-threaded here, so trivially atomic.
-      const next: AuthRateLimit =
-        !existing || existing.resetAt.getTime() <= Date.now()
-          ? { key: rateLimit.key, count: 1, resetAt: rateLimit.resetAt }
-          : { ...existing, count: existing.count + 1 }
-
-      rateLimits.set(rateLimit.key, next)
-      return { ...next }
-    },
-
-    async upsertConnection(connection: UpsertConnectionInput) {
-      connections.set(
-        connectionKey(connection.provider, connection.providerAccountId),
-        {
-          ...connection,
-          email: connection.email ?? null
-        }
-      )
-    },
-
-    async getConnection(where) {
-      const connection = connections.get(
-        connectionKey(where.provider, where.providerAccountId)
-      )
-      return connection ? { ...connection } : null
-    },
-
-    async listConnections(where) {
-      return [...connections.values()]
-        .filter((connection) => connection.userId === where.userId)
-        .map((connection) => ({ ...connection }))
-    },
-
-    async deleteConnection(where) {
-      for (const [key, connection] of connections) {
-        if (
-          connection.userId === where.userId &&
-          connection.provider === where.provider
-        ) {
-          connections.delete(key)
-          return { ...connection }
-        }
-      }
-      return null
-    },
-
-    async deleteExpired() {
-      const now = new Date()
-
-      for (const [identifier, magicCode] of magicCodes) {
-        if (magicCode.expiresAt < now) magicCodes.delete(identifier)
-      }
-      for (const [tokenHash, session] of sessions) {
-        if (session.expiresAt < now) sessions.delete(tokenHash)
-      }
-      for (const [key, rateLimit] of rateLimits) {
-        if (rateLimit.resetAt < now) rateLimits.delete(key)
-      }
-    },
-
-    users: () => [...users.values()].map((user) => ({ ...user })),
-    sessions: () => [...sessions.values()].map((session) => ({ ...session })),
-    reset() {
-      users.clear()
-      sessions.clear()
-      magicCodes.clear()
-      rateLimits.clear()
-      connections.clear()
     }
+  }
+
+  // Every function returns `as never`: these tables are `Record<string, unknown>`
+  // rows, and a generic `AuthRow<S, T>` return position is a write target TypeScript
+  // narrows to the intersection of all five row types, which nothing satisfies.
+  // A real implementation asserts at the same boundary for the same reason.
+  return {
+    async select({ table, where, limit, offset, orderBy }) {
+      const [[column, direction] = ["id", "asc" as AuthDirection]] =
+        Object.entries(orderBy) as [string, AuthDirection][]
+
+      return find(table, where)
+        .sort((left, right) => {
+          const order = compare(left[column], right[column])
+          return direction === "asc" ? order : -order
+        })
+        .slice(offset, offset + limit)
+        .map((row) => ({ ...row })) as never
+    },
+
+    async insert({ table, values }) {
+      const stored: StoredRow = {
+        ...(values as Record<string, unknown>),
+        id: (values as { id?: string }).id ?? crypto.randomUUID()
+      }
+      assertUnique(table, stored)
+      tableOf(table).set(stored.id, stored)
+
+      return { ...stored } as never
+    },
+
+    async update({ table, where, values }) {
+      const defined = Object.entries(values).filter(
+        ([, value]) => value !== undefined
+      )
+      // The same failure a query builder gives an empty `SET`, so a core
+      // regression surfaces in the suite rather than in someone's production
+      // database.
+      if (defined.length === 0) {
+        throw new Error(`update on ${table} was given no values to set`)
+      }
+
+      for (const row of find(table, where)) {
+        const updated = { ...row, ...Object.fromEntries(defined) }
+        assertUnique(table, updated)
+        tableOf(table).set(row.id, updated)
+      }
+    },
+
+    async delete({ table, where }) {
+      const removed = find(table, where)
+      for (const row of removed) tableOf(table).delete(row.id)
+
+      return removed.map((row) => ({ ...row })) as never
+    },
+
+    async cleanup() {
+      const now = Date.now()
+      for (const table of EXPIRING_TABLES) {
+        for (const [id, row] of tableOf(table)) {
+          const expiresAt = row.expiresAt
+          if (expiresAt instanceof Date && expiresAt.getTime() < now) {
+            tableOf(table).delete(id)
+          }
+        }
+      }
+    },
+
+    rows: (table) =>
+      [...tableOf(table).values()].map((row) => ({ ...row })) as never,
+    users: () =>
+      [...tableOf("users").values()].map((row) => ({ ...row })) as never,
+    sessions: () =>
+      [...tableOf("sessions").values()].map((row) => ({ ...row })) as never,
+    reset: () => tables.clear()
   }
 }

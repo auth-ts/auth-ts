@@ -452,9 +452,20 @@ describe("resolved defaults", () => {
     expect(config.cookie.path).toBe("/")
     expect(config.user.deleteFreshWindow).toBe("15m")
     expect(config.multiAccount).toBe(false)
-    expect(config.cleanup).toBe(true)
     expect(config.guest).toBe(false)
     expect(config.logLevel).toBe("warn")
+  })
+
+  it("leaves generateId unset by default and carries the one given", () => {
+    // Unset is the common case: the row goes to the store without an id and the
+    // column default fills it. Configured, core mints the id itself, so the
+    // resolved config has to be carrying the exact function it was handed.
+    expect(createAuthServer(baseOptions()).config.generateId).toBeUndefined()
+
+    const generateId = (table: string) => `${table}_1`
+    expect(
+      createAuthServer({ ...baseOptions(), generateId }).config.generateId
+    ).toBe(generateId)
   })
 
   it("leaves aud unset unless configured, so nothing has to match by accident", () => {
@@ -519,8 +530,8 @@ describe("resolved defaults", () => {
   it("starts each test with the fallback variables genuinely absent", () => {
     // The invariant the whole file's missing-secret assertions rest on. It fails
     // if the guard is removed and the developer running the suite exports either
-    // variable, or if cleanup ever goes back to assigning `undefined` — which
-    // Node stringifies into a perfectly usable secret.
+    // variable, or if the afterEach teardown ever goes back to assigning
+    // `undefined` — which Node stringifies into a perfectly usable secret.
     expect("AUTH_SECRET" in process.env).toBe(false)
     expect("JWT_PRIVATE_KEY" in process.env).toBe(false)
   })

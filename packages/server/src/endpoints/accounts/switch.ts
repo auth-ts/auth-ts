@@ -1,5 +1,6 @@
 import { notFound, unauthenticated } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
+import { selectOne } from "../../lib/select-one"
 import {
   serializeCookie,
   shouldUseSecureCookies
@@ -57,7 +58,7 @@ export const switchAccount = defineEndpoint({
     const target = parked.find(({ session }) => session.userId === input.userId)
     if (!target) throw notFound()
 
-    const targetUser = await internals.db.getUser({ id: input.userId })
+    const targetUser = await selectOne(internals, "users", { id: input.userId })
     if (!targetUser) throw notFound()
 
     const currentToken = readRefreshToken(internals, headers)
@@ -66,9 +67,7 @@ export const switchAccount = defineEndpoint({
       ? await demoteActive(internals, remaining, currentToken)
       : remaining
 
-    const secure = shouldUseSecureCookies(
-      input.requestURL ?? "https://localhost"
-    )
+    const secure = shouldUseSecureCookies(input.requestURL)
     const responseHeaders = new Headers()
     responseHeaders.append(
       "set-cookie",

@@ -1,6 +1,8 @@
 import type { AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import type { AdditionalFieldValues } from "../http/validate-additional-fields"
+import { selectOne } from "../lib/select-one"
+import { updateUser } from "../user/update-user"
 
 /** Identity details learned during a sign-in that a guest is completing. */
 export interface GuestIdentity {
@@ -57,22 +59,25 @@ export async function convertGuest(
   identity: GuestIdentity
 ): Promise<GuestConversion> {
   const existing = identity.email
-    ? await internals.db.getUser({ email: identity.email })
+    ? await selectOne(internals, "users", { email: identity.email })
     : identity.phoneNumber
-      ? await internals.db.getUser({ phoneNumber: identity.phoneNumber })
+      ? await selectOne(internals, "users", {
+          phoneNumber: identity.phoneNumber
+        })
       : null
 
   if (existing && existing.id !== guest.id) {
     return mergeGuestInto(internals, guest, existing)
   }
 
-  const upgraded = await internals.db.upsertUser({
-    id: guest.id,
+  // The one place `type` legitimately changes: an anonymous row becoming the
+  // real account it always was.
+  const upgraded = await updateUser(internals, guest, {
     type: "user",
-    ...(identity.email ? { email: identity.email } : {}),
-    ...(identity.phoneNumber ? { phoneNumber: identity.phoneNumber } : {}),
-    ...(identity.name ? { name: identity.name } : {}),
-    ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
+    email: identity.email,
+    phoneNumber: identity.phoneNumber,
+    name: identity.name,
+    imageURL: identity.imageURL,
     ...identity.additionalFields
   })
   internals.log.info("guest upgraded in place, keeping its id and its rows")
@@ -92,7 +97,7 @@ export async function mergeGuestInto(
   guest: AuthUser,
   existing: AuthUser
 ): Promise<GuestConversion> {
-  await internals.db.upsertUser({ id: guest.id, primaryUserId: existing.id })
+  await updateUser(internals, guest, { primaryUserId: existing.id })
   internals.log.info("guest sign-in resolved to an existing account")
 
   return { user: existing, outcome: "merged" }

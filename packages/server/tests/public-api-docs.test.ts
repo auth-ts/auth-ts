@@ -53,16 +53,27 @@ describe("public API documentation", () => {
 
   it("documents every field of the database contract, which consumers implement by hand", () => {
     const source = readFileSync(join(sourceRoot, "core/auth-db.ts"), "utf8")
-    const contract = sliceBetweenMarkers(source, "export interface AuthDB<")
+    // Stop at `defineAuthDB`: its implementation object restates the same four
+    // functions, documented once above rather than again on each line.
+    const contract = sliceBetweenMarkers(
+      source,
+      "export interface AuthDB<",
+      "export function defineAuthDB<"
+    )
     const lines = contract.split("\n")
 
     const undocumented: string[] = []
     for (const [index, line] of lines.entries()) {
-      const matched = /^ {2}([a-zA-Z]+)\(/.exec(line)
+      // Every member is a method, and each may be generic (`select<T…>(`),
+      // optional (`cleanup?()`), or phantom (`__schema?(`) — none of which
+      // exempts it from carrying a doc comment.
+      const matched = /^ {2}(__)?([a-zA-Z]+)\??(<[^>]*>)?\(/.exec(line)
       if (!matched) continue
 
       const previous = lines[index - 1]?.trim() ?? ""
-      if (!previous.endsWith("*/")) undocumented.push(matched[1] as string)
+      if (!previous.endsWith("*/")) {
+        undocumented.push(`${matched[1] ?? ""}${matched[2]}`)
+      }
     }
 
     expect(undocumented).toEqual([])

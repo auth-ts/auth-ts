@@ -8,416 +8,350 @@ beforeEach(() => {
   db = createMemoryDb()
 })
 
-describe("upsertUser", () => {
-  it("creates on first sight of an identifier and merges afterwards", async () => {
-    const created = await db.upsertUser({
-      email: "ada@example.com",
-      type: "user"
-    })
-    const merged = await db.upsertUser({
-      email: "ada@example.com",
-      name: "Ada"
-    })
+const user = (fields: Record<string, unknown> = {}) =>
+  db.insert({
+    table: "users",
+    values: {
+      email: null,
+      phoneNumber: null,
+      name: null,
+      imageURL: null,
+      primaryUserId: null,
+      type: "user",
+      ...fields
+    }
+  })
 
-    expect(merged.id).toBe(created.id)
-    expect(merged.name).toBe("Ada")
+const attempt = (key: string, expiresAt = new Date(Date.now() + 60_000)) =>
+  db.insert({ table: "attempts", values: { key, expiresAt } })
+
+const read = <
+  T extends "users" | "sessions" | "verificationCodes" | "attempts"
+>(
+  table: T,
+  where: Record<string, unknown> = {},
+  limit = 100
+) =>
+  db.select({
+    table,
+    where: where as never,
+    limit,
+    offset: 0,
+    orderBy: { id: "asc" } as never
+  })
+
+describe("insert", () => {
+  it("returns the stored row and names it when the caller did not", async () => {
+    const created = await user({ email: "ada@example.com" })
+
+    expect(created.id).toEqual(expect.any(String))
+    expect(created.email).toBe("ada@example.com")
     expect(db.users()).toHaveLength(1)
   })
 
-  it("leaves omitted fields alone", async () => {
-    await db.upsertUser({
-      email: "ada@example.com",
-      name: "Ada",
-      imageURL: "https://img.example/a.png"
-    })
-    const merged = await db.upsertUser({
-      email: "ada@example.com",
-      name: "Ada Lovelace"
-    })
+  it("keeps an id the caller supplied, which is what generateId produces", async () => {
+    const created = await user({ id: "user_ada", email: "ada@example.com" })
 
-    expect(merged.imageURL).toBe("https://img.example/a.png")
+    expect(created.id).toBe("user_ada")
+    expect(await read("users", { id: "user_ada" })).toHaveLength(1)
   })
 
-  it("applies type on insert only, so an admin is never demoted by signing in", async () => {
-    // The consumer promotes out of band; core must not undo it on the next sign-in.
-    const admin = await db.upsertUser({
-      email: "admin@example.com",
-      type: "admin"
-    })
-    expect(admin.type).toBe("admin")
+  it("refuses a duplicate email, the constraint the contract requires", async () => {
+    await user({ email: "ada@example.com" })
 
-    const afterSignIn = await db.upsertUser({
-      email: "admin@example.com",
-      type: "user"
-    })
-    expect(afterSignIn.type).toBe("admin")
+    // Core reads before it inserts, so this constraint — not core — is what
+    // decides the race between two first sign-ins for one address.
+    await expect(user({ email: "ada@example.com" })).rejects.toThrow(
+      /unique constraint/
+    )
   })
 
-  it("lets the id-targeted form promote a guest to user, the one type change core makes", async () => {
-    const guest = await db.upsertUser({ type: "guest" })
-    const converted = await db.upsertUser({ id: guest.id, type: "user" })
+  it("refuses a duplicate provider identity", async () => {
+    const owner = await user({ email: "ada@example.com" })
+    const link = {
+      userId: owner.id,
+      provider: "github",
+      providerAccountId: "1",
+      email: null
+    }
+    await db.insert({ table: "connections", values: link })
 
-    expect(converted.type).toBe("user")
+    await expect(
+      db.insert({ table: "connections", values: link })
+    ).rejects.toThrow(/unique constraint/)
   })
 
-  it("always creates a new row when no identifier is given, which is guest creation", async () => {
-    const first = await db.upsertUser({ type: "guest" })
-    const second = await db.upsertUser({ type: "guest" })
+  it("lets many rows share a null identifier, because guests have none", async () => {
+    await user({ type: "guest" })
+    await user({ type: "guest" })
 
-    expect(first.id).not.toBe(second.id)
-    expect(first.email).toBeNull()
-    expect(first.type).toBe("guest")
     expect(db.users()).toHaveLength(2)
   })
 
-  it("targets an exact row by id without an identifier lookup", async () => {
-    const guest = await db.upsertUser({ type: "guest" })
-    const converted = await db.upsertUser({
-      id: guest.id,
-      email: "ada@example.com",
-      type: "user"
+  it("lets many attempts share a key, which is the whole point of the log", async () => {
+    await attempt("sendCode:id:ada@example.com:0")
+    await attempt("sendCode:id:ada@example.com:0")
+
+    expect(
+      await read("attempts", { key: "sendCode:id:ada@example.com:0" })
+    ).toHaveLength(2)
+  })
+})
+
+describe("select", () => {
+  beforeEach(async () => {
+    await user({ email: "ada@example.com", name: "Ada", type: "admin" })
+    await user({ email: "grace@example.com", name: "Grace" })
+    await user({ email: "alan@example.com", name: "Alan" })
+  })
+
+  it("matches on every column given, and only on equality", async () => {
+    expect(await read("users", { name: "Ada", type: "admin" })).toHaveLength(1)
+    expect(await read("users", { name: "Ada", type: "user" })).toHaveLength(0)
+  })
+
+  it("returns every row when the query is empty", async () => {
+    expect(await read("users")).toHaveLength(3)
+  })
+
+  it("caps the result at the limit", async () => {
+    expect(await read("users", {}, 2)).toHaveLength(2)
+  })
+
+  it("orders by the named column in both directions", async () => {
+    const ascending = await db.select({
+      table: "users",
+      where: {},
+      limit: 10,
+      offset: 0,
+      orderBy: { name: "asc" }
+    })
+    const descending = await db.select({
+      table: "users",
+      where: {},
+      limit: 10,
+      offset: 0,
+      orderBy: { name: "desc" }
     })
 
-    expect(converted.id).toBe(guest.id)
-    expect(converted.type).toBe("user")
+    expect(ascending.map((row) => row.name)).toEqual(["Ada", "Alan", "Grace"])
+    expect(descending.map((row) => row.name)).toEqual(["Grace", "Alan", "Ada"])
+  })
+
+  it("skips the offset, so a page after the first is reachable", async () => {
+    const page = await db.select({
+      table: "users",
+      where: {},
+      limit: 2,
+      offset: 1,
+      orderBy: { name: "asc" }
+    })
+
+    expect(page.map((row) => row.name)).toEqual(["Alan", "Grace"])
+  })
+
+  it("orders dates chronologically rather than as strings", async () => {
+    const identifier = "ada@example.com"
+    const older = new Date("2026-01-01T00:00:00Z")
+    const newer = new Date("2026-06-01T00:00:00Z")
+    await db.insert({
+      table: "verificationCodes",
+      values: {
+        identifier,
+        codeHash: "old",
+        expiresAt: older,
+        purpose: "signIn"
+      }
+    })
+    await db.insert({
+      table: "verificationCodes",
+      values: {
+        identifier,
+        codeHash: "new",
+        expiresAt: newer,
+        purpose: "signIn"
+      }
+    })
+
+    const [newest] = await db.select({
+      table: "verificationCodes",
+      where: { identifier },
+      limit: 1,
+      offset: 0,
+      orderBy: { expiresAt: "desc" }
+    })
+
+    expect(newest?.codeHash).toBe("new")
+  })
+
+  it("hands back copies, so a caller cannot edit the table by mutating a row", async () => {
+    const [row] = await read("users", { email: "ada@example.com" })
+    if (row) row.name = "mutated"
+
+    const [stored] = await read("users", { email: "ada@example.com" })
+    expect(stored?.name).toBe("Ada")
+  })
+})
+
+describe("update", () => {
+  it("applies the given fields to every match and leaves the rest alone", async () => {
+    const ada = await user({ email: "ada@example.com", name: "Ada" })
+
+    await db.update({
+      table: "users",
+      where: { id: ada.id },
+      values: { name: "Ada Lovelace" }
+    })
+
+    const [stored] = await read("users", { id: ada.id })
+    expect(stored?.name).toBe("Ada Lovelace")
+    expect(stored?.email).toBe("ada@example.com")
+  })
+
+  it("refuses a set with nothing defined in it, as a query builder would", async () => {
+    const ada = await user({ email: "ada@example.com" })
+
+    // Core strips undefined and skips the call when nothing is left, so this
+    // failing here is how a regression in that rule surfaces in the suite
+    // rather than in someone's database.
+    await expect(
+      db.update({
+        table: "users",
+        where: { id: ada.id },
+        values: { name: undefined }
+      })
+    ).rejects.toThrow(/no values to set/)
+  })
+
+  it("refuses an update that would duplicate a unique value", async () => {
+    await user({ email: "ada@example.com" })
+    const grace = await user({ email: "grace@example.com" })
+
+    await expect(
+      db.update({
+        table: "users",
+        where: { id: grace.id },
+        values: { email: "ada@example.com" }
+      })
+    ).rejects.toThrow(/unique constraint/)
+  })
+})
+
+describe("delete", () => {
+  it("returns what it removed, which is how core answers 404 rather than 204", async () => {
+    const ada = await user({ email: "ada@example.com" })
+
+    const removed = await db.delete({ table: "users", where: { id: ada.id } })
+    const missed = await db.delete({ table: "users", where: { id: ada.id } })
+
+    expect(removed.map((row) => row.id)).toEqual([ada.id])
+    expect(missed).toEqual([])
+    expect(db.users()).toEqual([])
+  })
+
+  it("removes every match, not just the first", async () => {
+    await attempt("burst")
+    await attempt("burst")
+    await attempt("other")
+
+    const removed = await db.delete({
+      table: "attempts",
+      where: { key: "burst" }
+    })
+
+    expect(removed).toHaveLength(2)
+    expect(await read("attempts")).toHaveLength(1)
+  })
+
+  it("matches on every column, so an id that belongs to someone else matches nothing", async () => {
+    const ada = await user({ email: "ada@example.com" })
+    const grace = await user({ email: "grace@example.com" })
+    const session = await db.insert({
+      table: "sessions",
+      values: {
+        userId: ada.id,
+        tokenHash: "hash",
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 60_000),
+        userAgent: null,
+        ipAddress: null
+      }
+    })
+
+    const stolen = await db.delete({
+      table: "sessions",
+      where: { id: session.id, userId: grace.id }
+    })
+
+    expect(stolen).toEqual([])
+    expect(await read("sessions")).toHaveLength(1)
+  })
+})
+
+describe("cleanup", () => {
+  it("deletes rows past their expiry in every table that has one", async () => {
+    const ada = await user({ email: "ada@example.com" })
+    const past = new Date(Date.now() - 1000)
+    const future = new Date(Date.now() + 60_000)
+
+    for (const expiresAt of [past, future]) {
+      await db.insert({
+        table: "sessions",
+        values: {
+          userId: ada.id,
+          tokenHash: `hash-${expiresAt.getTime()}`,
+          createdAt: new Date(),
+          expiresAt,
+          userAgent: null,
+          ipAddress: null
+        }
+      })
+      await db.insert({
+        table: "verificationCodes",
+        values: {
+          identifier: "ada@example.com",
+          codeHash: `code-${expiresAt.getTime()}`,
+          expiresAt,
+          purpose: "signIn"
+        }
+      })
+      await attempt(`key-${expiresAt.getTime()}`, expiresAt)
+    }
+
+    await db.cleanup?.()
+
+    expect(await read("sessions")).toHaveLength(1)
+    expect(await read("verificationCodes")).toHaveLength(1)
+    expect(await read("attempts")).toHaveLength(1)
     expect(db.users()).toHaveLength(1)
   })
 
-  it("stores declared additional fields flat on the row", async () => {
-    const user = await db.upsertUser({
-      email: "ada@example.com",
-      referralCode: "ABC"
+  it("leaves connections alone, since nothing about a link expires", async () => {
+    const ada = await user({ email: "ada@example.com" })
+    await db.insert({
+      table: "connections",
+      values: {
+        userId: ada.id,
+        provider: "github",
+        providerAccountId: "1",
+        email: null
+      }
     })
-    expect(user.referralCode).toBe("ABC")
+
+    await db.cleanup?.()
+
+    expect(await db.rows("connections")).toHaveLength(1)
   })
 })
 
-describe("getUser", () => {
-  it("looks up by id, email, or phone number", async () => {
-    const created = await db.upsertUser({
-      email: "ada@example.com",
-      phoneNumber: "+15551234567"
-    })
+describe("reset", () => {
+  it("empties every table", async () => {
+    await user({ email: "ada@example.com" })
+    await attempt("key")
 
-    expect((await db.getUser({ id: created.id }))?.id).toBe(created.id)
-    expect((await db.getUser({ email: "ada@example.com" }))?.id).toBe(
-      created.id
-    )
-    expect((await db.getUser({ phoneNumber: "+15551234567" }))?.id).toBe(
-      created.id
-    )
-    expect(await db.getUser({ email: "nobody@example.com" })).toBeNull()
-  })
-})
+    db.reset()
 
-describe("sessions", () => {
-  const session = (
-    overrides: Partial<Parameters<MemoryDb["upsertSession"]>[0]> = {}
-  ) => ({
-    id: "session-1",
-    userId: "user-1",
-    tokenHash: "hash-1",
-    createdAt: new Date("2026-01-01T00:00:00Z"),
-    expiresAt: new Date("2026-02-01T00:00:00Z"),
-    ...overrides
-  })
-
-  it("round-trips by token hash", async () => {
-    await db.upsertSession(session())
-    expect((await db.getSession({ tokenHash: "hash-1" }))?.userId).toBe(
-      "user-1"
-    )
-  })
-
-  it("keeps createdAt fixed across refreshes while expiry slides", async () => {
-    await db.upsertSession(session())
-    await db.upsertSession(
-      session({
-        createdAt: new Date("2026-01-15T00:00:00Z"),
-        expiresAt: new Date("2026-03-01T00:00:00Z")
-      })
-    )
-    const stored = await db.getSession({ tokenHash: "hash-1" })
-
-    expect(stored?.createdAt.toISOString()).toBe("2026-01-01T00:00:00.000Z")
-    expect(stored?.expiresAt.toISOString()).toBe("2026-03-01T00:00:00.000Z")
-  })
-
-  it("enforces ownership inside the delete query", async () => {
-    await db.upsertSession(session())
-    await db.deleteSession({ id: "session-1", userId: "someone-else" })
-    expect(await db.getSession({ tokenHash: "hash-1" })).not.toBeNull()
-
-    await db.deleteSession({ id: "session-1", userId: "user-1" })
-    expect(await db.getSession({ tokenHash: "hash-1" })).toBeNull()
-  })
-
-  it("deletes by token hash alone, which is what logout presents", async () => {
-    await db.upsertSession(session())
-
-    // The other branch of the union takes no owner, and should not: the token
-    // hash is derived from the secret the caller already holds, so possession
-    // is the check. Logout has a cookie, not a user id.
-    const removed = await db.deleteSession({ tokenHash: "hash-1" })
-
-    expect(removed?.id).toBe("session-1")
-    expect(await db.getSession({ tokenHash: "hash-1" })).toBeNull()
-  })
-
-  it("spares the current session when deleting the others", async () => {
-    await db.upsertSession(session())
-    await db.upsertSession(session({ id: "session-2", tokenHash: "hash-2" }))
-    await db.upsertSession(session({ id: "session-3", tokenHash: "hash-3" }))
-
-    await db.deleteSessions({ userId: "user-1", exceptTokenHash: "hash-2" })
-    const remaining = await db.listSessions({ userId: "user-1" })
-
-    expect(remaining.map((entry) => entry.tokenHash)).toEqual(["hash-2"])
-  })
-
-  it("cascades session and connection removal when a user is deleted", async () => {
-    const user = await db.upsertUser({ email: "ada@example.com" })
-    await db.upsertSession(session({ userId: user.id }))
-    await db.upsertConnection({
-      userId: user.id,
-      provider: "github",
-      providerAccountId: "42"
-    })
-
-    await db.deleteUser({ id: user.id })
-
-    expect(await db.getSession({ tokenHash: "hash-1" })).toBeNull()
-    expect(await db.listConnections({ userId: user.id })).toEqual([])
-  })
-})
-
-describe("magic codes", () => {
-  it("keeps one live code per identifier, so a resend replaces the old one", async () => {
-    const base = {
-      identifier: "ada@example.com",
-      expiresAt: new Date(Date.now() + 60_000),
-      attempts: 0,
-      purpose: "signIn" as const
-    }
-    await db.upsertMagicCode({ ...base, codeHash: "first" })
-    await db.upsertMagicCode({ ...base, codeHash: "second" })
-
-    expect(
-      (await db.getMagicCode({ identifier: "ada@example.com" }))?.codeHash
-    ).toBe("second")
-  })
-})
-
-describe("every delete returns what it removed", () => {
-  it("deleteUser returns the row, or null for an unknown id", async () => {
-    const user = await db.upsertUser({ email: "ada@example.com" })
-    expect((await db.deleteUser({ id: user.id }))?.email).toBe(
-      "ada@example.com"
-    )
-    expect(await db.deleteUser({ id: user.id })).toBeNull()
-  })
-
-  it("deleteSession returns the row, and null when ownership does not match", async () => {
-    await db.upsertSession({
-      id: "s1",
-      userId: "u1",
-      tokenHash: "h1",
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 60_000)
-    })
-    expect(
-      await db.deleteSession({ id: "s1", userId: "someone-else" })
-    ).toBeNull()
-    expect(
-      (await db.deleteSession({ id: "s1", userId: "u1" }))?.tokenHash
-    ).toBe("h1")
-    expect(await db.deleteSession({ tokenHash: "h1" })).toBeNull()
-  })
-
-  it("deleteSessions returns every row it removed", async () => {
-    const base = {
-      userId: "u1",
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 60_000)
-    }
-    await db.upsertSession({ ...base, id: "s1", tokenHash: "h1" })
-    await db.upsertSession({ ...base, id: "s2", tokenHash: "h2" })
-    await db.upsertSession({ ...base, id: "s3", tokenHash: "h3" })
-    const removed = await db.deleteSessions({
-      userId: "u1",
-      exceptTokenHash: "h2"
-    })
-    expect(removed.map((s) => s.tokenHash).sort()).toEqual(["h1", "h3"])
-  })
-
-  it("deleteConnection returns the link, or null", async () => {
-    await db.upsertConnection({
-      userId: "u1",
-      provider: "github",
-      providerAccountId: "42"
-    })
-    expect(
-      (await db.deleteConnection({ userId: "u1", provider: "github" }))
-        ?.providerAccountId
-    ).toBe("42")
-    expect(
-      await db.deleteConnection({ userId: "u1", provider: "github" })
-    ).toBeNull()
-  })
-
-  it("deleteMagicCode with codeHash deletes only a matching row — the one-time gate", async () => {
-    const row = {
-      identifier: "ada@example.com",
-      expiresAt: new Date(Date.now() + 60_000),
-      attempts: 0,
-      purpose: "signIn" as const
-    }
-    await db.upsertMagicCode({ ...row, codeHash: "current" })
-    // A stale hash (a code issued before a resend) must not consume the row.
-    expect(
-      await db.deleteMagicCode({
-        identifier: "ada@example.com",
-        codeHash: "stale"
-      })
-    ).toBeNull()
-    expect(
-      (await db.getMagicCode({ identifier: "ada@example.com" }))?.codeHash
-    ).toBe("current")
-    // The matching hash does, and exactly once.
-    expect(
-      (
-        await db.deleteMagicCode({
-          identifier: "ada@example.com",
-          codeHash: "current"
-        })
-      )?.codeHash
-    ).toBe("current")
-    expect(
-      await db.deleteMagicCode({
-        identifier: "ada@example.com",
-        codeHash: "current"
-      })
-    ).toBeNull()
-  })
-})
-
-describe("upsertRateLimit", () => {
-  it("starts a window at 1 and increments on each call, keeping resetAt", async () => {
-    const resetAt = new Date(Date.now() + 60_000)
-    expect((await db.upsertRateLimit({ key: "k", resetAt })).count).toBe(1)
-    expect(
-      (
-        await db.upsertRateLimit({
-          key: "k",
-          resetAt: new Date(Date.now() + 999_999)
-        })
-      ).count
-    ).toBe(2)
-    const third = await db.upsertRateLimit({
-      key: "k",
-      resetAt: new Date(Date.now() + 999_999)
-    })
-    expect(third.count).toBe(3)
-    // The original window end is kept; a live window is never extended.
-    expect(third.resetAt.getTime()).toBe(resetAt.getTime())
-  })
-
-  it("resets to 1 and adopts the new resetAt once the window has passed", async () => {
-    await db.upsertRateLimit({ key: "k", resetAt: new Date(Date.now() - 1) })
-    const fresh = new Date(Date.now() + 60_000)
-    const reset = await db.upsertRateLimit({ key: "k", resetAt: fresh })
-    expect(reset.count).toBe(1)
-    expect(reset.resetAt.getTime()).toBe(fresh.getTime())
-  })
-})
-
-describe("deleteExpired", () => {
-  it("removes only rows that are already past their expiry", async () => {
-    const past = new Date(Date.now() - 60_000)
-    const future = new Date(Date.now() + 60_000)
-
-    await db.upsertMagicCode({
-      identifier: "old@example.com",
-      codeHash: "x",
-      expiresAt: past,
-      attempts: 0,
-      purpose: "signIn"
-    })
-    await db.upsertMagicCode({
-      identifier: "new@example.com",
-      codeHash: "y",
-      expiresAt: future,
-      attempts: 0,
-      purpose: "signIn"
-    })
-    await db.upsertSession({
-      id: "s1",
-      userId: "u1",
-      tokenHash: "dead",
-      createdAt: past,
-      expiresAt: past
-    })
-    await db.upsertSession({
-      id: "s2",
-      userId: "u1",
-      tokenHash: "live",
-      createdAt: past,
-      expiresAt: future
-    })
-    await db.upsertRateLimit({ key: "old", resetAt: past })
-    await db.upsertRateLimit({ key: "live", resetAt: future })
-
-    await db.deleteExpired()
-
-    expect(await db.getMagicCode({ identifier: "old@example.com" })).toBeNull()
-    expect(
-      await db.getMagicCode({ identifier: "new@example.com" })
-    ).not.toBeNull()
-    expect(await db.getSession({ tokenHash: "dead" })).toBeNull()
-    expect(await db.getSession({ tokenHash: "live" })).not.toBeNull()
-    expect(await db.getRateLimit({ key: "old" })).toBeNull()
-    expect(await db.getRateLimit({ key: "live" })).not.toBeNull()
-  })
-})
-
-describe("connections", () => {
-  it("keys on the provider account id, so an email change does not duplicate a user", async () => {
-    await db.upsertConnection({
-      userId: "user-1",
-      provider: "github",
-      providerAccountId: "42",
-      email: "old@example.com"
-    })
-    await db.upsertConnection({
-      userId: "user-1",
-      provider: "github",
-      providerAccountId: "42",
-      email: "new@example.com"
-    })
-
-    const connection = await db.getConnection({
-      provider: "github",
-      providerAccountId: "42"
-    })
-    expect(connection?.email).toBe("new@example.com")
-    expect(await db.listConnections({ userId: "user-1" })).toHaveLength(1)
-  })
-
-  it("unlinks only the requested user's provider", async () => {
-    await db.upsertConnection({
-      userId: "user-1",
-      provider: "github",
-      providerAccountId: "42"
-    })
-    await db.upsertConnection({
-      userId: "user-2",
-      provider: "github",
-      providerAccountId: "43"
-    })
-
-    await db.deleteConnection({ userId: "user-1", provider: "github" })
-
-    expect(await db.listConnections({ userId: "user-1" })).toEqual([])
-    expect(await db.listConnections({ userId: "user-2" })).toHaveLength(1)
+    expect(db.users()).toEqual([])
+    expect(await read("attempts")).toEqual([])
   })
 })

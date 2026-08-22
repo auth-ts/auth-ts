@@ -67,9 +67,18 @@ export function clearCookie(name: string, path: string, secure = true) {
  * Decides whether cookies should carry `Secure` for this request.
  *
  * `Secure` cookies are dropped by browsers over plain HTTP, which would break
- * `http://localhost` development entirely — so it is relaxed there and nowhere else.
+ * `http://localhost` development entirely — so it is relaxed there and nowhere
+ * else.
+ *
+ * No URL at all means an endpoint called in-process rather than over HTTP,
+ * where there is no request to inspect and no browser waiting. That answers
+ * `true`: the only reason to omit `Secure` is a local development origin, and
+ * something that cannot be observed to be one is not one. Guessing the other
+ * way would put a session credential on the wire.
  */
-export function shouldUseSecureCookies(requestURL: string) {
+export function shouldUseSecureCookies(requestURL?: string) {
+  if (!requestURL) return true
+
   const { protocol, hostname } = new URL(requestURL)
   if (protocol === "https:") return true
 

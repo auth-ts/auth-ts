@@ -2,6 +2,7 @@ import type { AuthSession, AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { sha256Hex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"
+import { selectOne } from "../lib/select-one"
 
 /**
  * The minimal carrier for anything that reads the refresh cookie.
@@ -46,8 +47,8 @@ export function readRefreshToken(
  * Resolves the caller's session from the refresh cookie or bearer token.
  *
  * Expiry is enforced here, on read, rather than trusted to a cleanup sweep —
- * cleanup is hygiene, and a session must be dead the moment it expires whether or
- * not anything has swept.
+ * cleanup is hygiene, and a session must be dead the moment it expires whether
+ * or not anything has swept. An expired row read here is also deleted here.
  *
  * @returns The session and user, or `null` if there is no live session.
  */
@@ -62,21 +63,25 @@ export async function resolveSession(
   }
 
   const tokenHash = await sha256Hex(rawToken)
-  const session = await internals.db.getSession({ tokenHash })
+  const session = await selectOne(internals, "sessions", { tokenHash })
   if (!session) {
     internals.log.debug("refresh credential does not match a stored session")
     return null
   }
 
   if (session.expiresAt.getTime() <= Date.now()) {
+    // Deleted, not merely refused: the row is already in hand, so removing it
+    // costs nothing the sweep would not eventually pay, and a deployment that
+    // never sweeps still does not accumulate dead sessions on live traffic.
+    await internals.db.delete({ table: "sessions", where: { id: session.id } })
     internals.log.debug("session expired on read")
     return null
   }
 
-  const user = await internals.db.getUser({ id: session.userId })
+  const user = await selectOne(internals, "users", { id: session.userId })
   if (!user) {
-    // The user was deleted but a session survived: the cascade contract was not
-    // honoured. Refuse the session rather than trusting the row.
+    // Core deletes a user's sessions before the user, so a session pointing at
+    // nothing means a delete failed part-way. Refuse it rather than trust it.
     internals.log.warn("session references a user that no longer exists")
     return null
   }

@@ -14,8 +14,8 @@ export type AdditionalFieldType = "string" | "number" | "boolean"
  *
  * This is the source of truth twice over. At runtime it is the allowlist a
  * request's fields are validated against; at compile time it is what
- * {@link AuthUser} and {@link UpsertUserInput} are typed from, so declaring
- * `plan` is what makes `user.plan` exist.
+ * {@link AuthUser} and {@link AuthInsert} are typed from, so declaring `plan` is
+ * what makes `user.plan` exist.
  */
 export type AdditionalFieldsSchema = Record<string, AdditionalFieldType>
 
@@ -39,10 +39,16 @@ export type AdditionalFields<S extends AdditionalFieldsSchema> =
 /**
  * Declared fields as core passes them **in** — each optional, never null, since
  * core only writes a value that validated against its declared type.
+ *
+ * A schema with no statically known keys is an open map here too, for the same
+ * reason it is on the way out: nothing has been declared, so nothing can be
+ * said about the columns, and a closed type would only be a lie that rejects
+ * the row core is actually writing.
  */
-export type AdditionalFieldsInput<S extends AdditionalFieldsSchema> = {
-  [K in keyof S]?: AdditionalFieldValue<S[K]>
-}
+export type AdditionalFieldsInput<S extends AdditionalFieldsSchema> =
+  string extends keyof S
+    ? { [field: string]: unknown }
+    : { [K in keyof S]?: AdditionalFieldValue<S[K]> }
 
 /** The user fields core owns. Your declared fields sit beside these on {@link AuthUser}. */
 export interface CoreUserFields {
@@ -72,9 +78,9 @@ export interface CoreUserFields {
  * fields core owns — typed from the schema you gave `createAuthServer`, so
  * `{ plan: "string" }` makes `user.plan` a `string | null | undefined`:
  * optional and nullable, because nothing guarantees a row has set it. Where no
- * schema is in scope — the client, or an adapter written against the bare
- * contract — the row is an open map rather than a closed one, which is what
- * a `select *` actually returns.
+ * schema is in scope — the client, or an implementation written against the
+ * bare contract — the row is an open map rather than a closed one, which is
+ * what a `select *` actually returns.
  *
  * This is also the `user` returned to the browser on sign-in and refresh, so
  * nothing sensitive belongs on it.
@@ -93,7 +99,8 @@ export interface AuthSession {
    *
    * It is an authentication input, not bookkeeping: account deletion reads the
    * age of the *authentication* from it. A sliding "last active" value would say
-   * nothing about how recently the person proved who they were.
+   * nothing about how recently the person proved who they were. Core writes it
+   * on insert and never updates it, so a refresh slides `expiresAt` alone.
    */
   createdAt: Date
   expiresAt: Date
@@ -101,33 +108,41 @@ export interface AuthSession {
   ipAddress?: string | null
 }
 
-/** What a live magic code is for. Checked on every verify so codes cannot cross purposes. */
-export type MagicCodePurpose = "signIn" | "deleteUser"
+/** What a live verification code is for. Checked on every verify so codes cannot cross purposes. */
+export type VerificationCodePurpose = "signIn" | "deleteUser"
 
-/** A live magic code. One per identifier — a new send replaces the old row. */
-export interface AuthMagicCode {
+/**
+ * A verification code, stored as an HMAC of the six digits.
+ *
+ * Several rows may exist for one identifier: a send deletes the identifier's
+ * codes and inserts a new one, and a verify reads the newest by `expiresAt`.
+ * Latest wins, so a resend still invalidates the code before it.
+ */
+export interface AuthVerificationCode {
+  id: string
   /** Normalized email or E.164 phone number. */
   identifier: string
   codeHash: string
   expiresAt: Date
-  /**
-   * Always `0`. Core counts wrong guesses through {@link AuthDB.upsertRateLimit},
-   * keyed on `codeHash` — that increment is atomic, and a field here could not
-   * be without a callback to make it so. Nothing reads this field.
-   */
-  attempts: number
-  purpose: MagicCodePurpose
+  purpose: VerificationCodePurpose
 }
 
-/** A fixed-window rate-limit counter. */
-export interface AuthRateLimit {
+/**
+ * One counted attempt — a rate-limit request or a wrong guess against a code.
+ *
+ * A log rather than a counter: rows are only ever inserted and counted, which
+ * needs no atomic increment and no conditional upsert. The window is part of
+ * `key`, so counting is an equality read and an old window is just old rows.
+ */
+export interface AuthAttempt {
+  id: string
   key: string
-  count: number
-  resetAt: Date
+  expiresAt: Date
 }
 
 /** A provider identity linked to a user. */
 export interface AuthConnection {
+  id: string
   userId: string
   provider: string
   /** The provider's stable id — GitHub's numeric id, Google's `sub`. */
@@ -136,311 +151,288 @@ export interface AuthConnection {
   email?: string | null
 }
 
-/** The core-owned fields {@link AuthDB.upsertUser} may be given. */
-export interface CoreUserInput {
-  /**
-   * When present, targets that exact row by id instead of looking up by
-   * identifier — used for guest conversion and `PATCH /user`.
-   */
-  id?: string
-  email?: string
-  phoneNumber?: string
-  name?: string
-  imageURL?: string
-  type?: UserType
-  primaryUserId?: string
-}
+/** The tables core reads and writes. */
+export type AuthTable =
+  | "users"
+  | "sessions"
+  | "verificationCodes"
+  | "attempts"
+  | "connections"
 
-/**
- * Fields accepted by {@link AuthDB.upsertUser}.
- *
- * Your declared `additionalFields` arrive **flat on this object**, beside the
- * fields core owns, exactly as they sit on {@link AuthUser} — so
- * `values({ id, ...user })` writes the row. Which of them may be applied
- * depends on the shape of the call; see `upsertUser`.
- */
-export type UpsertUserInput<
+/** Table name → the row it holds. Your declared fields ride flat on `users`. */
+export interface AuthTables<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
-> = CoreUserInput & AdditionalFieldsInput<S>
-
-/** Fields written by {@link AuthDB.upsertSession}. */
-export interface UpsertSessionInput {
-  /** Core-generated uuid — the browser-safe address of this session. */
-  id: string
-  userId: string
-  tokenHash: string
-  createdAt: Date
-  expiresAt: Date
-  /**
-   * Nullable rather than merely optional so that a session read from your table
-   * can be written straight back without reshaping. Unlike `upsertUser`, this is
-   * a whole-row write, so there is no "leave this field alone" case to confuse
-   * `null` with.
-   */
-  userAgent?: string | null
-  ipAddress?: string | null
+> {
+  users: AuthUser<S>
+  sessions: AuthSession
+  verificationCodes: AuthVerificationCode
+  attempts: AuthAttempt
+  connections: AuthConnection
 }
 
-/** Fields written by {@link AuthDB.upsertMagicCode}. */
-export interface UpsertMagicCodeInput {
-  identifier: string
-  codeHash: string
-  expiresAt: Date
-  /** Always `0`; see {@link AuthMagicCode.attempts}. */
-  attempts: number
-  purpose: MagicCodePurpose
-}
-
-/** Fields written by {@link AuthDB.upsertConnection}. */
-export interface UpsertConnectionInput {
-  userId: string
-  provider: string
-  providerAccountId: string
-  email?: string
-}
+/** A row of `T`, with your declared fields where they apply. */
+export type AuthRow<
+  S extends AdditionalFieldsSchema,
+  T extends AuthTable
+> = AuthTables<S>[T]
 
 /**
- * Fields written by {@link AuthDB.upsertRateLimit}.
- *
- * There is no `count` on purpose: the store owns it. `resetAt` is what the
- * window end should be *if this call starts a new window*; the store decides
- * whether it does.
+ * A query: column/value pairs, **all** of which must match, compared for
+ * equality. There are no operators — one would be the thin end of a query
+ * language, and equality is the thing every store expresses identically.
  */
-export interface UpsertRateLimitInput {
-  key: string
-  resetAt: Date
-}
+export type AuthWhere<
+  S extends AdditionalFieldsSchema,
+  T extends AuthTable
+> = Partial<AuthRow<S, T>>
 
-/** Query accepted by {@link AuthDB.getUser} — exactly one key. */
-export type GetUserWhere =
-  | { id: string }
-  | { email: string }
-  | { phoneNumber: string }
-
-/** Query accepted by {@link AuthDB.deleteSession}. */
-export type DeleteSessionWhere =
-  | { tokenHash: string }
-  | { id: string; userId: string }
+/** Sort direction, per {@link AuthOrderBy}. */
+export type AuthDirection = "asc" | "desc"
 
 /**
- * The integration surface: the callbacks that read and write your database.
+ * `{ column: "asc" | "desc" }` — exactly one column, Prisma's shape.
  *
- * This interface *is* the product. There are no adapters — you write these
- * functions against your own tables, and in exchange the library never owns your
- * schema, your migrations, or your data.
+ * One column and a direction is enough for "newest" and for paging, and it is
+ * the smallest ordering every store can express. The mapped type strips
+ * optionality (`-?`) so an optional column is still a valid key, and forbids
+ * the others so a second key is a type error rather than a silent choice.
+ */
+export type AuthOrderBy<
+  S extends AdditionalFieldsSchema,
+  T extends AuthTable
+> = {
+  [K in keyof AuthRow<S, T>]-?: { [P in K]: AuthDirection } & {
+    [P in Exclude<keyof AuthRow<S, T>, K>]?: never
+  }
+}[keyof AuthRow<S, T>]
+
+/**
+ * A row as core writes it: every column it owns, with `null` written out rather
+ * than left undefined.
  *
- * Two conventions run through it. `upsert*` takes the entity; `get*`, `list*`,
- * and `delete*` take a `where` query. And upserts are deliberate rather than
- * split into create/update: the create-or-merge race is delegated to your store,
- * where `ON CONFLICT`, `MERGE`, or `$setOnInsert` handles it atomically, instead
- * of being relocated into this library as a read-then-write on every sign-in.
+ * `id` is present only when `generateId` is configured on the server; otherwise
+ * it is omitted and your column default (`uuidv7()`, a `$defaultFn`, an
+ * identity column) fills it. Either way {@link AuthDB.insert} returns the
+ * stored row, which is how core learns the id.
+ */
+export type AuthInsert<
+  S extends AdditionalFieldsSchema,
+  T extends AuthTable
+> = T extends "users"
+  ? Omit<CoreUserFields, "id"> & { id?: string } & AdditionalFieldsInput<S>
+  : Omit<AuthRow<S, T>, "id"> & { id?: string }
+
+/** {@link AuthDB.select}'s input as a union over the tables — see `defineAuthDB`. */
+export type AuthSelectInput<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = {
+  [K in AuthTable]: {
+    table: K
+    where: AuthWhere<S, K>
+    limit: number
+    offset: number
+    orderBy: AuthOrderBy<S, K>
+  }
+}[AuthTable]
+
+/** {@link AuthDB.insert}'s input as a union over the tables — see `defineAuthDB`. */
+export type AuthInsertInput<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = { [K in AuthTable]: { table: K; values: AuthInsert<S, K> } }[AuthTable]
+
+/** {@link AuthDB.update}'s input as a union over the tables — see `defineAuthDB`. */
+export type AuthUpdateInput<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = {
+  [K in AuthTable]: {
+    table: K
+    where: AuthWhere<S, K>
+    values: Partial<AuthRow<S, K>>
+  }
+}[AuthTable]
+
+/** {@link AuthDB.delete}'s input as a union over the tables — see `defineAuthDB`. */
+export type AuthDeleteInput<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = { [K in AuthTable]: { table: K; where: AuthWhere<S, K> } }[AuthTable]
+
+/**
+ * The integration surface: four table functions and an optional sweep.
  *
- * Callbacks are pure with respect to the request: none of them receive headers.
- * Header-dependent session resolution is a spoofable auth bypass, and non-HTTP
- * callers (tests, migrations, the in-memory fixture) drive this contract
- * directly. For multi-tenancy, close over the tenant when constructing the
- * server instead.
+ * This interface *is* the product. There are no adapter packages — you write
+ * these functions against your own tables, and in exchange the library never
+ * owns your schema, your migrations, or your data.
+ *
+ * Core names the tables and the columns it reads; a schema that differs maps
+ * them inside these functions. What core needs of the store is small and
+ * stated:
+ *
+ * | table | unique | indexed | swept |
+ * | --- | --- | --- | --- |
+ * | `users` | `email`, `phoneNumber` | | |
+ * | `sessions` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
+ * | `verificationCodes` | | `identifier`, `expiresAt` | `expiresAt` |
+ * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
+ * | `connections` | `(provider, providerAccountId)` | `userId` | |
+ *
+ * **The uniqueness column is not hygiene, it is the design.** Core composes a
+ * read and a write where it used to hand your store an upsert, so two first
+ * sign-ins for one email both find nothing and both insert. The constraint is
+ * what turns that race into a failed request instead of two accounts for one
+ * person. The same holds for `(provider, providerAccountId)`.
+ *
+ * The one concurrency property core requires is that {@link AuthDB.delete} is
+ * atomic and returns what it removed: that is what makes a verification code usable
+ * exactly once, since two verifiers can both read the row but only one deletes
+ * it.
+ *
+ * These functions are pure with respect to the request: none of them receive
+ * headers. Header-dependent session resolution is a spoofable auth bypass, and
+ * non-HTTP callers (tests, migrations, the in-memory fixture) drive this
+ * contract directly. For multi-tenancy, close over the tenant when constructing
+ * the server instead.
  *
  * `S` is your declared `additionalFields`. Type an implementation as
- * `AuthDB<typeof additionalFields>` and `upsertUser` receives them typed and
- * every user it returns carries them; the bare `AuthDB` sees them as an open
- * map of primitives, and any server accepts it.
+ * `AuthDB<typeof additionalFields>` and every `users` row and write carries them
+ * typed; the bare `AuthDB` sees them as an open map of primitives, and any
+ * server accepts it.
  */
 export interface AuthDB<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > {
   /**
-   * Creates or merges a user.
+   * Reads rows matching `where`, ordered, offset, and capped.
    *
-   * Keyed on whichever identifier is present — core normalizes it first, and
-   * passes exactly one for code flows, or email for OAuth. Your declared
-   * fields arrive flat beside the core ones. Three shapes:
-   *
-   * - **An identifier, no `id`** — look up by that identifier. Insert the whole
-   *   object if absent; otherwise update **`name` and `imageURL` only**.
-   *   `type` and your declared fields are insert-only on this path: it is a
-   *   sign-in, and a sign-in that could rewrite `type` would demote an
-   *   administrator the next time they logged in, while one that could rewrite
-   *   profile columns is mass assignment. `undefined` means "leave alone".
-   * - **No identifier at all** — always insert. This is guest creation.
-   * - **`id` present** — update that exact row with everything given, no
-   *   identifier lookup. This is guest conversion and `PATCH /user`, and the
-   *   one place `type` may change: `guest` to `user`. Core never passes `admin`.
-   *
-   * @returns The stored user, as core should see it.
+   * Nothing here is optional, so there is no `undefined` to branch on and one
+   * code path per store. Core fills every value at the call site, and an
+   * unbounded read is a type error: every list core makes has a ceiling.
    */
-  upsertUser(user: UpsertUserInput<S>): Promise<AuthUser<S>>
-
-  /** Looks up one user by exactly one of id, email, or phone number. */
-  getUser(where: GetUserWhere): Promise<AuthUser<S> | null>
+  select<T extends AuthTable>(input: {
+    table: T
+    where: AuthWhere<S, T>
+    limit: number
+    offset: number
+    orderBy: AuthOrderBy<S, T>
+  }): Promise<AuthRow<S, T>[]>
 
   /**
-   * Deletes a user and returns the deleted row, or `null` if none matched.
+   * Inserts one row and returns it as stored.
    *
-   * Every `delete*` callback returns what it removed — `DELETE … RETURNING *`,
-   * `findOneAndDelete`, `OUTPUT deleted.*`. One round trip, and the caller
-   * learns whether anything was actually there, which is the difference between
-   * a 204 and a 404.
-   *
-   * **Contract:** this must also remove or invalidate that user's sessions, via
-   * `ON DELETE CASCADE` or by calling your own `deleteSessions`. A deleted
-   * account that keeps a live refresh token is still a working login.
+   * The returned row is how core learns anything the store decided — the `id`
+   * when `generateId` is not configured, and any column default. A unique
+   * violation must throw rather than merge: core reads before it inserts, and
+   * the constraint is deliberately the arbiter of the race between the two.
    */
-  deleteUser(where: { id: string }): Promise<AuthUser<S> | null>
-
-  /** Creates or updates a session row, keyed by `tokenHash`. */
-  upsertSession(session: UpsertSessionInput): Promise<void>
-
-  /** Looks up a session by token hash. Core only ever passes hashes. */
-  getSession(where: { tokenHash: string }): Promise<AuthSession | null>
-
-  /** Lists a user's sessions — the "your devices" screen. */
-  listSessions(where: { userId: string }): Promise<AuthSession[]>
+  insert<T extends AuthTable>(input: {
+    table: T
+    values: AuthInsert<S, T>
+  }): Promise<AuthRow<S, T>>
 
   /**
-   * Deletes one session and returns it, or `null` if none matched.
+   * Applies `fields` to every row matching `where`.
    *
-   * The `{ id, userId }` form must filter on **both** columns, so that revoking
-   * someone else's session id is structurally impossible rather than a check you
-   * remembered to write — and because it returns `null` in that case, core
-   * answers 404 without a separate lookup. After deletion, `getSession` must
-   * return null; a soft delete is fine as long as reads respect it.
+   * `fields` always carries at least one defined value — core composes the set
+   * itself and skips the call entirely when a request changes nothing, so no
+   * implementation needs a guard against the empty `SET` that most query
+   * builders reject.
+   *
+   * Nothing is returned: core already holds the row it is updating, so the
+   * result is `{ ...existing, ...fields }` composed in memory rather than a
+   * second round trip on stores that do not return representations.
    */
-  deleteSession(where: DeleteSessionWhere): Promise<AuthSession | null>
+  update<T extends AuthTable>(input: {
+    table: T
+    where: AuthWhere<S, T>
+    values: Partial<AuthRow<S, T>>
+  }): Promise<void>
 
   /**
-   * Deletes all of a user's sessions, optionally sparing the current one.
+   * Deletes every row matching `where` and returns what it removed.
    *
-   * `exceptTokenHash` powers "sign out my other devices". This also satisfies the
-   * cascade required by {@link AuthDB.deleteUser} if you reuse it there.
+   * `DELETE … RETURNING *`, `findOneAndDelete`, `OUTPUT deleted.*`. One round
+   * trip, and the returned rows are proof: they are how core answers 404 rather
+   * than 204, and how a single-use verification code picks a winner between two
+   * verifiers who both read it.
    */
-  deleteSessions(where: {
-    userId: string
-    exceptTokenHash?: string
-  }): Promise<AuthSession[]>
+  delete<T extends AuthTable>(input: {
+    table: T
+    where: AuthWhere<S, T>
+  }): Promise<AuthRow<S, T>[]>
 
   /**
-   * Stores the live magic code for an identifier, replacing any existing one.
+   * Deletes rows whose `expiresAt` has passed, in `sessions`, `verificationCodes`, and
+   * `attempts`. Optional.
    *
-   * One live code per identifier is a security property, not a convenience: it
-   * means a resend invalidates the previous code instead of widening the set of
-   * values an attacker may guess.
-   */
-  upsertMagicCode(magicCode: UpsertMagicCodeInput): Promise<void>
-
-  /** Reads the live magic code for an identifier. */
-  getMagicCode(where: { identifier: string }): Promise<AuthMagicCode | null>
-
-  /**
-   * Deletes the live magic code and returns it, or `null` if nothing matched.
-   *
-   * When `codeHash` is given, the delete must match on **both** columns in one
-   * statement — `DELETE … WHERE identifier = ? AND codeHash = ? RETURNING *`.
-   * That single conditional delete is what makes a code usable exactly once:
-   * two requests can both read the row and both pass the HMAC check, but the
-   * database lets only one of them delete it, and the other gets `null`. It
-   * also means a code sent *before* a resend can never consume the row the
-   * resend created, since the hashes differ.
-   *
-   * Without `codeHash` it deletes by identifier alone. Core always passes the
-   * hash — including when it burns a code at the attempt cap, so a resend that
-   * landed after the row was read keeps its fresh code. The bare form is there
-   * for your own use.
-   */
-  deleteMagicCode(where: {
-    identifier: string
-    codeHash?: string
-  }): Promise<AuthMagicCode | null>
-
-  /**
-   * Reads a rate-limit counter. Never called when `rateLimit: false`.
-   *
-   * For inspection and tests. The limiter itself never reads first — see
-   * {@link AuthDB.upsertRateLimit}.
-   */
-  getRateLimit(where: { key: string }): Promise<AuthRateLimit | null>
-
-  /**
-   * Counts one request against a key, atomically, and returns the counter.
-   *
-   * This is the whole rate limiter, and it has to be one statement. Read the
-   * count, add one, write it back — and ten parallel requests all read the same
-   * value and each store `count + 1`, so a burst registers as a single request.
-   * An atomic upsert is the fix, and it is still an upsert:
-   *
-   * ```sql
-   * INSERT INTO "rateLimits" ("key", "count", "resetAt") VALUES ($1, 1, $2)
-   * ON CONFLICT ("key") DO UPDATE SET
-   *   "count"   = CASE WHEN "rateLimits"."resetAt" <= now() THEN 1
-   *                    ELSE "rateLimits"."count" + 1 END,
-   *   "resetAt" = CASE WHEN "rateLimits"."resetAt" <= now() THEN EXCLUDED."resetAt"
-   *                    ELSE "rateLimits"."resetAt" END
-   * RETURNING *
-   * ```
-   *
-   * The contract in words: insert with `count = 1` and the given `resetAt` if
-   * the key is absent **or its window has passed**; otherwise add one to the
-   * existing count and keep the existing `resetAt`. Return the row as stored.
-   * The window reset is inside the same statement because it has the same race.
-   *
-   * Core compares the returned `count` against the window's `max`, so every
-   * request is counted — including the ones that are then refused. A store
-   * without conditional upsert expressions does the same thing inside a
-   * transaction.
-   *
-   * The same increment carries the per-code guess cap on magic codes, keyed on
-   * the code's hash, so it is called on a wrong guess **even when
-   * `rateLimit: false`**. That flag turns off the volume windows and the
-   * cooldown; five guesses per code is a hard limit that has to be atomic and
-   * stays on.
-   */
-  upsertRateLimit(rateLimit: UpsertRateLimitInput): Promise<AuthRateLimit>
-
-  /**
-   * Links a provider identity to a user, keyed on `(provider, providerAccountId)`.
-   *
-   * Keyed on the provider's stable id rather than email on purpose: people change
-   * their email at the provider, and matching on email alone quietly creates a
-   * second account for the same person.
-   */
-  upsertConnection(connection: UpsertConnectionInput): Promise<void>
-
-  /** Looks up a connection by the provider's stable account id. */
-  getConnection(where: {
-    provider: string
-    providerAccountId: string
-  }): Promise<AuthConnection | null>
-
-  /** Lists a user's linked providers. */
-  listConnections(where: { userId: string }): Promise<AuthConnection[]>
-
-  /**
-   * Unlinks a provider from a user and returns the removed link, or `null`.
-   * Ownership is enforced in the query, so another user's provider matches nothing.
-   */
-  deleteConnection(where: {
-    userId: string
-    provider: string
-  }): Promise<AuthConnection | null>
-
-  /**
-   * Deletes expired magic codes, sessions, and rate-limit counters.
-   *
-   * Three one-line deletes: `magicCodes.expiresAt < now()`,
-   * `sessions.expiresAt < now()`, `rateLimits.resetAt < now()`. Core calls this
-   * fire-and-forget after mutating flows, so index those columns.
+   * Implement it and core calls it for you — awaited, at most once a minute per
+   * server, and only after a request that could have written something. Awaited
+   * because an unawaited promise is not guaranteed to run on Cloudflare Workers
+   * once the response is returned, and a framework-agnostic library never sees
+   * `ctx.waitUntil`. Leave it out and cleanup is yours: a cron, a scheduled
+   * worker, a partitioned table. Either way it is hygiene, never a security
+   * boundary — expiry is enforced on read regardless of whether a sweep has
+   * ever run — but `attempts` grows by a row per counted request, so something
+   * must eventually delete them.
    *
    * It takes no arguments deliberately. "Expired" means expired *now*, and your
-   * database already knows what time it is — using its clock avoids the skew
-   * between an application server and the database that a passed-in timestamp
-   * would introduce, and makes the natural SQL the correct SQL.
-   *
-   * This is hygiene, never a security boundary: expiry is enforced on read
-   * everywhere regardless of whether a sweep has ever run.
-   *
-   * The one `delete*` that returns nothing: it sweeps three tables
-   * fire-and-forget, so there is no single row to hand back and no caller
-   * waiting to hear about it.
+   * database already knows what time it is; using its clock avoids the skew a
+   * passed-in timestamp would introduce, and makes the natural SQL the correct
+   * SQL. Sweeping in batches is fine — the contract does not ask for one
+   * statement.
    */
-  deleteExpired(): Promise<void>
+  cleanup?(): Promise<void>
+
+  /**
+   * Pins `S` so a schema mismatch is caught.
+   *
+   * `S` appears only inside generic methods, and TypeScript measures a type
+   * parameter used that way as unused — which would let
+   * `AuthDB<{ plan: "string" }>` satisfy `AuthDB<{ plan: "number" }>`. One
+   * parameter position is enough to make it count. It has to be a method
+   * rather than a property, and no `in`/`out` annotation would do instead:
+   * both are strict, and what is wanted here is the bivariance a method
+   * parameter gives — refuse two schemas that disagree, while a server
+   * declaring one still accepts an implementation written against the bare
+   * contract.
+   *
+   * Never implemented, never called.
+   *
+   * @internal
+   */
+  __schema?(schema: S): void
+}
+
+/**
+ * Types an implementation written as one function per table with a `switch`.
+ *
+ * Core's own calls are precise because {@link AuthDB} is generic, but a generic
+ * signature cannot be *proven* by a union-typed implementation, only asserted —
+ * the same reason an overload has an implementation signature. This helper
+ * holds that assertion, once, so your code has no casts in it:
+ *
+ * ```ts
+ * export const authDB = defineAuthDB({
+ *   async select({ table, where, limit }) {
+ *     switch (table) {
+ *       // `where` narrows with `table`: Partial<AuthUser> here,
+ *       case "users": return run(`… where email = $1`, [where.email])
+ *       case "attempts": return run(`… where key = $1 limit $2`, [where.key, limit])
+ *       …
+ *     }
+ *   },
+ *   …
+ * })
+ * ```
+ *
+ * A table map needs neither the switch nor this helper — see the reference.
+ */
+export function defineAuthDB<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+>(implementation: {
+  select(input: AuthSelectInput<S>): Promise<AuthRow<S, AuthTable>[]>
+  insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable>>
+  update(input: AuthUpdateInput<S>): Promise<void>
+  delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
+  cleanup?(): Promise<void>
+}): AuthDB<S> {
+  return implementation as unknown as AuthDB<S>
 }

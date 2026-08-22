@@ -1,8 +1,8 @@
 import { defineEndpoint } from "../http/define-endpoint"
 import { resolveLocale } from "../http/resolve-locale"
-import type { IdentifierBody } from "../magic-code/resolve-code-identifier"
-import { resolveCodeIdentifier } from "../magic-code/resolve-code-identifier"
-import { sendMagicCode } from "../magic-code/send-magic-code"
+import type { IdentifierBody } from "../verification-code/resolve-code-identifier"
+import { resolveCodeIdentifier } from "../verification-code/resolve-code-identifier"
+import { sendVerificationCode } from "../verification-code/send-verification-code"
 
 /** Body accepted by `POST /send-code`: exactly one identifier. */
 export interface SendCodeInput extends IdentifierBody {
@@ -37,7 +37,7 @@ export const sendCode = defineEndpoint({
   run: async (internals, input: SendCodeInput) => {
     const identifier = resolveCodeIdentifier(internals, input)
 
-    await sendMagicCode(internals, {
+    await sendVerificationCode(internals, {
       identifier,
       purpose: "signIn",
       locale:

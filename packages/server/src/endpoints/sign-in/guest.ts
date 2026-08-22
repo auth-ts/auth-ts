@@ -2,6 +2,7 @@ import { AuthApiError } from "../../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import { insertRow } from "../../lib/insert-row"
 import type { IssueMode } from "../../session/issue-session"
 import { issueSession } from "../../session/issue-session"
 
@@ -52,17 +53,22 @@ export const signInGuest = defineEndpoint({
       input.additionalFields
     )
 
-    // No identifier means the contract always inserts, which is what guest
-    // creation is: a brand new row every time, never a lookup.
-    const user = await internals.db.upsertUser({
-      type: "guest",
-      ...additionalFields
+    // A brand new row every time, never a lookup: an anonymous account has no
+    // identifier to find it by, which is exactly what makes it anonymous.
+    const user = await insertRow(internals, "users", {
+      email: null,
+      phoneNumber: null,
+      name: null,
+      imageURL: null,
+      primaryUserId: null,
+      ...additionalFields,
+      type: "guest"
     })
 
     const issued = await issueSession(internals, {
       user,
       headers,
-      requestURL: input.requestURL ?? "https://localhost",
+      requestURL: input.requestURL,
       ...(input.mode ? { mode: input.mode } : {})
     })
 

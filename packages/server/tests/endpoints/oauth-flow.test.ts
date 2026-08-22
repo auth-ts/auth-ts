@@ -3,6 +3,7 @@ import { codeChallengeS256 } from "../../src/oauth/pkce"
 import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
+import { insertUser, selectRow, selectRows } from "../helpers/rows"
 import { decodeState, forgeState } from "../helpers/state-cookie"
 import { stubGitHub, stubGoogle } from "../helpers/stub-provider-network"
 
@@ -485,21 +486,19 @@ describe("oauth callback", () => {
   it("merges a guest into the account a provider identity is already linked to, without moving the link", async () => {
     const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
     const { authServer, db } = context
-    const owner = await db.upsertUser({
-      email: "owner@example.com",
-      type: "user"
-    })
-    await db.upsertConnection({
-      userId: owner.id,
-      provider: "github",
-      providerAccountId: "4242"
+    const owner = await insertUser(db, { email: "owner@example.com" })
+    await db.insert({
+      table: "connections",
+      values: {
+        userId: owner.id,
+        provider: "github",
+        providerAccountId: "4242",
+        email: null
+      }
     })
     // A different account holds the email GitHub now reports — the exact
     // situation where resolving by email alone would re-point the link.
-    const other = await db.upsertUser({
-      email: "other@example.com",
-      type: "user"
-    })
+    const other = await insertUser(db, { email: "other@example.com" })
     const guestResponse = await authServer.handler(
       request("POST", "/api/auth/sign-in/guest")
     )
@@ -524,14 +523,18 @@ describe("oauth callback", () => {
     expect(response.status).toBe(302)
     expect(
       (
-        await db.getConnection({
+        await selectRow(db, "connections", {
           provider: "github",
           providerAccountId: "4242"
         })
       )?.userId
     ).toBe(owner.id)
-    expect((await db.getUser({ id: guest.id }))?.primaryUserId).toBe(owner.id)
-    expect(await db.listConnections({ userId: other.id })).toEqual([])
+    expect(
+      (await selectRow(db, "users", { id: guest.id }))?.primaryUserId
+    ).toBe(owner.id)
+    expect(await selectRows(db, "connections", { userId: other.id })).toEqual(
+      []
+    )
 
     const whoami = await authServer.handler(
       request("GET", "/api/auth/user", {
@@ -591,7 +594,7 @@ describe("oauth callback", () => {
     )
 
     expect(response.status).toBe(302)
-    const upgraded = (await context.db.getUser({
+    const upgraded = (await selectRow(context.db, "users", {
       id: guest.id
     })) as unknown as Record<string, unknown>
     expect(upgraded.type).toBe("user")
@@ -602,14 +605,15 @@ describe("oauth callback", () => {
   it("treats a guest's connect as a sign-in: merges into the linked account rather than refusing", async () => {
     const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
     const { authServer, db } = context
-    const owner = await db.upsertUser({
-      email: "owner@example.com",
-      type: "user"
-    })
-    await db.upsertConnection({
-      userId: owner.id,
-      provider: "github",
-      providerAccountId: "4242"
+    const owner = await insertUser(db, { email: "owner@example.com" })
+    await db.insert({
+      table: "connections",
+      values: {
+        userId: owner.id,
+        provider: "github",
+        providerAccountId: "4242",
+        email: null
+      }
     })
     const guestResponse = await authServer.handler(
       request("POST", "/api/auth/sign-in/guest")
@@ -644,10 +648,12 @@ describe("oauth callback", () => {
     // Not the connect branch's 409: a session is issued for the owner.
     expect(response.status).toBe(302)
     expect(readSetCookies(response).has("auth-ts.refresh")).toBe(true)
-    expect((await db.getUser({ id: guest.id }))?.primaryUserId).toBe(owner.id)
+    expect(
+      (await selectRow(db, "users", { id: guest.id }))?.primaryUserId
+    ).toBe(owner.id)
     expect(
       (
-        await db.getConnection({
+        await selectRow(db, "connections", {
           provider: "github",
           providerAccountId: "4242"
         })
@@ -684,13 +690,13 @@ describe("oauth callback", () => {
     )
 
     expect(response.status).toBe(302)
-    const upgraded = await db.getUser({ id: guest.id })
+    const upgraded = await selectRow(db, "users", { id: guest.id })
     expect(upgraded?.type).toBe("user")
     expect(upgraded?.email).toBe("ada@example.com")
     expect(upgraded?.primaryUserId).toBeNull()
     expect(
       (
-        await db.getConnection({
+        await selectRow(db, "connections", {
           provider: "github",
           providerAccountId: "5555"
         })
@@ -1032,7 +1038,7 @@ describe("connect and disconnect", () => {
 
     expect(callbackResponse.status).toBe(401)
     expect(
-      await context.db.listConnections({
+      await selectRows(context.db, "connections", {
         userId: required(context.db.users()[0], "user").id
       })
     ).toEqual([])
@@ -1040,13 +1046,17 @@ describe("connect and disconnect", () => {
 
   it("refuses to re-point a provider identity already linked elsewhere", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)
-    const firstUser = await context.db.upsertUser({
+    const firstUser = await insertUser(context.db, {
       email: "first@example.com"
     })
-    await context.db.upsertConnection({
-      userId: firstUser.id,
-      provider: "github",
-      providerAccountId: "4242"
+    await context.db.insert({
+      table: "connections",
+      values: {
+        userId: firstUser.id,
+        provider: "github",
+        providerAccountId: "4242",
+        email: null
+      }
     })
 
     const refreshToken = await signInWithCode(context)
@@ -1068,7 +1078,7 @@ describe("connect and disconnect", () => {
     )
 
     expect(callbackResponse.status).toBe(409)
-    const connection = await context.db.getConnection({
+    const connection = await selectRow(context.db, "connections", {
       provider: "github",
       providerAccountId: "4242"
     })
@@ -1080,10 +1090,14 @@ describe("connect and disconnect", () => {
     const refreshToken = await signInWithCode(context)
     const cookies = { "auth-ts.refresh": refreshToken }
     const user = required(context.db.users()[0], "user")
-    await context.db.upsertConnection({
-      userId: user.id,
-      provider: "github",
-      providerAccountId: "4242"
+    await context.db.insert({
+      table: "connections",
+      values: {
+        userId: user.id,
+        provider: "github",
+        providerAccountId: "4242",
+        email: null
+      }
     })
 
     const response = await context.authServer.handler(
@@ -1091,7 +1105,9 @@ describe("connect and disconnect", () => {
     )
 
     expect(response.status).toBe(204)
-    expect(await context.db.listConnections({ userId: user.id })).toEqual([])
+    expect(
+      await selectRows(context.db, "connections", { userId: user.id })
+    ).toEqual([])
   })
 })
 

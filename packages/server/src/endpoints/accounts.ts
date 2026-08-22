@@ -1,6 +1,7 @@
 import type { AuthUser } from "../core/auth-db"
 import { notFound, unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { selectOne } from "../lib/select-one"
 import {
   serializeCookie,
   shouldUseSecureCookies
@@ -59,7 +60,9 @@ export const listAccounts = defineEndpoint({
     // The prune already read each session, so only the users are left to
     // fetch — and those concurrently, for the same reason the prune is.
     const parkedUsers = await Promise.all(
-      parked.map(({ session }) => internals.db.getUser({ id: session.userId }))
+      parked.map(({ session }) =>
+        selectOne(internals, "users", { id: session.userId })
+      )
     )
     const accounts: AccountInfo[] = [{ user: active.user, current: true }]
     for (const user of parkedUsers) {
@@ -74,7 +77,7 @@ export const listAccounts = defineEndpoint({
         value: serializeAccounts(parkedTokens(parked)),
         path: config.cookie.path,
         maxAge: config.session.ttl,
-        secure: shouldUseSecureCookies(input.requestURL ?? "https://localhost")
+        secure: shouldUseSecureCookies(input.requestURL)
       })
     )
 

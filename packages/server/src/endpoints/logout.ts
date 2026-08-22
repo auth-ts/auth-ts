@@ -2,6 +2,7 @@ import type { AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { selectOne } from "../lib/select-one"
 import {
   clearCookie,
   serializeCookie,
@@ -16,6 +17,7 @@ import {
 } from "../session/accounts-cookie"
 import { mintAccessToken } from "../session/issue-session"
 import { resolveSession } from "../session/resolve-session"
+import { revokeOtherSessions } from "../session/revoke-other-sessions"
 
 /**
  * How far a sign-out reaches, for each account it applies to.
@@ -72,7 +74,6 @@ export const logout = defineEndpoint({
   },
   run: async (internals, input: LogoutInput) => {
     const headers = input.headers ?? new Headers()
-    const requestURL = input.requestURL ?? "https://localhost"
     const resolved = await resolveSession(internals, headers)
     if (!resolved) throw unauthenticated()
 
@@ -84,14 +85,11 @@ export const logout = defineEndpoint({
     if (scope === "others") {
       // The current session and its cookie survive: this is the "sign out my
       // other devices" button, and clearing anything locally would be wrong.
-      await internals.db.deleteSessions({
-        userId: resolved.user.id,
-        exceptTokenHash: resolved.tokenHash
-      })
+      await revokeOtherSessions(internals, resolved.user.id, resolved.tokenHash)
       return { data: undefined, status: 204 }
     }
 
-    const secure = shouldUseSecureCookies(requestURL)
+    const secure = shouldUseSecureCookies(input.requestURL)
     const parked = config.multiAccount
       ? await pruneDeadAccounts(
           internals,
@@ -104,12 +102,15 @@ export const logout = defineEndpoint({
     // account on the same device, and leaving one parked would be a sign-out
     // that signs nobody out.
     if (scope === "global") {
-      await internals.db.deleteSessions({ userId: resolved.user.id })
+      await internals.db.delete({
+        table: "sessions",
+        where: { userId: resolved.user.id }
+      })
     } else {
-      await internals.db.deleteSession({ tokenHash: resolved.tokenHash })
+      await deleteSessionByToken(internals, resolved.tokenHash)
       for (const { session } of parked) {
         if (session.userId === resolved.user.id) {
-          await internals.db.deleteSession({ tokenHash: session.tokenHash })
+          await deleteSessionByToken(internals, session.tokenHash)
         }
       }
     }
@@ -128,11 +129,11 @@ export const logout = defineEndpoint({
       if (scope === "global") {
         const userIds = new Set(others.map(({ session }) => session.userId))
         for (const userId of userIds) {
-          await internals.db.deleteSessions({ userId })
+          await internals.db.delete({ table: "sessions", where: { userId } })
         }
       } else {
         for (const { session } of others) {
-          await internals.db.deleteSession({ tokenHash: session.tokenHash })
+          await deleteSessionByToken(internals, session.tokenHash)
         }
       }
     }
@@ -171,7 +172,7 @@ async function promoteNextAccount(
   const { config } = internals
 
   for (const [index, next] of parked.entries()) {
-    const nextUser: AuthUser | null = await internals.db.getUser({
+    const nextUser: AuthUser | null = await selectOne(internals, "users", {
       id: next.session.userId
     })
     if (!nextUser) continue
@@ -209,4 +210,12 @@ async function promoteNextAccount(
   }
 
   return null
+}
+
+/** Deletes one session by its token hash — the shape most sign-outs need. */
+function deleteSessionByToken(
+  internals: AuthServerInternals,
+  tokenHash: string
+) {
+  return internals.db.delete({ table: "sessions", where: { tokenHash } })
 }

@@ -25,9 +25,9 @@ export interface RevokeSessionResult {
  * Revokes one of the signed-in user's sessions.
  *
  * Ownership is enforced inside the delete query rather than by comparing ids
- * first: `deleteSession({ id, userId })` filters on both columns, so revoking
- * someone else's session is structurally impossible instead of depending on a
- * check being present.
+ * first: the `where` names both `id` and `userId`, so revoking someone else's
+ * session is structurally impossible instead of depending on a check being
+ * present.
  */
 export const revokeSession = defineEndpoint({
   method: "DELETE",
@@ -45,9 +45,9 @@ export const revokeSession = defineEndpoint({
     // The delete filters on id AND userId and returns what it removed, so one
     // statement both enforces ownership and tells us whether anything was
     // there. No read-then-delete window for someone else's id to slip through.
-    const revoked = await internals.db.deleteSession({
-      id: input.id,
-      userId: resolved.user.id
+    const [revoked] = await internals.db.delete({
+      table: "sessions",
+      where: { id: input.id, userId: resolved.user.id }
     })
     if (!revoked) throw new AuthApiError("notFound", 404)
 
@@ -62,7 +62,7 @@ export const revokeSession = defineEndpoint({
         clearCookie(
           internals.config.cookie.name,
           internals.config.cookie.path,
-          shouldUseSecureCookies(input.requestURL ?? "https://localhost")
+          shouldUseSecureCookies(input.requestURL)
         )
       )
     }
