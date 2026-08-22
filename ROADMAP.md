@@ -186,6 +186,40 @@ has to do the things that are easy to skip:
 - **Replace the console email transport.** It prints codes to the server console,
   which is a sign-in-as-anyone hole the moment those logs are readable.
 
+### A conformance suite for the callbacks
+
+"No adapters" is a promise that the contract is learnable. Right now it is
+learnable by reading the JSDoc carefully and then getting 500s. The first live
+day against Neon produced two bugs, neither of them in the library: a plain index
+where `upsertConnection`'s `ON CONFLICT` needed a unique one, and an empty `SET`
+because a magic-code sign-in carries no `name` or `imageURL` and `undefined`
+means "leave alone". Every consumer who writes these eighteen callbacks against
+SQL will meet both, and nothing tells them before production.
+
+The fix is the other half of `@auth-ts/server/testing`. `createMemoryDb` already
+encodes the exact semantics the library's own suite runs against; the missing
+piece is that same suite pointed at *your* implementation:
+
+```ts
+import { testAuthDB } from "@auth-ts/server/testing"
+
+testAuthDB(() => authDB) // your real callbacks, your real database
+```
+
+- [ ] Lift the memory-db cases into a parameterised suite: the three `upsertUser`
+      shapes (identifier-keyed merge touching only `name` and `imageURL`, bare
+      insert for guests, id-targeted full update), `type` insert-only on the
+      identifier path, connection upsert with and without an email, deletes that
+      return what they removed and cascade to sessions, `deleteExpired`, and the
+      rate-limit window reset.
+- [ ] Run it from the reference application against Neon in CI, so the example's
+      `auth-db.ts` — the file people will copy — is proven rather than believed.
+- [ ] Add the SQL footnote to the `upsertUser` contract: if your upsert needs
+      something to `SET`, touch `updatedAt`.
+
+This is what lets the "Not building" entry below mean "we give you the spec and
+the test" rather than "good luck".
+
 ---
 
 ## Deferred features
@@ -261,12 +295,13 @@ Declining these is a design position, not a backlog.
 
 Adapters are a standing promise to track someone else's schema conventions, and
 they always leak: your table has an extra required column, a different id type, or
-a naming convention the adapter cannot express. The nineteen callbacks are the
+a naming convention the adapter cannot express. The eighteen callbacks are the
 same code an adapter would generate, except you can read them and they are
 already written against your own tables.
 
 **The callback interface is the product.** That is where the semver discipline
-goes.
+goes — and where the conformance suite above goes, because a contract you are
+asked to implement yourself owes you a way to check your work.
 
 ### Rotating the refresh token on every use
 
