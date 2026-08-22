@@ -73,13 +73,7 @@ export const authDB = defineAuthDB({
       ].map((table) => db.delete(table).where(lt(table.expiresAt, sql`now()`)))
     )
 
-    // A guest with no session left is unreachable: nothing identifies the
-    // account, so nobody can sign back into it. Sessions slide on every
-    // refresh, so "no session left" already means "not seen for a session's
-    // lifetime" — and `updatedAt` gives the same grace to a guest that was
-    // merged or signed out rather than simply abandoned. Their todos go with
-    // them, by the foreign key.
-    const unreachable = db
+    const staleGuests = db
       .select({ id: authTables.users.id })
       .from(authTables.users)
       .where(
@@ -97,6 +91,6 @@ export const authDB = defineAuthDB({
 
     await db
       .delete(authTables.users)
-      .where(inArray(authTables.users.id, unreachable))
+      .where(inArray(authTables.users.id, staleGuests))
   }
 })
