@@ -28,6 +28,8 @@ export type AuthErrorCode =
   | "notFound"
   /** The HTTP method is not allowed for this path. */
   | "methodNotAllowed"
+  /** A state-changing request came from an origin this server does not serve. */
+  | "forbiddenOrigin"
   /** A guest has no email or phone number, so no code can be sent to them. */
   | "guestCannotReceiveCode"
   /** The OAuth provider timed out or failed while the code was being exchanged. */

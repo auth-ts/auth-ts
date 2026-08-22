@@ -1,6 +1,7 @@
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 import { applyCorsHeaders, preflightResponse } from "./apply-cors.ts"
 import { AuthApiError, isAuthApiError } from "./auth-api-error.ts"
+import { assertAllowedOrigin } from "./check-origin.ts"
 import type { AnyEndpoint } from "./define-endpoint.ts"
 import { errorResponse } from "./error-response.ts"
 import { getErrorMessage } from "./get-error-message.ts"
@@ -14,8 +15,9 @@ export type AuthHandler = (request: Request) => Promise<Response>
  * Turns an endpoint declaration into an HTTP handler.
  *
  * The one piece of middleware in the package, and the only place HTTP meets the
- * logic. Before: answer a CORS preflight, and refuse a method the endpoint does
- * not declare. After: attach CORS headers, serialize a thrown
+ * logic. Before: answer a CORS preflight, refuse a method the endpoint does
+ * not declare, and refuse a state-changing request from an origin this server
+ * does not serve. After: attach CORS headers, serialize a thrown
  * {@link AuthApiError} into the standard envelope in the request's locale, and
  * sweep expired rows fire-and-forget.
  *
@@ -49,6 +51,7 @@ export function createHandler(
       if (request.method !== endpoint.method) {
         throw new AuthApiError("methodNotAllowed", 405)
       }
+      assertAllowedOrigin(internals, request)
 
       const params = matchEndpointParams(internals, request, endpoint.path)
       const input = endpoint.parse

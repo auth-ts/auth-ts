@@ -84,6 +84,18 @@ Revoking a session filters on both the session id and the user id **in the
 query**, so revoking someone else's session is structurally impossible rather
 than a check somebody remembered to write.
 
+**State-changing requests are checked against their `Origin`.** CORS headers
+decide who may *read* a response, not who may *send* a request: a `POST` with a
+simple content type goes out without a preflight, cookie attached. `SameSite=Lax`
+confines that to the same site, which still leaves a sibling subdomain — or a
+browser that does not enforce it — able to sign the user out, sign them into
+someone else's account, or have a guest's session merged into an attacker's. So
+every non-`GET` request that carries an `Origin` must name the server's own
+origin, its `baseURL`, or its `cors.origin`; anything else is refused with
+**403 `forbiddenOrigin`** before the body is parsed. A request with no `Origin`
+is a non-browser client, which holds no cookie and cannot be made to act for
+anyone.
+
 ## Accounts
 
 `type` is written by core only as `guest` or `user`, and only on insert — so

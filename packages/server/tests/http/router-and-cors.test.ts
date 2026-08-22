@@ -147,6 +147,108 @@ describe("matchRoute", () => {
   })
 })
 
+describe("origin check", () => {
+  // CORS headers decide who may read a response, not who may send a request.
+  // A simple POST carries the cookie without a preflight, so state-changing
+  // requests are refused unless their Origin is one this server serves.
+  it("refuses a state-changing request from an origin it does not serve", async () => {
+    const { authServer } = await createTestServer({ guest: true })
+
+    const refused = await authServer.handler(
+      request("POST", "/api/auth/sign-in/guest", {
+        headers: { origin: "https://evil.example.com" }
+      })
+    )
+    expect(refused.status).toBe(403)
+    expect(
+      ((await refused.json()) as { error: { code: string } }).error.code
+    ).toBe("forbiddenOrigin")
+
+    // A sandboxed or redirected context sends the literal string "null".
+    expect(
+      (
+        await authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            headers: { origin: "null" }
+          })
+        )
+      ).status
+    ).toBe(403)
+
+    // Reads are not state-changing and are left to CORS.
+    expect(
+      (
+        await authServer.handler(
+          request("GET", "/api/auth/jwks.json", {
+            headers: { origin: "https://evil.example.com" }
+          })
+        )
+      ).status
+    ).toBe(200)
+  })
+
+  it("allows its own origin, a configured baseURL, and the cors origin", async () => {
+    const sameOrigin = await createTestServer({ guest: true })
+    expect(
+      (
+        await sameOrigin.authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            headers: { origin: "https://app.example.com" }
+          })
+        )
+      ).status
+    ).toBe(200)
+
+    // Behind a proxy the runtime sees an internal URL; the browser names the
+    // public one, which is what baseURL is for.
+    const proxied = await createTestServer({
+      guest: true,
+      baseURL: "https://auth.example.com"
+    })
+    expect(
+      (
+        await proxied.authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            origin: "http://10.0.0.5:3000",
+            headers: { origin: "https://auth.example.com" }
+          })
+        )
+      ).status
+    ).toBe(200)
+
+    const crossOrigin = await createTestServer({
+      guest: true,
+      cors: { origin: "https://spa.example.com" }
+    })
+    expect(
+      (
+        await crossOrigin.authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            headers: { origin: "https://spa.example.com" }
+          })
+        )
+      ).status
+    ).toBe(200)
+    expect(
+      (
+        await crossOrigin.authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            headers: { origin: "https://other.example.com" }
+          })
+        )
+      ).status
+    ).toBe(403)
+  })
+
+  it("passes a request with no Origin header, which is a non-browser client with no cookie to abuse", async () => {
+    const { authServer } = await createTestServer({ guest: true })
+    expect(
+      (await authServer.handler(request("POST", "/api/auth/sign-in/guest")))
+        .status
+    ).toBe(200)
+  })
+})
+
 describe("cors", () => {
   it("adds no CORS headers and does not answer preflights when unset", async () => {
     const { authServer } = await createTestServer()
