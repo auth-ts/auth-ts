@@ -190,20 +190,25 @@ export type AuthWhere<
 export type AuthDirection = "asc" | "desc"
 
 /**
- * `{ column: "asc" | "desc" }` — exactly one column, Prisma's shape.
+ * `{ column: "asc" | "desc" }` — one column, Prisma's shape.
  *
  * One column and a direction is enough for "newest" and for paging, and it is
  * the smallest ordering every store can express. The mapped type strips
- * optionality (`-?`) so an optional column is still a valid key, and forbids
- * the others so a second key is a type error rather than a silent choice.
+ * optionality (`-?`) so an optional column is still a valid key; an empty
+ * object and an unknown column are both type errors.
+ *
+ * Core always passes exactly one key, and an implementation should read one:
+ * `const [[column, direction]] = Object.entries(orderBy)`. Forbidding a second
+ * key in the type is possible — intersect each member with the others as
+ * optional `never` — but it costs every implementation its types, because
+ * `Object.entries` then widens the direction to `any`. The guarantee is worth
+ * less than the types it takes to state.
  */
 export type AuthOrderBy<
   S extends AdditionalFieldsSchema,
   T extends AuthTable
 > = {
-  [K in keyof AuthRow<S, T>]-?: { [P in K]: AuthDirection } & {
-    [P in Exclude<keyof AuthRow<S, T>, K>]?: never
-  }
+  [K in keyof AuthRow<S, T>]-?: { [P in K]: AuthDirection }
 }[keyof AuthRow<S, T>]
 
 /**

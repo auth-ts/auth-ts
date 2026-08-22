@@ -93,15 +93,22 @@ describe("the table types the four functions take", () => {
     usersWhere({ tier: 1 })
   })
 
-  it("orders by exactly one column", () => {
+  it("orders by a declared column, in a named direction", () => {
     usersOrder({ id: "asc" })
     // An optional column is still a key to sort on.
     usersOrder({ plan: "desc" })
 
-    // @ts-expect-error one column and a direction — a second key is not a choice
-    usersOrder({ id: "asc", email: "desc" })
+    // @ts-expect-error an ordering has to name a column
+    usersOrder({})
     // @ts-expect-error nothing declares `tier`, so nothing can sort on it
     usersOrder({ tier: "asc" })
+    // @ts-expect-error a direction is one of two words
+    usersOrder({ id: "ascending" })
+
+    // A second key is not rejected, and that is deliberate: stating it in the
+    // type costs every implementation the direction's own type, since
+    // `Object.entries` then widens it to `any`. Core passes one key.
+    usersOrder({ id: "asc", email: "desc" })
   })
 })
 

@@ -52,7 +52,10 @@ const matches = (table: keyof typeof tables, where: object) => {
 export const authDB = defineAuthDB({
   async select({ table, where, limit, offset, orderBy }) {
     const columns: Record<string, PgColumn> = getColumns(tables[table])
-    const [[name = "id", direction = "asc"] = []] = Object.entries(orderBy)
+    const [entry] = Object.entries(orderBy)
+    if (!entry) throw new Error(`${table} was given an ordering with no column`)
+
+    const [name, direction] = entry
     const column = columns[name]
     if (!column) throw new Error(`${table} has no ${name} column`)
 
