@@ -17,7 +17,8 @@
   },
   "targetDefaults": {
     "dev": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^dev"],
+      "continuous": true
     },
     "build": {
       "dependsOn": ["^build"],

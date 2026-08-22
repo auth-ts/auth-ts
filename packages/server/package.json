@@ -23,6 +23,7 @@
   },
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json && bun ../../tools/build/dts-extensions.ts dist && bun scripts/check-edge-safety.ts",
+    "dev": "vite build --watch",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },
