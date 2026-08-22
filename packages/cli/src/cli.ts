@@ -70,12 +70,14 @@ function parseKeygenArgs(args: string[]): KeygenArgs {
     return fail(error instanceof Error ? error.message : String(error))
   }
 
-  if (!isAlgorithm(values.alg)) {
+  // JWA names them in capitals, but nobody types a header value from memory.
+  const algorithm = values.alg.toUpperCase()
+  if (!isAlgorithm(algorithm)) {
     return fail(`Unknown algorithm "${values.alg}". Use RS256 or ES256.`)
   }
 
   return {
-    algorithm: values.alg,
+    algorithm,
     directory: resolve(process.cwd(), values.out),
     envPath: resolve(process.cwd(), values.env),
     yes: values.yes

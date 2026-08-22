@@ -204,6 +204,10 @@ describe("auth-ts keygen", () => {
     )
   })
 
+  it("takes the algorithm in any case", () => {
+    expect(run(["keygen", "--alg", "es256"])).toContain('"alg": "ES256"')
+  })
+
   it("accepts --alg ES256", () => {
     const stdout = run(["keygen", "--alg", "ES256"])
 
