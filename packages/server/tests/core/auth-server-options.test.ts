@@ -175,6 +175,32 @@ describe("construction failures", () => {
     ).not.toThrow()
   })
 
+  it("rejects a zero rate-limit window, which would silently disable the limit", () => {
+    // The store resets the count whenever `resetAt <= now()`, so a window that
+    // ends the instant it starts counts every request as the first one. Unlike
+    // `deleteFreshWindow`, zero is never a setting here — only a mistake.
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { sendCodePerIP: { max: 30, window: "0s" } }
+      })
+    ).toThrow(/rateLimit\.sendCodePerIP\.window must be a positive duration/)
+    // Sub-millisecond rounds to the same thing once added to a Date.
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { verifyCodePerIP: { max: 30, window: "0.0001s" } }
+      })
+    ).toThrow(/rateLimit\.verifyCodePerIP\.window must be a positive duration/)
+    // The cooldown is a spacing, not a window: zero means "no spacing" and stays legal.
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        rateLimit: { sendCodeCooldown: "0s" }
+      })
+    ).not.toThrow()
+  })
+
   it("rejects a non-positive or fractional rate-limit max", () => {
     expect(() =>
       createAuthServer({

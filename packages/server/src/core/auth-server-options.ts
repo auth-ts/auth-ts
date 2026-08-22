@@ -452,6 +452,17 @@ function resolveRateLimit(
       )
     }
     requireDuration(limit.window, `rateLimit.${name}.window`)
+    // Zero is a real value for other durations, but not for a window. The store
+    // starts a fresh window whenever `resetAt <= now()`, so a window that ends
+    // the instant it starts resets the count to 1 on every request and the
+    // limit never fires — silently. Below a millisecond rounds to the same
+    // thing once it is added to a `Date`, so the bound is one millisecond, not
+    // zero.
+    if (parseDuration(limit.window) < 1) {
+      throw new AuthConfigError(
+        `rateLimit.${name}.window must be a positive duration. ${JSON.stringify(limit.window)} ends the moment it starts, so the count would reset on every request and the limit would never fire. To turn rate limiting off, set rateLimit: false.`
+      )
+    }
   }
 
   return merged
