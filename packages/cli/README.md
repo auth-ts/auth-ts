@@ -3,17 +3,16 @@
 The command line for [`@auth-ts/server`](https://www.npmjs.com/package/@auth-ts/server).
 
 ```bash
-bun x @auth-ts/cli keygen --out public
+bun x @auth-ts/cli keygen
 ```
 
-`keygen` generates an RS256 signing key (`--alg ES256` for the other) and a
-server secret, prints them as the two `.env` lines `@auth-ts/server` reads —
-`JWT_PRIVATE_KEY` and `AUTH_SECRET` — and writes the public key set to
-`public/jwks.json`, which your framework serves at `/jwks.json`. Point Neon, or
-anything else that trusts a JWKS URL, there.
+`keygen` generates a signing key, a server secret, and the public key set that
+verifies tokens signed with it. It prints all three, then asks whether to append
+the two variables to `.env` and write the key set to `public/jwks.json`. Nothing
+is written unless you say so, and a variable the env file already sets is never
+overwritten without being asked about first.
 
-Copy the two lines into your `.env`. They are the whole of stdout and
-everything else goes to stderr, so they pipe cleanly if you would rather. To
-rotate, run it again and deploy the new key and the new file together.
+`--out` moves the key set, `--env` moves the variables, `--yes` skips the
+question, and `--alg ES256` picks the other algorithm.
 
-Full documentation: [authts.dev](https://authts.dev)
+Full documentation: [authts.dev](https://authts.dev/docs/reference/cli)

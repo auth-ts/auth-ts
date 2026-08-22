@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createAuthServer } from "@auth-ts/server"
@@ -8,6 +8,7 @@ import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from "jose"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { Jwks } from "../src/keygen"
 import { keygen } from "../src/keygen"
+import { existingEnvNames, writeEnvFile } from "../src/write"
 
 let directory: string
 
@@ -38,7 +39,7 @@ describe("keygen", () => {
   it.each(["RS256", "ES256"] as const)(
     "generates a %s key whose tokens verify against the written jwks.json, as a database would",
     async (algorithm) => {
-      const result = await keygen({ algorithm, directory })
+      const result = await keygen({ algorithm })
       const authServer = serverFor(
         result.privateKeyPem,
         result.secret,
@@ -51,25 +52,41 @@ describe("keygen", () => {
       expect(decodeProtectedHeader(token).alg).toBe(algorithm)
 
       // ... and a verifier holding only the file accepts it.
-      const published = JSON.parse(
-        await readFile(result.jwksPath, "utf8")
-      ) as Jwks
-      const { payload } = await jwtVerify(token, createLocalJWKSet(published))
+      const { payload } = await jwtVerify(token, createLocalJWKSet(result.jwks))
       expect(payload.sub).toBe("user-1")
     }
   )
 
-  it("writes the key set to jwks.json in the directory it was given", async () => {
-    const result = await keygen({ algorithm: "RS256", directory })
+  it("appends variables an env file does not have", async () => {
+    const path = join(directory, ".env")
+    await writeFile(path, "EXISTING=1")
 
-    expect(result.jwksPath).toBe(resolve(directory, "jwks.json"))
-    const written = await readFile(result.jwksPath, "utf8")
-    expect(written.endsWith("\n")).toBe(true)
-    expect(JSON.parse(written)).toEqual(result.jwks)
+    await writeEnvFile(path, { A: '"one"', B: '"two"' })
+
+    // The file had no trailing newline, so the first variable would otherwise
+    // have landed on the end of `EXISTING=1`.
+    expect(await readFile(path, "utf8")).toBe('EXISTING=1\nA="one"\nB="two"\n')
+  })
+
+  it("leaves a variable that is already set unless told to replace it", async () => {
+    const path = join(directory, ".env")
+    await writeFile(path, 'AUTH_SECRET="original"\n')
+
+    expect(
+      await existingEnvNames(path, ["AUTH_SECRET", "JWT_PRIVATE_KEY"])
+    ).toEqual(["AUTH_SECRET"])
+
+    await writeEnvFile(path, { AUTH_SECRET: '"replacement"' })
+    expect(await readFile(path, "utf8")).toContain('AUTH_SECRET="original"')
+
+    await writeEnvFile(path, { AUTH_SECRET: '"replacement"' }, ["AUTH_SECRET"])
+    const after = await readFile(path, "utf8")
+    expect(after).toContain('AUTH_SECRET="replacement"')
+    expect(after).not.toContain("original")
   })
 
   it("publishes only public key material", async () => {
-    const result = await keygen({ algorithm: "RS256", directory })
+    const result = await keygen({ algorithm: "RS256" })
 
     expect(result.jwks.keys).toHaveLength(1)
     expect(result.jwks.keys[0]).toEqual({
@@ -80,21 +97,18 @@ describe("keygen", () => {
       use: "sig",
       kid: expect.any(String)
     })
-    expect(await readFile(result.jwksPath, "utf8")).not.toContain("PRIVATE")
+    expect(JSON.stringify(result.jwks)).not.toContain("PRIVATE")
   })
 
-  it("replaces a previous jwks.json: the file belongs to the key", async () => {
-    const first = await keygen({ algorithm: "RS256", directory })
-    const second = await keygen({ algorithm: "RS256", directory })
+  it("draws a new key every time: the key set belongs to the key", async () => {
+    const first = await keygen({ algorithm: "RS256" })
+    const second = await keygen({ algorithm: "RS256" })
 
-    expect(JSON.parse(await readFile(second.jwksPath, "utf8"))).toEqual(
-      second.jwks
-    )
     expect(second.jwks.keys[0]?.kid).not.toBe(first.jwks.keys[0]?.kid)
   })
 
   it("draws a 32-byte base64 secret, distinct from the key", async () => {
-    const result = await keygen({ algorithm: "RS256", directory })
+    const result = await keygen({ algorithm: "RS256" })
 
     expect(Buffer.from(result.secret, "base64")).toHaveLength(32)
     expect(result.secret).toMatch(/^[A-Za-z0-9+/]{43}=$/)
@@ -113,51 +127,81 @@ describe("auth-ts keygen", () => {
     })
   }
 
-  it("writes into --out, creating it", async () => {
-    run(["keygen", "--out", "public"])
-
-    const written = await readFile(join(directory, "public/jwks.json"), "utf8")
-    expect(JSON.parse(written)).toHaveProperty("keys")
-    await expect(readFile(join(directory, "jwks.json"))).rejects.toThrow()
-  })
-
-  it("writes nothing for --dry, and prints the key set as a third line", async () => {
-    const stdout = run(["keygen", "--dry"])
-
-    expect(stdout).toMatch(/^JWT_PRIVATE_KEY="/)
-    expect(stdout).toContain('\nAUTH_SECRET="')
-    const jwks = stdout.slice(stdout.indexOf("JWKS=") + "JWKS=".length)
-    expect(JSON.parse(jwks)).toHaveProperty("keys")
-    // Pretty-printed, so it can be read rather than only pasted.
-    expect(jwks).toContain("\n  ")
-
-    await expect(readFile(join(directory, "jwks.json"))).rejects.toThrow()
-  })
-
-  it("prints exactly the two .env lines and writes jwks.json in the working directory", async () => {
+  it("prints all three and writes nothing without an answer", async () => {
     const stdout = run(["keygen"])
 
-    const lines = stdout.trimEnd().split("\n")
-    expect(lines).toHaveLength(2)
-    expect(lines[0]).toMatch(
+    const [privateKey, secret] = stdout.split("\n")
+    expect(privateKey).toMatch(
       /^JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n[^"\n]+\\n-----END PRIVATE KEY-----"$/
     )
-    expect(lines[1]).toMatch(/^AUTH_SECRET="[A-Za-z0-9+/]{43}="$/)
+    expect(secret).toMatch(/^AUTH_SECRET="[A-Za-z0-9+/]{43}="$/)
+    const jwks = stdout.slice(stdout.indexOf("JWKS=") + "JWKS=".length)
+    expect(JSON.parse(jwks)).toHaveProperty("keys")
+    // Pretty-printed, so it reads rather than only pastes.
+    expect(jwks).toContain("\n  ")
 
-    // The printed value round-trips through the way .env loaders read it, and
-    // signs tokens the written file verifies.
-    const privateKeyPem = lines[0]
-      ?.slice('JWT_PRIVATE_KEY="'.length, -1)
+    // Nothing to answer the prompt, so nothing is kept.
+    await expect(readFile(join(directory, ".env"))).rejects.toThrow()
+    await expect(
+      readFile(join(directory, "public/jwks.json"))
+    ).rejects.toThrow()
+  })
+
+  it("keeps both with --yes, and the printed key verifies against the written set", async () => {
+    const stdout = run(["keygen", "--yes"])
+
+    const env = await readFile(join(directory, ".env"), "utf8")
+    expect(env).toContain("JWT_PRIVATE_KEY=")
+    expect(env).toContain("AUTH_SECRET=")
+
+    const privateKeyPem = stdout
+      .slice('JWT_PRIVATE_KEY="'.length, stdout.indexOf('"\nAUTH_SECRET'))
       .replace(/\\n/g, "\n")
-    const secret = lines[1]?.slice('AUTH_SECRET="'.length, -1)
-    const authServer = serverFor(privateKeyPem ?? "", secret ?? "")
+    const secret = env.match(/^AUTH_SECRET="(.+)"$/m)?.[1]
+    const authServer = serverFor(privateKeyPem, secret ?? "")
     const token = await authServer.signToken({ userId: "user-1" })
     const published = JSON.parse(
-      await readFile(join(directory, "jwks.json"), "utf8")
+      await readFile(join(directory, "public/jwks.json"), "utf8")
     ) as Jwks
+
     await expect(
       jwtVerify(token, createLocalJWKSet(published))
     ).resolves.toBeDefined()
+  })
+
+  it("honours --out and --env", async () => {
+    run(["keygen", "--yes", "--out", "static", "--env", ".env.local"])
+
+    expect(
+      JSON.parse(await readFile(join(directory, "static/jwks.json"), "utf8"))
+    ).toHaveProperty("keys")
+    expect(await readFile(join(directory, ".env.local"), "utf8")).toContain(
+      "AUTH_SECRET="
+    )
+    await expect(readFile(join(directory, ".env"))).rejects.toThrow()
+  })
+
+  it("will not replace a secret the env file already has, even with --yes", async () => {
+    await writeFile(join(directory, ".env"), 'AUTH_SECRET="original"\n')
+
+    run(["keygen", "--yes"])
+
+    const env = await readFile(join(directory, ".env"), "utf8")
+    expect(env).toContain('AUTH_SECRET="original"')
+    expect(env).toContain("JWT_PRIVATE_KEY=")
+  })
+
+  it("leaves the key set alone when the env file keeps its own key", async () => {
+    // The file belongs to the key. Writing a set for a key the server is not
+    // signing with would publish a verifier that rejects every token.
+    run(["keygen", "--yes"])
+    const first = await readFile(join(directory, "public/jwks.json"), "utf8")
+
+    run(["keygen", "--yes"])
+
+    expect(await readFile(join(directory, "public/jwks.json"), "utf8")).toBe(
+      first
+    )
   })
 
   it("accepts --alg ES256", () => {

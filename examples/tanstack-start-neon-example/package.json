@@ -18,7 +18,7 @@
     "deploy": "bun run build && wrangler deploy",
     "typecheck": "tsc -p tsconfig.json",
     "cf-typegen": "wrangler types",
-    "keygen": "bun x auth-ts keygen --out public"
+    "keygen": "bun x auth-ts keygen"
   },
   "dependencies": {
     "@auth-ts/client": "workspace:*",

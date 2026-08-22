@@ -4,49 +4,77 @@ description: bun x @auth-ts/cli keygen — the signing key, the secret, and jwks
 ---
 
 ```bash
-bun x @auth-ts/cli keygen --out public
+bun x @auth-ts/cli keygen
 ```
 
-`keygen` generates a signing key and a server secret, prints them as the two
-`.env` lines `@auth-ts/server` reads, and writes the public key set to
-`jwks.json`.
-
-`--out` says where that file goes, and defaults to the working directory.
-Frameworks that serve a folder verbatim — TanStack Start, Next.js, Vite, Nuxt —
-want `--out public`, which is what puts it at `<origin>/jwks.json`.
-
-`--dry` writes nothing and prints the key set as a third line instead, for
-looking before committing to a file.
+`keygen` generates the three things a server needs: a signing key, a server
+secret, and the public key set that verifies tokens signed with the key. It
+prints all three and then asks whether to keep them.
 
 ```text
 JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 AUTH_SECRET="..."
+JWKS={
+  "keys": [
+    { "kty": "RSA", "alg": "RS256", "use": "sig", "kid": "...", ... }
+  ]
+}
+
+Write /your/app/.env and /your/app/public/jwks.json? [y/N]
 ```
 
-Copy them into your `.env`. They are the whole of stdout — the path it wrote
-goes to stderr — so they pipe cleanly, though into a file you already keep
-rather than appended blind: run twice and you have two `JWT_PRIVATE_KEY` lines,
-and which one wins is up to whichever loader reads it.
+Answer yes and the two variables are appended to `.env` and the key set is
+written to `public/jwks.json`. Answer no — or pipe the output anywhere, which
+skips the question — and nothing is written at all. The three lines are the
+whole of stdout; the question and everything after it go to stderr, so
+redirecting gets you the values and nothing else.
 
 The private key is quoted with its line breaks as literal `\n`, which dotenv,
 Bun, Vite, and Next all expand.
 
+## Writing to your env file
+
+Appending only. A variable the file already sets is a live secret — replacing
+`AUTH_SECRET` invalidates every verification code in flight, and replacing
+`JWT_PRIVATE_KEY` invalidates every token signed with it — so an existing name
+is never overwritten silently. You are asked about each one:
+
+```text
+AUTH_SECRET is already set in /your/app/.env. Overwrite it? [y/N]
+```
+
+`--yes` answers the first question, not this one. A flag can commit you to
+writing a file; it cannot commit you to destroying a key, so an existing value
+survives `--yes` and is reported as left alone. Rotating deliberately means
+answering in person, or editing the file yourself.
+
+Keeping the private key keeps `jwks.json` too. The file belongs to the key —
+writing a key set for a key the server is not signing with would publish a
+verifier that rejects every token it sees — so a run that leaves
+`JWT_PRIVATE_KEY` alone leaves the key set alone as well, and says so.
+
 ## `jwks.json`
 
-The public half of the key, as a JWKS document. A framework with a public
-folder — TanStack Start, Next.js, Vite — serves it at `/jwks.json`, which is the
-URL you give Neon, or anything else that verifies against a JWKS. Its `kid` is
-the key's thumbprint, the same one the server stamps on every token header.
+The public half of the key, as a JWKS document. A framework that serves a folder
+verbatim — TanStack Start, Next.js, Vite, Nuxt — serves it at `/jwks.json`,
+which is the URL you give Neon, or anything else that verifies against a JWKS.
+Its `kid` is the key's thumbprint, the same one the server stamps on every token
+header.
 
-The file belongs to the key: running `keygen` again writes a new key and a new
-file, and the two are deployed together. See [rotating keys](/docs/guides/key-rotation).
+The file belongs to the key: running `keygen` again generates a new key and a
+new file, and the two are deployed together. See
+[rotating keys](/docs/guides/key-rotation).
 
-No public folder? Import the file and pass it to `createAuthServer` as
-`jwks: { json }`; it is then served at `/api/auth/jwks`. If it is hosted
-somewhere else, `jwks: { url }` tells the discovery document where.
+No public folder? Take the `JWKS=` value it printed and pass it to
+`createAuthServer` as `jwks: { json }`; it is then served at `/api/auth/jwks`.
+If it is hosted somewhere else, `jwks: { url }` tells the discovery document
+where.
 
 ## Options
 
 | Flag | Default | |
 | --- | --- | --- |
 | `--alg RS256\|ES256` | `RS256` | The signing algorithm. Match `jwt.alg` on the server. |
+| `--out DIR` | `public` | Where `jwks.json` goes. Created if it is not there. |
+| `--env FILE` | `.env` | Which env file the two variables are appended to. |
+| `--yes`, `-y` | off | Write without asking. Still will not overwrite a variable that is already set. |

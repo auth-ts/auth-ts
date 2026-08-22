@@ -1,5 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises"
-import { resolve } from "node:path"
 import type { JWK } from "jose"
 import {
   calculateJwkThumbprint,
@@ -15,10 +13,6 @@ export type JwtAlgorithm = "RS256" | "ES256"
 export interface KeygenOptions {
   /** The signing algorithm the key is for. */
   algorithm: JwtAlgorithm
-  /** Where `jwks.json` is written. Created if it is not there. */
-  directory: string
-  /** Generate everything and write nothing. `jwksPath` is where it would have gone. */
-  dry?: boolean
 }
 
 /** The public key set, as written to `jwks.json`. */
@@ -32,10 +26,8 @@ export interface KeygenResult {
   privateKeyPem: string
   /** 32 random bytes, base64 — the value of `AUTH_SECRET`. */
   secret: string
-  /** The key set that was written. */
+  /** The public key set. */
   jwks: Jwks
-  /** Absolute path of the written `jwks.json`. */
-  jwksPath: string
 }
 
 /**
@@ -53,19 +45,13 @@ async function toPublicJwk(publicKey: CryptoKey, algorithm: JwtAlgorithm) {
 }
 
 /**
- * Generates a signing key and a server secret, and writes the public key set
- * to `jwks.json`.
+ * Generates a signing key, a server secret, and the public key set.
  *
- * It lands in the working directory unless `directory` says otherwise —
- * `--out public` in a framework that serves that folder, which is what makes
- * the file reachable at `<origin>/jwks.json`, the URL a verifier is pointed at.
- * The file belongs to the key: to rotate, run this again and deploy the new key
- * and the new file together.
+ * Nothing is written here. What the command does with the three is its own
+ * decision, and the default is to print them and leave the filesystem alone.
  */
 export async function keygen({
-  algorithm,
-  directory,
-  dry = false
+  algorithm
 }: KeygenOptions): Promise<KeygenResult> {
   const { privateKey, publicKey } = await generateKeyPair(algorithm, {
     extractable: true
@@ -77,11 +63,6 @@ export async function keygen({
   ).toString("base64")
 
   const jwks: Jwks = { keys: [await toPublicJwk(publicKey, algorithm)] }
-  const jwksPath = resolve(directory, "jwks.json")
-  if (!dry) {
-    await mkdir(directory, { recursive: true })
-    await writeFile(jwksPath, `${JSON.stringify(jwks, null, 2)}\n`)
-  }
 
-  return { privateKeyPem, secret, jwks, jwksPath }
+  return { privateKeyPem, secret, jwks }
 }

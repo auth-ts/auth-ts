@@ -22,11 +22,12 @@ Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous 
 
 ```bash
 bun add @auth-ts/server @auth-ts/client
-bun x @auth-ts/cli keygen --out public
+bun x @auth-ts/cli keygen
 ```
 
-`keygen` prints `JWT_PRIVATE_KEY` and `AUTH_SECRET`, and writes the public key
-set to `public/jwks.json` — which your framework serves at `/jwks.json`.
+`keygen` prints `JWT_PRIVATE_KEY`, `AUTH_SECRET`, and the public key set, then
+asks whether to keep them — the two variables appended to `.env`, the key set
+written to `public/jwks.json`, which your framework serves at `/jwks.json`.
 
 ```ts
 // auth-server.ts
