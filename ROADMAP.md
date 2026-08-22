@@ -66,10 +66,27 @@ The one part of the build with no real-world evidence behind it.
 
 ### Publish the packages
 
+Releases run from the Actions tab (Actions → Release → Run workflow), never from
+a laptop. The workflow verifies, versions with `nx release`, pushes the tag and
+GitHub Release, then publishes to npm with trusted publishing (OIDC). There is no
+long-lived npm token once the first release is out.
+
 - [ ] Confirm the **`@auth-ts` npm scope** and the **`auth-ts` GitHub
       organisation** are yours.
-- [ ] Add `NPM_TOKEN` to the repository secrets.
-- [ ] Tag `v0.1.0`. The release workflow publishes both packages with provenance.
+- [ ] Run **Release** with `dry-run` on and `first-release` on. Read the bump
+      and changelog it prints.
+- [ ] **Bootstrap the first publish.** npm cannot attach a trusted publisher to
+      a package that does not exist yet, so `0.1.0` needs a token once. Create
+      a granular access token scoped to the `@auth-ts` packages with the
+      shortest lifetime npm allows, add it as the `NPM_TOKEN` repository
+      secret, and run **Release** with `dry-run` off and `first-release` on.
+- [ ] **Switch to trusted publishing.** On npmjs.com, for each of
+      `@auth-ts/server` and `@auth-ts/client`: package → Settings → Trusted
+      publishing → GitHub Actions, owner `auth-ts`, repository `auth-ts`,
+      workflow `release.yml`, environment `npm`, allowed action `npm publish`.
+      Then delete the `NPM_TOKEN` secret and revoke the token. Every later
+      release authenticates with OIDC; the workflow warns if the secret is
+      still present.
 
 ### Deploy the docs
 
@@ -119,11 +136,14 @@ and a disconnect against the demo.
 ### Publishing
 
 `nx release --dry-run` produces the changelog correctly and both packages version
-together from `0.1.0`. Nothing has been published. It needs `NPM_TOKEN` in the
-repository secrets and a `v0.1.0` tag.
+together from `0.1.0`. Nothing has been published. The **Release** workflow is
+written and the `npm` GitHub environment exists (deployments restricted to
+`main`); neither has run for real. The first run needs the one-time `NPM_TOKEN`
+bootstrap described under *Publish the packages*, after which trusted
+publishing takes over and no npm token remains anywhere.
 
 Check the `@auth-ts` npm scope and the `auth-ts` GitHub organisation actually
-exist and are yours before tagging.
+exist and are yours before the first release.
 
 ### Deploying the docs
 

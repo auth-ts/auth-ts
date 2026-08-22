@@ -1,28 +1,186 @@
 name: Release
 
+# Releases are cut from the Actions tab, not from a laptop: Actions → Release →
+# Run workflow. Nothing here runs on push or on a schedule, so a release is
+# always a deliberate act with a run log behind it.
+#
+# The run is three jobs. `verify` proves the tree is green. `version` runs
+# `nx release` on a clean runner: conventional commits pick the bump, both
+# packages move to the same version, the changelog and GitHub Release are
+# written, and the `vX.Y.Z` tag is pushed. `publish` builds that exact commit
+# from source and publishes to npm through trusted publishing (OIDC), so no
+# long-lived npm token exists anywhere.
+#
+# Run it with `dry-run` first. That prints the bump and the changelog that a
+# real run would produce, and stops there.
+
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Preview the bump and changelog. Commits, tags, and publishes nothing."
+        type: boolean
+        default: true
+      specifier:
+        description: "Override the bump derived from conventional commits (major, minor, patch, prerelease, or an exact version). Empty infers it."
+        type: string
+        default: ""
+      first-release:
+        description: "The first release ever. Uses the version on disk as the base and skips the previous-tag and registry checks."
+        type: boolean
+        default: false
+
+# One release at a time. A second run queues behind the first rather than
+# racing it for the version commit.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# Nothing at the workflow level. Each job declares exactly what it needs.
+permissions: {}
 
 jobs:
-  publish:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      # Actions are pinned to commit SHAs, not tags. A tag is mutable: whoever
+      # owns the action can repoint v4 at new code, and it would run here with
+      # our token and our checkout. The trailing comment is the released
+      # version the SHA belongs to, so updates stay reviewable.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - run: bun install --frozen-lockfile
+
+      - name: Lint and format
+        run: bun run lint
+
+      # Everything, not `affected`: a release is the one place the whole tree
+      # must be green regardless of what changed since the last run.
+      - name: Typecheck and test
+        run: bun x nx run-many -t typecheck test
+
+  version:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # This job writes to the repository: the version commit, the tag, and the
+      # GitHub Release. It is the only job that does.
+      contents: write
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      tag: ${{ steps.release.outputs.tag }}
+    env:
+      # `bun install` runs `lefthook install` via the `prepare` script, which
+      # would wire the biome pre-commit hook into the runner's checkout and run
+      # it against the version commit `nx release` makes. The hook is for
+      # humans editing source; the files committed here are package.json and
+      # CHANGELOG.md written by Nx.
+      LEFTHOOK: "0"
+    steps:
+      - name: Releases are cut from main
+        if: ${{ !inputs.dry-run && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::A real release must be run from main, not ${GITHUB_REF#refs/heads/}. Dry runs are fine from any branch."
+          exit 1
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Conventional commits: Nx walks history back to the previous tag to
+          # decide the bump and write the changelog.
+          fetch-depth: 0
+          # The token is added to the remote URL right before `nx release`
+          # needs it to push, after dependency installation has already run.
+          # Nothing that runs during `bun install` can see it.
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - run: bun install --frozen-lockfile
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Authorise the push
+        if: ${{ !inputs.dry-run }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+      # `nx release` versions, writes CHANGELOG.md, commits, tags, pushes, and
+      # creates the GitHub Release (the push and the release come from
+      # `changelog.workspaceChangelog.createRelease: "github"` in nx.json).
+      # `--skip-publish` leaves publishing to the next job, which runs on a
+      # separate runner with different permissions.
+      #
+      # Inputs reach the shell through env, never by interpolating `${{ }}`
+      # into the script, so a crafted specifier cannot become a command.
+      - name: nx release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          SPECIFIER: ${{ inputs.specifier }}
+          FIRST_RELEASE: ${{ inputs.first-release }}
+        run: |
+          args=(--skip-publish --verbose)
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          [ "$FIRST_RELEASE" = "true" ] && args+=(--first-release)
+          [ -n "$SPECIFIER" ] && args+=("$SPECIFIER")
+
+          bun x nx release "${args[@]}"
+
+          if [ "$DRY_RUN" != "true" ]; then
+            # The publish job checks out this commit, not the tag name: a tag
+            # can be moved, a SHA cannot.
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            echo "tag=$(git describe --tags --exact-match HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: version
+    if: ${{ !inputs.dry-run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The `npm` environment is what npm's trusted-publisher config for each
+    # package is bound to (owner auth-ts, repo auth-ts, workflow release.yml,
+    # environment npm). Its deployment-branch policy only admits runs from
+    # main, and it is the place to add a required reviewer if a second pair of
+    # eyes on publishes is ever wanted.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/org/auth-ts
     permissions:
       # Read-only: this job publishes to npm and touches nothing in the
-      # repository. Versioning, tagging, and the changelog happen locally via
-      # `nx release`, and the tag push is what triggers this. If a step is ever
-      # added that creates a GitHub release, that step needs contents: write —
-      # give it its own job rather than widening this one.
+      # repository. The version commit, tag, and GitHub Release were made by
+      # the `version` job, which is the only one with contents: write.
       contents: read
-      # Required for npm provenance, which links the published package to this
-      # workflow run so consumers can verify where it came from.
+      # Required for trusted publishing: the OIDC token npm exchanges for a
+      # short-lived publish credential, and for the provenance attestation that
+      # links the published package to this workflow run.
       id-token: write
+    env:
+      # Empty unless the bootstrap secret exists; see the bootstrap step below.
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          fetch-depth: 0
-          # Publishing uses NPM_TOKEN, never the git remote, so the job's token
-          # has no reason to persist into .git/config.
+          ref: ${{ needs.version.outputs.sha }}
+          # Publishing uses OIDC, never the git remote, so the job's token has
+          # no reason to persist into .git/config.
           persist-credentials: false
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -34,20 +192,50 @@ jobs:
           # extra download per release is a fair price for that.
           no-cache: true
 
+      # Node 24 for its bundled npm. `nx release publish` shells out to
+      # `npm publish`, and trusted publishing needs npm 11.5.1 or later; Node
+      # 22 ships npm 10. No `registry-url`: that would write an `_authToken`
+      # line into .npmrc, and there is no token.
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
+          node-version: 24
+
+      - name: npm supports trusted publishing
+        run: |
+          node -e '
+            const [major, minor, patch] = process.versions.npm.split(".").map(Number);
+            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!ok) { console.error(`npm ${process.versions.npm} is too old for trusted publishing (needs 11.5.1+)`); process.exit(1); }
+            console.log(`npm ${process.versions.npm}`);
+          '
+
+      # Bootstrap only. npm cannot attach a trusted publisher to a package that
+      # does not exist yet, so the very first publish of a package needs a
+      # token. Create a granular token scoped to the @auth-ts packages with the
+      # shortest lifetime npm offers, add it as the NPM_TOKEN secret, run the
+      # release, configure trusted publishing on each package, then delete the
+      # secret and the token. With the secret absent this step does nothing and
+      # npm authenticates with OIDC.
+      - name: Bootstrap token (first publish of a new package only)
+        if: ${{ env.NPM_TOKEN != '' }}
+        run: |
+          echo "::warning::Publishing with NPM_TOKEN. Once trusted publishing is configured for every package, delete the secret."
+          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > "$HOME/.npmrc"
 
       - run: bun install --frozen-lockfile
 
-      # Build from source at the tagged commit, never from the cache. The Nx
-      # cache is remote now, so a cache hit would publish artifacts this run did
+      # Build from source at the released commit, never from the cache. The Nx
+      # cache is remote, so a cache hit would publish artifacts this run did
       # not produce — while npm provenance attests that it did.
       - run: bun x nx run-many -t build --projects='packages/*' --skip-nx-cache
 
       - name: Publish
-        run: bun x nx release publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          FIRST_RELEASE: ${{ inputs.first-release }}
+          # Trusted publishing attests provenance by default; this makes it
+          # explicit and covers the bootstrap-token path as well.
           NPM_CONFIG_PROVENANCE: "true"
+        run: |
+          args=()
+          [ "$FIRST_RELEASE" = "true" ] && args+=(--first-release)
+          bun x nx release publish "${args[@]}"
