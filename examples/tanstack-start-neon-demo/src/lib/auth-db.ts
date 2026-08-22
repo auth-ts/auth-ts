@@ -1,13 +1,13 @@
 import type { AuthDB } from "@auth-ts/server"
 import { and, eq, lt, ne, sql } from "drizzle-orm"
-import { db } from "../db/db.ts"
+import { db } from "../db/db"
 import {
   connections,
   magicCodes,
   rateLimits,
   sessions,
   users
-} from "../db/schema.ts"
+} from "../db/schema"
 
 export const authDB: AuthDB = {
   async upsertUser({ id, additionalFields, ...user }) {

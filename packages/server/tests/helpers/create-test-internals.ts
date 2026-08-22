@@ -1,11 +1,11 @@
-import { resolveAuthServerConfig } from "../../src/core/auth-server-config.ts"
-import type { AuthServerInternals } from "../../src/core/auth-server-internals.ts"
-import { createAuthServerInternals } from "../../src/core/auth-server-internals.ts"
-import type { AuthServerOptions } from "../../src/core/auth-server-options.ts"
-import type { LogLevel } from "../../src/lib/logger.ts"
-import type { MemoryDb } from "../../src/lib/memory-db.ts"
-import { createMemoryDb } from "../../src/lib/memory-db.ts"
-import { generateTestKeys } from "./generate-test-keys.ts"
+import { resolveAuthServerConfig } from "../../src/core/auth-server-config"
+import type { AuthServerInternals } from "../../src/core/auth-server-internals"
+import { createAuthServerInternals } from "../../src/core/auth-server-internals"
+import type { AuthServerOptions } from "../../src/core/auth-server-options"
+import type { LogLevel } from "../../src/lib/logger"
+import type { MemoryDb } from "../../src/lib/memory-db"
+import { createMemoryDb } from "../../src/lib/memory-db"
+import { generateTestKeys } from "./generate-test-keys"
 
 /** A code captured from an email or SMS send, so tests never guess at one. */
 export interface CapturedCode {

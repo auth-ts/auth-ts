@@ -1,7 +1,7 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { AuthApiError } from "./auth-api-error.ts"
-import type { AnyEndpoint } from "./define-endpoint.ts"
-import { splitPathSegments } from "./get-route-param.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { AuthApiError } from "./auth-api-error"
+import type { AnyEndpoint } from "./define-endpoint"
+import { splitPathSegments } from "./get-route-param"
 
 /** A matched endpoint plus the dynamic segments pulled out of the path. */
 export interface RouteMatch {

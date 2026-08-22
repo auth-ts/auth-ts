@@ -1,7 +1,7 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import type { RateLimitWindow } from "../core/auth-server-options.ts"
-import { parseDuration } from "../lib/parse-duration.ts"
-import { AuthApiError } from "./auth-api-error.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import type { RateLimitWindow } from "../core/auth-server-options"
+import { parseDuration } from "../lib/parse-duration"
+import { AuthApiError } from "./auth-api-error"
 
 /**
  * Counts one request against a fixed window, throwing when the window is full.

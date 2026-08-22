@@ -1,10 +1,7 @@
-import { AuthApiError, unauthenticated } from "../../http/auth-api-error.ts"
-import { defineEndpoint } from "../../http/define-endpoint.ts"
-import {
-  clearCookie,
-  shouldUseSecureCookies
-} from "../../lib/serialize-cookie.ts"
-import { resolveSession } from "../../session/resolve-session.ts"
+import { AuthApiError, unauthenticated } from "../../http/auth-api-error"
+import { defineEndpoint } from "../../http/define-endpoint"
+import { clearCookie, shouldUseSecureCookies } from "../../lib/serialize-cookie"
+import { resolveSession } from "../../session/resolve-session"
 
 /** Input for revoking one session. */
 export interface RevokeSessionInput {

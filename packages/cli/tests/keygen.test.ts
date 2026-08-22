@@ -6,8 +6,8 @@ import { createAuthServer } from "@auth-ts/server"
 import { createMemoryDb } from "@auth-ts/server/testing"
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from "jose"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import type { Jwks } from "../src/keygen.ts"
-import { keygen } from "../src/keygen.ts"
+import type { Jwks } from "../src/keygen"
+import { keygen } from "../src/keygen"
 
 let directory: string
 

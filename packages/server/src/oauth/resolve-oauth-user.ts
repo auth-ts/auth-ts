@@ -1,8 +1,8 @@
-import type { AuthUser } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { AuthApiError } from "../http/auth-api-error.ts"
-import { convertGuest, mergeGuestInto } from "../session/convert-guest.ts"
-import type { ProviderIdentity } from "./providers/oauth-provider.ts"
+import type { AuthUser } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { AuthApiError } from "../http/auth-api-error"
+import { convertGuest, mergeGuestInto } from "../session/convert-guest"
+import type { ProviderIdentity } from "./providers/oauth-provider"
 
 /** What shapes how a provider identity resolves to a user. */
 export interface ResolveOAuthUserOptions {

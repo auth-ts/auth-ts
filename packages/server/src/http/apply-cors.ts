@@ -1,4 +1,4 @@
-import type { CorsOptions } from "../core/auth-server-options.ts"
+import type { CorsOptions } from "../core/auth-server-options"
 
 const ALLOWED_METHODS = "GET, POST, PATCH, DELETE, OPTIONS"
 const ALLOWED_HEADERS = "content-type, authorization, accept-language"

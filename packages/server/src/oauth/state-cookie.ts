@@ -1,12 +1,12 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { AuthApiError } from "../http/auth-api-error.ts"
-import { decodeBase64url, encodeBase64url } from "../lib/base64url.ts"
-import { randomBytesBase64url } from "../lib/generate-random.ts"
-import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash.ts"
-import { readCookie } from "../lib/parse-cookies.ts"
-import { parseDuration } from "../lib/parse-duration.ts"
-import { clearCookie, serializeCookie } from "../lib/serialize-cookie.ts"
-import { codeChallengeS256, createCodeVerifier } from "./pkce.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { AuthApiError } from "../http/auth-api-error"
+import { decodeBase64url, encodeBase64url } from "../lib/base64url"
+import { randomBytesBase64url } from "../lib/generate-random"
+import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash"
+import { readCookie } from "../lib/parse-cookies"
+import { parseDuration } from "../lib/parse-duration"
+import { clearCookie, serializeCookie } from "../lib/serialize-cookie"
+import { codeChallengeS256, createCodeVerifier } from "./pkce"
 
 /**
  * How long a half-finished OAuth flow stays valid.

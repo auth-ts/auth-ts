@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { createTestServer } from "../helpers/create-test-server.ts"
-import { request } from "../helpers/request.ts"
+import { createTestServer } from "../helpers/create-test-server"
+import { request } from "../helpers/request"
 
 describe("matchRoute", () => {
   it("dispatches every documented endpoint through the catch-all", async () => {
@@ -410,7 +410,7 @@ describe("cors", () => {
     const response = await authServer.handler(request("GET", "/api/auth/jwks"))
     expect(response.headers.get("vary")).toBe("origin")
 
-    const { applyCorsHeaders } = await import("../../src/http/apply-cors.ts")
+    const { applyCorsHeaders } = await import("../../src/http/apply-cors")
     const headers = applyCorsHeaders(new Headers({ vary: "accept-encoding" }), {
       origin: "https://app.example.com"
     })

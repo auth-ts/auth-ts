@@ -1,6 +1,6 @@
 import type { AuthUser } from "@auth-ts/server"
-import type { AuthClientInternals } from "../core/auth-client-internals.ts"
-import { AuthError } from "../lib/auth-error.ts"
+import type { AuthClientInternals } from "../core/auth-client-internals"
+import { AuthError } from "../lib/auth-error"
 
 /**
  * Returns the signed-in user, or `null`.

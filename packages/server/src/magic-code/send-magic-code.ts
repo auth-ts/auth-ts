@@ -1,13 +1,13 @@
-import type { MagicCodePurpose } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { AuthApiError } from "../http/auth-api-error.ts"
-import { checkRateLimit } from "../http/check-rate-limit.ts"
-import { getCooldownRemaining } from "../http/get-cooldown-remaining.ts"
-import { randomSixDigitCode } from "../lib/generate-random.ts"
-import { getClientIp } from "../lib/get-client-ip.ts"
-import { hmacSha256Hex } from "../lib/hash.ts"
-import { parseDuration } from "../lib/parse-duration.ts"
-import type { CodeIdentifier } from "./resolve-code-identifier.ts"
+import type { MagicCodePurpose } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { AuthApiError } from "../http/auth-api-error"
+import { checkRateLimit } from "../http/check-rate-limit"
+import { getCooldownRemaining } from "../http/get-cooldown-remaining"
+import { randomSixDigitCode } from "../lib/generate-random"
+import { getClientIp } from "../lib/get-client-ip"
+import { hmacSha256Hex } from "../lib/hash"
+import { parseDuration } from "../lib/parse-duration"
+import type { CodeIdentifier } from "./resolve-code-identifier"
 
 /**
  * How long a magic code is valid.

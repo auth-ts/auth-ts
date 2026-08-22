@@ -12,7 +12,7 @@ import {
 import { baseOptions } from "~/lib/layout.shared"
 import { source } from "~/lib/source"
 import { getMDXComponents } from "~/mdx-components"
-import browserCollections from "../../.source/browser.ts"
+import browserCollections from "../../.source/browser"
 
 export const Route = createFileRoute("/docs/$")({
   component: DocumentationPage,

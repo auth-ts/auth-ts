@@ -1,4 +1,4 @@
-import { dataApi } from "./data-api.ts"
+import { dataApi } from "./data-api"
 
 /** A row from the `todos` table. */
 export interface Todo {

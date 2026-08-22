@@ -3,7 +3,7 @@ import {
   getClientIp,
   isIpAddress,
   resolveClientIpConfig
-} from "../../src/lib/get-client-ip.ts"
+} from "../../src/lib/get-client-ip"
 
 const xff = (value: string) => new Headers({ "x-forwarded-for": value })
 

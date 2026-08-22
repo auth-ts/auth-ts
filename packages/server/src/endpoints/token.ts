@@ -1,9 +1,9 @@
-import type { AuthUser } from "../core/auth-db.ts"
-import { unauthenticated } from "../http/auth-api-error.ts"
-import { defineEndpoint } from "../http/define-endpoint.ts"
-import { mintAccessToken, slideSession } from "../session/issue-session.ts"
-import type { HeadersInput } from "../session/resolve-session.ts"
-import { resolveSession } from "../session/resolve-session.ts"
+import type { AuthUser } from "../core/auth-db"
+import { unauthenticated } from "../http/auth-api-error"
+import { defineEndpoint } from "../http/define-endpoint"
+import { mintAccessToken, slideSession } from "../session/issue-session"
+import type { HeadersInput } from "../session/resolve-session"
+import { resolveSession } from "../session/resolve-session"
 
 /**
  * The session as a token response describes it — a projection, never the row.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { validateRedirect } from "../../src/lib/validate-redirect.ts"
+import { validateRedirect } from "../../src/lib/validate-redirect"
 
 describe("validateRedirect", () => {
   it("keeps same-origin relative paths", () => {

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
-import { authClient } from "../lib/auth-client.ts"
+import { authClient } from "../lib/auth-client"
 
 /** The query key the session lives under, shared so other hooks can scope to it. */
 export const sessionQueryKey = ["session"] as const

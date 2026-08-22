@@ -1,5 +1,5 @@
 import type { AccountInfo, AuthUser, ConnectionInfo } from "@auth-ts/server"
-import type { AuthClientInternals } from "../core/auth-client-internals.ts"
+import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Lists the providers linked to this user. */
 export function createListConnections(internals: AuthClientInternals) {

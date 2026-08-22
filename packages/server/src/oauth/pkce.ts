@@ -1,5 +1,5 @@
-import { bytesToBase64url } from "../lib/base64url.ts"
-import { randomBytesBase64url } from "../lib/generate-random.ts"
+import { bytesToBase64url } from "../lib/base64url"
+import { randomBytesBase64url } from "../lib/generate-random"
 
 const textEncoder = new TextEncoder()
 

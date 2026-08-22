@@ -1,5 +1,5 @@
-import { AuthApiError } from "../../http/auth-api-error.ts"
-import { defineEndpoint } from "../../http/define-endpoint.ts"
+import { AuthApiError } from "../../http/auth-api-error"
+import { defineEndpoint } from "../../http/define-endpoint"
 
 /**
  * The minimal OIDC discovery document.

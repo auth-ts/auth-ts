@@ -1,12 +1,12 @@
-import { AuthConfigError } from "../http/auth-config-error.ts"
-import type { LocalizationOptions } from "../http/get-error-message.ts"
-import { assertNoReservedFields } from "../http/validate-additional-fields.ts"
-import type { ClientIpConfig, ClientIpOptions } from "../lib/get-client-ip.ts"
-import { resolveClientIpConfig } from "../lib/get-client-ip.ts"
-import type { Logger, LogLevel } from "../lib/logger.ts"
-import type { Duration } from "../lib/parse-duration.ts"
-import { parseDuration } from "../lib/parse-duration.ts"
-import type { AuthDB } from "./auth-db.ts"
+import { AuthConfigError } from "../http/auth-config-error"
+import type { LocalizationOptions } from "../http/get-error-message"
+import { assertNoReservedFields } from "../http/validate-additional-fields"
+import type { ClientIpConfig, ClientIpOptions } from "../lib/get-client-ip"
+import { resolveClientIpConfig } from "../lib/get-client-ip"
+import type { Logger, LogLevel } from "../lib/logger"
+import type { Duration } from "../lib/parse-duration"
+import { parseDuration } from "../lib/parse-duration"
+import type { AuthDB } from "./auth-db"
 import type {
   AdditionalFieldsSchema,
   AuthServerOptions,
@@ -19,7 +19,7 @@ import type {
   RateLimitOptions,
   SessionOptions,
   SmsOptions
-} from "./auth-server-options.ts"
+} from "./auth-server-options"
 
 /**
  * The configuration the server runs on: {@link AuthServerOptions} after

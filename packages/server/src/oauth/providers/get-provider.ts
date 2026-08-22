@@ -1,10 +1,10 @@
 import type {
   ProviderCredentials,
   ProvidersOptions
-} from "../../core/auth-server-options.ts"
-import { github } from "./github.ts"
-import { google } from "./google.ts"
-import type { OAuthProvider } from "./oauth-provider.ts"
+} from "../../core/auth-server-options"
+import { github } from "./github"
+import { google } from "./google"
+import type { OAuthProvider } from "./oauth-provider"
 
 const PROVIDERS: Record<string, OAuthProvider> = { github, google }
 

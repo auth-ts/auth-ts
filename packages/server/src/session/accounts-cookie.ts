@@ -1,7 +1,7 @@
-import type { AuthSession } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { sha256Hex } from "../lib/hash.ts"
-import { readCookie } from "../lib/parse-cookies.ts"
+import type { AuthSession } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { sha256Hex } from "../lib/hash"
+import { readCookie } from "../lib/parse-cookies"
 
 /**
  * How many users may be parked in one browser.

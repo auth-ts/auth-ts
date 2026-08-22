@@ -1,4 +1,4 @@
-import type { AuthErrorCode } from "./error-response.ts"
+import type { AuthErrorCode } from "./error-response"
 
 /**
  * The built-in English message for every error code.

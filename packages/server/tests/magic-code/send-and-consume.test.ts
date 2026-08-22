@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
-import { hmacSha256Hex } from "../../src/lib/hash.ts"
-import { consumeMagicCode } from "../../src/magic-code/consume-magic-code.ts"
-import { resolveCodeIdentifier } from "../../src/magic-code/resolve-code-identifier.ts"
-import { sendMagicCode } from "../../src/magic-code/send-magic-code.ts"
-import { createTestInternals } from "../helpers/create-test-internals.ts"
-import { required } from "../helpers/required.ts"
+import { hmacSha256Hex } from "../../src/lib/hash"
+import { consumeMagicCode } from "../../src/magic-code/consume-magic-code"
+import { resolveCodeIdentifier } from "../../src/magic-code/resolve-code-identifier"
+import { sendMagicCode } from "../../src/magic-code/send-magic-code"
+import { createTestInternals } from "../helpers/create-test-internals"
+import { required } from "../helpers/required"
 
 const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 

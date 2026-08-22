@@ -1,4 +1,4 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals"
 
 /** HTTP methods the endpoint table uses. */
 export type EndpointMethod = "GET" | "POST" | "PATCH" | "DELETE"

@@ -1,4 +1,4 @@
-import { AuthApiError } from "../../http/auth-api-error.ts"
+import { AuthApiError } from "../../http/auth-api-error"
 
 /**
  * Whether a provider response means "try again later" rather than "no".

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { createAuthServer } from "../../src/core/create-auth-server.ts"
-import { AuthConfigError } from "../../src/http/auth-config-error.ts"
-import { createMemoryDb } from "../../src/lib/memory-db.ts"
-import { generateTestKeys } from "../helpers/generate-test-keys.ts"
+import { createAuthServer } from "../../src/core/create-auth-server"
+import { AuthConfigError } from "../../src/http/auth-config-error"
+import { createMemoryDb } from "../../src/lib/memory-db"
+import { generateTestKeys } from "../helpers/generate-test-keys"
 
 const keys = await generateTestKeys("RS256")
 

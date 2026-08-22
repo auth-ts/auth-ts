@@ -1,5 +1,5 @@
-import type { Logger, LogLevel } from "../lib/logger.ts"
-import type { AuthClientOptions } from "./auth-client-options.ts"
+import type { Logger, LogLevel } from "../lib/logger"
+import type { AuthClientOptions } from "./auth-client-options"
 
 /**
  * The configuration the client runs on: {@link AuthClientOptions} after

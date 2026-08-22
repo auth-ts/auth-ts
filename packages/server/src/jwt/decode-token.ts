@@ -1,5 +1,5 @@
 import { decodeJwt } from "jose"
-import type { UnverifiedClaims } from "./verify-token.ts"
+import type { UnverifiedClaims } from "./verify-token"
 
 /** The result of an unverified decode. */
 export interface DecodedToken {

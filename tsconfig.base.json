@@ -21,9 +21,7 @@
       "@auth-ts/server": ["./packages/server/src/index.ts"],
       "@auth-ts/server/testing": ["./packages/server/src/lib/memory-db.ts"],
       "@auth-ts/client": ["./packages/client/src/index.ts"]
-    },
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true
+    }
   },
   "exclude": ["node_modules", "dist"]
 }

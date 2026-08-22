@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
-import { useUser } from "../hooks/use-user.ts"
+import { useUser } from "../hooks/use-user"
 import {
   createTodo,
   deleteTodo,
   listTodos,
   setTodoCompleted
-} from "../lib/todos.ts"
+} from "../lib/todos"
 
 export const Route = createFileRoute("/")({ component: TodosPage })
 

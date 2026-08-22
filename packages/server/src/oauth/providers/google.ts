@@ -1,12 +1,12 @@
 import { createRemoteJWKSet, errors, jwtVerify } from "jose"
-import { AuthApiError } from "../../http/auth-api-error.ts"
+import { AuthApiError } from "../../http/auth-api-error"
 import type {
   AuthorizeURLInput,
   ExchangeCodeInput,
   OAuthProvider,
   ProviderIdentity
-} from "./oauth-provider.ts"
-import { providerRejected } from "./provider-response.ts"
+} from "./oauth-provider"
+import { providerRejected } from "./provider-response"
 
 interface GoogleIdTokenClaims {
   sub?: string

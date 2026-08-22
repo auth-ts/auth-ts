@@ -1,8 +1,8 @@
 import type { JWTVerifyGetKey } from "jose"
 import { createLocalJWKSet, jwtVerify } from "jose"
-import type { UserType } from "../core/auth-db.ts"
-import type { Jwks } from "./build-jwks.ts"
-import type { JwtAlgorithm } from "./import-signing-key.ts"
+import type { UserType } from "../core/auth-db"
+import type { Jwks } from "./build-jwks"
+import type { JwtAlgorithm } from "./import-signing-key"
 
 /**
  * Claims as a token states them, before anything has been checked.

@@ -1,11 +1,11 @@
-import { AuthApiError, notFound } from "../../http/auth-api-error.ts"
-import { defineEndpoint } from "../../http/define-endpoint.ts"
-import { shouldUseSecureCookies } from "../../lib/serialize-cookie.ts"
-import { validateRedirect } from "../../lib/validate-redirect.ts"
-import { getProvider } from "../../oauth/providers/get-provider.ts"
-import { createStateCookie } from "../../oauth/state-cookie.ts"
-import { resolveSession } from "../../session/resolve-session.ts"
-import type { SignInProviderInput } from "../sign-in/$provider.ts"
+import { AuthApiError, notFound } from "../../http/auth-api-error"
+import { defineEndpoint } from "../../http/define-endpoint"
+import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
+import { validateRedirect } from "../../lib/validate-redirect"
+import { getProvider } from "../../oauth/providers/get-provider"
+import { createStateCookie } from "../../oauth/state-cookie"
+import { resolveSession } from "../../session/resolve-session"
+import type { SignInProviderInput } from "../sign-in/$provider"
 
 /** Input for starting a provider link. */
 export interface ConnectProviderInput extends SignInProviderInput {}

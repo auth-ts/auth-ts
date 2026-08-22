@@ -1,4 +1,4 @@
-import type { AuthClientInternals } from "../core/auth-client-internals.ts"
+import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Where to send the browser, and where to come back to. */
 export interface OAuthNavigationInput {

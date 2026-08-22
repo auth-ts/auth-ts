@@ -1,4 +1,4 @@
-import type { AuthErrorCode } from "./error-response.ts"
+import type { AuthErrorCode } from "./error-response"
 
 /**
  * The error every endpoint throws when it cannot complete.

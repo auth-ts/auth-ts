@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import type { MemoryDb } from "../../src/lib/memory-db.ts"
-import { createMemoryDb } from "../../src/lib/memory-db.ts"
+import type { MemoryDb } from "../../src/lib/memory-db"
+import { createMemoryDb } from "../../src/lib/memory-db"
 
 let db: MemoryDb
 

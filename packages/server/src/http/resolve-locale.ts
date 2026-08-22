@@ -1,4 +1,4 @@
-import type { LocalizationOptions } from "./get-error-message.ts"
+import type { LocalizationOptions } from "./get-error-message"
 
 /**
  * Picks the locale for a request.

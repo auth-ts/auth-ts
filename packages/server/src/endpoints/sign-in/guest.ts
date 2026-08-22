@@ -1,10 +1,10 @@
-import { AuthApiError } from "../../http/auth-api-error.ts"
-import { checkRateLimit } from "../../http/check-rate-limit.ts"
-import { defineEndpoint } from "../../http/define-endpoint.ts"
-import { validateAdditionalFields } from "../../http/validate-additional-fields.ts"
-import { getClientIp } from "../../lib/get-client-ip.ts"
-import type { IssueMode } from "../../session/issue-session.ts"
-import { issueSession } from "../../session/issue-session.ts"
+import { AuthApiError } from "../../http/auth-api-error"
+import { checkRateLimit } from "../../http/check-rate-limit"
+import { defineEndpoint } from "../../http/define-endpoint"
+import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import { getClientIp } from "../../lib/get-client-ip"
+import type { IssueMode } from "../../session/issue-session"
+import { issueSession } from "../../session/issue-session"
 
 /** Body accepted by `POST /sign-in/guest`. */
 export interface SignInGuestInput {

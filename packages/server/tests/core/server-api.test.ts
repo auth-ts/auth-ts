@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
-import { AuthConfigError } from "../../src/http/auth-config-error.ts"
-import { createTestServer } from "../helpers/create-test-server.ts"
-import { readSetCookies, request } from "../helpers/request.ts"
-import { required } from "../helpers/required.ts"
+import { AuthConfigError } from "../../src/http/auth-config-error"
+import { createTestServer } from "../helpers/create-test-server"
+import { readSetCookies, request } from "../helpers/request"
+import { required } from "../helpers/required"
 
 type TestContext = Awaited<ReturnType<typeof createTestServer>>
 

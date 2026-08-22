@@ -1,6 +1,6 @@
-import type { AuthServerConfig } from "../core/auth-server-config.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { AuthApiError } from "./auth-api-error.ts"
+import type { AuthServerConfig } from "../core/auth-server-config"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { AuthApiError } from "./auth-api-error"
 
 /** Methods that must not have side effects, and so need no origin check. */
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])

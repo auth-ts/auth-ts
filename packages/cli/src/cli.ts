@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util"
-import type { JwtAlgorithm } from "./keygen.ts"
-import { keygen } from "./keygen.ts"
+import type { JwtAlgorithm } from "./keygen"
+import { keygen } from "./keygen"
 
 const USAGE = `Usage: npx @auth-ts/cli <command>
 

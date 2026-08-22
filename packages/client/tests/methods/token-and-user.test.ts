@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { createAuthClient } from "../../src/core/create-auth-client.ts"
-import { AuthError } from "../../src/lib/auth-error.ts"
-import type { FakeAuthServer } from "../helpers/fake-auth-server.ts"
-import { fakeAccessToken, fakeAuthServer } from "../helpers/fake-auth-server.ts"
+import { createAuthClient } from "../../src/core/create-auth-client"
+import { AuthError } from "../../src/lib/auth-error"
+import type { FakeAuthServer } from "../helpers/fake-auth-server"
+import { fakeAccessToken, fakeAuthServer } from "../helpers/fake-auth-server"
 
 const user = { id: "user-1", email: "ada@example.com", type: "user" as const }
 

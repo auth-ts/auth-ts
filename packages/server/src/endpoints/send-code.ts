@@ -1,8 +1,8 @@
-import { defineEndpoint } from "../http/define-endpoint.ts"
-import { resolveLocale } from "../http/resolve-locale.ts"
-import type { IdentifierBody } from "../magic-code/resolve-code-identifier.ts"
-import { resolveCodeIdentifier } from "../magic-code/resolve-code-identifier.ts"
-import { sendMagicCode } from "../magic-code/send-magic-code.ts"
+import { defineEndpoint } from "../http/define-endpoint"
+import { resolveLocale } from "../http/resolve-locale"
+import type { IdentifierBody } from "../magic-code/resolve-code-identifier"
+import { resolveCodeIdentifier } from "../magic-code/resolve-code-identifier"
+import { sendMagicCode } from "../magic-code/send-magic-code"
 
 /** Body accepted by `POST /send-code`: exactly one identifier. */
 export interface SendCodeInput extends IdentifierBody {

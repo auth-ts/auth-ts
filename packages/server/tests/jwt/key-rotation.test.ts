@@ -1,7 +1,7 @@
 import { decodeProtectedHeader } from "jose"
 import { describe, expect, it } from "vitest"
-import { createTestServer } from "../helpers/create-test-server.ts"
-import { generateTestKeys } from "../helpers/generate-test-keys.ts"
+import { createTestServer } from "../helpers/create-test-server"
+import { generateTestKeys } from "../helpers/generate-test-keys"
 
 /**
  * Walks the documented runbook end to end, from the local verifier's point of

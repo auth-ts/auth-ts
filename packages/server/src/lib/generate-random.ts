@@ -1,4 +1,4 @@
-import { bytesToBase64url } from "./base64url.ts"
+import { bytesToBase64url } from "./base64url"
 
 /**
  * Generates cryptographically random bytes and encodes them base64url.

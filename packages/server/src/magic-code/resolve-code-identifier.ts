@@ -1,6 +1,6 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { AuthApiError } from "../http/auth-api-error.ts"
-import { normalizeEmail, normalizePhone } from "../lib/normalize-identifiers.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { AuthApiError } from "../http/auth-api-error"
+import { normalizeEmail, normalizePhone } from "../lib/normalize-identifiers"
 
 /**
  * The longest an email address can be and still be deliverable — RFC 5321's

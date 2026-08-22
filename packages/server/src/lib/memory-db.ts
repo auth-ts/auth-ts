@@ -11,8 +11,8 @@ import type {
   UpsertMagicCodeInput,
   UpsertSessionInput,
   UpsertUserInput
-} from "../core/auth-db.ts"
-import { randomUUID } from "./generate-random.ts"
+} from "../core/auth-db"
+import { randomUUID } from "./generate-random"
 
 /** An in-memory {@link AuthDB} plus a few helpers for inspecting it in tests. */
 export interface MemoryDb extends AuthDB {

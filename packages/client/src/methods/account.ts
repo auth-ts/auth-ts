@@ -3,8 +3,8 @@ import type {
   RevokeSessionResult,
   SessionInfo
 } from "@auth-ts/server"
-import type { AuthClientInternals } from "../core/auth-client-internals.ts"
-import { AuthError } from "../lib/auth-error.ts"
+import type { AuthClientInternals } from "../core/auth-client-internals"
+import { AuthError } from "../lib/auth-error"
 
 /** The flat body accepted by profile updates. */
 export type UpdateUserInput = {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { verifyToken } from "../../src/jwt/verify-token.ts"
-import { issueSession } from "../../src/session/issue-session.ts"
-import { resolveSession } from "../../src/session/resolve-session.ts"
-import { createTestInternals } from "../helpers/create-test-internals.ts"
-import { readSetCookies } from "../helpers/request.ts"
-import { required } from "../helpers/required.ts"
+import { verifyToken } from "../../src/jwt/verify-token"
+import { issueSession } from "../../src/session/issue-session"
+import { resolveSession } from "../../src/session/resolve-session"
+import { createTestInternals } from "../helpers/create-test-internals"
+import { readSetCookies } from "../helpers/request"
+import { required } from "../helpers/required"
 
 const REQUEST_URL = "https://app.example.com/api/auth/verify-code"
 

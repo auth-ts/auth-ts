@@ -1,5 +1,5 @@
 import type { AuthUser } from "@auth-ts/server"
-import type { AuthClientInternals } from "../core/auth-client-internals.ts"
+import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Exactly one identifier: whichever you pass selects the channel. */
 export type SendCodeInput =

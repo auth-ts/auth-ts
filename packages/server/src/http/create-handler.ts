@@ -1,12 +1,12 @@
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { applyCorsHeaders, preflightResponse } from "./apply-cors.ts"
-import { AuthApiError, isAuthApiError } from "./auth-api-error.ts"
-import { assertAllowedOrigin } from "./check-origin.ts"
-import type { AnyEndpoint } from "./define-endpoint.ts"
-import { errorResponse } from "./error-response.ts"
-import { getErrorMessage } from "./get-error-message.ts"
-import { matchEndpointParams } from "./match-route.ts"
-import { resolveLocale } from "./resolve-locale.ts"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { applyCorsHeaders, preflightResponse } from "./apply-cors"
+import { AuthApiError, isAuthApiError } from "./auth-api-error"
+import { assertAllowedOrigin } from "./check-origin"
+import type { AnyEndpoint } from "./define-endpoint"
+import { errorResponse } from "./error-response"
+import { getErrorMessage } from "./get-error-message"
+import { matchEndpointParams } from "./match-route"
+import { resolveLocale } from "./resolve-locale"
 
 /** A mounted endpoint: what the consumer's framework calls. */
 export type AuthHandler = (request: Request) => Promise<Response>

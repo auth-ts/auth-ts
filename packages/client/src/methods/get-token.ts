@@ -1,7 +1,7 @@
 import type { AuthUser } from "@auth-ts/server"
-import type { AuthClientInternals } from "../core/auth-client-internals.ts"
-import { AuthError } from "../lib/auth-error.ts"
-import { readLifetimeClaims } from "../lib/read-lifetime-claims.ts"
+import type { AuthClientInternals } from "../core/auth-client-internals"
+import { AuthError } from "../lib/auth-error"
+import { readLifetimeClaims } from "../lib/read-lifetime-claims"
 
 /** What the refresh endpoint returns. */
 interface TokenResponse {

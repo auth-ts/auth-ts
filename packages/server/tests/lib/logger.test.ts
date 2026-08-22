@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { createLogger } from "../../src/lib/logger.ts"
+import { createLogger } from "../../src/lib/logger"
 
 describe("createLogger", () => {
   it("emits nothing at silent", () => {

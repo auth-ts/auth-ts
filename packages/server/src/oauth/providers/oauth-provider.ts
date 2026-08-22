@@ -1,4 +1,4 @@
-import type { ProviderCredentials } from "../../core/auth-server-options.ts"
+import type { ProviderCredentials } from "../../core/auth-server-options"
 
 /** The identity a provider vouches for, after its verification rules are applied. */
 export interface ProviderIdentity {

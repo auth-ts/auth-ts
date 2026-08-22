@@ -3,7 +3,7 @@ import {
   hmacSha256Hex,
   sha256Hex,
   timingSafeEqualHex
-} from "../../src/lib/hash.ts"
+} from "../../src/lib/hash"
 
 describe("hmacSha256Hex key reuse", () => {
   it("imports the key once per secret rather than once per call", async () => {

@@ -1,9 +1,9 @@
-import { notFound, unauthenticated } from "../../http/auth-api-error.ts"
-import { defineEndpoint } from "../../http/define-endpoint.ts"
+import { notFound, unauthenticated } from "../../http/auth-api-error"
+import { defineEndpoint } from "../../http/define-endpoint"
 import {
   serializeCookie,
   shouldUseSecureCookies
-} from "../../lib/serialize-cookie.ts"
+} from "../../lib/serialize-cookie"
 import {
   demoteActive,
   parkedTokens,
@@ -11,12 +11,9 @@ import {
   pruneDeadAccounts,
   readAccountsCookie,
   serializeAccounts
-} from "../../session/accounts-cookie.ts"
-import { mintAccessToken } from "../../session/issue-session.ts"
-import {
-  readRefreshToken,
-  resolveSession
-} from "../../session/resolve-session.ts"
+} from "../../session/accounts-cookie"
+import { mintAccessToken } from "../../session/issue-session"
+import { readRefreshToken, resolveSession } from "../../session/resolve-session"
 
 /** Body accepted by `POST /accounts/switch`. */
 export interface SwitchAccountInput {

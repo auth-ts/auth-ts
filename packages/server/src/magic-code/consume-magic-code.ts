@@ -1,7 +1,7 @@
-import type { AuthMagicCode, MagicCodePurpose } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { AuthApiError } from "../http/auth-api-error.ts"
-import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash.ts"
+import type { AuthMagicCode, MagicCodePurpose } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { AuthApiError } from "../http/auth-api-error"
+import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash"
 
 /**
  * How many wrong guesses a code survives before it is burned.

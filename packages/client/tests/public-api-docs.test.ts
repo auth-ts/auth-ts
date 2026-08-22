@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 import {
   sourceFiles,
   undocumentedExports
-} from "../../../tools/testing/undocumented-exports.ts"
+} from "../../../tools/testing/undocumented-exports"
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../src")
 

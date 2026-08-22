@@ -1,5 +1,5 @@
 import { createAuthServer } from "@auth-ts/server"
-import { authDB } from "./auth-db.ts"
+import { authDB } from "./auth-db"
 
 export const authServer = createAuthServer({
   db: authDB,

@@ -1,6 +1,6 @@
 import type { AuthErrorBody } from "@auth-ts/server"
-import type { AuthClientConfig } from "../core/auth-client-config.ts"
-import { AuthError, AuthNetworkError } from "./auth-error.ts"
+import type { AuthClientConfig } from "../core/auth-client-config"
+import { AuthError, AuthNetworkError } from "./auth-error"
 
 /** Per-request options. */
 export interface FetchJsonOptions {

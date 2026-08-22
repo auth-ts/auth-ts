@@ -1,7 +1,7 @@
-import { unauthenticated } from "../http/auth-api-error.ts"
-import { defineEndpoint } from "../http/define-endpoint.ts"
-import type { HeadersInput } from "../session/resolve-session.ts"
-import { resolveSession } from "../session/resolve-session.ts"
+import { unauthenticated } from "../http/auth-api-error"
+import { defineEndpoint } from "../http/define-endpoint"
+import type { HeadersInput } from "../session/resolve-session"
+import { resolveSession } from "../session/resolve-session"
 
 /** One linked provider, as shown on an account screen. */
 export interface ConnectionInfo {

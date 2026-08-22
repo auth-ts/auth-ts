@@ -1,22 +1,22 @@
-import type { AuthUser } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { signToken } from "../jwt/sign-token.ts"
-import { randomBytesBase64url, randomUUID } from "../lib/generate-random.ts"
-import { getClientIp } from "../lib/get-client-ip.ts"
-import { sha256Hex } from "../lib/hash.ts"
-import { parseDuration } from "../lib/parse-duration.ts"
+import type { AuthUser } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { signToken } from "../jwt/sign-token"
+import { randomBytesBase64url, randomUUID } from "../lib/generate-random"
+import { getClientIp } from "../lib/get-client-ip"
+import { sha256Hex } from "../lib/hash"
+import { parseDuration } from "../lib/parse-duration"
 import {
   serializeCookie,
   shouldUseSecureCookies
-} from "../lib/serialize-cookie.ts"
+} from "../lib/serialize-cookie"
 import {
   demoteActive,
   parkedTokens,
   pruneDeadAccounts,
   readAccountsCookie,
   serializeAccounts
-} from "./accounts-cookie.ts"
-import { readRefreshToken } from "./resolve-session.ts"
+} from "./accounts-cookie"
+import { readRefreshToken } from "./resolve-session"
 
 /**
  * Where the refresh token goes.

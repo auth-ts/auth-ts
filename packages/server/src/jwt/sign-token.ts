@@ -1,8 +1,8 @@
 import { SignJWT } from "jose"
-import type { UserType } from "../core/auth-db.ts"
-import type { Duration } from "../lib/parse-duration.ts"
-import { parseDurationSeconds } from "../lib/parse-duration.ts"
-import type { JwtAlgorithm } from "./import-signing-key.ts"
+import type { UserType } from "../core/auth-db"
+import type { Duration } from "../lib/parse-duration"
+import { parseDurationSeconds } from "../lib/parse-duration"
+import type { JwtAlgorithm } from "./import-signing-key"
 
 /**
  * Claims you may put in a token.

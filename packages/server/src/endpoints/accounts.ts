@@ -1,17 +1,17 @@
-import type { AuthUser } from "../core/auth-db.ts"
-import { notFound, unauthenticated } from "../http/auth-api-error.ts"
-import { defineEndpoint } from "../http/define-endpoint.ts"
+import type { AuthUser } from "../core/auth-db"
+import { notFound, unauthenticated } from "../http/auth-api-error"
+import { defineEndpoint } from "../http/define-endpoint"
 import {
   serializeCookie,
   shouldUseSecureCookies
-} from "../lib/serialize-cookie.ts"
+} from "../lib/serialize-cookie"
 import {
   parkedTokens,
   pruneDeadAccounts,
   readAccountsCookie,
   serializeAccounts
-} from "../session/accounts-cookie.ts"
-import { resolveSession } from "../session/resolve-session.ts"
+} from "../session/accounts-cookie"
+import { resolveSession } from "../session/resolve-session"
 
 /** One signed-in user in this browser. */
 export interface AccountInfo {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   parseDuration,
   parseDurationSeconds
-} from "../../src/lib/parse-duration.ts"
+} from "../../src/lib/parse-duration"
 
 describe("parseDuration", () => {
   it("parses every documented default", () => {

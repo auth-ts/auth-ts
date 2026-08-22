@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   builtInErrorMessages,
   getErrorMessage
-} from "../../src/http/get-error-message.ts"
-import { resolveLocale } from "../../src/http/resolve-locale.ts"
+} from "../../src/http/get-error-message"
+import { resolveLocale } from "../../src/http/resolve-locale"
 
 const localization = {
   defaultLocale: "en",

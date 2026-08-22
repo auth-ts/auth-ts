@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { authServer } from "../../../lib/auth-server.ts"
+import { authServer } from "../../../lib/auth-server"
 
 /**
  * The entire auth surface, in one route.

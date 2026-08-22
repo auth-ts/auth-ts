@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
-import { createTestServer } from "../helpers/create-test-server.ts"
-import { readSetCookies, request } from "../helpers/request.ts"
-import { required } from "../helpers/required.ts"
+import { createTestServer } from "../helpers/create-test-server"
+import { readSetCookies, request } from "../helpers/request"
+import { required } from "../helpers/required"
 
 /** Waits for fire-and-forget work scheduled during a request. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))

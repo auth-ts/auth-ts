@@ -3,7 +3,7 @@ import {
   randomBytesBase64url,
   randomSixDigitCode,
   randomUUID
-} from "../../src/lib/generate-random.ts"
+} from "../../src/lib/generate-random"
 
 describe("randomBytesBase64url", () => {
   it("emits url-safe characters only, with no padding", () => {

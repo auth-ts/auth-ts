@@ -1,13 +1,13 @@
-import { AuthApiError, unauthenticated } from "../http/auth-api-error.ts"
-import { defineEndpoint } from "../http/define-endpoint.ts"
-import { resolveLocale } from "../http/resolve-locale.ts"
-import { validateAdditionalFields } from "../http/validate-additional-fields.ts"
-import { parseDuration } from "../lib/parse-duration.ts"
-import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie.ts"
-import { consumeMagicCode } from "../magic-code/consume-magic-code.ts"
-import { sendMagicCode } from "../magic-code/send-magic-code.ts"
-import type { HeadersInput } from "../session/resolve-session.ts"
-import { resolveSession } from "../session/resolve-session.ts"
+import { AuthApiError, unauthenticated } from "../http/auth-api-error"
+import { defineEndpoint } from "../http/define-endpoint"
+import { resolveLocale } from "../http/resolve-locale"
+import { validateAdditionalFields } from "../http/validate-additional-fields"
+import { parseDuration } from "../lib/parse-duration"
+import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
+import { consumeMagicCode } from "../magic-code/consume-magic-code"
+import { sendMagicCode } from "../magic-code/send-magic-code"
+import type { HeadersInput } from "../session/resolve-session"
+import { resolveSession } from "../session/resolve-session"
 
 /**
  * Reads the signed-in user.

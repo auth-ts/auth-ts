@@ -1,4 +1,4 @@
-import type { Logger, LogLevel } from "../lib/logger.ts"
+import type { Logger, LogLevel } from "../lib/logger"
 
 // The shape `createAuthClient` accepts — and nothing else. Options are the
 // partial input; what they resolve to is `AuthClientConfig`, in

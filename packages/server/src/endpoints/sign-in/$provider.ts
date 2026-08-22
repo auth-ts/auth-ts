@@ -1,11 +1,11 @@
-import { AuthApiError, notFound } from "../../http/auth-api-error.ts"
-import { defineEndpoint } from "../../http/define-endpoint.ts"
-import { resolveLocale } from "../../http/resolve-locale.ts"
-import { validateAdditionalFields } from "../../http/validate-additional-fields.ts"
-import { shouldUseSecureCookies } from "../../lib/serialize-cookie.ts"
-import { validateRedirect } from "../../lib/validate-redirect.ts"
-import { getProvider } from "../../oauth/providers/get-provider.ts"
-import { createStateCookie } from "../../oauth/state-cookie.ts"
+import { AuthApiError, notFound } from "../../http/auth-api-error"
+import { defineEndpoint } from "../../http/define-endpoint"
+import { resolveLocale } from "../../http/resolve-locale"
+import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
+import { validateRedirect } from "../../lib/validate-redirect"
+import { getProvider } from "../../oauth/providers/get-provider"
+import { createStateCookie } from "../../oauth/state-cookie"
 
 /** Input for starting an OAuth sign-in. */
 export interface SignInProviderInput {

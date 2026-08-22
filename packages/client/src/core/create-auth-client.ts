@@ -1,30 +1,30 @@
 import type { AuthUser } from "@auth-ts/server"
-import { readLifetimeClaims } from "../lib/read-lifetime-claims.ts"
+import { readLifetimeClaims } from "../lib/read-lifetime-claims"
 import {
   createDeleteUser,
   createListSessions,
   createLogout,
   createRevokeSession,
   createUpdateUser
-} from "../methods/account.ts"
+} from "../methods/account"
 import {
   createDisconnect,
   createListAccounts,
   createListConnections,
   createSwitchAccount
-} from "../methods/connections-and-accounts.ts"
-import { createGetToken } from "../methods/get-token.ts"
-import { createGetUser } from "../methods/get-user.ts"
-import { createConnect, createSignIn } from "../methods/oauth.ts"
-import type { SignInResult } from "../methods/sign-in-with-code.ts"
+} from "../methods/connections-and-accounts"
+import { createGetToken } from "../methods/get-token"
+import { createGetUser } from "../methods/get-user"
+import { createConnect, createSignIn } from "../methods/oauth"
+import type { SignInResult } from "../methods/sign-in-with-code"
 import {
   createSendCode,
   createSignInAsGuest,
   createVerifyCode
-} from "../methods/sign-in-with-code.ts"
-import { createAuthClientInternals } from "./auth-client-internals.ts"
-import type { AuthClientOptions } from "./auth-client-options.ts"
-import type { UserListener } from "./user-store.ts"
+} from "../methods/sign-in-with-code"
+import { createAuthClientInternals } from "./auth-client-internals"
+import type { AuthClientOptions } from "./auth-client-options"
+import type { UserListener } from "./user-store"
 
 /**
  * The browser client.

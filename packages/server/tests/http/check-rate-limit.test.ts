@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { checkRateLimit } from "../../src/http/check-rate-limit.ts"
-import { createTestInternals } from "../helpers/create-test-internals.ts"
-import { required } from "../helpers/required.ts"
+import { checkRateLimit } from "../../src/http/check-rate-limit"
+import { createTestInternals } from "../helpers/create-test-internals"
+import { required } from "../helpers/required"
 
 const KEY = "sendCode:ip:203.0.113.7"
 

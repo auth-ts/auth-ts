@@ -1,21 +1,21 @@
-import type { AuthUser } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { unauthenticated } from "../http/auth-api-error.ts"
-import { defineEndpoint } from "../http/define-endpoint.ts"
+import type { AuthUser } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { unauthenticated } from "../http/auth-api-error"
+import { defineEndpoint } from "../http/define-endpoint"
 import {
   clearCookie,
   serializeCookie,
   shouldUseSecureCookies
-} from "../lib/serialize-cookie.ts"
-import type { ParkedAccount } from "../session/accounts-cookie.ts"
+} from "../lib/serialize-cookie"
+import type { ParkedAccount } from "../session/accounts-cookie"
 import {
   parkedTokens,
   pruneDeadAccounts,
   readAccountsCookie,
   serializeAccounts
-} from "../session/accounts-cookie.ts"
-import { mintAccessToken } from "../session/issue-session.ts"
-import { resolveSession } from "../session/resolve-session.ts"
+} from "../session/accounts-cookie"
+import { mintAccessToken } from "../session/issue-session"
+import { resolveSession } from "../session/resolve-session"
 
 /**
  * How far a sign-out reaches, for each account it applies to.

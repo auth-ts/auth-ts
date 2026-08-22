@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { codeChallengeS256 } from "../../src/oauth/pkce.ts"
-import { createTestServer } from "../helpers/create-test-server.ts"
-import { readSetCookies, request } from "../helpers/request.ts"
-import { required } from "../helpers/required.ts"
-import { decodeState, forgeState } from "../helpers/state-cookie.ts"
-import { stubGitHub, stubGoogle } from "../helpers/stub-provider-network.ts"
+import { codeChallengeS256 } from "../../src/oauth/pkce"
+import { createTestServer } from "../helpers/create-test-server"
+import { readSetCookies, request } from "../helpers/request"
+import { required } from "../helpers/required"
+import { decodeState, forgeState } from "../helpers/state-cookie"
+import { stubGitHub, stubGoogle } from "../helpers/stub-provider-network"
 
 const OAUTH_OPTIONS = {
   baseURL: "https://app.example.com",
@@ -1145,7 +1145,7 @@ describe("google", () => {
     // point in production. A fresh module instance is the only way to reach the
     // first-fetch failure path.
     vi.resetModules()
-    const { google } = await import("../../src/oauth/providers/google.ts")
+    const { google } = await import("../../src/oauth/providers/google")
     stubGoogle({ sub: "g-1", status: { jwks: 503 } })
 
     await expect(

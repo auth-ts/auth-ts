@@ -1,19 +1,19 @@
 import { calculateJwkThumbprint, decodeJwt, importSPKI, SignJWT } from "jose"
 import { beforeAll, describe, expect, it } from "vitest"
-import { buildJwks } from "../../src/jwt/build-jwks.ts"
-import { decodeToken } from "../../src/jwt/decode-token.ts"
+import { buildJwks } from "../../src/jwt/build-jwks"
+import { decodeToken } from "../../src/jwt/decode-token"
 import {
   importAdditionalPublicKey,
   importSigningKey
-} from "../../src/jwt/import-signing-key.ts"
-import type { SignTokenContext } from "../../src/jwt/sign-token.ts"
-import { signToken } from "../../src/jwt/sign-token.ts"
-import type { VerifyTokenContext } from "../../src/jwt/verify-token.ts"
+} from "../../src/jwt/import-signing-key"
+import type { SignTokenContext } from "../../src/jwt/sign-token"
+import { signToken } from "../../src/jwt/sign-token"
+import type { VerifyTokenContext } from "../../src/jwt/verify-token"
 import {
   createVerificationKeySet,
   verifyToken
-} from "../../src/jwt/verify-token.ts"
-import { generateTestKeys } from "../helpers/generate-test-keys.ts"
+} from "../../src/jwt/verify-token"
+import { generateTestKeys } from "../helpers/generate-test-keys"
 
 let signContext: SignTokenContext
 let verifyContext: VerifyTokenContext

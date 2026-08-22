@@ -6,7 +6,7 @@ import {
   sourceFiles,
   undocumentedExports,
   undocumentedExportsInSource
-} from "../../../tools/testing/undocumented-exports.ts"
+} from "../../../tools/testing/undocumented-exports"
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../src")
 

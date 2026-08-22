@@ -1,6 +1,6 @@
-import type { AuthUser } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import type { AdditionalFieldValues } from "../http/validate-additional-fields.ts"
+import type { AuthUser } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import type { AdditionalFieldValues } from "../http/validate-additional-fields"
 
 /** Identity details learned during a sign-in that a guest is completing. */
 export interface GuestIdentity {

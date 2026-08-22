@@ -1,11 +1,11 @@
-import { AuthApiError } from "../../http/auth-api-error.ts"
+import { AuthApiError } from "../../http/auth-api-error"
 import type {
   AuthorizeURLInput,
   ExchangeCodeInput,
   OAuthProvider,
   ProviderIdentity
-} from "./oauth-provider.ts"
-import { isProviderUnavailable, providerRejected } from "./provider-response.ts"
+} from "./oauth-provider"
+import { isProviderUnavailable, providerRejected } from "./provider-response"
 
 interface GitHubUser {
   id: number

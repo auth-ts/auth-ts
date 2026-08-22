@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { parseCookies, readCookie } from "../../src/lib/parse-cookies.ts"
+import { parseCookies, readCookie } from "../../src/lib/parse-cookies"
 import {
   clearCookie,
   serializeCookie,
   shouldUseSecureCookies
-} from "../../src/lib/serialize-cookie.ts"
+} from "../../src/lib/serialize-cookie"
 
 describe("parseCookies", () => {
   it("parses a multi-cookie header", () => {

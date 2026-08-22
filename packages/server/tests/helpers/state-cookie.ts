@@ -1,6 +1,6 @@
-import { decodeBase64url } from "../../src/lib/base64url.ts"
-import type { OAuthStatePayload } from "../../src/oauth/state-cookie.ts"
-import { signStatePayload } from "../../src/oauth/state-cookie.ts"
+import { decodeBase64url } from "../../src/lib/base64url"
+import type { OAuthStatePayload } from "../../src/oauth/state-cookie"
+import { signStatePayload } from "../../src/oauth/state-cookie"
 
 /** The secret `createTestServer` configures, so tests can mint valid cookies. */
 export const TEST_SERVER_SECRET = "test-server-secret"

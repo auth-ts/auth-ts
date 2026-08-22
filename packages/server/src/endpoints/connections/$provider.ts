@@ -1,6 +1,6 @@
-import { AuthApiError, unauthenticated } from "../../http/auth-api-error.ts"
-import { defineEndpoint } from "../../http/define-endpoint.ts"
-import { resolveSession } from "../../session/resolve-session.ts"
+import { AuthApiError, unauthenticated } from "../../http/auth-api-error"
+import { defineEndpoint } from "../../http/define-endpoint"
+import { resolveSession } from "../../session/resolve-session"
 
 /** Input for unlinking a provider. */
 export interface DisconnectProviderInput {

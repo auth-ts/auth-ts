@@ -1,6 +1,6 @@
-import type { AdditionalFieldsSchema } from "../core/auth-server-options.ts"
-import { AuthApiError } from "./auth-api-error.ts"
-import { AuthConfigError } from "./auth-config-error.ts"
+import type { AdditionalFieldsSchema } from "../core/auth-server-options"
+import { AuthApiError } from "./auth-api-error"
+import { AuthConfigError } from "./auth-config-error"
 
 /** A validated set of additional-field values. */
 export type AdditionalFieldValues = Record<string, string | number | boolean>

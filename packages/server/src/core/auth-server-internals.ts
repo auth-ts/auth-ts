@@ -1,16 +1,16 @@
 import type { JWK } from "jose"
-import { buildJwks } from "../jwt/build-jwks.ts"
-import type { SigningKeyMaterial } from "../jwt/import-signing-key.ts"
+import { buildJwks } from "../jwt/build-jwks"
+import type { SigningKeyMaterial } from "../jwt/import-signing-key"
 import {
   importAdditionalPublicKey,
   importSigningKey
-} from "../jwt/import-signing-key.ts"
-import type { VerificationKeySet } from "../jwt/verify-token.ts"
-import { createVerificationKeySet } from "../jwt/verify-token.ts"
-import type { LeveledLogger } from "../lib/logger.ts"
-import { createLogger } from "../lib/logger.ts"
-import type { AuthDB } from "./auth-db.ts"
-import type { AuthServerConfig } from "./auth-server-config.ts"
+} from "../jwt/import-signing-key"
+import type { VerificationKeySet } from "../jwt/verify-token"
+import { createVerificationKeySet } from "../jwt/verify-token"
+import type { LeveledLogger } from "../lib/logger"
+import { createLogger } from "../lib/logger"
+import type { AuthDB } from "./auth-db"
+import type { AuthServerConfig } from "./auth-server-config"
 
 /** Key material, imported once on first use. */
 export interface KeyMaterial extends SigningKeyMaterial {

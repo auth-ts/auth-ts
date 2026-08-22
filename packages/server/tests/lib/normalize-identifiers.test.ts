@@ -3,7 +3,7 @@ import {
   looksLikeEmail,
   normalizeEmail,
   normalizePhone
-} from "../../src/lib/normalize-identifiers.ts"
+} from "../../src/lib/normalize-identifiers"
 
 describe("normalizeEmail", () => {
   it("collapses case and trims, so one person is one account", () => {

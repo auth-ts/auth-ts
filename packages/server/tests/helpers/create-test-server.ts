@@ -1,10 +1,10 @@
-import type { AuthServerOptions } from "../../src/core/auth-server-options.ts"
-import type { AuthServer } from "../../src/core/create-auth-server.ts"
-import { createAuthServer } from "../../src/core/create-auth-server.ts"
-import type { MemoryDb } from "../../src/lib/memory-db.ts"
-import { createMemoryDb } from "../../src/lib/memory-db.ts"
-import type { CapturedCode } from "./create-test-internals.ts"
-import { generateTestKeys } from "./generate-test-keys.ts"
+import type { AuthServerOptions } from "../../src/core/auth-server-options"
+import type { AuthServer } from "../../src/core/create-auth-server"
+import { createAuthServer } from "../../src/core/create-auth-server"
+import type { MemoryDb } from "../../src/lib/memory-db"
+import { createMemoryDb } from "../../src/lib/memory-db"
+import type { CapturedCode } from "./create-test-internals"
+import { generateTestKeys } from "./generate-test-keys"
 
 /** A real server wired to in-memory storage, with sends and logs captured. */
 export interface TestServer {

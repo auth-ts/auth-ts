@@ -2,8 +2,8 @@ import { isAuthError } from "@auth-ts/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
-import { useUser } from "../hooks/use-user.ts"
-import { authClient } from "../lib/auth-client.ts"
+import { useUser } from "../hooks/use-user"
+import { authClient } from "../lib/auth-client"
 
 export const Route = createFileRoute("/account")({ component: AccountPage })
 

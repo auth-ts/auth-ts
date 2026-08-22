@@ -1,7 +1,7 @@
-import type { AuthSession, AuthUser } from "../core/auth-db.ts"
-import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import { sha256Hex } from "../lib/hash.ts"
-import { readCookie } from "../lib/parse-cookies.ts"
+import type { AuthSession, AuthUser } from "../core/auth-db"
+import type { AuthServerInternals } from "../core/auth-server-internals"
+import { sha256Hex } from "../lib/hash"
+import { readCookie } from "../lib/parse-cookies"
 
 /**
  * The minimal carrier for anything that reads the refresh cookie.

@@ -1,7 +1,7 @@
 import { loader } from "fumadocs-core/source"
 import { icons } from "lucide-react"
 import { createElement } from "react"
-import { docs } from "../../.source/server.ts"
+import { docs } from "../../.source/server"
 
 /** The documentation tree, loaded from `content/docs`. */
 export const source = loader({

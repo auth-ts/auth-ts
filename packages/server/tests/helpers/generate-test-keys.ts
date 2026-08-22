@@ -1,5 +1,5 @@
 import { exportPKCS8, exportSPKI, generateKeyPair } from "jose"
-import type { JwtAlgorithm } from "../../src/jwt/import-signing-key.ts"
+import type { JwtAlgorithm } from "../../src/jwt/import-signing-key"
 
 /** A generated key pair in the PEM formats the library's options accept. */
 export interface TestKeyPair {

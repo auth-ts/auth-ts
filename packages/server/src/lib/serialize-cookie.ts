@@ -1,5 +1,5 @@
-import type { Duration } from "./parse-duration.ts"
-import { parseDurationSeconds } from "./parse-duration.ts"
+import type { Duration } from "./parse-duration"
+import { parseDurationSeconds } from "./parse-duration"
 
 /**
  * The cookie attributes this library controls.

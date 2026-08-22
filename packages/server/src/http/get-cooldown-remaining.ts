@@ -1,6 +1,6 @@
-import type { AuthMagicCode } from "../core/auth-db.ts"
-import type { Duration } from "../lib/parse-duration.ts"
-import { parseDuration } from "../lib/parse-duration.ts"
+import type { AuthMagicCode } from "../core/auth-db"
+import type { Duration } from "../lib/parse-duration"
+import { parseDuration } from "../lib/parse-duration"
 
 /**
  * Seconds left before another code may be sent to this identifier.
