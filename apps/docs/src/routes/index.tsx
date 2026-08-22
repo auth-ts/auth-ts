@@ -115,8 +115,8 @@ function Hero() {
   return (
     <section className="border-fd-border relative isolate overflow-hidden border-b">
       <HeroBackdrop />
-      <div className="relative mx-auto grid max-w-5xl gap-x-12 gap-y-10 px-6 py-20 md:py-28 lg:grid-cols-[1.5fr_1fr] lg:items-end">
-        <div>
+      <div className="relative mx-auto grid max-w-5xl grid-cols-1 gap-x-12 gap-y-10 px-6 py-20 md:py-28 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end">
+        <div className="min-w-0">
           {/*
            * The mark and the wordmark are one line and the largest thing here.
            * The sentence under them is the descriptive half of the heading, so
@@ -232,8 +232,14 @@ function Features() {
 function Snippets() {
   return (
     <section className="border-fd-border border-b">
-      <div className="mx-auto grid max-w-5xl gap-10 px-6 py-16 lg:grid-cols-2">
-        <div className="space-y-3">
+      {/*
+       * `grid-cols-1` and `min-w-0` are both load-bearing. Without an explicit
+       * column the implicit one sizes to its content, and a grid item's default
+       * `min-width: auto` stops it shrinking below its longest unbroken line —
+       * so a wide code sample widens the page instead of scrolling in place.
+       */}
+      <div className="mx-auto grid max-w-5xl grid-cols-1 gap-10 px-6 py-16 lg:grid-cols-2">
+        <div className="min-w-0 space-y-3">
           <h2 className="font-mono text-sm">
             <span className="text-fd-primary">01</span> On the server
           </h2>
@@ -243,7 +249,7 @@ function Snippets() {
           </p>
           <DynamicCodeBlock lang="ts" code={SERVER_SNIPPET} />
         </div>
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           <h2 className="font-mono text-sm">
             <span className="text-fd-primary">02</span> In the browser
           </h2>
