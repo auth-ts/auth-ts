@@ -30,8 +30,6 @@ export function useUser() {
 
   return useQuery({
     queryKey: sessionQueryKey,
-    queryFn: authClient.getUser,
-    refetchOnWindowFocus: true,
-    staleTime: 60_000
+    queryFn: authClient.getUser
   })
 }
