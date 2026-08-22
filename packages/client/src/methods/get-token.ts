@@ -35,7 +35,10 @@ function readLifetimeClaims(token: string) {
  *
  * @throws {AuthError} `unauthenticated` when there is no live session. Local
  * state is cleared first, because a token and a user that outlive their session
- * are worse than none.
+ * are worse than none. Any other failure — the server erroring, a proxy in
+ * front of it answering for it, the network dropping — is thrown as-is and
+ * clears nothing: none of those is a verdict on the session, and blanking the
+ * interface because a deploy was mid-flight is the bug, not the fix.
  */
 export function createGetToken(internals: AuthClientInternals) {
   return async function getToken(): Promise<string> {
@@ -64,10 +67,11 @@ export function createGetToken(internals: AuthClientInternals) {
 
         return result.accessToken
       } catch (error) {
-        if (error instanceof AuthError) {
-          internals.log.debug("refresh refused, clearing local state", {
-            code: error.code
-          })
+        // Only the server saying "no session" is grounds to forget the user. A
+        // 500, a 502 from the proxy, a 429 — every non-2xx becomes an AuthError,
+        // and most of them say nothing about whether the cookie is still good.
+        if (error instanceof AuthError && error.code === "unauthenticated") {
+          internals.log.debug("refresh refused, clearing local state")
           internals.tokenStore.clear()
           internals.userStore.set(null)
         }

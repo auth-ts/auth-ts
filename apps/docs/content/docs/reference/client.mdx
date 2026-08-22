@@ -23,10 +23,14 @@ a page mounting ten components makes one round-trip and they all see the same
 token. Hand it to your PostgREST client as its access token.
 
 `getUser()` returns the signed-in user or `null`. It is gated on the token rather
-than a separate cache, so it costs nothing while the token is valid. On a network
-failure it resolves to the **last known user** rather than `null` — being offline
-is not being signed out, and an application that forgets who you are whenever the
-connection drops is worse than one that is briefly optimistic.
+than a separate cache, so it costs nothing while the token is valid. Only the
+server answering `unauthenticated` yields `null`. A network failure, a server
+error, or a proxy answering in the server's place all resolve to the **last
+known user** — being offline is not being signed out, and neither is the auth
+server being mid-deploy. An application that forgets who you are whenever
+something between it and the server hiccups is worse than one that is briefly
+optimistic. (`getToken()` likewise clears local state only on `unauthenticated`;
+every other failure is thrown and leaves the caches alone.)
 
 ## React
 

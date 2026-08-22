@@ -11,9 +11,13 @@ import { AuthError } from "../lib/auth-error.ts"
  * the user from that response — the token itself carries only `sub` and is never
  * decoded into a user.
  *
- * A network failure resolves to the last known user rather than `null`. Being
- * offline is not being signed out, and an application that forgets who you are
- * every time the connection drops is worse than one that is briefly optimistic.
+ * Only the server answering `unauthenticated` resolves to `null`. Anything
+ * else — the network failing, the server erroring, a proxy answering for it —
+ * resolves to the last known user. Being offline is not being signed out, and
+ * neither is the auth server being mid-deploy; an application that forgets who
+ * you are whenever something between it and the server hiccups is worse than
+ * one that is briefly optimistic. Server failures are logged at `warn` so they
+ * are not mistaken for a tunnel.
  */
 export function createGetUser(
   internals: AuthClientInternals,
@@ -30,9 +34,16 @@ export function createGetUser(
       await getToken()
       return internals.userStore.get()
     } catch (error) {
-      if (error instanceof AuthError) return null
+      if (error instanceof AuthError) {
+        if (error.code === "unauthenticated") return null
+        internals.log.warn("auth server failed, keeping the last known user", {
+          code: error.code,
+          status: error.status
+        })
+      } else {
+        internals.log.debug("offline, keeping the last known user")
+      }
 
-      internals.log.debug("offline, keeping the last known user")
       return internals.userStore.get() ?? restored
     }
   }

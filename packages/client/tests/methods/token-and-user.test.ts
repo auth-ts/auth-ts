@@ -129,6 +129,43 @@ describe("getToken", () => {
     expect(client.getCachedUser()).toBeNull()
   })
 
+  it("throws on a server failure but keeps both caches, because a 500 is not a verdict", async () => {
+    server.on("POST", "/api/auth/token", {
+      body: { accessToken: fakeAccessToken(), user }
+    })
+    const client = createAuthClient()
+    await client.getToken()
+
+    // Every non-2xx becomes an AuthError; only unauthenticated means the
+    // session is gone. Before this, a deploy-time 500 blanked every tab.
+    for (const reply of [
+      {
+        status: 500,
+        body: { error: { code: "internalError", message: "Something broke." } }
+      },
+      // A proxy answering for the server, with no JSON envelope at all.
+      { status: 502, body: "Bad Gateway" },
+      {
+        status: 429,
+        body: { error: { code: "rateLimited", message: "Slow down." } }
+      }
+    ]) {
+      server.restore()
+      server = fakeAuthServer()
+      server.on("POST", "/api/auth/token", reply)
+      client.clearToken()
+
+      await expect(
+        client.getToken(),
+        String(reply.status)
+      ).rejects.toBeInstanceOf(AuthError)
+      expect(client.getCachedUser(), String(reply.status)).toMatchObject({
+        email: "ada@example.com"
+      })
+      expect(localStorage.getItem("auth-ts.user")).toContain("ada@example.com")
+    }
+  })
+
   it("surfaces retryAfter from a throttled response", async () => {
     server.on("POST", "/api/auth/token", {
       status: 429,
@@ -197,6 +234,25 @@ describe("getUser", () => {
 
     expect(await client.getUser()).toMatchObject({ email: "ada@example.com" })
     expect(localStorage.getItem("auth-ts.user")).toContain("ada@example.com")
+  })
+
+  it("keeps the last known user when the server fails, not only when the network does", async () => {
+    server.on("POST", "/api/auth/token", {
+      body: { accessToken: fakeAccessToken(), user }
+    })
+    const client = createAuthClient()
+    await client.getUser()
+
+    server.restore()
+    server = fakeAuthServer()
+    server.on("POST", "/api/auth/token", {
+      status: 500,
+      body: { error: { code: "internalError", message: "Something broke." } }
+    })
+    client.clearToken()
+
+    // The auth server being mid-deploy is not the session being gone.
+    expect(await client.getUser()).toMatchObject({ email: "ada@example.com" })
   })
 
   it("shares one refresh between concurrent callers", async () => {
