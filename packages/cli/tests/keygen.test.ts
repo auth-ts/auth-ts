@@ -134,7 +134,7 @@ describe("auth-ts keygen", () => {
       /^JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n[^"\n]+\\n-----END PRIVATE KEY-----"$/m
     )
     expect(stdout).toMatch(/^AUTH_SECRET="[A-Za-z0-9+/]{43}="$/m)
-    const jwks = stdout.slice(stdout.indexOf("JWKS=") + "JWKS=".length)
+    const jwks = stdout.slice(stdout.indexOf("jwks.json") + "jwks.json".length)
     expect(JSON.parse(jwks)).toHaveProperty("keys")
     // Pretty-printed, so it reads rather than only pastes.
     expect(jwks).toContain("\n  ")

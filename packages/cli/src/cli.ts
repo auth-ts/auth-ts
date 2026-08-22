@@ -27,18 +27,49 @@ three lines pipe cleanly on their own.
 /**
  * Colour, only where someone is looking at it.
  *
- * Each stream is checked on its own: piping the values into a file must not
- * put escape codes in it, and that is true even while the questions on stderr
- * are still going to a terminal. `NO_COLOR` turns the lot off.
+ * Each stream is styled on its own: piping the values into a file must not put
+ * escape codes in it, and that stays true while the questions on stderr are
+ * still going to a terminal. `NO_COLOR` turns the lot off.
  */
 function styler(stream: { isTTY?: boolean }) {
   const plain = !stream.isTTY || process.env.NO_COLOR
-  return (code: number, value: string) =>
-    plain ? value : `\u001B[${code}m${value}\u001B[39m`
+  const paint = (code: number, reset = 39) =>
+    plain
+      ? (value: string) => value
+      : (value: string) => `\u001B[${code}m${value}\u001B[${reset}m`
+
+  return {
+    name: paint(36),
+    string: paint(32),
+    path: paint(36),
+    ok: paint(32),
+    warn: paint(33),
+    yes: paint(32),
+    no: paint(31),
+    dim: paint(2, 22)
+  }
 }
+
+type Style = ReturnType<typeof styler>
 
 const out = styler(process.stdout)
 const say = styler(process.stderr)
+
+/**
+ * JSON, coloured the way an editor would: keys apart from values, punctuation
+ * receding. One pass, so a brace inside a string cannot be mistaken for syntax.
+ */
+function highlightJson(json: string, style: Style) {
+  return json.replace(
+    /("(?:[^"\\]|\\.)*")(\s*:)|("(?:[^"\\]|\\.)*")|([[\]{},])/g,
+    (match, key, colon, string, punctuation) => {
+      if (key) return `${style.name(key)}${style.dim(colon)}`
+      if (string) return style.string(string)
+      if (punctuation) return style.dim(punctuation)
+      return match
+    }
+  )
+}
 
 const ALGORITHMS: readonly JwtAlgorithm[] = ["RS256", "ES256"]
 
@@ -115,7 +146,12 @@ async function confirm(question: string) {
     output: process.stderr
   })
   try {
-    const answer = await prompt.question(`${question} ${say(90, "[y/N]")} `)
+    const choices = `${say.dim("[")}${say.yes("y")}${say.dim("/")}${say.no("N")}${say.dim("]")}`
+    // End of input — a Ctrl-D at the question — is an answer of no, not a
+    // crash on the way out.
+    const answer = await prompt
+      .question(`${question} ${choices} `)
+      .catch(() => "")
     return /^y(es)?$/i.test(answer.trim())
   } finally {
     prompt.close()
@@ -126,9 +162,15 @@ async function runKeygen(args: string[]) {
   const options = parseKeygenArgs(args)
   const { privateKeyPem, secret, jwks } = await keygen(options)
 
-  console.log(`${out(36, "JWT_PRIVATE_KEY")}=${quoteForEnv(privateKeyPem)}\n`)
-  console.log(`${out(36, "AUTH_SECRET")}="${secret}"\n`)
-  console.log(`${out(36, "JWKS")}=${JSON.stringify(jwks, null, 2)}`)
+  const variable = (name: string, value: string) =>
+    `${out.name(name)}${out.dim("=")}${out.string(value)}\n`
+
+  console.log(variable("JWT_PRIVATE_KEY", quoteForEnv(privateKeyPem)))
+  console.log(variable("AUTH_SECRET", `"${secret}"`))
+  // Not a variable like the other two — a file, shown as one.
+  console.log(
+    `${out.name("jwks.json")}\n${highlightJson(JSON.stringify(jwks, null, 2), out)}`
+  )
 
   const values = {
     JWT_PRIVATE_KEY: quoteForEnv(privateKeyPem),
@@ -138,7 +180,7 @@ async function runKeygen(args: string[]) {
   const write =
     options.yes ||
     (await confirm(
-      `\nWrite ${options.envPath} and ${options.directory}/jwks.json?`
+      `\nWrite ${say.path(options.envPath)} and ${say.path(`${options.directory}/jwks.json`)}?`
     ))
   if (!write) return
 
@@ -154,7 +196,7 @@ async function runKeygen(args: string[]) {
       `${name} is already set in ${options.envPath}. Overwrite it?`
     )
     if (overwrite) replace.push(name)
-    else console.error(say(33, `Left ${name} as it was.`))
+    else console.error(say.warn(`Left ${name} as it was.`))
   }
 
   await writeEnvFile(options.envPath, values, replace)
@@ -167,8 +209,7 @@ async function runKeygen(args: string[]) {
     !replace.includes("JWT_PRIVATE_KEY")
   if (keptKey) {
     console.error(
-      say(
-        33,
+      say.warn(
         `Left ${options.directory}/jwks.json alone: it belongs to the key already in ${options.envPath}.`
       )
     )
@@ -177,7 +218,9 @@ async function runKeygen(args: string[]) {
 
   const jwksPath = await writeKeySet(options.directory, jwks)
 
-  console.error(say(32, `Wrote ${options.envPath} and ${jwksPath}`))
+  console.error(
+    `${say.ok("Wrote")} ${say.path(options.envPath)} ${say.ok("and")} ${say.path(jwksPath)}`
+  )
 }
 
 const [command, ...rest] = process.argv.slice(2)
