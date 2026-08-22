@@ -14,6 +14,7 @@ interface GoogleIdTokenClaims {
   email_verified?: boolean
   name?: string
   picture?: string
+  nonce?: string
 }
 
 /** Both forms Google has issued as `iss`; the OIDC discovery document lists the first. */
@@ -35,17 +36,29 @@ const googleKeys = createRemoteJWKSet(
 
 /**
  * Google sign-in, via the standard OIDC authorization code flow.
+ *
+ * PKCE on the code exchange and a nonce bound into the ID token, both carried
+ * in the signed state cookie across the redirect.
  */
 export const google: OAuthProvider = {
   id: "google",
 
-  authorizeURL({ credentials, redirectURI, state }: AuthorizeURLInput) {
+  authorizeURL({
+    credentials,
+    redirectURI,
+    state,
+    codeChallenge,
+    nonce
+  }: AuthorizeURLInput) {
     const parameters = new URLSearchParams({
       client_id: credentials.clientId,
       redirect_uri: redirectURI,
       response_type: "code",
       scope: "openid email profile",
-      state
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+      nonce
     })
 
     return `https://accounts.google.com/o/oauth2/v2/auth?${parameters.toString()}`
@@ -55,6 +68,8 @@ export const google: OAuthProvider = {
     credentials,
     redirectURI,
     code,
+    codeVerifier,
+    nonce,
     signal
   }: ExchangeCodeInput): Promise<ProviderIdentity> {
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -65,7 +80,8 @@ export const google: OAuthProvider = {
         client_secret: credentials.clientSecret,
         redirect_uri: redirectURI,
         grant_type: "authorization_code",
-        code
+        code,
+        code_verifier: codeVerifier
       }),
       signal
     })
@@ -101,6 +117,11 @@ export const google: OAuthProvider = {
       throw classifyVerifyFailure(error)
     }
     if (!claims.sub) throw new AuthApiError("unauthenticated", 401)
+
+    // The nonce ties this token to this flow: it went out in the authorize
+    // request and must come back in the token, or the token was minted for
+    // some other request and is being replayed into this one.
+    if (claims.nonce !== nonce) throw new AuthApiError("unauthenticated", 401)
 
     // Same stakes as GitHub: an unverified address is an account takeover waiting
     // to happen, so it is dropped rather than trusted.

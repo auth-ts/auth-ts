@@ -35,7 +35,7 @@ export function readRefreshToken(
   internals: AuthServerInternals,
   headers: Headers
 ) {
-  const fromCookie = readCookie(headers, internals.options.cookie.name)
+  const fromCookie = readCookie(headers, internals.config.cookie.name)
   if (fromCookie) return fromCookie
 
   // The /i matters: the Bearer scheme is case-insensitive per RFC 6750.

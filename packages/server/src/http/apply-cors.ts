@@ -18,7 +18,14 @@ export function applyCorsHeaders(
 
   headers.set("access-control-allow-origin", cors.origin)
   headers.set("access-control-allow-credentials", "true")
-  headers.set("vary", "origin")
+  // Appended, not set: `Vary` is a list, and an endpoint that already varies
+  // on something else must not have that clobbered on the way out.
+  const vary = headers.get("vary")
+  if (
+    !vary?.split(",").some((field) => field.trim().toLowerCase() === "origin")
+  ) {
+    headers.append("vary", "origin")
+  }
 
   return headers
 }

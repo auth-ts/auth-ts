@@ -14,7 +14,7 @@ function buildURL(
   input: OAuthNavigationInput
 ) {
   const url = new URL(
-    `${internals.options.baseURL}${internals.options.basePath}${path}/${encodeURIComponent(input.provider)}`,
+    `${internals.config.baseURL}${internals.config.basePath}${path}/${encodeURIComponent(input.provider)}`,
     globalThis.location?.href ?? "http://localhost"
   )
 

@@ -35,21 +35,21 @@ export const connectProvider = defineEndpoint({
     }
   },
   run: async (internals, input: ConnectProviderInput) => {
-    const { options } = internals
+    const { config } = internals
     const headers = input.headers ?? new Headers()
 
     const resolved = await resolveSession(internals, headers)
     if (!resolved) throw new AuthApiError("unauthenticated", 401)
 
-    const configured = getProvider(options.providers, input.provider)
-    if (!configured || !options.baseURL) throw notFound()
+    const configured = getProvider(config.providers, input.provider)
+    if (!configured || !config.baseURL) throw notFound()
 
     const secure = shouldUseSecureCookies(
       input.requestURL ?? "https://localhost"
     )
-    const redirectURI = `${options.baseURL}${options.basePath}/callback/${input.provider}`
+    const redirectURI = `${config.baseURL}${config.basePath}/callback/${input.provider}`
 
-    const { state, setCookie } = await createStateCookie(
+    const { state, codeChallenge, nonce, setCookie } = await createStateCookie(
       internals,
       input.provider,
       {
@@ -65,7 +65,9 @@ export const connectProvider = defineEndpoint({
       location: configured.provider.authorizeURL({
         credentials: configured.credentials,
         redirectURI,
-        state
+        state,
+        codeChallenge,
+        nonce
       })
     })
     responseHeaders.append("set-cookie", setCookie)

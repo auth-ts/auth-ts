@@ -1,5 +1,9 @@
 import type { Logger, LogLevel } from "../lib/logger.ts"
 
+// The shape `createAuthClient` accepts — and nothing else. Options are the
+// partial input; what they resolve to is `AuthClientConfig`, in
+// `auth-client-config.ts`. Same split as the server, for the same reason.
+
 /** Options accepted by `createAuthClient`. Everything is optional. */
 export interface AuthClientOptions {
   /** Where the auth server is mounted. Must match the server's `basePath`. @default "/api/auth" */
@@ -25,30 +29,4 @@ export interface AuthClientOptions {
   logLevel?: LogLevel
   /** Log sink override. Defaults to `console`. */
   logger?: Logger
-}
-
-/** Options after defaults. */
-export interface ResolvedAuthClientOptions {
-  basePath: string
-  baseURL: string
-  locale?: string
-  logLevel: LogLevel
-  logger?: Logger
-}
-
-/** Applies defaults. Performs no input/output — constructing a client is free. */
-export function resolveAuthClientOptions(
-  options: AuthClientOptions = {}
-): ResolvedAuthClientOptions {
-  const basePath = options.basePath ?? "/api/auth"
-
-  return {
-    basePath: basePath.startsWith("/")
-      ? basePath.replace(/\/+$/, "")
-      : `/${basePath}`,
-    baseURL: options.baseURL?.replace(/\/+$/, "") ?? "",
-    ...(options.locale ? { locale: options.locale } : {}),
-    logLevel: options.logLevel ?? "error",
-    ...(options.logger ? { logger: options.logger } : {})
-  }
 }

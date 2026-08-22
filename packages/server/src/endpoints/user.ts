@@ -92,9 +92,23 @@ export const updateUser = defineEndpoint({
     }
 
     const additionalFields = validateAdditionalFields(
-      internals.options.user.additionalFields,
+      internals.config.user.additionalFields,
       rest
     )
+
+    // A PATCH that changes nothing is a client mistake, and saying so beats a
+    // 200 that looks like success. It also never reaches the callback: an
+    // `UPDATE … SET` with no columns is an error in most query builders, and
+    // there is nothing for a consumer to do about a write that asks for nothing.
+    if (
+      name === undefined &&
+      imageURL === undefined &&
+      Object.keys(additionalFields).length === 0
+    ) {
+      throw new AuthApiError("invalidField", 400, {
+        message: "Provide at least one field to update."
+      })
+    }
 
     const user = await internals.db.upsertUser({
       id: resolved.user.id,
@@ -124,6 +138,11 @@ export interface DeleteUserInput {
  * The challenge deliberately answers 403 rather than 202: **204 must be the only
  * success shape**, or a client that treats any 2xx as done will clear its state
  * and tell the user their account is gone while it very much is not.
+ *
+ * The deletion code shares the one-live-code-per-identifier row with sign-in
+ * codes, so a stranger spamming `/send-code` at this address keeps the
+ * challenge inside the send cooldown. Bounded nuisance, not a bypass: the
+ * purpose is checked on verify, so a sign-in code never authorizes a deletion.
  */
 export const deleteUser = defineEndpoint({
   method: "DELETE",
@@ -138,7 +157,7 @@ export const deleteUser = defineEndpoint({
     const resolved = await resolveSession(internals, headers)
     if (!resolved) throw unauthenticated()
 
-    const { options } = internals
+    const { config } = internals
     const { user, session } = resolved
 
     if (input.code) {
@@ -157,7 +176,7 @@ export const deleteUser = defineEndpoint({
     // require the code. With `<=`, a session created in the same millisecond as
     // the request would satisfy a zero-length window and delete outright.
     const authenticatedAgo = Date.now() - session.createdAt.getTime()
-    if (authenticatedAgo < parseDuration(options.user.deleteFreshWindow)) {
+    if (authenticatedAgo < parseDuration(config.user.deleteFreshWindow)) {
       return finishDeletion()
     }
 
@@ -175,7 +194,7 @@ export const deleteUser = defineEndpoint({
       purpose: "deleteUser",
       locale: resolveLocale(
         headers.get("accept-language"),
-        options.localization
+        config.localization
       ),
       headers
     })
@@ -191,12 +210,12 @@ export const deleteUser = defineEndpoint({
       )
       responseHeaders.append(
         "set-cookie",
-        clearCookie(options.cookie.name, options.cookie.path, secure)
+        clearCookie(config.cookie.name, config.cookie.path, secure)
       )
-      if (options.multiAccount) {
+      if (config.multiAccount) {
         responseHeaders.append(
           "set-cookie",
-          clearCookie(options.cookie.accountsName, options.cookie.path, secure)
+          clearCookie(config.cookie.accountsName, config.cookie.path, secure)
         )
       }
 

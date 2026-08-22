@@ -4,15 +4,29 @@ import { decodeBase64url, encodeBase64url } from "../lib/base64url.ts"
 import { randomBytesBase64url } from "../lib/generate-random.ts"
 import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash.ts"
 import { readCookie } from "../lib/parse-cookies.ts"
+import { parseDuration } from "../lib/parse-duration.ts"
 import { clearCookie, serializeCookie } from "../lib/serialize-cookie.ts"
+import { codeChallengeS256, createCodeVerifier } from "./pkce.ts"
 
 /**
  * How long a half-finished OAuth flow stays valid.
  *
  * Long enough to sign in at the provider, short enough that an abandoned tab
- * cannot be completed hours later.
+ * cannot be completed hours later. Enforced twice: as the cookie's `Max-Age`,
+ * which a browser honours, and against the `issuedAt` signed into the payload,
+ * which holds for any client at all — a cookie replayed from a jar that does
+ * not expire anything is refused here regardless.
  */
 export const OAUTH_STATE_TTL = "10m"
+
+/**
+ * How far ahead of this server's clock a state may claim to have been issued.
+ *
+ * The same tolerance the token verifiers use, for the same reason: two hosts
+ * behind one load balancer rarely agree on the second, and a state minted on
+ * the one that runs slightly fast must not be refused by the one that does not.
+ */
+const ISSUED_AT_TOLERANCE_MS = 60_000
 
 /** What the state cookie remembers across the redirect to the provider and back. */
 export interface OAuthStatePayload {
@@ -31,6 +45,23 @@ export interface OAuthStatePayload {
   intent: "signIn" | "connect"
   /** Validated same-origin path to return to. */
   redirect: string
+  /**
+   * When the flow started, epoch milliseconds. The callback refuses a payload
+   * older than {@link OAUTH_STATE_TTL} whether or not the browser still had
+   * the cookie — the lifetime is this server's rule, not the cookie jar's.
+   */
+  issuedAt: number
+  /**
+   * The PKCE code verifier, sent to the provider's token endpoint at the
+   * callback. Only its S256 challenge ever travels through the browser.
+   */
+  codeVerifier: string
+  /**
+   * The OIDC nonce, for providers that return an ID token. Bound into the
+   * authorize request and required to reappear in the token, so a token minted
+   * for some other flow cannot complete this one.
+   */
+  nonce: string
   /** Locale, carried here because a navigation cannot set `Accept-Language`. */
   locale?: string
   /** Sign-up fields, applied only if the callback creates a user. */
@@ -82,28 +113,57 @@ async function verifyStatePayload(
   }
 }
 
+/** What starting a flow produced: the cookie, and the values the authorize URL carries. */
+export interface StateCookie {
+  /** The `?state=` value. */
+  state: string
+  /** The S256 challenge of the verifier signed into the cookie. */
+  codeChallenge: string
+  /** The OIDC nonce signed into the cookie. */
+  nonce: string
+  /** The `Set-Cookie` header value. */
+  setCookie: string
+}
+
 /** Builds the state cookie for a flow about to start. */
 export async function createStateCookie(
   internals: AuthServerInternals,
   provider: string,
-  payload: Omit<OAuthStatePayload, "state" | "provider">,
+  payload: Omit<
+    OAuthStatePayload,
+    "state" | "provider" | "issuedAt" | "codeVerifier" | "nonce"
+  >,
   secure: boolean
-) {
+): Promise<StateCookie> {
   const state = randomBytesBase64url(32)
+  const codeVerifier = createCodeVerifier()
+  const nonce = randomBytesBase64url(32)
   const setCookie = serializeCookie({
-    name: internals.options.cookie.stateName,
+    name: internals.config.cookie.stateName,
     value: await signStatePayload(
-      { ...payload, state, provider } satisfies OAuthStatePayload,
-      internals.options.secret
+      {
+        ...payload,
+        state,
+        provider,
+        issuedAt: Date.now(),
+        codeVerifier,
+        nonce
+      } satisfies OAuthStatePayload,
+      internals.config.secret
     ),
     // Scoped to the exact callback path: this cookie is only ever read there, so
     // there is no reason for it to ride along with anything else.
-    path: `${internals.options.basePath}/callback/${provider}`,
+    path: `${internals.config.basePath}/callback/${provider}`,
     maxAge: OAUTH_STATE_TTL,
     secure
   })
 
-  return { state, setCookie }
+  return {
+    state,
+    codeChallenge: await codeChallengeS256(codeVerifier),
+    nonce,
+    setCookie
+  }
 }
 
 /**
@@ -117,11 +177,15 @@ export async function createStateCookie(
  *
  * The signature is checked before anything in the payload is read, so a cookie
  * this server did not write — or one it wrote and something else edited — is
- * indistinguishable from a missing one.
+ * indistinguishable from a missing one. Then the payload's own claims: the
+ * state must match the parameter, the provider must be this callback's, the
+ * flow must be younger than {@link OAUTH_STATE_TTL}, and the PKCE verifier and
+ * nonce must be present — a payload without them was not written by this
+ * version of the server and cannot complete an exchange that requires them.
  *
  * @throws {AuthApiError} `unauthenticated` when the cookie is missing, was not
- * signed by this server, does not match the parameter, or was issued for a
- * different provider's callback.
+ * signed by this server, does not match the parameter, was issued for a
+ * different provider's callback, or has aged out.
  */
 export async function readStateCookie(
   internals: AuthServerInternals,
@@ -129,10 +193,10 @@ export async function readStateCookie(
   stateParameter: string | null,
   provider: string
 ) {
-  const raw = readCookie(headers, internals.options.cookie.stateName)
+  const raw = readCookie(headers, internals.config.cookie.stateName)
   if (!raw || !stateParameter) throw new AuthApiError("unauthenticated", 401)
 
-  const payload = await verifyStatePayload(raw, internals.options.secret)
+  const payload = await verifyStatePayload(raw, internals.config.secret)
   if (!payload) {
     internals.log.warn("oauth state cookie failed signature check")
     throw new AuthApiError("unauthenticated", 401)
@@ -148,6 +212,26 @@ export async function readStateCookie(
     throw new AuthApiError("unauthenticated", 401)
   }
 
+  const age =
+    typeof payload.issuedAt === "number" ? Date.now() - payload.issuedAt : NaN
+  if (
+    !(age <= parseDuration(OAUTH_STATE_TTL)) ||
+    age < -ISSUED_AT_TOLERANCE_MS
+  ) {
+    internals.log.warn("oauth state expired")
+    throw new AuthApiError("unauthenticated", 401)
+  }
+
+  if (
+    typeof payload.codeVerifier !== "string" ||
+    payload.codeVerifier.length === 0 ||
+    typeof payload.nonce !== "string" ||
+    payload.nonce.length === 0
+  ) {
+    internals.log.warn("oauth state is missing its verifier or nonce")
+    throw new AuthApiError("unauthenticated", 401)
+  }
+
   return payload
 }
 
@@ -158,8 +242,8 @@ export function clearStateCookie(
   secure: boolean
 ) {
   return clearCookie(
-    internals.options.cookie.stateName,
-    `${internals.options.basePath}/callback/${provider}`,
+    internals.config.cookie.stateName,
+    `${internals.config.basePath}/callback/${provider}`,
     secure
   )
 }

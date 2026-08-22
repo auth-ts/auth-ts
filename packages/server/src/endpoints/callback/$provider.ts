@@ -57,9 +57,9 @@ export const callbackProvider = defineEndpoint({
     }
   },
   run: async (internals, input: CallbackProviderInput) => {
-    const { options } = internals
-    const configured = getProvider(options.providers, input.provider)
-    if (!configured || !options.baseURL) throw notFound()
+    const { config } = internals
+    const configured = getProvider(config.providers, input.provider)
+    if (!configured || !config.baseURL) throw notFound()
 
     const secure = shouldUseSecureCookies(input.requestURL)
     const clearState = clearStateCookie(internals, input.provider, secure)
@@ -72,7 +72,7 @@ export const callbackProvider = defineEndpoint({
       input.state,
       input.provider
     )
-    const locale = payload.locale ?? options.localization?.defaultLocale ?? "en"
+    const locale = payload.locale ?? config.localization?.defaultLocale ?? "en"
 
     if (input.providerError || !input.code) {
       return errorPage(internals, "unauthenticated", locale, clearState)
@@ -86,7 +86,7 @@ export const callbackProvider = defineEndpoint({
     let additionalFields: AdditionalFieldValues
     try {
       additionalFields = validateAdditionalFields(
-        options.user.additionalFields,
+        config.user.additionalFields,
         payload.additionalFields
       )
     } catch (error) {
@@ -98,8 +98,10 @@ export const callbackProvider = defineEndpoint({
     try {
       identity = await configured.provider.exchangeCode({
         credentials: configured.credentials,
-        redirectURI: `${options.baseURL}${options.basePath}/callback/${input.provider}`,
+        redirectURI: `${config.baseURL}${config.basePath}/callback/${input.provider}`,
         code: input.code,
+        codeVerifier: payload.codeVerifier,
+        nonce: payload.nonce,
         signal: AbortSignal.timeout(PROVIDER_DEADLINE_MS)
       })
     } catch (error) {
@@ -234,7 +236,7 @@ function errorPage(
   clearState: string,
   status = 401
 ) {
-  const message = getErrorMessage(code, locale, internals.options.localization)
+  const message = getErrorMessage(code, locale, internals.config.localization)
   const headers = new Headers({ "content-type": "text/html; charset=utf-8" })
   headers.append("set-cookie", clearState)
 

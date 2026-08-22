@@ -1,5 +1,5 @@
 import type { AuthErrorBody } from "@auth-ts/server"
-import type { ResolvedAuthClientOptions } from "../core/auth-client-options.ts"
+import type { AuthClientConfig } from "../core/auth-client-config.ts"
 import { AuthError, AuthNetworkError } from "./auth-error.ts"
 
 /** Per-request options. */
@@ -24,10 +24,10 @@ export type FetchJson = <Result>(options: FetchJsonOptions) => Promise<Result>
  * train went into a tunnel", because only one of those should clear local state.
  */
 export function createFetchJson(
-  options: ResolvedAuthClientOptions,
+  config: AuthClientConfig,
   getLocale: () => string | undefined
 ): FetchJson {
-  const base = `${options.baseURL}${options.basePath}`
+  const base = `${config.baseURL}${config.basePath}`
 
   return async <Result>({ method, path, body }: FetchJsonOptions) => {
     const headers = new Headers()

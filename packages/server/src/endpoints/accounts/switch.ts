@@ -1,12 +1,12 @@
 import { notFound, unauthenticated } from "../../http/auth-api-error.ts"
 import { defineEndpoint } from "../../http/define-endpoint.ts"
-import { sha256Hex } from "../../lib/hash.ts"
 import {
   serializeCookie,
   shouldUseSecureCookies
 } from "../../lib/serialize-cookie.ts"
 import {
   demoteActive,
+  parkedTokens,
   promoteAccount,
   pruneDeadAccounts,
   readAccountsCookie,
@@ -46,8 +46,8 @@ export const switchAccount = defineEndpoint({
     }
   },
   run: async (internals, input: SwitchAccountInput) => {
-    const { options } = internals
-    if (!options.multiAccount) throw notFound()
+    const { config } = internals
+    if (!config.multiAccount) throw notFound()
 
     const headers = input.headers ?? new Headers()
     const active = await resolveSession(internals, headers)
@@ -57,25 +57,14 @@ export const switchAccount = defineEndpoint({
       internals,
       readAccountsCookie(internals, headers)
     )
-
-    let targetToken: string | undefined
-    for (const token of parked) {
-      const session = await internals.db.getSession({
-        tokenHash: await sha256Hex(token)
-      })
-      if (session?.userId === input.userId) {
-        targetToken = token
-        break
-      }
-    }
-
-    if (!targetToken) throw notFound()
+    const target = parked.find(({ session }) => session.userId === input.userId)
+    if (!target) throw notFound()
 
     const targetUser = await internals.db.getUser({ id: input.userId })
     if (!targetUser) throw notFound()
 
     const currentToken = readRefreshToken(internals, headers)
-    const remaining = promoteAccount(parked, targetToken)
+    const remaining = promoteAccount(parkedTokens(parked), target.token)
     const nextParked = currentToken
       ? await demoteActive(internals, remaining, currentToken)
       : remaining
@@ -87,20 +76,20 @@ export const switchAccount = defineEndpoint({
     responseHeaders.append(
       "set-cookie",
       serializeCookie({
-        name: options.cookie.name,
-        value: targetToken,
-        path: options.cookie.path,
-        maxAge: options.session.ttl,
+        name: config.cookie.name,
+        value: target.token,
+        path: config.cookie.path,
+        maxAge: config.session.ttl,
         secure
       })
     )
     responseHeaders.append(
       "set-cookie",
       serializeCookie({
-        name: options.cookie.accountsName,
+        name: config.cookie.accountsName,
         value: serializeAccounts(nextParked),
-        path: options.cookie.path,
-        maxAge: options.session.ttl,
+        path: config.cookie.path,
+        maxAge: config.session.ttl,
         secure
       })
     )

@@ -26,16 +26,26 @@ interface GitHubEmail {
  * Scope is `read:user user:email` because the profile response does not include
  * a usable email — `/user/emails` is a second call, and the only one that reports
  * verification status.
+ *
+ * PKCE is sent on every flow; GitHub has honoured it for OAuth apps since July
+ * 2025. No `nonce`: GitHub issues no ID token, so there is nothing to echo it in.
  */
 export const github: OAuthProvider = {
   id: "github",
 
-  authorizeURL({ credentials, redirectURI, state }: AuthorizeURLInput) {
+  authorizeURL({
+    credentials,
+    redirectURI,
+    state,
+    codeChallenge
+  }: AuthorizeURLInput) {
     const parameters = new URLSearchParams({
       client_id: credentials.clientId,
       redirect_uri: redirectURI,
       scope: "read:user user:email",
-      state
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256"
     })
 
     return `https://github.com/login/oauth/authorize?${parameters.toString()}`
@@ -45,6 +55,7 @@ export const github: OAuthProvider = {
     credentials,
     redirectURI,
     code,
+    codeVerifier,
     signal
   }: ExchangeCodeInput): Promise<ProviderIdentity> {
     const tokenResponse = await fetch(
@@ -59,7 +70,8 @@ export const github: OAuthProvider = {
           client_id: credentials.clientId,
           client_secret: credentials.clientSecret,
           redirect_uri: redirectURI,
-          code
+          code,
+          code_verifier: codeVerifier
         }),
         signal
       }

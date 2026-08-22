@@ -93,6 +93,11 @@ export interface StubGoogleIdentity {
   }
   /** HTTP statuses to answer with instead of 200, per endpoint. */
   status?: { token?: number; jwks?: number }
+  /**
+   * The `nonce` claim to put in the ID token. Full-flow tests copy it out of
+   * the state cookie so the token matches; a test can also set a wrong one.
+   */
+  nonce?: string
 }
 
 const GOOGLE_KID = "test-google-kid"
@@ -151,7 +156,8 @@ async function mintGoogleIdToken(identity: StubGoogleIdentity) {
       ? {}
       : { email_verified: identity.emailVerified }),
     ...(identity.name ? { name: identity.name } : {}),
-    ...(identity.picture ? { picture: identity.picture } : {})
+    ...(identity.picture ? { picture: identity.picture } : {}),
+    ...(identity.nonce ? { nonce: identity.nonce } : {})
   })
     .setProtectedHeader({ alg: "RS256", kid: GOOGLE_KID })
     .setIssuer(overrides.issuer ?? "https://accounts.google.com")

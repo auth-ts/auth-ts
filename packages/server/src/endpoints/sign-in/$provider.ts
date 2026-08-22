@@ -61,7 +61,7 @@ export const signInProvider = defineEndpoint({
         url.searchParams.get("locale") ??
         resolveLocale(
           request.headers.get("accept-language"),
-          internals.options.localization
+          internals.config.localization
         ),
       additionalFields: rawFields
         ? parseAdditionalFields(rawFields)
@@ -71,20 +71,20 @@ export const signInProvider = defineEndpoint({
     }
   },
   run: async (internals, input: SignInProviderInput) => {
-    const { options } = internals
-    const configured = getProvider(options.providers, input.provider)
-    if (!configured || !options.baseURL) throw notFound()
+    const { config } = internals
+    const configured = getProvider(config.providers, input.provider)
+    if (!configured || !config.baseURL) throw notFound()
 
     const additionalFields = validateAdditionalFields(
-      options.user.additionalFields,
+      config.user.additionalFields,
       input.additionalFields
     )
     const secure = shouldUseSecureCookies(
       input.requestURL ?? "https://localhost"
     )
-    const redirectURI = `${options.baseURL}${options.basePath}/callback/${input.provider}`
+    const redirectURI = `${config.baseURL}${config.basePath}/callback/${input.provider}`
 
-    const { state, setCookie } = await createStateCookie(
+    const { state, codeChallenge, nonce, setCookie } = await createStateCookie(
       internals,
       input.provider,
       {
@@ -102,7 +102,9 @@ export const signInProvider = defineEndpoint({
       location: configured.provider.authorizeURL({
         credentials: configured.credentials,
         redirectURI,
-        state
+        state,
+        codeChallenge,
+        nonce
       })
     })
     headers.append("set-cookie", setCookie)

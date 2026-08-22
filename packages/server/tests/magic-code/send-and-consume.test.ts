@@ -78,6 +78,43 @@ describe("resolveCodeIdentifier", () => {
 })
 
 describe("sendMagicCode", () => {
+  it("rolls the stored code back when delivery fails, so the retry is not in cooldown", async () => {
+    // The cooldown is derived from the live row. A row left behind by a code
+    // nobody received would refuse the user's retry for a minute — for an
+    // outage that was the sender's, not theirs.
+    let outage = true
+    const { internals, db, logCalls } = await createTestInternals({
+      email: {
+        sendCode: () => {
+          if (outage) throw new Error("SMTP down")
+        }
+      }
+    })
+    const send = () =>
+      sendMagicCode(internals, {
+        identifier: emailIdentifier,
+        purpose: "signIn",
+        locale: "en",
+        headers: new Headers()
+      })
+
+    await expect(send()).rejects.toThrow("SMTP down")
+    expect(await db.getMagicCode({ identifier: "ada@example.com" })).toBeNull()
+    expect(
+      logCalls.some(
+        (call) =>
+          call.level === "error" &&
+          call.message === "magic code delivery failed"
+      )
+    ).toBe(true)
+
+    outage = false
+    await expect(send()).resolves.toBeUndefined()
+    expect(
+      await db.getMagicCode({ identifier: "ada@example.com" })
+    ).not.toBeNull()
+  })
+
   it("delivers a six-digit code and stores only its HMAC", async () => {
     const { internals, db, sentCodes } = await createTestInternals()
 
@@ -374,7 +411,7 @@ describe("consumeMagicCode", () => {
     }
     // The counter is the rate-limit row keyed on the code's hash, not a field
     // on the code row — that is what makes it atomic.
-    const key = `magicCode:attempts:${await hmacSha256Hex(code, internals.options.secret)}`
+    const key = `magicCode:attempts:${await hmacSha256Hex(code, internals.config.secret)}`
     expect((await db.getRateLimit({ key }))?.count).toBe(4)
     expect(
       await db.getMagicCode({ identifier: "ada@example.com" })
@@ -521,7 +558,7 @@ describe("consumeMagicCode", () => {
     // stale guesses counted against A's key alone — B starts with a full budget,
     // so a wrong guess against it is its first, not its sixth.
     const keyFor = async (c: string) =>
-      `magicCode:attempts:${await hmacSha256Hex(c, internals.options.secret)}`
+      `magicCode:attempts:${await hmacSha256Hex(c, internals.config.secret)}`
     expect((await db.getRateLimit({ key: await keyFor(codeA) }))?.count).toBe(5)
     expect(await db.getRateLimit({ key: await keyFor(codeB) })).toBeNull()
     await guessWrong()

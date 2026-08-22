@@ -137,7 +137,7 @@ describe("matchRoute", () => {
   it("honours a custom basePath, including one written with a trailing slash", async () => {
     const { authServer } = await createTestServer({ basePath: "/auth/" })
 
-    expect(authServer.options.basePath).toBe("/auth")
+    expect(authServer.config.basePath).toBe("/auth")
     expect(
       (await authServer.handler(request("GET", "/auth/jwks.json"))).status
     ).toBe(200)
@@ -389,5 +389,27 @@ describe("cors", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe(
       "https://app.example.com"
     )
+  })
+
+  it("appends origin to Vary rather than clobbering what is already there", async () => {
+    const { authServer } = await createTestServer({
+      cors: { origin: "https://app.example.com" }
+    })
+    const response = await authServer.handler(
+      request("GET", "/api/auth/jwks.json")
+    )
+    expect(response.headers.get("vary")).toBe("origin")
+
+    const { applyCorsHeaders } = await import("../../src/http/apply-cors.ts")
+    const headers = applyCorsHeaders(new Headers({ vary: "accept-encoding" }), {
+      origin: "https://app.example.com"
+    })
+    expect(headers.get("vary")).toBe("accept-encoding, origin")
+    // Idempotent: a second application does not list it twice.
+    expect(
+      applyCorsHeaders(headers, { origin: "https://app.example.com" }).get(
+        "vary"
+      )
+    ).toBe("accept-encoding, origin")
   })
 })

@@ -29,7 +29,7 @@ export const sendCode = defineEndpoint({
       ...body,
       locale: resolveLocale(
         request.headers.get("accept-language"),
-        internals.options.localization
+        internals.config.localization
       ),
       headers: request.headers
     }
@@ -41,7 +41,7 @@ export const sendCode = defineEndpoint({
       identifier,
       purpose: "signIn",
       locale:
-        input.locale ?? internals.options.localization?.defaultLocale ?? "en",
+        input.locale ?? internals.config.localization?.defaultLocale ?? "en",
       headers: input.headers ?? new Headers()
     })
 

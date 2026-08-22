@@ -34,52 +34,70 @@ export function createHandler(
   internals: AuthServerInternals,
   endpoint: AnyEndpoint
 ): AuthHandler {
-  return async (request) => {
-    const { options } = internals
-
-    if (request.method === "OPTIONS") {
-      const preflight = preflightResponse(options.cors)
-      if (preflight) return preflight
-    }
-
-    const locale = resolveLocale(
-      request.headers.get("accept-language"),
-      options.localization
+  return (request) =>
+    handleRequest(
+      internals,
+      endpoint,
+      request,
+      matchEndpointParams(internals, request, endpoint.path)
     )
+}
 
-    try {
-      if (request.method !== endpoint.method) {
-        throw new AuthApiError("methodNotAllowed", 405)
-      }
-      assertAllowedOrigin(internals, request)
+/**
+ * Serves one request with one endpoint — the body of every handler.
+ *
+ * Split from {@link createHandler} so the catch-all can hand over the `params`
+ * its router already extracted instead of parsing the URL and matching the
+ * path a second time on every request. A directly mounted handler resolves
+ * them itself, through the same matcher, so the two mount styles cannot
+ * disagree about what a `$param` is.
+ */
+export async function handleRequest(
+  internals: AuthServerInternals,
+  endpoint: AnyEndpoint,
+  request: Request,
+  params: Record<string, string>
+): Promise<Response> {
+  const { config } = internals
 
-      const params = matchEndpointParams(internals, request, endpoint.path)
-      const input = endpoint.parse
-        ? await endpoint.parse({ request, params, internals })
-        : undefined
-      const result = await endpoint.run(internals, input as never)
+  if (request.method === "OPTIONS") {
+    const preflight = preflightResponse(config.cors)
+    if (preflight) return preflight
+  }
 
-      const headers = applyCorsHeaders(
-        new Headers(result.headers),
-        options.cors
-      )
-      const status = result.status ?? 200
+  const locale = resolveLocale(
+    request.headers.get("accept-language"),
+    config.localization
+  )
 
-      if (result.body !== undefined) {
-        return new Response(result.body, { status, headers })
-      }
-
-      if (status === 204 || result.data === undefined) {
-        return new Response(null, { status, headers })
-      }
-
-      headers.set("content-type", "application/json")
-      return new Response(JSON.stringify(result.data), { status, headers })
-    } catch (error) {
-      return toErrorResponse(internals, error, locale)
-    } finally {
-      sweepExpired(internals)
+  try {
+    if (request.method !== endpoint.method) {
+      throw new AuthApiError("methodNotAllowed", 405)
     }
+    assertAllowedOrigin(internals, request)
+
+    const input = endpoint.parse
+      ? await endpoint.parse({ request, params, internals })
+      : undefined
+    const result = await endpoint.run(internals, input as never)
+
+    const headers = applyCorsHeaders(new Headers(result.headers), config.cors)
+    const status = result.status ?? 200
+
+    if (result.body !== undefined) {
+      return new Response(result.body, { status, headers })
+    }
+
+    if (status === 204 || result.data === undefined) {
+      return new Response(null, { status, headers })
+    }
+
+    headers.set("content-type", "application/json")
+    return new Response(JSON.stringify(result.data), { status, headers })
+  } catch (error) {
+    return toErrorResponse(internals, error, locale)
+  } finally {
+    sweepExpired(internals)
   }
 }
 
@@ -89,11 +107,11 @@ function toErrorResponse(
   error: unknown,
   locale: string
 ) {
-  const { options } = internals
-  const headers = applyCorsHeaders(new Headers(), options.cors)
+  const { config } = internals
+  const headers = applyCorsHeaders(new Headers(), config.cors)
 
   if (isAuthApiError(error)) {
-    const message = getErrorMessage(error.code, locale, options.localization, {
+    const message = getErrorMessage(error.code, locale, config.localization, {
       ...(error.retryAfter === undefined
         ? {}
         : { retryAfter: error.retryAfter })
@@ -140,7 +158,7 @@ function toErrorResponse(
  * never affect the response.
  */
 function sweepExpired(internals: AuthServerInternals) {
-  if (!internals.options.cleanup) return
+  if (!internals.config.cleanup) return
 
   void Promise.resolve(internals.db.deleteExpired()).catch((error: unknown) => {
     internals.log.error("deleteExpired failed", { error: String(error) })

@@ -1,9 +1,24 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
   hmacSha256Hex,
   sha256Hex,
   timingSafeEqualHex
 } from "../../src/lib/hash.ts"
+
+describe("hmacSha256Hex key reuse", () => {
+  it("imports the key once per secret rather than once per call", async () => {
+    const importKey = vi.spyOn(crypto.subtle, "importKey")
+    const secret = `memo-secret-${Math.random()}`
+
+    const first = await hmacSha256Hex("one", secret)
+    const second = await hmacSha256Hex("two", secret)
+    await hmacSha256Hex("three", `${secret}-other`)
+
+    expect(first).not.toBe(second)
+    expect(importKey).toHaveBeenCalledTimes(2)
+    importKey.mockRestore()
+  })
+})
 
 describe("sha256Hex", () => {
   it("matches the known digest of the empty string", async () => {

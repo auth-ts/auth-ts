@@ -54,17 +54,17 @@ export const verifyCode = defineEndpoint({
     // credential, so a 400 here must be free to retry; burning it on a typo in
     // additionalFields would force the user to request another code.
     const additionalFields = validateAdditionalFields(
-      internals.options.user.additionalFields,
+      internals.config.user.additionalFields,
       input.additionalFields
     )
 
-    if (internals.options.rateLimit !== false) {
-      const clientIp = getClientIp(headers, internals.options.clientIp)
+    if (internals.config.rateLimit !== false) {
+      const clientIp = getClientIp(headers, internals.config.clientIp)
       if (clientIp) {
         await checkRateLimit(
           internals,
           `verifyCode:ip:${clientIp}`,
-          internals.options.rateLimit.verifyCodePerIP
+          internals.config.rateLimit.verifyCodePerIP
         )
       }
     }
@@ -80,7 +80,8 @@ export const verifyCode = defineEndpoint({
       active?.user.type === "guest"
         ? (
             await convertGuest(internals, active.user, {
-              [identifier.kind]: identifier.value
+              [identifier.kind]: identifier.value,
+              additionalFields
             })
           ).user
         : await internals.db.upsertUser({

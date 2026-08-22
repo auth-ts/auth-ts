@@ -11,6 +11,7 @@ import {
 } from "../lib/serialize-cookie.ts"
 import {
   demoteActive,
+  parkedTokens,
   pruneDeadAccounts,
   readAccountsCookie,
   serializeAccounts
@@ -30,7 +31,7 @@ export type IssueMode = "cookie" | "token"
 /** User-agent and validated client IP for a session row, from the request headers. */
 function sessionStamp(internals: AuthServerInternals, headers: Headers) {
   const userAgent = headers.get("user-agent")
-  const ipAddress = getClientIp(headers, internals.options.clientIp)
+  const ipAddress = getClientIp(headers, internals.config.clientIp)
 
   return {
     ...(userAgent ? { userAgent } : {}),
@@ -62,6 +63,11 @@ export interface IssueSessionInput {
    * were upgraded in place or merged into an existing account, the anonymous
    * session has served its purpose, and a stranded guest in the account
    * switcher — or a still-valid refresh token for one — helps nobody.
+   *
+   * Without `multiAccount` this is also implied: whatever session the request
+   * presented is replaced by the one being issued, because the browser is
+   * about to overwrite its cookie with the new token and a row nothing can
+   * reach any more is a live credential nobody can see to revoke.
    */
   replaces?: string
 }
@@ -82,7 +88,7 @@ export async function issueSession(
   internals: AuthServerInternals,
   { user, headers, requestURL, mode = "cookie", replaces }: IssueSessionInput
 ): Promise<IssueResult> {
-  const { options } = internals
+  const { config } = internals
   const rawToken = randomBytesBase64url(32)
   const tokenHash = await sha256Hex(rawToken)
   const now = new Date()
@@ -92,14 +98,23 @@ export async function issueSession(
     userId: user.id,
     tokenHash,
     createdAt: now,
-    expiresAt: new Date(now.getTime() + parseDuration(options.session.ttl)),
+    expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
     ...sessionStamp(internals, headers)
   })
 
+  // Without multiAccount a sign-in replaces rather than appends: the session
+  // the request presented is about to become unreachable from this browser,
+  // so it is deleted rather than left to run out its month-long lifetime
+  // somewhere nobody can revoke it. Under multiAccount it is parked below.
+  const presented = readRefreshToken(internals, headers)
+  const superseded =
+    replaces ??
+    (!config.multiAccount && presented ? await sha256Hex(presented) : undefined)
+
   // Only once the replacement exists: if creating it had failed, the caller
   // would still hold a working session rather than none.
-  if (replaces) {
-    await internals.db.deleteSession({ tokenHash: replaces })
+  if (superseded && superseded !== tokenHash) {
+    await internals.db.deleteSession({ tokenHash: superseded })
     internals.log.debug("superseded session deleted")
   }
 
@@ -120,40 +135,38 @@ export async function issueSession(
   responseHeaders.append(
     "set-cookie",
     serializeCookie({
-      name: options.cookie.name,
+      name: config.cookie.name,
       value: rawToken,
-      path: options.cookie.path,
-      maxAge: options.session.ttl,
+      path: config.cookie.path,
+      maxAge: config.session.ttl,
       secure
     })
   )
 
-  if (options.multiAccount) {
+  if (config.multiAccount) {
     // Sign-ins append rather than replace: the previous active session moves to
     // the parked list so the user can switch back to it.
-    const previousActive = readRefreshToken(internals, headers)
-    const parked = await pruneDeadAccounts(
-      internals,
-      readAccountsCookie(internals, headers)
+    const parked = parkedTokens(
+      await pruneDeadAccounts(internals, readAccountsCookie(internals, headers))
     )
     // A superseded session is gone, not parked; anything else the browser had
     // active is demoted as usual.
-    const superseded =
-      previousActive !== undefined &&
+    const presentedWasSuperseded =
+      presented !== undefined &&
       replaces !== undefined &&
-      (await sha256Hex(previousActive)) === replaces
+      (await sha256Hex(presented)) === replaces
     const nextParked =
-      previousActive && !superseded
-        ? await demoteActive(internals, parked, previousActive)
+      presented && !presentedWasSuperseded
+        ? await demoteActive(internals, parked, presented)
         : parked
 
     responseHeaders.append(
       "set-cookie",
       serializeCookie({
-        name: options.cookie.accountsName,
+        name: config.cookie.accountsName,
         value: serializeAccounts(nextParked),
-        path: options.cookie.path,
-        maxAge: options.session.ttl,
+        path: config.cookie.path,
+        maxAge: config.session.ttl,
         secure
       })
     )
@@ -174,18 +187,18 @@ export async function mintAccessToken(
   internals: AuthServerInternals,
   user: AuthUser
 ) {
-  const { options } = internals
+  const { config } = internals
   const { signingKey, kid } = await internals.keys()
 
   return signToken(
     {
       signingKey,
-      algorithm: options.jwt.alg,
+      algorithm: config.jwt.alg,
       kid,
-      ttl: options.jwt.ttl,
-      claims: options.jwt.claims,
-      ...(options.issuer ? { issuer: options.issuer } : {}),
-      ...(options.jwt.audience ? { audience: options.jwt.audience } : {})
+      ttl: config.jwt.ttl,
+      claims: config.jwt.claims,
+      ...(config.issuer ? { issuer: config.issuer } : {}),
+      ...(config.jwt.audience ? { audience: config.jwt.audience } : {})
     },
     { userId: user.id, type: user.type }
   )
@@ -213,11 +226,11 @@ export async function slideSession(
   },
   headers: Headers
 ): Promise<Date> {
-  if (!internals.options.session.sliding) return session.expiresAt
+  if (!internals.config.session.sliding) return session.expiresAt
   internals.log.debug("sliding session expiry")
 
   const expiresAt = new Date(
-    Date.now() + parseDuration(internals.options.session.ttl)
+    Date.now() + parseDuration(internals.config.session.ttl)
   )
   await internals.db.upsertSession({
     id: session.id,

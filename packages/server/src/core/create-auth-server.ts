@@ -1,7 +1,7 @@
 import { type AuthApiError, isAuthApiError } from "../http/auth-api-error.ts"
 import { AuthConfigError } from "../http/auth-config-error.ts"
 import type { AuthHandler } from "../http/create-handler.ts"
-import { createHandler } from "../http/create-handler.ts"
+import { createHandler, handleRequest } from "../http/create-handler.ts"
 import type {
   AnyEndpoint,
   EndpointDefinition
@@ -15,13 +15,11 @@ import { verifyToken } from "../jwt/verify-token.ts"
 import type { HeadersInput } from "../session/resolve-session.ts"
 import { readRefreshToken, resolveSession } from "../session/resolve-session.ts"
 import type { AuthSession, AuthUser } from "./auth-db.ts"
+import type { AuthServerConfig } from "./auth-server-config.ts"
+import { resolveAuthServerConfig } from "./auth-server-config.ts"
 import type { AuthServerInternals } from "./auth-server-internals.ts"
 import { createAuthServerInternals } from "./auth-server-internals.ts"
-import type {
-  AuthServerOptions,
-  ResolvedAuthServerOptions
-} from "./auth-server-options.ts"
-import { resolveAuthServerOptions } from "./auth-server-options.ts"
+import type { AuthServerOptions } from "./auth-server-options.ts"
 import type { EndpointRegistry } from "./endpoint-registry.ts"
 import { endpointRegistry } from "./endpoint-registry.ts"
 
@@ -47,8 +45,11 @@ export interface AuthSessionResult {
 
 /** The configured server. */
 export interface AuthServer extends AuthCallables {
-  /** The resolved options, useful for tests and for reading back defaults. */
-  options: ResolvedAuthServerOptions
+  /**
+   * The configuration this server runs on — the options after defaults and
+   * validation. Read it back in tests, or to learn a default without guessing.
+   */
+  config: AuthServerConfig
   /**
    * The catch-all handler. Mount once at `<basePath>/*` and it dispatches
    * everything.
@@ -81,9 +82,10 @@ export interface AuthServer extends AuthCallables {
  * @throws {AuthConfigError} When the configuration is incomplete or contradictory.
  */
 export function createAuthServer(options: AuthServerOptions): AuthServer {
-  const resolved = resolveAuthServerOptions(options)
+  const resolved = resolveAuthServerConfig(options)
   const internals = createAuthServerInternals(resolved)
   const routes = compileRoutes(endpointRegistry)
+  warnAboutInertIpLimits(internals)
 
   const callables = {} as Record<string, (input: unknown) => Promise<unknown>>
   const handlers = {} as Record<string, AuthHandler>
@@ -111,17 +113,24 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
 
   const handler: AuthHandler = async (request) => {
     try {
-      const { endpoint } = matchRoute(internals, request, routes)
-      return await createHandler(internals, endpoint)(request)
+      // The router already parsed the URL and pulled out the `$params`, so they
+      // are handed straight to the endpoint rather than matched a second time.
+      const { endpoint, params } = matchRoute(internals, request, routes)
+      return await handleRequest(internals, endpoint, request, params)
     } catch (error) {
       if (!isAuthApiError(error)) throw error
-      return createHandler(internals, notFoundEndpoint(error, request))(request)
+      return handleRequest(
+        internals,
+        notFoundEndpoint(error, request),
+        request,
+        {}
+      )
     }
   }
 
   return {
     ...(callables as unknown as AuthCallables),
-    options: resolved,
+    config: resolved,
     handler,
     handlers: handlers as AuthHandlers,
     verifyToken: async (token) => {
@@ -166,6 +175,32 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
 }
 
 /**
+ * Says out loud, once, that the per-IP limits are not going to fire.
+ *
+ * With the default `clientIp.trustedProxies: 0` no client address is derived,
+ * which is the right default — trusting a forwarded header blindly lets a
+ * caller pick their own rate-limit key — but it means `sendCodePerIP`,
+ * `verifyCodePerIP`, and `guestPerIP` are configured and inert, and
+ * `session.ipAddress` is never set. That is a safe failure, and exactly the kind
+ * that is never noticed until someone sprays `/send-code` across a thousand
+ * addresses. A warning, not an error, because a server reached directly has
+ * no proxies to declare and `createAuthServer({ db, email })` must keep
+ * working out of the box.
+ */
+function warnAboutInertIpLimits(internals: AuthServerInternals) {
+  const { config } = internals
+  if (config.rateLimit === false || config.clientIp.trustedProxies > 0) return
+
+  internals.log.warn(
+    "per-IP rate limits are configured but will not apply: clientIp.trustedProxies is 0, so no client address is derived. " +
+      "sendCodePerIP, verifyCodePerIP, and guestPerIP are inert and session.ipAddress will be null. " +
+      "Set clientIp.trustedProxies to the number of proxies in front of this server (1 on Vercel, Cloudflare, and most platforms), " +
+      "or rateLimit: false if something in front of it already limits by address.",
+    { header: config.clientIp.header }
+  )
+}
+
+/**
  * Callables that read the refresh cookie and are meant for server-side use.
  *
  * Only these get the configuration guard: over HTTP a missing cookie is just an
@@ -198,7 +233,7 @@ function notFoundEndpoint(error: AuthApiError, request: Request): AnyEndpoint {
  * choice, so it throws with the fix in the message instead.
  */
 function assertCookieReachable(
-  resolved: ResolvedAuthServerOptions,
+  resolved: AuthServerConfig,
   headers: Headers | undefined,
   internals: AuthServerInternals
 ) {

@@ -1,5 +1,6 @@
 import type { AuthUser } from "../core/auth-db.ts"
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
+import type { AdditionalFieldValues } from "../http/validate-additional-fields.ts"
 
 /** Identity details learned during a sign-in that a guest is completing. */
 export interface GuestIdentity {
@@ -7,6 +8,15 @@ export interface GuestIdentity {
   phoneNumber?: string
   name?: string
   imageURL?: string
+  /**
+   * Validated sign-up fields from the request.
+   *
+   * Applied when the guest is upgraded in place — that is the moment their
+   * real account comes into being, which is what sign-up fields are for.
+   * Dropped on a merge: the existing account wins and nothing is created, so
+   * there is no sign-up for them to belong to.
+   */
+  additionalFields?: AdditionalFieldValues
 }
 
 /** The outcome of converting a guest. */
@@ -56,13 +66,15 @@ export async function convertGuest(
     return mergeGuestInto(internals, guest, existing)
   }
 
+  const additionalFields = identity.additionalFields ?? {}
   const upgraded = await internals.db.upsertUser({
     id: guest.id,
     type: "user",
     ...(identity.email ? { email: identity.email } : {}),
     ...(identity.phoneNumber ? { phoneNumber: identity.phoneNumber } : {}),
     ...(identity.name ? { name: identity.name } : {}),
-    ...(identity.imageURL ? { imageURL: identity.imageURL } : {})
+    ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
+    ...(Object.keys(additionalFields).length > 0 ? { additionalFields } : {})
   })
   internals.log.info("guest upgraded in place, keeping its id and its rows")
 

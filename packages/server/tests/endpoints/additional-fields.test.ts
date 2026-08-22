@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server.ts"
 import { readSetCookies, request } from "../helpers/request.ts"
 import { required } from "../helpers/required.ts"
@@ -124,6 +124,77 @@ describe("additionalFields on sign-up", () => {
 
     expect(body.user.referralCode).toBe("GUEST1")
   })
+
+  it("applies them when a guest is upgraded in place — that is the sign-up", async () => {
+    const context = await createTestServer(options)
+    const guestResponse = await context.authServer.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const cookies = {
+      "auth-ts.refresh": required(
+        readSetCookies(guestResponse).get("auth-ts.refresh"),
+        "refresh"
+      ).value
+    }
+    const guestId = ((await guestResponse.json()) as { user: { id: string } })
+      .user.id
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        cookies,
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes.at(-1), "code").code,
+          additionalFields: { referralCode: "ADA10", seats: 3 }
+        }
+      })
+    )
+    const body = (await response.json()) as { user: Record<string, unknown> }
+
+    expect(body.user.id).toBe(guestId)
+    expect(body.user.type).toBe("user")
+    expect(body.user.referralCode).toBe("ADA10")
+    expect(body.user.seats).toBe(3)
+  })
+
+  it("drops them when a guest merges into an existing account, which nothing created", async () => {
+    const context = await createTestServer(options)
+    await verifyWith(context, "ada@example.com", { referralCode: "ADA10" })
+
+    const guestResponse = await context.authServer.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const cookies = {
+      "auth-ts.refresh": required(
+        readSetCookies(guestResponse).get("auth-ts.refresh"),
+        "refresh"
+      ).value
+    }
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        cookies,
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes.at(-1), "code").code,
+          additionalFields: { referralCode: "STOLEN" }
+        }
+      })
+    )
+    const body = (await response.json()) as { user: Record<string, unknown> }
+
+    expect(body.user.referralCode).toBe("ADA10")
+  })
 })
 
 describe("additionalFields on PATCH", () => {
@@ -148,6 +219,33 @@ describe("additionalFields on PATCH", () => {
     expect(body.user.name).toBe("Ada")
     expect(body.user.referralCode).toBe("UPDATED")
     expect(body.user.seats).toBe(9)
+  })
+
+  it("answers 400 for a body that changes nothing, without touching the database", async () => {
+    // An UPDATE with no SET columns is an error in most query builders — the
+    // reference adapter's drizzle throws "No values to set" — so an empty PATCH
+    // used to surface as a 500. It is the client's mistake, and never reaches
+    // the callback now.
+    const context = await createTestServer(options)
+    const signInResponse = await verifyWith(context, "ada@example.com")
+    const cookies = {
+      "auth-ts.refresh": required(
+        readSetCookies(signInResponse).get("auth-ts.refresh"),
+        "refresh"
+      ).value
+    }
+    const upsertUser = vi.spyOn(context.db, "upsertUser")
+
+    for (const body of [{}, { name: undefined }, { seats: undefined }]) {
+      const response = await context.authServer.handler(
+        request("PATCH", "/api/auth/user", { cookies, body })
+      )
+      expect(response.status).toBe(400)
+      expect(
+        ((await response.json()) as { error: { code: string } }).error.code
+      ).toBe("invalidField")
+    }
+    expect(upsertUser).not.toHaveBeenCalled()
   })
 
   it("still rejects identity fields and undeclared keys", async () => {

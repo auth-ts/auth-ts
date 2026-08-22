@@ -1,7 +1,7 @@
+import { resolveAuthServerConfig } from "../../src/core/auth-server-config.ts"
 import type { AuthServerInternals } from "../../src/core/auth-server-internals.ts"
 import { createAuthServerInternals } from "../../src/core/auth-server-internals.ts"
 import type { AuthServerOptions } from "../../src/core/auth-server-options.ts"
-import { resolveAuthServerOptions } from "../../src/core/auth-server-options.ts"
 import type { LogLevel } from "../../src/lib/logger.ts"
 import type { MemoryDb } from "../../src/lib/memory-db.ts"
 import { createMemoryDb } from "../../src/lib/memory-db.ts"
@@ -55,7 +55,7 @@ export async function createTestInternals(
   const sentCodes: CapturedCode[] = []
   const logCalls: TestInternals["logCalls"] = []
 
-  const options = resolveAuthServerOptions({
+  const config = resolveAuthServerConfig({
     db,
     email: {
       sendCode: ({ email, code, locale, purpose, headers }) => {
@@ -95,7 +95,7 @@ export async function createTestInternals(
   })
 
   return {
-    internals: createAuthServerInternals(options),
+    internals: createAuthServerInternals(config),
     db,
     sentCodes,
     logCalls,

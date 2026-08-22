@@ -1,3 +1,4 @@
+import type { AuthSession } from "../core/auth-db.ts"
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
 import { sha256Hex } from "../lib/hash.ts"
 import { readCookie } from "../lib/parse-cookies.ts"
@@ -24,7 +25,7 @@ export function readAccountsCookie(
   internals: AuthServerInternals,
   headers: Headers
 ) {
-  const raw = readCookie(headers, internals.options.cookie.accountsName)
+  const raw = readCookie(headers, internals.config.cookie.accountsName)
   if (!raw) return []
 
   try {
@@ -50,27 +51,44 @@ export function serializeAccounts(tokens: string[]) {
   return JSON.stringify(tokens)
 }
 
+/** A parked refresh token together with the live session it resolves to. */
+export interface ParkedAccount {
+  token: string
+  session: AuthSession
+}
+
 /**
  * Drops parked tokens whose sessions are gone or expired.
  *
  * Called wherever the list is read, so a revoked device stops appearing in the
  * account switcher on the next request rather than lingering until someone
- * clicks it.
+ * clicks it. The sessions it read are handed back alongside the tokens, so a
+ * caller that needs them — the switcher listing users, sign-out revoking rows
+ * — does not read every one a second time. The lookups run concurrently; the
+ * list is bounded by {@link PARKED_ACCOUNT_LIMIT}, so that is at most a
+ * handful of reads in flight, never a forged cookie's worth.
  */
 export async function pruneDeadAccounts(
   internals: AuthServerInternals,
   tokens: string[]
-) {
-  const live: string[] = []
-
-  for (const token of tokens) {
-    const session = await internals.db.getSession({
-      tokenHash: await sha256Hex(token)
+): Promise<ParkedAccount[]> {
+  const resolved = await Promise.all(
+    tokens.map(async (token) => {
+      const session = await internals.db.getSession({
+        tokenHash: await sha256Hex(token)
+      })
+      return session && session.expiresAt.getTime() > Date.now()
+        ? { token, session }
+        : null
     })
-    if (session && session.expiresAt.getTime() > Date.now()) live.push(token)
-  }
+  )
 
-  return live
+  return resolved.filter((entry): entry is ParkedAccount => entry !== null)
+}
+
+/** The bare tokens of a parked list, for the cookie and the list helpers below. */
+export function parkedTokens(accounts: ParkedAccount[]) {
+  return accounts.map((account) => account.token)
 }
 
 /**

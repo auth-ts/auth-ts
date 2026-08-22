@@ -1,12 +1,12 @@
 import type { AuthUser } from "../core/auth-db.ts"
 import { notFound, unauthenticated } from "../http/auth-api-error.ts"
 import { defineEndpoint } from "../http/define-endpoint.ts"
-import { sha256Hex } from "../lib/hash.ts"
 import {
   serializeCookie,
   shouldUseSecureCookies
 } from "../lib/serialize-cookie.ts"
 import {
+  parkedTokens,
   pruneDeadAccounts,
   readAccountsCookie,
   serializeAccounts
@@ -45,8 +45,8 @@ export const listAccounts = defineEndpoint({
     requestURL: request.url
   }),
   run: async (internals, input: ListAccountsInput) => {
-    const { options } = internals
-    if (!options.multiAccount) throw notFound()
+    const { config } = internals
+    if (!config.multiAccount) throw notFound()
 
     const headers = input.headers ?? new Headers()
     const active = await resolveSession(internals, headers)
@@ -56,15 +56,13 @@ export const listAccounts = defineEndpoint({
       internals,
       readAccountsCookie(internals, headers)
     )
+    // The prune already read each session, so only the users are left to
+    // fetch — and those concurrently, for the same reason the prune is.
+    const parkedUsers = await Promise.all(
+      parked.map(({ session }) => internals.db.getUser({ id: session.userId }))
+    )
     const accounts: AccountInfo[] = [{ user: active.user, current: true }]
-
-    for (const token of parked) {
-      const session = await internals.db.getSession({
-        tokenHash: await sha256Hex(token)
-      })
-      if (!session) continue
-
-      const user = await internals.db.getUser({ id: session.userId })
+    for (const user of parkedUsers) {
       if (user) accounts.push({ user, current: false })
     }
 
@@ -72,10 +70,10 @@ export const listAccounts = defineEndpoint({
     responseHeaders.append(
       "set-cookie",
       serializeCookie({
-        name: options.cookie.accountsName,
-        value: serializeAccounts(parked),
-        path: options.cookie.path,
-        maxAge: options.session.ttl,
+        name: config.cookie.accountsName,
+        value: serializeAccounts(parkedTokens(parked)),
+        path: config.cookie.path,
+        maxAge: config.session.ttl,
         secure: shouldUseSecureCookies(input.requestURL ?? "https://localhost")
       })
     )

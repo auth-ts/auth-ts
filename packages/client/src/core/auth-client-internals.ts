@@ -2,11 +2,9 @@ import type { FetchJson } from "../lib/fetch-json.ts"
 import { createFetchJson } from "../lib/fetch-json.ts"
 import type { LeveledLogger } from "../lib/logger.ts"
 import { createLogger } from "../lib/logger.ts"
-import type {
-  AuthClientOptions,
-  ResolvedAuthClientOptions
-} from "./auth-client-options.ts"
-import { resolveAuthClientOptions } from "./auth-client-options.ts"
+import type { AuthClientConfig } from "./auth-client-config.ts"
+import { resolveAuthClientConfig } from "./auth-client-config.ts"
+import type { AuthClientOptions } from "./auth-client-options.ts"
 import type { TokenStore } from "./token-store.ts"
 import { createTokenStore } from "./token-store.ts"
 import type { UserStore } from "./user-store.ts"
@@ -20,7 +18,8 @@ import { createUserStore } from "./user-store.ts"
  * five parameters through every function.
  */
 export interface AuthClientInternals {
-  options: ResolvedAuthClientOptions
+  /** The resolved configuration — options after defaults. */
+  config: AuthClientConfig
   tokenStore: TokenStore
   userStore: UserStore
   fetchJson: FetchJson
@@ -33,24 +32,24 @@ export interface AuthClientInternals {
 export function createAuthClientInternals(
   options: AuthClientOptions = {}
 ): AuthClientInternals {
-  const resolved = resolveAuthClientOptions(options)
+  const config = resolveAuthClientConfig(options)
 
   const tokenStore = createTokenStore()
 
   const internals: AuthClientInternals = {
-    options: resolved,
+    config,
     tokenStore,
     userStore: createUserStore(() => {
       tokenStore.clear()
     }),
     fetchJson: undefined as unknown as FetchJson,
-    log: createLogger(resolved.logLevel, resolved.logger),
-    locale: resolved.locale
+    log: createLogger(config.logLevel, config.logger),
+    locale: config.locale
   }
 
   // Reads `internals.locale` on each request, so setLocale takes effect
   // immediately rather than only for clients constructed afterwards.
-  internals.fetchJson = createFetchJson(resolved, () => internals.locale)
+  internals.fetchJson = createFetchJson(config, () => internals.locale)
 
   return internals
 }

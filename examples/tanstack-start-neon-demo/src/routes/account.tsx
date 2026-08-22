@@ -214,6 +214,9 @@ function AccountPage() {
           <button
             type="button"
             onClick={async () => {
+              // Every account in this browser — the default, as in Clerk and
+              // Better Auth. "Sign out this account" below is the switcher's
+              // narrower version.
               await authClient.logout()
               queryClient.clear()
               await navigate({ to: "/login" })
@@ -221,6 +224,22 @@ function AccountPage() {
             className="rounded border border-neutral-300 px-3 py-1.5"
           >
             Sign out
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const result = await authClient.logout({ account: "current" })
+              queryClient.clear()
+              if (result?.switchedTo) {
+                setMessage(`Now signed in as ${result.switchedTo.email}.`)
+                await sessions.refetch()
+              } else {
+                await navigate({ to: "/login" })
+              }
+            }}
+            className="rounded border border-neutral-300 px-3 py-1.5"
+          >
+            Sign out this account
           </button>
           <button
             type="button"

@@ -10,7 +10,7 @@ import { createVerificationKeySet } from "../jwt/verify-token.ts"
 import type { LeveledLogger } from "../lib/logger.ts"
 import { createLogger } from "../lib/logger.ts"
 import type { AuthDb } from "./auth-db.ts"
-import type { ResolvedAuthServerOptions } from "./auth-server-options.ts"
+import type { AuthServerConfig } from "./auth-server-config.ts"
 
 /** Key material, imported once on first use. */
 export interface KeyMaterial extends SigningKeyMaterial {
@@ -35,7 +35,8 @@ export interface KeyMaterial extends SigningKeyMaterial {
  * back to `createAuthServer`.
  */
 export interface AuthServerInternals {
-  options: ResolvedAuthServerOptions
+  /** The resolved configuration — options after defaults and validation. */
+  config: AuthServerConfig
   db: AuthDb
   log: LeveledLogger
   /**
@@ -48,22 +49,22 @@ export interface AuthServerInternals {
   keys(): Promise<KeyMaterial>
 }
 
-/** Builds the internals struct from resolved options. */
+/** Builds the internals struct from the resolved configuration. */
 export function createAuthServerInternals(
-  options: ResolvedAuthServerOptions
+  config: AuthServerConfig
 ): AuthServerInternals {
-  const log = createLogger(options.logLevel, options.logger)
+  const log = createLogger(config.logLevel, config.logger)
   let keyMaterial: Promise<KeyMaterial> | undefined
 
   const loadKeys = () => {
     keyMaterial ??= (async () => {
       const material = await importSigningKey(
-        options.jwt.privateKey,
-        options.jwt.alg
+        config.jwt.privateKey,
+        config.jwt.alg
       )
       const imported = await Promise.all(
-        (options.jwt.additionalPublicKeys ?? []).map((publicKeyPem) =>
-          importAdditionalPublicKey(publicKeyPem, options.jwt.alg)
+        (config.jwt.additionalPublicKeys ?? []).map((publicKeyPem) =>
+          importAdditionalPublicKey(publicKeyPem, config.jwt.alg)
         )
       )
 
@@ -97,8 +98,8 @@ export function createAuthServerInternals(
   }
 
   return {
-    options,
-    db: options.db,
+    config,
+    db: config.db,
     log,
     keys: loadKeys
   }

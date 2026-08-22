@@ -35,25 +35,25 @@ export const signInGuest = defineEndpoint({
     return { ...body, headers: request.headers, requestURL: request.url }
   },
   run: async (internals, input: SignInGuestInput) => {
-    const { options } = internals
+    const { config } = internals
     // Not merely disabled: absent. An endpoint that is off should look like an
     // endpoint that does not exist.
-    if (!options.guest) throw new AuthApiError("notFound", 404)
+    if (!config.guest) throw new AuthApiError("notFound", 404)
 
     const headers = input.headers ?? new Headers()
 
-    if (options.rateLimit !== false) {
-      const clientIp = getClientIp(headers, options.clientIp)
+    if (config.rateLimit !== false) {
+      const clientIp = getClientIp(headers, config.clientIp)
       if (clientIp)
         await checkRateLimit(
           internals,
           `guest:ip:${clientIp}`,
-          options.rateLimit.guestPerIP
+          config.rateLimit.guestPerIP
         )
     }
 
     const additionalFields = validateAdditionalFields(
-      options.user.additionalFields,
+      config.user.additionalFields,
       input.additionalFields
     )
 

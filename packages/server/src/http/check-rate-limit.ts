@@ -24,7 +24,7 @@ export async function checkRateLimit(
   key: string,
   window: RateLimitWindow
 ) {
-  if (internals.options.rateLimit === false) return
+  if (internals.config.rateLimit === false) return
 
   const now = Date.now()
   const counted = await internals.db.upsertRateLimit({
