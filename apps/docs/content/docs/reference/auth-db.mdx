@@ -82,7 +82,7 @@ index, because the missing constraint only shows under a race.
   guaranteed to run on Cloudflare Workers once the response is returned; if you
   are on Workers and would rather keep the sweep off the response's path, hand
   it to `waitUntil` from `cloudflare:workers` and return nothing, which is why
-  `cleanup` may return `void` as well as a promise. Leave it out and the
+  `cleanup` returns `unknown` — a promise the library will await, or nothing at all. Leave it out and the
   schedule is yours: a cron, a scheduled worker, a partitioned table.
   **Something has to do it**:
   `attempts` grows by a row per counted request, so a deployment that sweeps
