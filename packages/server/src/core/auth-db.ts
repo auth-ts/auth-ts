@@ -172,8 +172,8 @@ export interface AuthTables<
 
 /** A row of `T`, with your declared fields where they apply. */
 export type AuthRow<
-  S extends AdditionalFieldsSchema,
-  T extends AuthTable
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
+  T extends AuthTable = AuthTable
 > = AuthTables<S>[T]
 
 /**
@@ -182,8 +182,8 @@ export type AuthRow<
  * language, and equality is the thing every store expresses identically.
  */
 export type AuthWhere<
-  S extends AdditionalFieldsSchema,
-  T extends AuthTable
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
+  T extends AuthTable = AuthTable
 > = Partial<AuthRow<S, T>>
 
 /** Sort direction, per {@link AuthOrderBy}. */
@@ -197,6 +197,10 @@ export type AuthDirection = "asc" | "desc"
  * optionality (`-?`) so an optional column is still a valid key; an empty
  * object and an unknown column are both type errors.
  *
+ * The conditional distributes over `T`, so `AuthOrderBy` with no table named
+ * means "an ordering for any one of the tables" rather than "an ordering over
+ * the columns they all share" — `keyof` of a union is the intersection.
+ *
  * Core always passes exactly one key, and an implementation should read one:
  * `const [[column, direction]] = Object.entries(orderBy)`. Forbidding a second
  * key in the type is possible — intersect each member with the others as
@@ -205,11 +209,13 @@ export type AuthDirection = "asc" | "desc"
  * less than the types it takes to state.
  */
 export type AuthOrderBy<
-  S extends AdditionalFieldsSchema,
-  T extends AuthTable
-> = {
-  [K in keyof AuthRow<S, T>]-?: { [P in K]: AuthDirection }
-}[keyof AuthRow<S, T>]
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
+  T extends AuthTable = AuthTable
+> = T extends AuthTable
+  ? {
+      [K in keyof AuthRow<S, T>]-?: { [P in K]: AuthDirection }
+    }[keyof AuthRow<S, T>]
+  : never
 
 /**
  * A row as core writes it: every column it owns, with `null` written out rather
@@ -221,8 +227,8 @@ export type AuthOrderBy<
  * stored row, which is how core learns the id.
  */
 export type AuthInsert<
-  S extends AdditionalFieldsSchema,
-  T extends AuthTable
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
+  T extends AuthTable = AuthTable
 > = T extends "users"
   ? Omit<CoreUserFields, "id"> & { id?: string } & AdditionalFieldsInput<S>
   : Omit<AuthRow<S, T>, "id"> & { id?: string }
