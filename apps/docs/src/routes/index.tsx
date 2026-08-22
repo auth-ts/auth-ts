@@ -144,7 +144,7 @@ function Hero() {
                * seventh of an em, far enough to read as a mark rather than a
                * link, close enough to still belong to the words.
                */}
-              <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:-bottom-[0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
+              <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:bottom-[-0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
                 Free forever
               </span>{" "}
               auth in TypeScript.
