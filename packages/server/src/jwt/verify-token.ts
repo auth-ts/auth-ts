@@ -1,5 +1,7 @@
-import { jwtVerify } from "jose"
+import type { JWTVerifyGetKey } from "jose"
+import { createLocalJWKSet, jwtVerify } from "jose"
 import type { UserType } from "../core/auth-db.ts"
+import type { Jwks } from "./build-jwks.ts"
 import type { JwtAlgorithm } from "./import-signing-key.ts"
 
 /**
@@ -34,10 +36,27 @@ export interface TokenClaims extends UnverifiedClaims {
   exp: number
 }
 
+/**
+ * Resolves a token's header to one of the published public keys.
+ *
+ * This is the local twin of what a remote verifier does against `jwks.json`:
+ * the key is picked by the header's `kid` from the whole published set — the
+ * signing key and every `additionalPublicKeys` entry — so local verification
+ * follows the same rotation runbook as Neon or Supabase. A token signed by the
+ * previous key, with its `kid`, keeps verifying for as long as that key is
+ * still published, and stops the moment it is removed.
+ */
+export type VerificationKeySet = JWTVerifyGetKey
+
+/** Builds a {@link VerificationKeySet} from the document served at `jwks.json`. */
+export function createVerificationKeySet(jwks: Jwks): VerificationKeySet {
+  return createLocalJWKSet(jwks)
+}
+
 /** What {@link verifyToken} needs, resolved from the server options. */
 export interface VerifyTokenContext {
-  /** The public key. Web Crypto cannot verify with a private key. */
-  verificationKey: CryptoKey
+  /** Every public key a token may be verified against, selected by `kid`. */
+  keys: VerificationKeySet
   algorithm: JwtAlgorithm
   issuer?: string
   audience?: string
@@ -63,16 +82,17 @@ export interface VerifyTokenContext {
  * simply omits `exp` would verify and never expire. Core's own tokens always
  * carry both, so nothing it signs is affected.
  *
- * @returns The claims, or `null` for any failure at all — bad signature, wrong
- * algorithm, wrong audience or issuer, expired, or malformed. Callers get one
- * thing to check rather than a taxonomy of ways to be unauthenticated.
+ * @returns The claims, or `null` for any failure at all — bad signature, unknown
+ * `kid`, wrong algorithm, wrong audience or issuer, expired, or malformed.
+ * Callers get one thing to check rather than a taxonomy of ways to be
+ * unauthenticated.
  */
 export async function verifyToken(
   context: VerifyTokenContext,
   token: string
 ): Promise<TokenClaims | null> {
   try {
-    const { payload } = await jwtVerify(token, context.verificationKey, {
+    const { payload } = await jwtVerify(token, context.keys, {
       algorithms: [context.algorithm],
       clockTolerance: "60s",
       requiredClaims: ["iat", "exp"],

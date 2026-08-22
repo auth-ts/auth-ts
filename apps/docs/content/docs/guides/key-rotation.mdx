@@ -12,8 +12,8 @@ overlap them.
 **1. Generate the new pair.** Keep the old one exactly where it is.
 
 **2. Publish both.** Add the new *public* key to `jwt.additionalPublicKeys` and
-deploy. Your JWKS now serves two keys; the new one gets its JWK thumbprint as its
-`kid`. You are still signing with the old key, and nothing has changed for anyone.
+deploy. Your JWKS now serves two keys. You are still signing with the old key,
+and nothing has changed for anyone.
 
 ```ts
 createAuthServer({
@@ -37,6 +37,23 @@ then remove the old key entirely.
 Skip step 2 and there is a window where you are signing with a key no verifier
 has fetched yet. Every request fails with a signature error, and the cause is
 invisible from the application logs — the rejection happens inside the database.
+
+## Why the `kid` never changes
+
+Every key's `kid` is its JWK thumbprint, derived from the key itself, so a key
+carries the same `kid` whether it is currently signing or only listed in
+`additionalPublicKeys`. That is what lets step 3 do its job: a verifier that
+cached the JWKS before the switch already holds the new key under the `kid` new
+tokens will carry, and a token minted just before the switch still names a key
+the JWKS serves just after it. There is no `kid` to configure.
+
+## Local verification follows the same list
+
+`authServer.verifyToken()` picks the key by the token's `kid` from the same set
+`jwks.json` publishes — the signing key and every entry in
+`additionalPublicKeys`. The runbook above therefore covers in-process
+verification too: a token signed by the previous key keeps verifying for as long
+as that key is still published, and stops the moment you remove it.
 
 ## Sessions survive
 

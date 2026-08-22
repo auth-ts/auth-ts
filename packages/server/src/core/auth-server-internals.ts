@@ -1,9 +1,12 @@
 import type { JWK } from "jose"
+import { buildJwks } from "../jwt/build-jwks.ts"
 import type { SigningKeyMaterial } from "../jwt/import-signing-key.ts"
 import {
   importAdditionalPublicKey,
   importSigningKey
 } from "../jwt/import-signing-key.ts"
+import type { VerificationKeySet } from "../jwt/verify-token.ts"
+import { createVerificationKeySet } from "../jwt/verify-token.ts"
 import type { LeveledLogger } from "../lib/logger.ts"
 import { createLogger } from "../lib/logger.ts"
 import type { AuthDb } from "./auth-db.ts"
@@ -13,6 +16,13 @@ import type { ResolvedAuthServerOptions } from "./auth-server-options.ts"
 export interface KeyMaterial extends SigningKeyMaterial {
   /** Public keys published alongside the signing key during rotation. */
   additionalPublicJwks: JWK[]
+  /**
+   * Every published key, for local verification.
+   *
+   * Built from the same document `jwks.json` serves, so what this server
+   * accepts and what it tells remote verifiers to accept cannot drift apart.
+   */
+  verificationKeys: VerificationKeySet
 }
 
 /**
@@ -48,16 +58,18 @@ export function createAuthServerInternals(
     keyMaterial ??= (async () => {
       const material = await importSigningKey(
         options.jwt.privateKey,
-        options.jwt.alg,
-        options.jwt.kid
+        options.jwt.alg
       )
       const additionalPublicJwks = await Promise.all(
         (options.jwt.additionalPublicKeys ?? []).map((publicKeyPem) =>
           importAdditionalPublicKey(publicKeyPem, options.jwt.alg)
         )
       )
+      const verificationKeys = createVerificationKeySet(
+        buildJwks(material.publicJwk, additionalPublicJwks)
+      )
 
-      return { ...material, additionalPublicJwks }
+      return { ...material, additionalPublicJwks, verificationKeys }
     })()
 
     return keyMaterial

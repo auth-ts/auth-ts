@@ -2,7 +2,6 @@ import type { JWK } from "jose"
 import {
   calculateJwkThumbprint,
   exportJWK,
-  importJWK,
   importPKCS8,
   importSPKI
 } from "jose"
@@ -17,27 +16,34 @@ import {
  */
 export type JwtAlgorithm = "RS256" | "ES256"
 
-/** An imported key pair: what signs, what verifies, and what gets published. */
+/** An imported signing key: what signs, and what gets published. */
 export interface SigningKeyMaterial {
   /** Private key — signs tokens, never leaves the server. */
   signingKey: CryptoKey
-  /**
-   * Public key — verifies tokens.
-   *
-   * Separate from {@link SigningKeyMaterial.signingKey} because Web Crypto
-   * requires it to be: `verify` rejects a private key outright.
-   */
-  verificationKey: CryptoKey
+  /** Key id, carried in every token header. See {@link toPublicJwk}. */
+  kid: string
   /** The public JWK, already carrying `kid`, `alg`, and `use`. */
   publicJwk: JWK
 }
 
-/** Strips the private components, leaving only what is safe to publish. */
-function toPublicJwk(jwk: JWK, algorithm: JwtAlgorithm, kid: string): JWK {
+/**
+ * Strips the private components and stamps the public JWK with its `kid`.
+ *
+ * The `kid` is the RFC 7638 thumbprint of the key itself, never a configured
+ * name. That is what makes rotation work: a key carries the same `kid` whether
+ * it is currently signing or merely published in `additionalPublicKeys`, so a
+ * token minted before the switch still names a key the JWKS serves after it,
+ * and a verifier that cached the JWKS before the switch already holds the new
+ * key under the `kid` new tokens will carry. A fixed name like `"main"` would
+ * instead move from the old key to the new one at the switch, and every cached
+ * verifier would be wrong in both directions at once.
+ */
+async function toPublicJwk(jwk: JWK, algorithm: JwtAlgorithm): Promise<JWK> {
   const published: JWK =
     jwk.kty === "RSA"
       ? { kty: jwk.kty, n: jwk.n, e: jwk.e }
       : { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y }
+  const kid = await calculateJwkThumbprint(published)
 
   return { ...published, alg: algorithm, use: "sig", kid }
 }
@@ -54,32 +60,30 @@ function toPublicJwk(jwk: JWK, algorithm: JwtAlgorithm, kid: string): JWK {
  */
 export async function importSigningKey(
   privateKeyPem: string,
-  algorithm: JwtAlgorithm,
-  kid: string
+  algorithm: JwtAlgorithm
 ): Promise<SigningKeyMaterial> {
   const signingKey = await importPKCS8(privateKeyPem, algorithm, {
     extractable: true
   })
-  const publicJwk = toPublicJwk(await exportJWK(signingKey), algorithm, kid)
-  const verificationKey = (await importJWK(publicJwk, algorithm)) as CryptoKey
+  const publicJwk = await toPublicJwk(await exportJWK(signingKey), algorithm)
 
-  return { signingKey, verificationKey, publicJwk }
+  // The thumbprint is always set by `toPublicJwk`; the fallback only satisfies
+  // jose's `JWK` type, where `kid` is optional.
+  return { signingKey, kid: publicJwk.kid ?? "", publicJwk }
 }
 
 /**
  * Imports an additional public key (SPKI PEM) to publish alongside the current one.
  *
- * Used during rotation. Its `kid` is the JWK thumbprint rather than a
- * configured name: these keys are only ever verified against, never signed with,
- * so a stable value derived from the key itself is both sufficient and impossible
- * to get wrong.
+ * Used during rotation. It gets the same thumbprint `kid` it would have as the
+ * signing key, so moving a key between the two roles changes nothing a
+ * verifier can see except which one is signing.
  */
 export async function importAdditionalPublicKey(
   publicKeyPem: string,
   algorithm: JwtAlgorithm
 ): Promise<JWK> {
   const key = await importSPKI(publicKeyPem, algorithm, { extractable: true })
-  const jwk = await exportJWK(key)
 
-  return toPublicJwk(jwk, algorithm, await calculateJwkThumbprint(jwk))
+  return toPublicJwk(await exportJWK(key), algorithm)
 }

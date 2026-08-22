@@ -117,9 +117,9 @@ describe("issueSession", () => {
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
-    const { verificationKey } = await internals.keys()
+    const { verificationKeys } = await internals.keys()
     const claims = await verifyToken(
-      { verificationKey, algorithm: "RS256" },
+      { keys: verificationKeys, algorithm: "RS256" },
       issued.accessToken
     )
 
@@ -140,9 +140,9 @@ describe("issueSession", () => {
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
-    const { verificationKey } = await internals.keys()
+    const { verificationKeys } = await internals.keys()
     const claims = await verifyToken(
-      { verificationKey, algorithm: "RS256" },
+      { keys: verificationKeys, algorithm: "RS256" },
       issued.accessToken
     )
 

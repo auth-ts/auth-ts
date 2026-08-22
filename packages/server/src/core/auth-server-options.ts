@@ -79,8 +79,6 @@ export interface JwtOptions {
    * @default { role: "authenticated" }
    */
   claims?: Record<string, unknown>
-  /** Key id in the JWKS and the token header. @default "main" */
-  kid?: string
   /**
    * Sets `aud` and makes verification enforce it.
    *
@@ -88,7 +86,14 @@ export interface JwtOptions {
    * and a default value only creates a mismatch to debug.
    */
   audience?: string
-  /** SPKI PEM public keys to publish alongside the current one during rotation. */
+  /**
+   * SPKI PEM public keys to publish — and verify against — alongside the
+   * current one during rotation.
+   *
+   * Every key's `kid` is its JWK thumbprint, so a key keeps the same `kid`
+   * whether it is signing or listed here, and moving it between the two roles
+   * is invisible to verifiers. Local `verifyToken` consults this list too.
+   */
   additionalPublicKeys?: string[]
 }
 
@@ -282,9 +287,7 @@ export interface ResolvedAuthServerOptions {
   sms?: SmsOptions
   guest: boolean
   providers: ProvidersOptions
-  jwt: Required<
-    Pick<JwtOptions, "privateKey" | "alg" | "ttl" | "claims" | "kid">
-  > &
+  jwt: Required<Pick<JwtOptions, "privateKey" | "alg" | "ttl" | "claims">> &
     Pick<JwtOptions, "audience" | "additionalPublicKeys">
   secret: string
   basePath: string
@@ -529,7 +532,6 @@ export function resolveAuthServerOptions(
       alg: options.jwt?.alg ?? "RS256",
       ttl: requireDuration(options.jwt?.ttl ?? "10m", "jwt.ttl"),
       claims: requireClaims(options.jwt?.claims),
-      kid: options.jwt?.kid ?? "main",
       ...(options.jwt?.audience ? { audience: options.jwt.audience } : {}),
       ...(options.jwt?.additionalPublicKeys
         ? { additionalPublicKeys: options.jwt.additionalPublicKeys }

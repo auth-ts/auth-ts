@@ -1,4 +1,4 @@
-import { decodeJwt, importSPKI, SignJWT } from "jose"
+import { calculateJwkThumbprint, decodeJwt, importSPKI, SignJWT } from "jose"
 import { beforeAll, describe, expect, it } from "vitest"
 import { buildJwks } from "../../src/jwt/build-jwks.ts"
 import { decodeToken } from "../../src/jwt/decode-token.ts"
@@ -9,7 +9,10 @@ import {
 import type { SignTokenContext } from "../../src/jwt/sign-token.ts"
 import { signToken } from "../../src/jwt/sign-token.ts"
 import type { VerifyTokenContext } from "../../src/jwt/verify-token.ts"
-import { verifyToken } from "../../src/jwt/verify-token.ts"
+import {
+  createVerificationKeySet,
+  verifyToken
+} from "../../src/jwt/verify-token.ts"
 import { generateTestKeys } from "../helpers/generate-test-keys.ts"
 
 let signContext: SignTokenContext
@@ -19,28 +22,29 @@ let publicKeyPem: string
 beforeAll(async () => {
   const keys = await generateTestKeys("RS256")
   publicKeyPem = keys.publicKeyPem
-  const { signingKey, verificationKey, publicJwk } = await importSigningKey(
+  const { signingKey, kid, publicJwk } = await importSigningKey(
     keys.privateKeyPem,
-    "RS256",
-    "main"
+    "RS256"
   )
 
   signContext = {
     signingKey,
     algorithm: "RS256",
-    kid: "main",
+    kid,
     ttl: "10m",
     claims: { role: "authenticated" },
     issuer: "https://app.example.com/api/auth",
     audience: "authenticated"
   }
   verifyContext = {
-    verificationKey,
+    keys: createVerificationKeySet(buildJwks(publicJwk)),
     algorithm: "RS256",
     issuer: "https://app.example.com/api/auth",
     audience: "authenticated"
   }
-  expect(publicJwk.kid).toBe("main")
+  // The kid is the key's own RFC 7638 thumbprint, not a configured name.
+  expect(publicJwk.kid).toBe(kid)
+  expect(kid).toBe(await calculateJwkThumbprint(publicJwk))
 })
 
 describe("signToken", () => {
@@ -171,7 +175,7 @@ describe("signToken", () => {
     const token = await signToken(signContext, { userId: "user-1" })
     const header = JSON.parse(atob(token.split(".")[0] ?? ""))
 
-    expect(header.kid).toBe("main")
+    expect(header.kid).toBe(signContext.kid)
     expect(header.alg).toBe("RS256")
   })
 
@@ -197,23 +201,27 @@ describe("signToken", () => {
 describe("verifyToken", () => {
   it("rejects a token signed by a different key", async () => {
     const other = await generateTestKeys("RS256")
-    const otherKey = await importSigningKey(
-      other.privateKeyPem,
-      "RS256",
-      "main"
-    )
-    const token = await signToken(
+    const otherKey = await importSigningKey(other.privateKeyPem, "RS256")
+
+    // Claiming the published kid: the key is found, the signature fails.
+    const impersonating = await signToken(
       { ...signContext, signingKey: otherKey.signingKey },
       { userId: "user-1" }
     )
+    // Carrying its own kid: no published key matches at all.
+    const unknown = await signToken(
+      { ...signContext, signingKey: otherKey.signingKey, kid: otherKey.kid },
+      { userId: "user-1" }
+    )
 
-    await expect(verifyToken(verifyContext, token)).resolves.toBeNull()
+    await expect(verifyToken(verifyContext, impersonating)).resolves.toBeNull()
+    await expect(verifyToken(verifyContext, unknown)).resolves.toBeNull()
   })
 
   it("rejects algorithm confusion — an HS256 token keyed with the public key", async () => {
     const publicKeyBytes = new TextEncoder().encode(publicKeyPem)
     const forged = await new SignJWT({ sub: "attacker", role: "authenticated" })
-      .setProtectedHeader({ alg: "HS256", kid: "main" })
+      .setProtectedHeader({ alg: "HS256", kid: signContext.kid })
       .setIssuedAt()
       .setExpirationTime("10m")
       .setIssuer("https://app.example.com/api/auth")
@@ -280,7 +288,7 @@ describe("verifyToken", () => {
     // that true.
     const base = () =>
       new SignJWT({ sub: "user-1" })
-        .setProtectedHeader({ alg: "RS256", kid: "main" })
+        .setProtectedHeader({ alg: "RS256", kid: signContext.kid })
         .setIssuer("https://app.example.com/api/auth")
         .setAudience("authenticated")
     const noExp = await base().setIssuedAt().sign(signContext.signingKey)
@@ -302,24 +310,26 @@ describe("verifyToken", () => {
 describe("ES256", () => {
   it("signs and verifies end to end", async () => {
     const keys = await generateTestKeys("ES256")
-    const { signingKey, verificationKey, publicJwk } = await importSigningKey(
+    const { signingKey, kid, publicJwk } = await importSigningKey(
       keys.privateKeyPem,
-      "ES256",
-      "main"
+      "ES256"
     )
 
     const token = await signToken(
       {
         signingKey,
         algorithm: "ES256",
-        kid: "main",
+        kid,
         ttl: "10m",
         claims: { role: "authenticated" }
       },
       { userId: "user-1" }
     )
     const claims = await verifyToken(
-      { verificationKey, algorithm: "ES256" },
+      {
+        keys: createVerificationKeySet(buildJwks(publicJwk)),
+        algorithm: "ES256"
+      },
       token
     )
 
@@ -332,10 +342,9 @@ describe("ES256", () => {
 describe("buildJwks", () => {
   it("publishes only public material", async () => {
     const keys = await generateTestKeys("RS256")
-    const { publicJwk } = await importSigningKey(
+    const { kid, publicJwk } = await importSigningKey(
       keys.privateKeyPem,
-      "RS256",
-      "main"
+      "RS256"
     )
     const jwks = buildJwks(publicJwk)
 
@@ -344,7 +353,7 @@ describe("buildJwks", () => {
       kty: "RSA",
       use: "sig",
       alg: "RS256",
-      kid: "main"
+      kid
     })
     for (const privateComponent of ["d", "p", "q", "dp", "dq", "qi"]) {
       expect(jwks.keys[0]).not.toHaveProperty(privateComponent)
@@ -354,10 +363,9 @@ describe("buildJwks", () => {
   it("publishes rotation keys alongside the signing key, each with a thumbprint kid", async () => {
     const current = await generateTestKeys("RS256")
     const next = await generateTestKeys("RS256")
-    const { publicJwk } = await importSigningKey(
+    const { kid, publicJwk } = await importSigningKey(
       current.privateKeyPem,
-      "RS256",
-      "main"
+      "RS256"
     )
     const additional = await importAdditionalPublicKey(
       next.publicKeyPem,
@@ -366,10 +374,26 @@ describe("buildJwks", () => {
     const jwks = buildJwks(publicJwk, [additional])
 
     expect(jwks.keys).toHaveLength(2)
-    expect(jwks.keys[0]?.kid).toBe("main")
-    expect(jwks.keys[1]?.kid).toBeTruthy()
-    expect(jwks.keys[1]?.kid).not.toBe("main")
+    expect(jwks.keys[0]?.kid).toBe(kid)
+    expect(jwks.keys[1]?.kid).toBe(await calculateJwkThumbprint(additional))
+    expect(jwks.keys[1]?.kid).not.toBe(kid)
     await expect(importSPKI(next.publicKeyPem, "RS256")).resolves.toBeDefined()
+  })
+
+  it("gives a key the same kid whether it is signing or merely published", async () => {
+    // This is the property rotation depends on: a token minted before the
+    // switch names a kid the JWKS still serves after it, and a verifier that
+    // cached the JWKS before the switch already knows the new key by the kid
+    // new tokens will carry.
+    const keys = await generateTestKeys("RS256")
+    const asSigner = await importSigningKey(keys.privateKeyPem, "RS256")
+    const asAdditional = await importAdditionalPublicKey(
+      keys.publicKeyPem,
+      "RS256"
+    )
+
+    expect(asAdditional.kid).toBe(asSigner.kid)
+    expect(asAdditional).toEqual(asSigner.publicJwk)
   })
 })
 
@@ -404,7 +428,7 @@ describe("decodeToken", () => {
     // what the token says — `exp` absent, not expired — not null, and not a
     // fabricated number. The type says so too: `claims.exp` is optional here.
     const noExp = await new SignJWT({ sub: "user-1" })
-      .setProtectedHeader({ alg: "RS256", kid: "main" })
+      .setProtectedHeader({ alg: "RS256", kid: signContext.kid })
       .setIssuedAt()
       .sign(signContext.signingKey)
 

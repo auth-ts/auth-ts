@@ -327,7 +327,11 @@ describe("jwks and discovery", () => {
 
     expect(response.status).toBe(200)
     expect(body.keys).toHaveLength(1)
-    expect(body.keys[0]).toMatchObject({ kty: "RSA", use: "sig", kid: "main" })
+    expect(body.keys[0]).toMatchObject({
+      kty: "RSA",
+      use: "sig",
+      kid: expect.any(String)
+    })
     expect(body.keys[0]).not.toHaveProperty("d")
   })
 

@@ -125,11 +125,11 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     handler,
     handlers: handlers as AuthHandlers,
     verifyToken: async (token) => {
-      const { verificationKey } = await internals.keys()
+      const { verificationKeys } = await internals.keys()
 
       return verifyToken(
         {
-          verificationKey,
+          keys: verificationKeys,
           algorithm: resolved.jwt.alg,
           ...(resolved.issuer ? { issuer: resolved.issuer } : {}),
           ...(resolved.jwt.audience ? { audience: resolved.jwt.audience } : {})
@@ -138,13 +138,13 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       )
     },
     signToken: async (claims = {}) => {
-      const { signingKey } = await internals.keys()
+      const { signingKey, kid } = await internals.keys()
 
       return signToken(
         {
           signingKey,
           algorithm: resolved.jwt.alg,
-          kid: resolved.jwt.kid,
+          kid,
           ttl: resolved.jwt.ttl,
           claims: resolved.jwt.claims,
           ...(resolved.issuer ? { issuer: resolved.issuer } : {}),
