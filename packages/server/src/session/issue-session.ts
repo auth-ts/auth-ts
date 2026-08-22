@@ -54,6 +54,16 @@ export interface IssueSessionInput {
   headers: Headers
   requestURL: string
   mode?: IssueMode
+  /**
+   * Token hash of a session this one supersedes.
+   *
+   * That session is deleted rather than left live, and under `multiAccount` it
+   * is not parked either. Used when a guest completes a sign-in: whether they
+   * were upgraded in place or merged into an existing account, the anonymous
+   * session has served its purpose, and a stranded guest in the account
+   * switcher — or a still-valid refresh token for one — helps nobody.
+   */
+  replaces?: string
 }
 
 /**
@@ -70,7 +80,7 @@ export interface IssueSessionInput {
  */
 export async function issueSession(
   internals: AuthServerInternals,
-  { user, headers, requestURL, mode = "cookie" }: IssueSessionInput
+  { user, headers, requestURL, mode = "cookie", replaces }: IssueSessionInput
 ): Promise<IssueResult> {
   const { options } = internals
   const rawToken = randomBytesBase64url(32)
@@ -85,6 +95,13 @@ export async function issueSession(
     expiresAt: new Date(now.getTime() + parseDuration(options.session.ttl)),
     ...sessionStamp(internals, headers)
   })
+
+  // Only once the replacement exists: if creating it had failed, the caller
+  // would still hold a working session rather than none.
+  if (replaces) {
+    await internals.db.deleteSession({ tokenHash: replaces })
+    internals.log.debug("superseded session deleted")
+  }
 
   const responseHeaders = new Headers()
   const accessToken = await mintAccessToken(internals, user)
@@ -119,9 +136,16 @@ export async function issueSession(
       internals,
       readAccountsCookie(internals, headers)
     )
-    const nextParked = previousActive
-      ? await demoteActive(internals, parked, previousActive)
-      : parked
+    // A superseded session is gone, not parked; anything else the browser had
+    // active is demoted as usual.
+    const superseded =
+      previousActive !== undefined &&
+      replaces !== undefined &&
+      (await sha256Hex(previousActive)) === replaces
+    const nextParked =
+      previousActive && !superseded
+        ? await demoteActive(internals, parked, previousActive)
+        : parked
 
     responseHeaders.append(
       "set-cookie",

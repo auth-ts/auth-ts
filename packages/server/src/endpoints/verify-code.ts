@@ -95,7 +95,9 @@ export const verifyCode = defineEndpoint({
       user,
       headers,
       requestURL: input.requestURL ?? "https://localhost",
-      ...(input.mode ? { mode: input.mode } : {})
+      ...(input.mode ? { mode: input.mode } : {}),
+      // The guest's session has done its job either way — see `convertGuest`.
+      ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
     })
 
     return {
