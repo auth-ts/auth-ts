@@ -78,8 +78,13 @@ index, because the missing constraint only shows under a race.
   property this contract asks of your store.
 - **`cleanup` is optional and takes no arguments.** Implement it and the library
   calls it for you — awaited, at most once a minute, and only after a request
-  that could have written something. Leave it out and the schedule is yours: a
-  cron, a scheduled worker, a partitioned table. **Something has to do it**:
+  that could have written something. Awaited because an unawaited promise is not
+  guaranteed to run on Cloudflare Workers once the response is returned; if you
+  are on Workers and would rather keep the sweep off the response's path, hand
+  it to `waitUntil` from `cloudflare:workers` and return nothing, which is why
+  `cleanup` may return `void` as well as a promise. Leave it out and the
+  schedule is yours: a cron, a scheduled worker, a partitioned table.
+  **Something has to do it**:
   `attempts` grows by a row per counted request, so a deployment that sweeps
   nowhere grows without bound under a flood. Expired means expired *now*, and
   your database already knows the time, so `expiresAt < now()` avoids any skew

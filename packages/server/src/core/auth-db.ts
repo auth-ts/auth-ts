@@ -396,7 +396,7 @@ export interface AuthDB<
    * SQL. Sweeping in batches is fine — the contract does not ask for one
    * statement.
    */
-  cleanup?(): Promise<unknown>
+  cleanup?(): void | Promise<unknown>
 
   /**
    * Pins `S` so a schema mismatch is caught.
@@ -450,7 +450,7 @@ export function defineAuthDB<
   insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable> | undefined>
   update(input: AuthUpdateInput<S>): Promise<unknown>
   delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
-  cleanup?(): Promise<unknown>
+  cleanup?(): void | Promise<unknown>
 }): AuthDB<S> {
   return implementation as unknown as AuthDB<S>
 }

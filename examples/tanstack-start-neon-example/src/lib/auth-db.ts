@@ -1,3 +1,4 @@
+import { waitUntil } from "cloudflare:workers"
 import type {
   AuthDirection,
   AuthOrderBy,
@@ -64,26 +65,30 @@ export const authDB = defineAuthDB({
   delete: ({ table, where }) =>
     db.delete(authTables[table]).where(buildWhere(table, where)).returning(),
   cleanup: () =>
-    Promise.all(
-      [
-        authTables.sessions,
-        authTables.verificationCodes,
-        authTables.attempts
-      ].map((table) => db.delete(table).where(lt(table.expiresAt, sql`now()`)))
-    ).then(() =>
-      db
-        .delete(authTables.users)
-        .where(
-          and(
-            eq(authTables.users.type, "guest"),
-            lt(authTables.users.updatedAt, sql`now() - interval '30 days'`),
-            notExists(
-              db
-                .select()
-                .from(authTables.sessions)
-                .where(eq(authTables.sessions.userId, authTables.users.id))
+    waitUntil(
+      Promise.all(
+        [
+          authTables.sessions,
+          authTables.verificationCodes,
+          authTables.attempts
+        ].map((table) =>
+          db.delete(table).where(lt(table.expiresAt, sql`now()`))
+        )
+      ).then(() =>
+        db
+          .delete(authTables.users)
+          .where(
+            and(
+              eq(authTables.users.type, "guest"),
+              lt(authTables.users.updatedAt, sql`now() - interval '30 days'`),
+              notExists(
+                db
+                  .select()
+                  .from(authTables.sessions)
+                  .where(eq(authTables.sessions.userId, authTables.users.id))
+              )
             )
           )
-        )
+      )
     )
 })
