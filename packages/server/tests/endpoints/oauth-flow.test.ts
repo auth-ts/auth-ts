@@ -218,10 +218,37 @@ describe("oauth callback", () => {
     }
     expect(db.users()).toHaveLength(0)
 
-    // A 4xx on the emails endpoint is the scope not being granted, which is the
-    // "no verified address" refusal — still a 403, not an outage.
+    // GitHub answers its rate limits with 403, not 429: primary limits carry
+    // x-ratelimit-remaining: 0, secondary ones retry-after. Both are throttling.
+    const throttlingHeaders: Array<Record<string, string>> = [
+      { "x-ratelimit-remaining": "0" },
+      { "retry-after": "60" }
+    ]
+    for (const headers of throttlingHeaders) {
+      const { stateCookie, state } = await startSignIn(authServer)
+      stubGitHub({
+        id: 4242,
+        status: { profile: 403 },
+        headers: { profile: headers }
+      })
+      const throttled = await authServer.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          cookies: { "auth-ts.state": stateCookie }
+        })
+      )
+      expect(throttled.status, JSON.stringify(headers)).toBe(502)
+    }
+
+    // A plain 403 on the emails endpoint is the scope not being granted, which
+    // is the "no verified address" refusal — still a 403, not an outage. The
+    // budget header GitHub sends on every response is not a throttling signal
+    // unless it reads zero.
     const { stateCookie, state } = await startSignIn(authServer)
-    stubGitHub({ id: 4242, status: { emails: 403 } })
+    stubGitHub({
+      id: 4242,
+      status: { emails: 403 },
+      headers: { emails: { "x-ratelimit-remaining": "4999" } }
+    })
     const refused = await authServer.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: { "auth-ts.state": stateCookie }

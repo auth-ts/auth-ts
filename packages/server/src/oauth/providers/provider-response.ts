@@ -7,9 +7,20 @@ import { AuthApiError } from "../../http/auth-api-error.ts"
  * neither case has anything been decided about the person signing in, so both
  * are reported as the provider being unavailable. Anything else — a rejected
  * code, a revoked token, a missing scope — is a verdict, and is reported as one.
+ *
+ * GitHub is the exception that needs reading past the status: it answers its
+ * rate limits with 403, not 429 — `x-ratelimit-remaining: 0` for the primary
+ * limit and `retry-after` for the secondary one. A 403 carrying either signal
+ * is throttling; a 403 without them is the ordinary refusal it looks like.
  */
 export function isProviderUnavailable(response: Response) {
-  return response.status >= 500 || response.status === 429
+  if (response.status >= 500 || response.status === 429) return true
+
+  return (
+    response.status === 403 &&
+    (response.headers.get("x-ratelimit-remaining") === "0" ||
+      response.headers.has("retry-after"))
+  )
 }
 
 /**
