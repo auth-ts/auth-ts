@@ -60,7 +60,7 @@ function AccountPage() {
   })
 
   if (isPending) return <p className="text-neutral-500">Loading…</p>
-  if (!user) return <p className="text-neutral-600">Not signed in.</p>
+  if (!user) return <p className="text-neutral-400">Not signed in.</p>
 
   const removeAccount = async () => {
     setMessage(null)
@@ -102,7 +102,7 @@ function AccountPage() {
             value={draftName ?? user.name ?? ""}
             onChange={(event) => setDraftName(event.target.value)}
             placeholder="Your name"
-            className="flex-1 rounded border border-neutral-300 px-3 py-2"
+            className="flex-1 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 placeholder:text-neutral-500"
           />
           <button
             type="button"
@@ -112,7 +112,7 @@ function AccountPage() {
               draftName.trim() === (user.name ?? "")
             }
             onClick={() => draftName && rename.mutate(draftName.trim())}
-            className="rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-50"
+            className="rounded bg-neutral-100 px-4 py-2 text-neutral-900 disabled:opacity-50"
           >
             Save
           </button>
@@ -147,7 +147,7 @@ function AccountPage() {
             onClick={() =>
               authClient.connect({ provider: "github", redirect: "/account" })
             }
-            className="rounded border border-neutral-300 px-3 py-1.5 text-sm"
+            className="rounded border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm"
           >
             Link GitHub
           </button>
@@ -162,7 +162,7 @@ function AccountPage() {
               <span className="flex-1">
                 {session.userAgent ?? "Unknown device"}
                 {session.current ? (
-                  <span className="ml-2 text-green-700">this device</span>
+                  <span className="ml-2 text-green-400">this device</span>
                 ) : null}
               </span>
               <span className="text-neutral-500">
@@ -207,7 +207,7 @@ function AccountPage() {
                       })
                       queryClient.clear()
                     }}
-                    className="text-neutral-700 underline"
+                    className="text-neutral-300 underline"
                   >
                     Switch
                   </button>
@@ -218,7 +218,7 @@ function AccountPage() {
         </div>
       ) : null}
 
-      <div className="space-y-3 border-t border-neutral-200 pt-6">
+      <div className="space-y-3 border-t border-neutral-800 pt-6">
         <h2 className="font-medium">Sessions</h2>
         <div className="flex flex-wrap gap-2 text-sm">
           <button
@@ -231,7 +231,7 @@ function AccountPage() {
               queryClient.clear()
               await navigate({ to: "/login" })
             }}
-            className="rounded border border-neutral-300 px-3 py-1.5"
+            className="rounded border border-neutral-700 bg-neutral-900 px-3 py-1.5"
           >
             Sign out
           </button>
@@ -250,7 +250,7 @@ function AccountPage() {
                 await navigate({ to: "/login" })
               }
             }}
-            className="rounded border border-neutral-300 px-3 py-1.5"
+            className="rounded border border-neutral-700 bg-neutral-900 px-3 py-1.5"
           >
             Sign out this account
           </button>
@@ -261,7 +261,7 @@ function AccountPage() {
               setMessage("Signed out on your other devices.")
               await sessions.refetch()
             }}
-            className="rounded border border-neutral-300 px-3 py-1.5"
+            className="rounded border border-neutral-700 bg-neutral-900 px-3 py-1.5"
           >
             Sign out other devices
           </button>
@@ -272,33 +272,33 @@ function AccountPage() {
               queryClient.clear()
               await navigate({ to: "/login" })
             }}
-            className="rounded border border-neutral-300 px-3 py-1.5"
+            className="rounded border border-neutral-700 bg-neutral-900 px-3 py-1.5"
           >
             Sign out everywhere
           </button>
         </div>
       </div>
 
-      <div className="space-y-3 border-t border-neutral-200 pt-6">
-        <h2 className="font-medium text-red-700">Delete account</h2>
+      <div className="space-y-3 border-t border-neutral-800 pt-6">
+        <h2 className="font-medium text-red-400">Delete account</h2>
         {deletionCode !== null ? (
           <input
             value={deletionCode}
             onChange={(event) => setDeletionCode(event.target.value)}
             placeholder="Confirmation code"
-            className="w-48 rounded border border-neutral-300 px-3 py-2"
+            className="w-48 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 placeholder:text-neutral-500"
           />
         ) : null}
         <button
           type="button"
           onClick={removeAccount}
-          className="block rounded bg-red-700 px-4 py-2 text-white"
+          className="block rounded bg-red-600 px-4 py-2 text-white"
         >
           {deletionCode !== null ? "Confirm deletion" : "Delete my account"}
         </button>
       </div>
 
-      {message ? <p className="text-sm text-neutral-600">{message}</p> : null}
+      {message ? <p className="text-sm text-neutral-400">{message}</p> : null}
     </section>
   )
 }

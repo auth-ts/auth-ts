@@ -7,7 +7,7 @@ function HomePage() {
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Hello world</h1>
-      <p className="text-neutral-600">
+      <p className="text-neutral-400">
         This demo signs tokens the Neon Data API trusts. Head to{" "}
         <Link to="/todos" className="underline">
           your todos

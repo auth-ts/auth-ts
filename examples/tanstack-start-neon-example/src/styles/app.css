@@ -1,1 +1,7 @@
 @import "tailwindcss";
+
+/* This demo is dark only. `color-scheme` is what reaches the parts no utility
+   class can: the caret, scrollbars, checkboxes, and autofill backgrounds. */
+:root {
+  color-scheme: dark;
+}

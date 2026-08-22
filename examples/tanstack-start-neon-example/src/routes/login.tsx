@@ -65,11 +65,11 @@ function LoginPage() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="w-full rounded border border-neutral-300 px-3 py-2"
+            className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 placeholder:text-neutral-500"
           />
           <button
             type="submit"
-            className="w-full rounded bg-neutral-900 px-4 py-2 text-white"
+            className="w-full rounded bg-neutral-100 px-4 py-2 text-neutral-900"
           >
             Email me a code
           </button>
@@ -88,11 +88,11 @@ function LoginPage() {
             value={code}
             onChange={(event) => setCode(event.target.value)}
             placeholder="123456"
-            className="w-full rounded border border-neutral-300 px-3 py-2 tracking-widest"
+            className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 tracking-widest placeholder:text-neutral-500"
           />
           <button
             type="submit"
-            className="w-full rounded bg-neutral-900 px-4 py-2 text-white"
+            className="w-full rounded bg-neutral-100 px-4 py-2 text-neutral-900"
           >
             Sign in
           </button>
@@ -107,7 +107,7 @@ function LoginPage() {
       )}
 
       {message ? (
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-neutral-400">
           {message}
           {/* The countdown is the point of retryAfter: "try again later" with no
               number is the least useful error message in software. */}
@@ -115,13 +115,13 @@ function LoginPage() {
         </p>
       ) : null}
 
-      <div className="space-y-2 border-t border-neutral-200 pt-6">
+      <div className="space-y-2 border-t border-neutral-800 pt-6">
         <button
           type="button"
           onClick={() =>
             authClient.signIn({ provider: "github", redirect: "/todos" })
           }
-          className="w-full rounded border border-neutral-300 px-4 py-2"
+          className="w-full rounded border border-neutral-700 bg-neutral-900 px-4 py-2"
         >
           Continue with GitHub
         </button>
@@ -131,7 +131,7 @@ function LoginPage() {
             await authClient.signInAsGuest()
             await navigate({ to: "/todos" })
           }}
-          className="w-full rounded border border-neutral-300 px-4 py-2"
+          className="w-full rounded border border-neutral-700 bg-neutral-900 px-4 py-2"
         >
           Continue as guest
         </button>

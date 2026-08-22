@@ -50,7 +50,7 @@ function TodosPage() {
     return (
       <section className="space-y-4">
         <h1 className="text-2xl font-semibold">Your todos</h1>
-        <p className="text-neutral-600">
+        <p className="text-neutral-400">
           <Link to="/login" className="underline">
             Sign in
           </Link>{" "}
@@ -83,27 +83,28 @@ function TodosPage() {
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Something to do"
-          className="flex-1 rounded border border-neutral-300 px-3 py-2"
+          className="flex-1 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 placeholder:text-neutral-500"
         />
         <button
           type="submit"
-          className="rounded bg-neutral-900 px-4 py-2 text-white"
+          className="rounded bg-neutral-100 px-4 py-2 text-neutral-900"
         >
           Add
         </button>
       </form>
 
       {todos.isError ? (
-        <p className="text-red-600">
+        <p className="text-red-400">
           Could not load todos: {String(todos.error)}
         </p>
       ) : null}
 
-      <ul className="divide-y divide-neutral-200 rounded border border-neutral-200 bg-white">
+      <ul className="divide-y divide-neutral-800 rounded border border-neutral-800 bg-neutral-900">
         {(todos.data ?? []).map((todo) => (
           <li key={todo.id} className="flex items-center gap-3 px-4 py-3">
             <input
               type="checkbox"
+              className="accent-neutral-100"
               checked={todo.completed}
               onChange={() =>
                 toggle.mutate({ id: todo.id, completed: !todo.completed })
@@ -112,7 +113,7 @@ function TodosPage() {
             <span
               className={
                 todo.completed
-                  ? "flex-1 text-neutral-400 line-through"
+                  ? "flex-1 text-neutral-600 line-through"
                   : "flex-1"
               }
             >
