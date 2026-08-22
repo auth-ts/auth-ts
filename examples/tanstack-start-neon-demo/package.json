@@ -9,7 +9,6 @@
     "deploy": "bun run build && wrangler deploy",
     "typecheck": "tsc -p tsconfig.json",
     "cf-typegen": "wrangler types",
-    "db:push": "drizzle-kit push && bun run scripts/apply-permissions.ts",
     "keys": "bun run scripts/generate-keys.ts",
     "jwks": "bun run scripts/print-jwks.ts"
   },
