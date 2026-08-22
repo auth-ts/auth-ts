@@ -95,6 +95,15 @@ export async function sendMagicCode(
   // live row, so a row left behind by a code nobody received would refuse
   // their retry for a minute. The delete matches on the hash, so a resend that
   // landed in between keeps its own fresh code.
+  //
+  // Two sends to one identifier racing each other are not serialized, and do
+  // not need to be. One live code per identifier already means the earlier
+  // send's code is dead the moment the later one is stored — whether or not
+  // the earlier one is still in flight to the inbox. If the later delivery
+  // then fails, the rollback leaves no row, and the one thing the person can
+  // do — ask again — works at once instead of waiting out a cooldown for a
+  // code nobody received. Serializing that would take a lock primitive the
+  // database contract deliberately does not have.
   try {
     await deliver(internals, identifier, code, locale, purpose, headers)
   } catch (error) {
