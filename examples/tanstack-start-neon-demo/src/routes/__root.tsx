@@ -6,7 +6,7 @@ import {
   Outlet,
   Scripts
 } from "@tanstack/react-router"
-import styles from "../styles.css?url"
+import styles from "../styles/app.css?url"
 
 /**
  * The application shell.
@@ -22,7 +22,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       meta: [
         { charSet: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
-        { title: "auth-ts demo" }
+        { title: "Auth.ts Demo" }
       ],
       links: [{ rel: "stylesheet", href: styles }]
     }),
@@ -36,6 +36,7 @@ function RootComponent() {
       <head>
         <HeadContent />
       </head>
+
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
         <header className="border-b border-neutral-200 bg-white">
           <nav className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4 text-sm">
