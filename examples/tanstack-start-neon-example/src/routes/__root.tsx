@@ -17,7 +17,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { title: "Auth.ts Demo" }
       ],
-      links: [{ rel: "stylesheet", href: styles }]
+      links: [
+        { rel: "stylesheet", href: styles },
+        {
+          rel: "apple-touch-icon",
+          sizes: "180x180",
+          href: "/apple-touch-icon.png"
+        },
+        { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+        { rel: "manifest", href: "/site.webmanifest" },
+        { rel: "icon", href: "/favicon.ico" }
+      ]
     }),
     component: RootComponent
   }

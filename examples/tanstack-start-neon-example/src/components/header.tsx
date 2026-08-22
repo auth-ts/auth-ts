@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router"
 import { useUser } from "../hooks/use-user"
+import { Logo } from "./logo"
 
 export function Header() {
   const { data: user } = useUser()
@@ -9,7 +10,11 @@ export function Header() {
     <header className="border-b border-base-300 bg-base-100">
       <div className="navbar mx-auto max-w-3xl px-2">
         <div className="navbar-start">
-          <Link to="/" className="btn btn-ghost px-2 text-lg font-semibold">
+          <Link
+            to="/"
+            className="btn btn-ghost gap-1.5 px-2 text-lg font-semibold"
+          >
+            <Logo className="size-6 text-primary" />
             Auth.ts
           </Link>
         </div>
