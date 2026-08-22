@@ -1,23 +1,11 @@
 node_modules
-dist
-.output
-.nitro
-.wrangler
-.source
 .nx
 coverage
-*.tsbuildinfo
-.tanstack
-
-# Declarations belong in dist/. These only ever appear in src/ when a build is
-# misconfigured, and once committed nothing regenerates them — so they drift
-# silently the moment an exported type changes.
-src/**/*.d.ts
-src/**/*.d.ts.map
-.env
-.env.local
 .DS_Store
-jwks.json
+
+.env
+.env.*
+!.env.example
 
 .claude/worktrees
 .claude/settings.local.json

@@ -1,0 +1,12 @@
+node_modules
+
+.DS_Store
+.cache
+.output
+.nitro
+.tanstack
+.wrangler
+dist
+*.tsbuildinfo
+
+.source
