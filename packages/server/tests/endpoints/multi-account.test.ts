@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server.ts"
 import { readSetCookies, request } from "../helpers/request.ts"
 import { required } from "../helpers/required.ts"
@@ -228,6 +228,62 @@ describe("multiAccount enabled", () => {
     expect(
       readSetCookies(response).get("auth-ts.refresh.accounts")?.value
     ).toBe("[]")
+  })
+
+  it("ignores a forged accounts cookie instead of running a query per entry", async () => {
+    // The cookie is untrusted and each entry costs a hash and a lookup. One this
+    // server wrote never exceeds the cap, so an oversized one is dropped whole
+    // rather than turning a single request into a thousand sequential queries.
+    const context = await createTestServer(options)
+    const { cookies } = await signIn(context, "ada@example.com")
+    const getSession = vi.spyOn(context.db, "getSession")
+
+    const forged = JSON.stringify(
+      Array.from({ length: 1000 }, (_, index) => `forged-token-${index}`)
+    )
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/accounts", {
+        cookies: { ...cookies, "auth-ts.refresh.accounts": forged }
+      })
+    )
+    const body = (await response.json()) as {
+      accounts: Array<{ user: { email: string } }>
+    }
+
+    expect(body.accounts.map((account) => account.user.email)).toEqual([
+      "ada@example.com"
+    ])
+    // One lookup for the active session, none for the forged entries.
+    expect(getSession).toHaveBeenCalledTimes(1)
+    expect(
+      readSetCookies(response).get("auth-ts.refresh.accounts")?.value
+    ).toBe("[]")
+
+    // Within the cap, duplicates collapse: three copies of the active token are
+    // one parked entry, so the endpoint's three lookups (resolve, prune, build)
+    // rather than the seven the un-deduped list would cost.
+    getSession.mockClear()
+    const active = cookies["auth-ts.refresh"]
+    await context.authServer.handler(
+      request("GET", "/api/auth/accounts", {
+        cookies: {
+          ...cookies,
+          "auth-ts.refresh.accounts": JSON.stringify([active, active, active])
+        }
+      })
+    )
+    expect(getSession).toHaveBeenCalledTimes(3)
+
+    getSession.mockClear()
+    await context.authServer.handler(
+      request("GET", "/api/auth/accounts", {
+        cookies: {
+          ...cookies,
+          "auth-ts.refresh.accounts": JSON.stringify([active, 42, null])
+        }
+      })
+    )
+    expect(getSession).toHaveBeenCalledTimes(1)
   })
 
   it("promotes the next account on local sign-out instead of leaving the browser empty", async () => {
