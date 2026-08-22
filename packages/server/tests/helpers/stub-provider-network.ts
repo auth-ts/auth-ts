@@ -12,6 +12,12 @@ export interface StubGitHubIdentity {
   accessToken?: string | null
   /** HTTP statuses to answer with instead of 200, per endpoint. */
   status?: { token?: number; profile?: number; emails?: number }
+  /** Extra response headers, per endpoint — GitHub signals rate limits this way. */
+  headers?: {
+    token?: Record<string, string>
+    profile?: Record<string, string>
+    emails?: Record<string, string>
+  }
 }
 
 /**
@@ -35,12 +41,17 @@ export function stubGitHub(identity: StubGitHubIdentity) {
         identity.accessToken === null
           ? {}
           : { access_token: identity.accessToken ?? "provider-token" },
-        identity.status?.token
+        identity.status?.token,
+        identity.headers?.token
       )
     }
 
     if (url.endsWith("/user/emails")) {
-      return jsonResponse(identity.emails ?? [], identity.status?.emails)
+      return jsonResponse(
+        identity.emails ?? [],
+        identity.status?.emails,
+        identity.headers?.emails
+      )
     }
 
     if (url.endsWith("api.github.com/user")) {
@@ -51,7 +62,8 @@ export function stubGitHub(identity: StubGitHubIdentity) {
           login: identity.login ?? "octocat",
           avatar_url: identity.avatarURL ?? null
         },
-        identity.status?.profile
+        identity.status?.profile,
+        identity.headers?.profile
       )
     }
 
@@ -153,9 +165,13 @@ async function mintGoogleIdToken(identity: StubGoogleIdentity) {
   return jwt.sign(privateKey)
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(
+  body: unknown,
+  status = 200,
+  headers: Record<string, string> = {}
+) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" }
+    headers: { "content-type": "application/json", ...headers }
   })
 }
