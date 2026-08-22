@@ -79,6 +79,17 @@ complete account takeover, and row-level security cannot save you — it will
 faithfully serve the attacker the victim's rows, because authorization cannot fix
 an authentication failure.
 
+**The redirect URI is derived per request** — from `X-Forwarded-Host` and
+`X-Forwarded-Proto`, falling back to the request URL — unless `baseURL` pins it.
+That is deliberate, and it is not the weak link people expect: a provider only
+ever redirects to a URI registered in its own console, so a forged `Host`
+produces an error page at GitHub or Google rather than an authorization code
+delivered anywhere. The authorize request and the code exchange build the URI
+from one function, so the two always agree — a mismatch is what providers reject.
+Set `baseURL` when the canonical origin should be fixed regardless: a proxy that
+rewrites the host without forwarding it, or a deployment answering on several
+origins.
+
 **Redirects are validated.** A `?redirect=` value must be a same-origin relative
 path: it must start with `/`, and `//evil.example` is rejected because browsers
 treat protocol-relative URLs as absolute.
@@ -110,10 +121,11 @@ confines that to the same site, which still leaves a sibling subdomain — or a
 browser that does not enforce it — able to sign the user out, sign them into
 someone else's account, or have a guest's session merged into an attacker's. So
 every non-`GET` request that carries an `Origin` (or, failing that, a `Referer`)
-must name the server's own origin, its `baseURL`, or its `cors.origin`; anything
-else is refused with **403 `forbiddenOrigin`** before the body is parsed. A
-request with neither header is a non-browser client, which holds no cookie and
-cannot be made to act for anyone.
+must name the server's own origin — as the runtime sees it, or as a proxy
+forwarded it — its `baseURL`, or its `cors.origin`; anything else is refused
+with **403 `forbiddenOrigin`** before the body is parsed. A request with neither
+header is a non-browser client, which holds no cookie and cannot be made to act
+for anyone.
 
 **Request bodies must be `application/json`**, or the answer is **415
 `unsupportedMediaType`**. This is the second, independent layer: a page cannot

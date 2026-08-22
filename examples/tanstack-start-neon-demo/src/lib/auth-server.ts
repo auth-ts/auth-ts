@@ -19,7 +19,6 @@ export const authServer = createAuthServer({
   multiAccount: true,
   // The number of proxies in front of this app: 1 on Cloudflare, 0 when reached directly.
   clientIp: { trustedProxies: Number(process.env.AUTH_TRUSTED_PROXIES ?? 0) },
-  baseURL: process.env.AUTH_BASE_URL as string,
   // Loaders read the session during SSR, so the cookie must reach page requests.
   cookie: { path: "/" },
   logLevel: "info",

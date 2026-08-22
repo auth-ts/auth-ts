@@ -136,6 +136,133 @@ describe("oauth start", () => {
   })
 })
 
+describe("oauth redirect_uri origin", () => {
+  const NO_BASE_URL = {
+    providers: {
+      github: { clientId: "client-id", clientSecret: "client-secret" }
+    }
+  }
+
+  /** The `redirect_uri` the authorize URL was built with. */
+  async function redirectURIOf(
+    authServer: Awaited<ReturnType<typeof createTestServer>>["authServer"],
+    options: Parameters<typeof request>[2] = {}
+  ) {
+    const response = await authServer.handler(
+      request("GET", "/api/auth/sign-in/github", options)
+    )
+    const location = new URL(
+      required(response.headers.get("location"), "location")
+    )
+    return required(location.searchParams.get("redirect_uri"), "redirect_uri")
+  }
+
+  it("derives the origin from the request when no baseURL is configured", async () => {
+    const { authServer } = await createTestServer(NO_BASE_URL)
+
+    expect(await redirectURIOf(authServer)).toBe(
+      "https://app.example.com/api/auth/callback/github"
+    )
+    expect(
+      await redirectURIOf(authServer, { origin: "http://localhost:3000" })
+    ).toBe("http://localhost:3000/api/auth/callback/github")
+  })
+
+  it("prefers the forwarded host and protocol, which is the origin behind a proxy", async () => {
+    // The runtime sees the internal URL; only these headers carry the origin
+    // the browser actually used, so a proxied deployment needs no configuration.
+    const { authServer } = await createTestServer(NO_BASE_URL)
+
+    expect(
+      await redirectURIOf(authServer, {
+        origin: "http://10.0.0.7:8080",
+        headers: {
+          "x-forwarded-host": "app.example.com",
+          "x-forwarded-proto": "https"
+        }
+      })
+    ).toBe("https://app.example.com/api/auth/callback/github")
+  })
+
+  it("takes the leftmost forwarded entry and keeps only an origin", async () => {
+    const { authServer } = await createTestServer(NO_BASE_URL)
+
+    expect(
+      await redirectURIOf(authServer, {
+        origin: "http://10.0.0.7:8080",
+        headers: {
+          // Each hop appends, so the browser's host is the leftmost entry, and
+          // anything beyond a host in it is normalized away.
+          "x-forwarded-host": "app.example.com/evil, edge.internal",
+          "x-forwarded-proto": "https, http"
+        }
+      })
+    ).toBe("https://app.example.com/api/auth/callback/github")
+  })
+
+  it("pins the origin when baseURL is configured, whatever the request says", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+
+    expect(
+      await redirectURIOf(authServer, {
+        origin: "http://10.0.0.7:8080",
+        headers: { "x-forwarded-host": "attacker.example.com" }
+      })
+    ).toBe("https://app.example.com/api/auth/callback/github")
+  })
+
+  it("exchanges the code with the same redirect_uri it authorized with", async () => {
+    // The provider records the URI from the authorize request and refuses the
+    // exchange unless the identical string comes back, so the two derivations
+    // have to agree.
+    const { authServer } = await createTestServer(NO_BASE_URL)
+    const proxied = {
+      origin: "http://10.0.0.7:8080",
+      headers: {
+        "x-forwarded-host": "app.example.com",
+        "x-forwarded-proto": "https"
+      }
+    }
+
+    const start = await authServer.handler(
+      request("GET", "/api/auth/sign-in/github", proxied)
+    )
+    const location = new URL(
+      required(start.headers.get("location"), "location")
+    )
+    const stateCookie = required(
+      readSetCookies(start).get("auth-ts.state"),
+      "state cookie"
+    ).value
+    const { state } = decodeState(stateCookie)
+
+    const fetchSpy = stubGitHub({
+      id: 1,
+      emails: verifiedEmails("ada@example.com")
+    })
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        ...proxied,
+        cookies: { "auth-ts.state": stateCookie }
+      })
+    )
+
+    expect(response.status).toBe(302)
+    const exchange = required(
+      fetchSpy.mock.calls.find(([url]) =>
+        String(url).includes("login/oauth/access_token")
+      ),
+      "token exchange"
+    )
+    const body = JSON.parse(String(exchange[1]?.body)) as {
+      redirect_uri: string
+    }
+    expect(body.redirect_uri).toBe(location.searchParams.get("redirect_uri"))
+    expect(body.redirect_uri).toBe(
+      "https://app.example.com/api/auth/callback/github"
+    )
+  })
+})
 describe("oauth callback", () => {
   it("signs in, sets the session cookie, and returns to the validated path", async () => {
     const { authServer, db } = await createTestServer(OAUTH_OPTIONS)

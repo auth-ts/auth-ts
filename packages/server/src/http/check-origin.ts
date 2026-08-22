@@ -1,5 +1,6 @@
 import type { AuthServerConfig } from "../core/auth-server-config"
 import type { AuthServerInternals } from "../core/auth-server-internals"
+import { getRequestOrigin } from "../lib/get-base-url"
 import { AuthApiError } from "./auth-api-error"
 
 /** Methods that must not have side effects, and so need no origin check. */
@@ -35,15 +36,21 @@ function originOf(url: string) {
  * The origins allowed to make state-changing requests.
  *
  * The request's own origin is always allowed — that is the same-origin case.
- * `baseURL` is allowed because behind a proxy the request URL the runtime
- * sees may be internal while the browser names the public origin. `cors.origin`
- * is allowed because it is, by configuration, the one other origin this server
- * serves.
+ * The forwarded origin is allowed for the same reason it is what the redirect
+ * URI is built from: behind a proxy the URL the runtime sees is internal while
+ * the browser names the public origin, and the two only meet in
+ * `X-Forwarded-Host`. A page cannot forge that header — it is not
+ * CORS-safelisted, so setting it forces a preflight this check would refuse —
+ * and a client that can set it directly is not a browser and carries no cookie.
+ * `baseURL` is allowed whenever one is configured, and `cors.origin` because it
+ * is, by configuration, the one other origin this server serves.
  */
-function allowedOrigins(config: AuthServerConfig, requestURL: string) {
+function allowedOrigins(config: AuthServerConfig, request: Request) {
   const allowed = new Set<string>()
-  const self = originOf(requestURL)
+  const self = originOf(request.url)
   if (self) allowed.add(self)
+  const forwarded = getRequestOrigin(request.url, request.headers)
+  if (forwarded) allowed.add(forwarded)
   if (config.baseURL) {
     const base = originOf(config.baseURL)
     if (base) allowed.add(base)
@@ -69,8 +76,9 @@ function allowedOrigins(config: AuthServerConfig, requestURL: string) {
  *
  * **The origin must be served here.** The browser stamps every cross-origin
  * `POST` with `Origin` (`Referer` is consulted when a privacy setting has
- * stripped it), and one that is not this server's own, its `baseURL`, or its
- * configured `cors.origin` is refused. A request with neither header passes:
+ * stripped it), and one that is not this server's own — as the runtime sees it
+ * or as a proxy forwarded it — nor its `baseURL`, nor its configured
+ * `cors.origin`, is refused. A request with neither header passes:
  * its absence means a non-browser client — a native app or CLI using
  * `mode: "token"` — which holds no cookie and so cannot be made to act on
  * someone's behalf. That is the one way this check fails open.
@@ -98,7 +106,7 @@ export function assertAllowedOrigin(
     originOf(request.headers.get("referer") ?? "")
   if (
     origin !== null &&
-    !allowedOrigins(internals.config, request.url).has(origin)
+    !allowedOrigins(internals.config, request).has(origin)
   ) {
     internals.log.warn("refused a request from a disallowed origin", {
       origin

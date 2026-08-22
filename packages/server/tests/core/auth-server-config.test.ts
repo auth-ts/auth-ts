@@ -89,13 +89,21 @@ describe("construction failures", () => {
     ).not.toThrow()
   })
 
-  it("requires baseURL when providers are configured", () => {
-    expect(() =>
-      createAuthServer({
+  it("leaves baseURL unset, providers or not, and reads no environment variable", () => {
+    process.env.AUTH_BASE_URL = "https://from-the-environment.example.com"
+    try {
+      const { config } = createAuthServer({
         ...baseOptions(),
         providers: { github: { clientId: "id", clientSecret: "secret" } }
       })
-    ).toThrow(/baseURL is required/)
+
+      // Absent, not defaulted: the origin is derived per request instead, and
+      // no environment variable stands behind the option.
+      expect(config.baseURL).toBeUndefined()
+      expect(config.issuer).toBeUndefined()
+    } finally {
+      delete process.env.AUTH_BASE_URL
+    }
   })
 
   it("refuses a provider whose credentials are missing or empty", () => {

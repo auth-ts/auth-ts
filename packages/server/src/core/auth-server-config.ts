@@ -317,11 +317,6 @@ export function resolveAuthServerConfig(
   }
 
   const baseURL = options.baseURL?.replace(/\/+$/, "")
-  if (Object.keys(providers).length > 0 && !baseURL) {
-    throw new AuthConfigError(
-      "baseURL is required when providers are configured: an OAuth redirect_uri must never come from a request header."
-    )
-  }
 
   const additionalFields = options.user?.additionalFields ?? {}
   assertNoReservedFields(additionalFields, RESERVED_USER_FIELDS)

@@ -2,6 +2,7 @@ import { AuthApiError, notFound } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import { validateRedirect } from "../../lib/validate-redirect"
+import { getCallbackURL } from "../../oauth/callback-url"
 import { getProvider } from "../../oauth/providers/get-provider"
 import { createStateCookie } from "../../oauth/state-cookie"
 import { resolveSession } from "../../session/resolve-session"
@@ -42,12 +43,17 @@ export const connectProvider = defineEndpoint({
     if (!resolved) throw new AuthApiError("unauthenticated", 401)
 
     const configured = getProvider(config.providers, input.provider)
-    if (!configured || !config.baseURL) throw notFound()
+    if (!configured) throw notFound()
 
     const secure = shouldUseSecureCookies(
       input.requestURL ?? "https://localhost"
     )
-    const redirectURI = `${config.baseURL}${config.basePath}/callback/${input.provider}`
+    const redirectURI = getCallbackURL(
+      config,
+      input.provider,
+      input.requestURL,
+      headers
+    )
 
     const { state, codeChallenge, nonce, setCookie } = await createStateCookie(
       internals,

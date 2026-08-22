@@ -241,7 +241,7 @@ export interface AuthServerOptions {
    * @default false
    */
   guest?: boolean
-  /** Sign-in method: OAuth. Requires {@link AuthServerOptions.baseURL}. */
+  /** Sign-in method: OAuth. */
   providers?: ProvidersOptions
   /** Token signing, lifetime, claims, and the keys local verification accepts. */
   jwt?: JwtOptions
@@ -258,9 +258,19 @@ export interface AuthServerOptions {
   /** Where the handlers are mounted. Drives cookie path and OAuth callback URLs. @default "/api/auth" */
   basePath?: string
   /**
-   * Absolute origin of this server. **Required when `providers` is set**, because
-   * an OAuth `redirect_uri` must never be derived from a request header an
-   * attacker can set.
+   * Absolute origin of this server, e.g. `https://app.example.com`.
+   *
+   * Optional, with no environment variable behind it. Left unset, every origin
+   * this server needs — the OAuth `redirect_uri` above all — is derived per
+   * request from `X-Forwarded-Host` and `X-Forwarded-Proto`, falling back to the
+   * request URL. That is correct for a single-origin app, behind a proxy or not,
+   * and a forged host does not become a redirect anywhere: providers only ever
+   * redirect to a URI registered in their own console.
+   *
+   * Set it to pin the canonical origin — a proxy that rewrites the host without
+   * forwarding it, or an app answering on several origins that must always name
+   * one — and to publish an `issuer`: the discovery document and the `iss` claim
+   * need a fixed value, so both are absent without it.
    */
   baseURL?: string
   /** Refresh-token lifetime and whether it slides on use. */

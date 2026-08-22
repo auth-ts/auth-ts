@@ -31,9 +31,9 @@ doing; nothing here is blocked on anything in the later sections.
 The one part of the build with no real-world evidence behind it.
 
 - [ ] Register a **GitHub OAuth app**; callback
-      `<AUTH_BASE_URL>/api/auth/callback/github`.
+      `<origin>/api/auth/callback/github`.
 - [ ] Register a **Google OAuth client**; callback
-      `<AUTH_BASE_URL>/api/auth/callback/google`.
+      `<origin>/api/auth/callback/google`.
 - [ ] Put the four credentials in the demo's `.env`.
 - [ ] Run each provider through: sign in, connect from the account page,
       disconnect, and sign in again to confirm the stable-id match holds.
@@ -58,8 +58,9 @@ The one part of the build with no real-world evidence behind it.
       security and the ten-minute token lifetime are what contain that.
 - [ ] Confirm the auth tables are still unreachable after any schema change:
       `set local role authenticated; select count(*) from users;` must return 0.
-- [ ] Set `AUTH_BASE_URL` to the deployed origin — it is `http://localhost:3000`
-      today, and OAuth redirect URIs are built from it.
+- [ ] Register the deployed origin's callback URL with each OAuth provider. The
+      redirect URI is derived per request, so nothing is configured on this side
+      — but the provider only redirects to a URI listed in its own console.
 - [ ] Set `AUTH_TRUSTED_PROXIES` to the platform's real proxy count (1 on
       Vercel and most PaaS). Unset, per-IP rate limits stay off; too high, and
       they key on an `X-Forwarded-For` entry the client wrote.
@@ -131,7 +132,7 @@ shape, a scope that no longer returns what it used to, a redirect URI mismatch
 the provider reports differently than expected.
 
 To close it: register a GitHub app and a Google client, point the callback at
-`<AUTH_BASE_URL>/api/auth/callback/<provider>`, and run both flows plus a connect
+`<origin>/api/auth/callback/<provider>`, and run both flows plus a connect
 and a disconnect against the demo.
 
 ### Publishing

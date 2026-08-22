@@ -6,6 +6,7 @@ import { getErrorMessage } from "../../http/get-error-message"
 import type { AdditionalFieldValues } from "../../http/validate-additional-fields"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
+import { getCallbackURL } from "../../oauth/callback-url"
 import { getProvider } from "../../oauth/providers/get-provider"
 import type { ProviderIdentity } from "../../oauth/providers/oauth-provider"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user"
@@ -59,7 +60,7 @@ export const callbackProvider = defineEndpoint({
   run: async (internals, input: CallbackProviderInput) => {
     const { config } = internals
     const configured = getProvider(config.providers, input.provider)
-    if (!configured || !config.baseURL) throw notFound()
+    if (!configured) throw notFound()
 
     const secure = shouldUseSecureCookies(input.requestURL)
     const clearState = clearStateCookie(internals, input.provider, secure)
@@ -98,7 +99,12 @@ export const callbackProvider = defineEndpoint({
     try {
       identity = await configured.provider.exchangeCode({
         credentials: configured.credentials,
-        redirectURI: `${config.baseURL}${config.basePath}/callback/${input.provider}`,
+        redirectURI: getCallbackURL(
+          config,
+          input.provider,
+          input.requestURL,
+          input.headers
+        ),
         code: input.code,
         codeVerifier: payload.codeVerifier,
         nonce: payload.nonce,

@@ -4,6 +4,7 @@ import { resolveLocale } from "../../http/resolve-locale"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import { validateRedirect } from "../../lib/validate-redirect"
+import { getCallbackURL } from "../../oauth/callback-url"
 import { getProvider } from "../../oauth/providers/get-provider"
 import { createStateCookie } from "../../oauth/state-cookie"
 
@@ -73,7 +74,7 @@ export const signInProvider = defineEndpoint({
   run: async (internals, input: SignInProviderInput) => {
     const { config } = internals
     const configured = getProvider(config.providers, input.provider)
-    if (!configured || !config.baseURL) throw notFound()
+    if (!configured) throw notFound()
 
     const additionalFields = validateAdditionalFields(
       config.user.additionalFields,
@@ -82,7 +83,12 @@ export const signInProvider = defineEndpoint({
     const secure = shouldUseSecureCookies(
       input.requestURL ?? "https://localhost"
     )
-    const redirectURI = `${config.baseURL}${config.basePath}/callback/${input.provider}`
+    const redirectURI = getCallbackURL(
+      config,
+      input.provider,
+      input.requestURL,
+      input.headers
+    )
 
     const { state, codeChallenge, nonce, setCookie } = await createStateCookie(
       internals,
