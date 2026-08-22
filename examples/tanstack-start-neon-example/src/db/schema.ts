@@ -130,7 +130,7 @@ export const todos = pgTable.withRLS(
   "todos",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
-    userId: uuid("userId").notNull().default(sql`(auth.user_id()::uuid)`),
+    userId: uuid("userId").notNull().default(sql`(auth.user_id())::uuid`),
     title: text("title").notNull(),
     completed: boolean("completed").notNull().default(false),
     createdAt: timestamp("createdAt", { withTimezone: true })
