@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import type { MemoryDb } from "../../src/lib/memory-db"
 import { createMemoryDb } from "../../src/lib/memory-db"
+import { required } from "../helpers/required"
 
 let db: MemoryDb
 
@@ -8,8 +9,8 @@ beforeEach(() => {
   db = createMemoryDb()
 })
 
-const user = (fields: Record<string, unknown> = {}) =>
-  db.insert({
+const user = async (fields: Record<string, unknown> = {}) => {
+  const [row] = await db.insert({
     table: "users",
     values: {
       email: null,
@@ -21,6 +22,9 @@ const user = (fields: Record<string, unknown> = {}) =>
       ...fields
     }
   })
+
+  return required(row, "inserted user")
+}
 
 const attempt = (key: string, expiresAt = new Date(Date.now() + 60_000)) =>
   db.insert({ table: "attempts", values: { key, expiresAt } })
@@ -266,7 +270,7 @@ describe("delete", () => {
   it("matches on every column, so an id that belongs to someone else matches nothing", async () => {
     const ada = await user({ email: "ada@example.com" })
     const grace = await user({ email: "grace@example.com" })
-    const session = await db.insert({
+    const [session] = await db.insert({
       table: "sessions",
       values: {
         userId: ada.id,
@@ -280,7 +284,7 @@ describe("delete", () => {
 
     const stolen = await db.delete({
       table: "sessions",
-      where: { id: session.id, userId: grace.id }
+      where: { id: required(session, "inserted session").id, userId: grace.id }
     })
 
     expect(stolen).toEqual([])

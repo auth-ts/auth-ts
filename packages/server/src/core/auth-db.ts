@@ -327,17 +327,22 @@ export interface AuthDB<
   }): Promise<AuthRow<S, T>[]>
 
   /**
-   * Inserts one row and returns it as stored.
+   * Inserts one row and returns what was written.
    *
-   * The returned row is how core learns anything the store decided — the `id`
+   * A list, because that is what `INSERT … RETURNING` hands back and what the
+   * driver already has — the library takes the row out of it and decides what
+   * an empty result means, so no implementation has to. It is the same shape
+   * {@link AuthDB.delete} returns, for the same reason.
+   *
+   * What comes back is how core learns anything the store decided: the `id`
    * when `generateId` is not configured, and any column default. A unique
-   * violation must throw rather than merge: core reads before it inserts, and
+   * violation must throw rather than merge — core reads before it inserts, and
    * the constraint is deliberately the arbiter of the race between the two.
    */
   insert<T extends AuthTable>(input: {
     table: T
     values: AuthInsert<S, T>
-  }): Promise<AuthRow<S, T>>
+  }): Promise<AuthRow<S, T>[]>
 
   /**
    * Applies `fields` to every row matching `where`.
@@ -355,7 +360,7 @@ export interface AuthDB<
     table: T
     where: AuthWhere<S, T>
     values: Partial<AuthRow<S, T>>
-  }): Promise<void>
+  }): Promise<unknown>
 
   /**
    * Deletes every row matching `where` and returns what it removed.
@@ -390,7 +395,7 @@ export interface AuthDB<
    * SQL. Sweeping in batches is fine — the contract does not ask for one
    * statement.
    */
-  cleanup?(): Promise<void>
+  cleanup?(): Promise<unknown>
 
   /**
    * Pins `S` so a schema mismatch is caught.
@@ -441,10 +446,10 @@ export function defineAuthDB<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 >(implementation: {
   select(input: AuthSelectInput<S>): Promise<AuthRow<S, AuthTable>[]>
-  insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable>>
-  update(input: AuthUpdateInput<S>): Promise<void>
+  insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable>[]>
+  update(input: AuthUpdateInput<S>): Promise<unknown>
   delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
-  cleanup?(): Promise<void>
+  cleanup?(): Promise<unknown>
 }): AuthDB<S> {
   return implementation as unknown as AuthDB<S>
 }

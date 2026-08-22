@@ -6,13 +6,14 @@ import type {
   AuthWhere
 } from "../../src/core/auth-db"
 import type { MemoryDb } from "../../src/lib/memory-db"
+import { required } from "./required"
 
 /** Seeds a user, filling the columns core always writes so tests name only what they care about. */
-export function insertUser(
+export async function insertUser(
   db: MemoryDb,
   fields: Partial<AuthUser> = {}
 ): Promise<AuthUser> {
-  return db.insert({
+  const [user] = await db.insert({
     table: "users",
     values: {
       email: null,
@@ -24,6 +25,8 @@ export function insertUser(
       ...fields
     }
   })
+
+  return required(user, "inserted user")
 }
 
 /** Reads matching rows, unbounded enough for a test and ordered by insertion. */

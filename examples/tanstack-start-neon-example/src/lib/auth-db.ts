@@ -18,6 +18,7 @@ const authTables = Object.fromEntries(
 const buildWhere = (table: AuthTable, where: AuthWhere) => {
   const columns = getColumns(authTables[table])
   const entries = Object.entries(where) as [keyof typeof columns, never][]
+
   return and(...entries.map(([name, value]) => eq(columns[name], value)))
 }
 
@@ -27,58 +28,37 @@ const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
     keyof typeof columns,
     AuthDirection
   ][]
+
   return entries.map(([name, direction]) =>
     (direction === "asc" ? asc : desc)(columns[name])
   )
 }
 
 export const authDB = defineAuthDB({
-  async select({ table, where, limit, offset, orderBy }) {
-    return db
+  select: ({ table, where, limit, offset, orderBy }) =>
+    db
       .select()
       .from(authTables[table])
       .where(buildWhere(table, where))
       .orderBy(...buildOrderBy(table, orderBy))
       .limit(limit)
-      .offset(offset)
-  },
+      .offset(offset),
 
-  async insert({ table, values }) {
-    // The row comes back as stored, which is how the library learns the id this
-    // schema's `uuidv7()` default just generated.
-    const [inserted] = await db
-      .insert(authTables[table])
-      .values(values)
-      .returning()
-    if (!inserted) throw new Error(`insert into ${table} returned no row`)
+  insert: ({ table, values }) =>
+    db.insert(authTables[table]).values(values).returning(),
 
-    return inserted
-  },
+  update: ({ table, where, values }) =>
+    db.update(authTables[table]).set(values).where(buildWhere(table, where)),
 
-  async update({ table, where, values }) {
-    await db
-      .update(authTables[table])
-      .set(values)
-      .where(buildWhere(table, where))
-  },
+  delete: ({ table, where }) =>
+    db.delete(authTables[table]).where(buildWhere(table, where)).returning(),
 
-  async delete({ table, where }) {
-    return db
-      .delete(authTables[table])
-      .where(buildWhere(table, where))
-      .returning()
-  },
-
-  async cleanup() {
-    // Optional on the contract. Implementing it hands the sweep to the library,
-    // which runs it at most once a minute after a mutating request; leaving it
-    // out would mean owning the schedule here instead.
-    await Promise.all(
+  cleanup: () =>
+    Promise.all(
       [
         authTables.sessions,
         authTables.verificationCodes,
         authTables.attempts
       ].map((table) => db.delete(table).where(lt(table.expiresAt, sql`now()`)))
     )
-  }
 })

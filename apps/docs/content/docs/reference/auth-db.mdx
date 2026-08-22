@@ -55,17 +55,21 @@ index, because the missing constraint only shows under a race.
   smallest ordering every store can express. Read it the same way you read
   `where`, by mapping over its entries; there is no reason to pull the single
   key out by hand.
-- **`insert` returns the row as stored.** That is how the library learns
-  anything your database decided, the `id` above all. A unique violation must
-  throw rather than merge: the library reads before it inserts, and the
-  constraint is deliberately the arbiter of the race between the two.
+- **`insert` returns what it wrote**, as a list — the same shape `delete`
+  returns, and what `INSERT … RETURNING` already hands you. The library takes
+  the row out and decides what an empty result means, so you do not have to.
+  What comes back is how it learns anything your database decided, the `id`
+  above all. A unique violation must throw rather than merge: the library reads
+  before it inserts, and the constraint is deliberately the arbiter of the race
+  between the two.
 - **Ids are yours.** The row arrives without one unless you set
   [`generateId`](/docs/reference/create-auth-server#generating-ids), so your `uuidv7()` default,
   `$defaultFn`, or identity column fills it as it always would.
 - **`update` never receives an empty set.** The library composes the fields
   itself and skips the call entirely when a request changes nothing, so you need
   no guard against the `UPDATE … SET` with no columns that most query builders
-  reject. It returns nothing: the library already holds the row it is updating.
+  reject. Whatever it resolves to is ignored, so handing back your driver's own
+  promise is enough — the library already holds the row it is updating.
 - **`delete` returns what it removed**, as an array. Those rows are proof: they
   are how a revoke answers 404 rather than 204 without a second query, and how a
   verification code becomes usable exactly once. Two verifiers can both read a code and
@@ -148,15 +152,23 @@ const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
 }
 
 export const authDB = defineAuthDB({
-  async select({ table, where, limit, offset, orderBy }) {
-    return db
+  select: ({ table, where, limit, offset, orderBy }) =>
+    db
       .select()
       .from(authTables[table])
       .where(buildWhere(table, where))
       .orderBy(...buildOrderBy(table, orderBy))
       .limit(limit)
-      .offset(offset)
-  }
+      .offset(offset),
+
+  insert: ({ table, values }) =>
+    db.insert(authTables[table]).values(values).returning(),
+
+  update: ({ table, where, values }) =>
+    db.update(authTables[table]).set(values).where(buildWhere(table, where)),
+
+  delete: ({ table, where }) =>
+    db.delete(authTables[table]).where(buildWhere(table, where)).returning()
   // ...
 })
 ```
