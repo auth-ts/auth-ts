@@ -273,7 +273,6 @@ describe("resolved defaults", () => {
     expect(options.basePath).toBe("/api/auth")
     expect(options.jwt.alg).toBe("RS256")
     expect(options.jwt.ttl).toBe("10m")
-    expect(options.jwt.kid).toBe("main")
     expect(options.jwt.claims).toEqual({ role: "authenticated" })
     expect(options.session).toEqual({ ttl: "30d", sliding: true })
     expect(options.cookie.name).toBe("auth-ts.refresh")

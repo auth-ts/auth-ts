@@ -151,13 +151,13 @@ export async function mintAccessToken(
   user: AuthUser
 ) {
   const { options } = internals
-  const { signingKey } = await internals.keys()
+  const { signingKey, kid } = await internals.keys()
 
   return signToken(
     {
       signingKey,
       algorithm: options.jwt.alg,
-      kid: options.jwt.kid,
+      kid,
       ttl: options.jwt.ttl,
       claims: options.jwt.claims,
       ...(options.issuer ? { issuer: options.issuer } : {}),
