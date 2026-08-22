@@ -76,6 +76,30 @@ describe("additionalFields on sign-up", () => {
     ).toBe("invalidField")
   })
 
+  it("rejects the body before the code is consumed, so the corrected retry still works", async () => {
+    const context = await createTestServer(options)
+
+    const rejected = await verifyWith(context, "ada@example.com", {
+      isAdmin: true
+    })
+    expect(rejected.status).toBe(400)
+
+    // Same code, fixed body: the code must still be there to consume.
+    const retried = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes.at(-1), "code").code,
+          additionalFields: { referralCode: "ADA10" }
+        }
+      })
+    )
+    const body = (await retried.json()) as { user: Record<string, unknown> }
+
+    expect(retried.status).toBe(200)
+    expect(body.user.referralCode).toBe("ADA10")
+  })
+
   it("rejects a declared key of the wrong primitive type", async () => {
     const context = await createTestServer(options)
     const response = await verifyWith(context, "ada@example.com", {
