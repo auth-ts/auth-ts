@@ -26,44 +26,41 @@ import {
 const tables = { users, sessions, verificationCodes, attempts, connections }
 
 /**
- * Every column/value pair in a `where`, as one `AND` — the only filter the
- * contract has.
+ * The column a name from the contract refers to.
  *
- * `where` arrives as column names rather than column objects, because the
- * library has no way to hold a reference to your schema. This is the
- * translation.
+ * `where` and `orderBy` arrive as column names, because the library has no way
+ * to hold a reference to your schema. This is the translation, and the only
+ * place the two vocabularies meet.
  */
-const matches = (table: keyof typeof tables, where: object) => {
+const columnOf = (table: keyof typeof tables, name: string) => {
   const columns: Record<string, PgColumn> = getColumns(tables[table])
+  const column = columns[name]
+  // Only reachable if this schema is missing a column the library names, which
+  // is worth saying out loud rather than leaving to a confusing failure later.
+  if (!column) throw new Error(`${table} has no ${name} column`)
 
-  return and(
-    ...Object.entries(where).map(([name, value]) => {
-      const column = columns[name]
-      // Only reachable if this schema is missing a column the library names,
-      // which is worth saying out loud rather than leaving to a confusing
-      // failure further down.
-      if (!column) throw new Error(`${table} has no ${name} column`)
-
-      return eq(column, value)
-    })
-  )
+  return column
 }
+
+/** Every column/value pair in a `where`, as one `AND` — the only filter the contract has. */
+const matches = (table: keyof typeof tables, where: object) =>
+  and(
+    ...Object.entries(where).map(([name, value]) =>
+      eq(columnOf(table, name), value)
+    )
+  )
 
 export const authDB = defineAuthDB({
   async select({ table, where, limit, offset, orderBy }) {
-    const columns: Record<string, PgColumn> = getColumns(tables[table])
-    const [entry] = Object.entries(orderBy)
-    if (!entry) throw new Error(`${table} was given an ordering with no column`)
-
-    const [name, direction] = entry
-    const column = columns[name]
-    if (!column) throw new Error(`${table} has no ${name} column`)
-
     return db
       .select()
       .from(tables[table])
       .where(matches(table, where))
-      .orderBy((direction === "asc" ? asc : desc)(column))
+      .orderBy(
+        ...Object.entries(orderBy).map(([name, direction]) =>
+          (direction === "asc" ? asc : desc)(columnOf(table, name))
+        )
+      )
       .limit(limit)
       .offset(offset)
   },

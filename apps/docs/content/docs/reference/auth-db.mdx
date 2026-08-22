@@ -50,10 +50,11 @@ index, because the missing constraint only shows under a race.
   thin end of a query language.
 - **`select` takes `limit`, `offset`, and `orderBy`, always.** Nothing is
   optional, so there is no `undefined` to branch on and your implementation has
-  one code path. `orderBy` is one column and a direction — `{ createdAt: "desc" }`,
-  always exactly one key, so `Object.entries(orderBy)[0]` is the whole of it
-  — which is enough for "newest" and for paging, and the smallest ordering every
-  store can express.
+  one code path. `orderBy` is one column and a direction —
+  `{ createdAt: "desc" }` — which is enough for "newest" and for paging, and the
+  smallest ordering every store can express. Read it the same way you read
+  `where`, by mapping over its entries; there is no reason to pull the single
+  key out by hand.
 - **`insert` returns the row as stored.** That is how the library learns
   anything your database decided, the `id` above all. A unique violation must
   throw rather than merge: the library reads before it inserts, and the
@@ -122,19 +123,15 @@ const tables = { users, sessions, verificationCodes, attempts, connections }
 
 export const authDB = defineAuthDB({
   async select({ table, where, limit, offset, orderBy }) {
-    const columns: Record<string, PgColumn> = getColumns(tables[table])
-    const [entry] = Object.entries(orderBy)
-    if (!entry) throw new Error(`${table} was given an ordering with no column`)
-
-    const [name, direction] = entry
-    const column = columns[name]
-    if (!column) throw new Error(`${table} has no ${name} column`)
-
     return db
       .select()
       .from(tables[table])
       .where(matches(table, where))
-      .orderBy((direction === "asc" ? asc : desc)(column))
+      .orderBy(
+        ...Object.entries(orderBy).map(([name, direction]) =>
+          (direction === "asc" ? asc : desc)(columnOf(table, name))
+        )
+      )
       .limit(limit)
       .offset(offset)
   }
