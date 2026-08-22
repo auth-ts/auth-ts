@@ -12,7 +12,9 @@ function AccountPage() {
   const { data: user, isPending } = useUser()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [name, setName] = useState("")
+  // `null` until the user edits, so the input shows the stored name and Save
+  // cannot send an empty or unchanged value over it.
+  const [draftName, setDraftName] = useState<string | null>(null)
   const [deletionCode, setDeletionCode] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -36,8 +38,11 @@ function AccountPage() {
   })
 
   const rename = useMutation({
-    mutationFn: () => authClient.updateUser({ name }),
-    onSuccess: () => setMessage("Saved.")
+    mutationFn: (name: string) => authClient.updateUser({ name }),
+    onSuccess: () => {
+      setDraftName(null)
+      setMessage("Saved.")
+    }
   })
 
   const revoke = useMutation({
@@ -94,15 +99,20 @@ function AccountPage() {
         <h2 className="font-medium">Profile</h2>
         <div className="flex gap-2">
           <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={user.name ?? "Your name"}
+            value={draftName ?? user.name ?? ""}
+            onChange={(event) => setDraftName(event.target.value)}
+            placeholder="Your name"
             className="flex-1 rounded border border-neutral-300 px-3 py-2"
           />
           <button
             type="button"
-            onClick={() => rename.mutate()}
-            className="rounded bg-neutral-900 px-4 py-2 text-white"
+            disabled={
+              draftName === null ||
+              draftName.trim() === "" ||
+              draftName.trim() === (user.name ?? "")
+            }
+            onClick={() => draftName && rename.mutate(draftName.trim())}
+            className="rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-50"
           >
             Save
           </button>
