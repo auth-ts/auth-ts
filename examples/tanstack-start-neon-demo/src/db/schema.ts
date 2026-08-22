@@ -13,24 +13,6 @@ import {
   uuid
 } from "drizzle-orm/pg-core"
 
-/**
- * Users.
- *
- * Both identifiers are nullable because a guest has neither, and unique when
- * present so one person cannot become two accounts.
- *
- * Row-level security is enabled here — and on every other auth table — with no
- * policy attached. That combination denies every role except the table owner,
- * which is exactly right: the server connects as the owner and the callbacks
- * work, while the Data API connects as `authenticated` and sees nothing at all.
- *
- * This is not belt and braces. Neon grants `authenticated` full CRUD on
- * everything in `public` when the Data API is turned on, so without it any
- * signed-in user could read every account, every session token hash, and every
- * live magic code by querying the REST endpoint directly. Note the contrast with
- * `todos`, which enables RLS *and* forces it, because there the owner should be
- * constrained too.
- */
 export const users = pgTable.withRLS("users", {
   id: uuid("id").primaryKey().default(sql`uuidv7()`),
   email: text("email").unique(),
@@ -48,7 +30,6 @@ export const users = pgTable.withRLS("users", {
     .$onUpdate(() => new Date())
 })
 
-/** Refresh tokens, stored only as hashes. */
 export const sessions = pgTable.withRLS(
   "sessions",
   {
@@ -74,7 +55,6 @@ export const sessions = pgTable.withRLS(
   ]
 )
 
-/** Live magic codes — one per identifier, enforced by the unique constraint. */
 export const magicCodes = pgTable.withRLS(
   "magicCodes",
   {
@@ -98,7 +78,6 @@ export const magicCodes = pgTable.withRLS(
   (table) => [index("magicCodesExpiresAtIndex").on(table.expiresAt)]
 )
 
-/** Fixed-window rate-limit counters. */
 export const rateLimits = pgTable.withRLS(
   "rateLimits",
   {
@@ -117,7 +96,6 @@ export const rateLimits = pgTable.withRLS(
   (table) => [index("rateLimitsResetAtIndex").on(table.resetAt)]
 )
 
-/** Linked provider identities, keyed on the provider's stable account id. */
 export const connections = pgTable.withRLS(
   "connections",
   {
@@ -148,14 +126,6 @@ export const connections = pgTable.withRLS(
   ]
 )
 
-/**
- * The application's own table — the one the browser reads directly.
- *
- * `userId` defaults to `auth.user_id()` from the verified JWT, so the value is
- * server-derived and a client-supplied one is simply overwritten. The policy then
- * restricts every row to its owner, which is the property the whole demo exists
- * to prove.
- */
 export const todos = pgTable.withRLS(
   "todos",
   {
