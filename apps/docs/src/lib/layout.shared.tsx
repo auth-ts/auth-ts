@@ -15,11 +15,14 @@ export const REPO_URL = "https://github.com/auth-ts/auth-ts"
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
+      // Wrapped rather than a fragment: every layout hardcodes `gap-2.5` on
+      // the title slot, which is too airy for a mark this size. One child
+      // leaves that gap nothing to act on, so the spacing below is what shows.
       title: (
-        <>
-          <Logo className="size-5" />
+        <span className="inline-flex items-center gap-1.5">
+          <Logo className="text-fd-primary size-6" />
           Auth.ts
-        </>
+        </span>
       )
     },
     githubUrl: REPO_URL,

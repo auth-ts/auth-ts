@@ -3,6 +3,31 @@
 @import "fumadocs-ui/css/preset.css";
 
 /**
+ * Indigo accent over the neutral preset. Only the primary tokens move — the
+ * background, foreground, and muted greys stay as `neutral.css` set them, so
+ * body copy is unchanged.
+ *
+ * The fill lightens in dark mode so it stays legible either way — as a solid
+ * fill (the hero and closing buttons) and as text (active sidebar and TOC
+ * markers, the logo, highlighted code lines).
+ *
+ * Its label is the page background, which is the inverse of the foreground the
+ * rest of the page is drawn in. One declaration covers both themes: `.dark`
+ * lands on `<html>`, the same element as `:root`, so the `var()` resolves
+ * against whichever background is in play rather than needing a second copy.
+ */
+:root {
+  --color-fd-primary: oklch(58.5% 0.233 277.117); /* indigo-500 */
+  --color-fd-primary-foreground: var(--color-fd-background);
+  --color-fd-ring: oklch(58.5% 0.233 277.117);
+}
+
+.dark {
+  --color-fd-primary: oklch(67.3% 0.182 276.935); /* indigo-400 */
+  --color-fd-ring: oklch(67.3% 0.182 276.935);
+}
+
+/**
  * Tailwind v4's Preflight gives buttons `cursor: default`, matching the browser
  * rather than v3. This restores the pointer, which is what every control on the
  * site is built to expect. Disabled controls keep the default cursor — both
