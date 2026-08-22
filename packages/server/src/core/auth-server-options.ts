@@ -139,11 +139,19 @@ export interface CookieOptions {
   /** @default "auth-ts.refresh" */
   name?: string
   /**
-   * Defaults to `basePath`, so the token is sent only to the auth mount.
+   * Defaults to `"/"`, so a page request carries the session.
    *
-   * Set `"/"` when server-side rendering needs the session on page requests —
-   * with the tradeoff that the refresh token then rides the `Cookie` header of
-   * every same-origin request, and therefore into access logs and APM traces.
+   * Server-side rendering is the reason: a loader, middleware, or server
+   * component runs on a request to your own routes, not to the auth mount, and
+   * a cookie scoped to the mount is simply not sent there — the session reads
+   * as absent for a signed-in visitor, silently.
+   *
+   * Narrowing it to `basePath` is hardening you can opt into: the refresh token
+   * then rides the `Cookie` header of auth requests only, rather than every
+   * same-origin request and the access logs, CDN logs, and APM traces those
+   * pass through. Path is not a security boundary in the browser — `HttpOnly`,
+   * `SameSite=Lax`, and host-only scoping are what protect the token — so what
+   * this buys is exposure hygiene, and it costs you server-side session reads.
    */
   path?: string
 }
@@ -255,7 +263,7 @@ export interface AuthServerOptions {
    * independently.
    */
   secret?: string
-  /** Where the handlers are mounted. Drives cookie path and OAuth callback URLs. @default "/api/auth" */
+  /** Where the handlers are mounted. Drives the OAuth callback URLs. @default "/api/auth" */
   basePath?: string
   /**
    * Absolute origin of this server, e.g. `https://app.example.com`.

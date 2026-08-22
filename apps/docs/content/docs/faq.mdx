@@ -23,7 +23,7 @@ page, and the long-lived thing — the cookie — is unreadable from JavaScript.
 
 ## Why isn't the refresh token rotated?
 
-The cookie is `HttpOnly`, path-scoped, and never crosses an origin. Rotation
+The cookie is `HttpOnly`, host-only, and never crosses an origin. Rotation
 mostly defends against theft that requires a compromise defeating rotation anyway,
 while reliably causing a race between concurrent tabs. If you store the refresh
 token somewhere else, rotation becomes mandatory — which is why that mode is not

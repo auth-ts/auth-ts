@@ -446,7 +446,7 @@ describe("resolved defaults", () => {
     expect(config.jwt.claims).toEqual({ role: "authenticated" })
     expect(config.session).toEqual({ ttl: "30d", sliding: true })
     expect(config.cookie.name).toBe("auth-ts.refresh")
-    expect(config.cookie.path).toBe("/api/auth")
+    expect(config.cookie.path).toBe("/")
     expect(config.user.deleteFreshWindow).toBe("15m")
     expect(config.multiAccount).toBe(false)
     expect(config.cleanup).toBe(true)
@@ -474,15 +474,18 @@ describe("resolved defaults", () => {
     expect(config.issuer).toBe("https://app.example.com/api/auth")
   })
 
-  it("defaults the cookie path to basePath and keeps an explicit override", () => {
+  it("keeps the cookie path at the root whatever the mount, unless narrowed", () => {
+    // The mount moves the endpoints and the OAuth callbacks; it must not move
+    // the cookie out of reach of a page request, which is where the session is
+    // read during server-side rendering.
     expect(
       createAuthServer({ ...baseOptions(), basePath: "/auth" }).config.cookie
         .path
-    ).toBe("/auth")
-    expect(
-      createAuthServer({ ...baseOptions(), cookie: { path: "/" } }).config
-        .cookie.path
     ).toBe("/")
+    expect(
+      createAuthServer({ ...baseOptions(), cookie: { path: "/api/auth" } })
+        .config.cookie.path
+    ).toBe("/api/auth")
   })
 
   it("merges partial rate limits over the defaults", () => {

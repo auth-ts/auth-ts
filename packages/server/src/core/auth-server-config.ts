@@ -382,7 +382,7 @@ export function resolveAuthServerConfig(
     },
     cookie: {
       name: cookieName,
-      path: options.cookie?.path ?? basePath,
+      path: options.cookie?.path ?? "/",
       accountsName: `${cookieName}.accounts`,
       stateName: "auth-ts.state"
     },

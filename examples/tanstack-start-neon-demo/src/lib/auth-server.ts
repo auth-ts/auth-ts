@@ -12,8 +12,6 @@ export const authServer = createAuthServer({
   },
   guest: true,
   multiAccount: true,
-  // Loaders read the session during SSR, so the cookie must reach page requests.
-  cookie: { path: "/" },
   providers: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID as string,

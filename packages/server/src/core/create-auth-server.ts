@@ -200,7 +200,7 @@ function warnAboutInertIpLimits(internals: AuthServerInternals) {
  *
  * Only these get the configuration guard: over HTTP a missing cookie is just an
  * unauthenticated request, but in a loader it almost always means `cookie.path`
- * is still scoped to the auth mount.
+ * has been narrowed to the auth mount.
  */
 const COOKIE_PLANE_CALLABLES = new Set(["getToken"])
 
@@ -222,10 +222,11 @@ function notFoundEndpoint(error: AuthApiError, request: Request): AnyEndpoint {
 /**
  * Explains the "server-side rendering is always logged out" trap before it happens.
  *
- * With the default `cookie.path`, the refresh cookie is only sent to the auth
- * mount, so a page request carries nothing and this would quietly return null
- * forever. That presents as a bug in the application rather than a configuration
- * choice, so it throws with the fix in the message instead.
+ * A `cookie.path` narrowed to the auth mount means the refresh cookie is never
+ * sent to a page request, so a server-side read would quietly return null
+ * forever. That presents as a bug in the application rather than the cost of a
+ * configuration choice, so it throws with the fix in the message instead. The
+ * default path is `"/"`, so this is only ever reached by opting into scoping.
  */
 function assertCookieReachable(
   resolved: AuthServerConfig,

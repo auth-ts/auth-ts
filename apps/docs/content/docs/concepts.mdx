@@ -7,8 +7,12 @@ icon: Lightbulb
 ## Two tokens
 
 **The refresh token** is the session. It is 32 random bytes, delivered to the
-browser only as an `HttpOnly`, `Secure`, `SameSite=Lax` cookie scoped to the auth
-mount. Your database stores nothing but `sha256` of it, so a leaked table cannot
+browser only as an `HttpOnly`, `Secure`, `SameSite=Lax`, host-only cookie. It is
+rooted at `/` so a page request carries it, which is what lets a loader or a
+server component read the session during rendering; `cookie.path` narrows it to
+the auth mount if you would rather the token stayed out of the `Cookie` header
+of every same-origin request, at the cost of those reads. Your database stores
+nothing but `sha256` of it, so a leaked table cannot
 be replayed as a session. That is the whole of what hashing buys. The token
 itself is a bearer credential: whoever holds it holds the session until it is
 revoked or expires, and hashing does nothing to change that.

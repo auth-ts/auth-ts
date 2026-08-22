@@ -31,7 +31,6 @@ const cookieHeaders = (refreshToken: string) =>
 describe("getToken as a function", () => {
   it("matches POST /token exactly, including sliding the session", async () => {
     const context = await createTestServer({
-      cookie: { path: "/" },
       session: { ttl: "30d" }
     })
     const refreshToken = await signIn(context)
@@ -65,7 +64,6 @@ describe("getToken as a function", () => {
     vi.useFakeTimers()
     try {
       const context = await createTestServer({
-        cookie: { path: "/" },
         session: { ttl: "30d" }
       })
       const refreshToken = await signIn(context)
@@ -92,7 +90,6 @@ describe("getToken as a function", () => {
     vi.useFakeTimers()
     try {
       const context = await createTestServer({
-        cookie: { path: "/" },
         session: { ttl: "30d", sliding: false }
       })
       const refreshToken = await signIn(context)
@@ -116,7 +113,7 @@ describe("getToken as a function", () => {
   })
 
   it("accepts a Request directly, since it satisfies the headers shape", async () => {
-    const context = await createTestServer({ cookie: { path: "/" } })
+    const context = await createTestServer()
     const refreshToken = await signIn(context)
 
     const result = await context.authServer.getToken(
@@ -132,7 +129,7 @@ describe("getToken as a function", () => {
     // Callables throw AuthApiError so a caller can switch on `code`; getSession is
     // the one that answers null, because "is anyone signed in" is a question with
     // a legitimate negative answer.
-    const context = await createTestServer({ cookie: { path: "/" } })
+    const context = await createTestServer()
     const refreshToken = await signIn(context)
     await context.db.deleteSessions({
       userId: required(context.db.users()[0], "user").id
@@ -146,8 +143,10 @@ describe("getToken as a function", () => {
     })
   })
 
-  it("explains the cookie.path trap instead of silently returning null", async () => {
-    const context = await createTestServer()
+  it("explains a narrowed cookie.path instead of silently returning null", async () => {
+    // Only reachable by opting into mount scoping: the default path is "/",
+    // which is exactly why a server-side read works without configuration.
+    const context = await createTestServer({ cookie: { path: "/api/auth" } })
 
     await expect(
       context.authServer.getToken({ headers: new Headers() })
@@ -160,7 +159,7 @@ describe("getToken as a function", () => {
 
 describe("getSession", () => {
   it("resolves the session and user without minting a token", async () => {
-    const context = await createTestServer({ cookie: { path: "/" } })
+    const context = await createTestServer()
     const refreshToken = await signIn(context)
 
     const result = await context.authServer.getSession({
@@ -176,7 +175,7 @@ describe("getSession", () => {
   })
 
   it("resolves null for a revoked or expired session", async () => {
-    const context = await createTestServer({ cookie: { path: "/" } })
+    const context = await createTestServer()
     const refreshToken = await signIn(context)
     const session = required(context.db.sessions()[0], "session")
 
@@ -189,7 +188,7 @@ describe("getSession", () => {
   })
 
   it("throws the configuration error when no cookie can reach the route", async () => {
-    const context = await createTestServer()
+    const context = await createTestServer({ cookie: { path: "/api/auth" } })
 
     await expect(
       context.authServer.getSession({ headers: new Headers() })

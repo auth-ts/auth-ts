@@ -23,7 +23,8 @@ describe("issueSession", () => {
     expect(cookie?.attributes).toContain("HttpOnly")
     expect(cookie?.attributes).toContain("SameSite=Lax")
     expect(cookie?.attributes).toContain("Secure")
-    expect(cookie?.attributes).toContain("Path=/api/auth")
+    // Rooted, so a page request carries it and a loader can read the session.
+    expect(cookie?.attributes).toContain("Path=/")
     expect(cookie?.attributes.toLowerCase()).not.toContain("domain")
   })
 
