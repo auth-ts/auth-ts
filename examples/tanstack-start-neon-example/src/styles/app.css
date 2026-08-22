@@ -1,7 +1,10 @@
 @import "tailwindcss";
 
-/* This demo is dark only. `color-scheme` is what reaches the parts no utility
-   class can: the caret, scrollbars, checkboxes, and autofill backgrounds. */
-:root {
-  color-scheme: dark;
+/* The theme follows the operating system: light unless the OS asks for dark.
+   Each theme supplies its own `color-scheme`, which reaches the parts no
+   utility class can: the caret, scrollbars, checkboxes, and autofill. */
+@plugin "daisyui" {
+  themes:
+    light --default,
+    dark --prefersdark;
 }

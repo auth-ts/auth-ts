@@ -30,10 +30,10 @@ function RootComponent() {
         <HeadContent />
       </head>
 
-      <body className="min-h-screen bg-neutral-950 text-neutral-100">
+      <body className="min-h-screen bg-base-200 text-base-content">
         <Header />
 
-        <main className="mx-auto max-w-3xl px-6 py-10">
+        <main className="mx-auto max-w-3xl px-4 py-10">
           <Outlet />
         </main>
 

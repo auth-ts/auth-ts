@@ -1,9 +1,15 @@
 import { isAuthError } from "@auth-ts/client"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
+import { GitHubIcon } from "../components/icons"
 import { authClient } from "../lib/auth-client"
 
 export const Route = createFileRoute("/login")({ component: LoginPage })
+
+interface Notice {
+  text: string
+  tone: "info" | "error"
+}
 
 /** Every way in that this demo has configured. */
 function LoginPage() {
@@ -11,7 +17,7 @@ function LoginPage() {
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [stage, setStage] = useState<"email" | "code">("email")
-  const [message, setMessage] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
   const [cooldown, setCooldown] = useState(0)
 
   const report = (error: unknown) => {
@@ -19,26 +25,32 @@ function LoginPage() {
     // localized and free to change, the code is the contract.
     if (isAuthError(error) && error.retryAfter) {
       setCooldown(error.retryAfter)
-      setMessage(error.message)
+      setNotice({ text: error.message, tone: "error" })
       return
     }
 
-    setMessage(isAuthError(error) ? error.message : "Something went wrong.")
+    setNotice({
+      text: isAuthError(error) ? error.message : "Something went wrong.",
+      tone: "error"
+    })
   }
 
   const requestCode = async () => {
-    setMessage(null)
+    setNotice(null)
     try {
       await authClient.sendCode({ email })
       setStage("code")
-      setMessage("Check the server console for your code.")
+      setNotice({
+        text: "Check the server console for your code.",
+        tone: "info"
+      })
     } catch (error) {
       report(error)
     }
   }
 
   const submitCode = async () => {
-    setMessage(null)
+    setNotice(null)
     try {
       await authClient.verifyCode({ email, code })
       await navigate({ to: "/todos" })
@@ -48,93 +60,115 @@ function LoginPage() {
   }
 
   return (
-    <section className="max-w-sm space-y-6">
-      <h1 className="text-2xl font-semibold">Sign in</h1>
+    <section className="mx-auto max-w-sm">
+      <div className="card bg-base-100 shadow-sm">
+        <div className="card-body gap-5">
+          <div>
+            <h1 className="card-title text-2xl">Sign in</h1>
+            <p className="text-sm text-base-content/60">
+              We'll email you a one-time code. No password to remember.
+            </p>
+          </div>
 
-      {stage === "email" ? (
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void requestCode()
-          }}
-        >
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
-            className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 placeholder:text-neutral-500"
-          />
-          <button
-            type="submit"
-            className="w-full rounded bg-neutral-100 px-4 py-2 text-neutral-900"
-          >
-            Email me a code
-          </button>
-        </form>
-      ) : (
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void submitCode()
-          }}
-        >
-          <input
-            inputMode="numeric"
-            required
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder="123456"
-            className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 tracking-widest placeholder:text-neutral-500"
-          />
-          <button
-            type="submit"
-            className="w-full rounded bg-neutral-100 px-4 py-2 text-neutral-900"
-          >
-            Sign in
-          </button>
-          <button
-            type="button"
-            onClick={() => setStage("email")}
-            className="text-sm text-neutral-500"
-          >
-            Use a different address
-          </button>
-        </form>
-      )}
+          {stage === "email" ? (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void requestCode()
+              }}
+            >
+              <fieldset className="fieldset">
+                <legend className="fieldset-legend">Email</legend>
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  className="input w-full"
+                />
+              </fieldset>
+              <button type="submit" className="btn btn-primary w-full">
+                Email me a code
+              </button>
+            </form>
+          ) : (
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void submitCode()
+              }}
+            >
+              <fieldset className="fieldset">
+                <legend className="fieldset-legend">Code</legend>
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="123456"
+                  className="input w-full text-center font-mono text-lg tracking-[0.4em]"
+                />
+                <p className="label">Sent to {email}</p>
+              </fieldset>
+              <button type="submit" className="btn btn-primary w-full">
+                Sign in
+              </button>
+              <button
+                type="button"
+                onClick={() => setStage("email")}
+                className="btn btn-ghost btn-sm w-full"
+              >
+                Use a different address
+              </button>
+            </form>
+          )}
 
-      {message ? (
-        <p className="text-sm text-neutral-400">
-          {message}
-          {/* The countdown is the point of retryAfter: "try again later" with no
-              number is the least useful error message in software. */}
-          {cooldown ? ` (${cooldown}s)` : null}
-        </p>
-      ) : null}
+          {notice ? (
+            <div
+              role="alert"
+              className={`alert alert-soft text-sm ${
+                notice.tone === "error" ? "alert-error" : "alert-info"
+              }`}
+            >
+              <span>
+                {notice.text}
+                {/* The countdown is the point of retryAfter: "try again later"
+                    with no number is the least useful error message in software. */}
+                {cooldown ? ` (${cooldown}s)` : null}
+              </span>
+            </div>
+          ) : null}
 
-      <div className="space-y-2 border-t border-neutral-800 pt-6">
-        <button
-          type="button"
-          onClick={() =>
-            authClient.signIn({ provider: "github", redirect: "/todos" })
-          }
-          className="w-full rounded border border-neutral-700 bg-neutral-900 px-4 py-2"
-        >
-          Continue with GitHub
-        </button>
-        <button
-          type="button"
-          onClick={async () => {
-            await authClient.signInAsGuest()
-            await navigate({ to: "/todos" })
-          }}
-          className="w-full rounded border border-neutral-700 bg-neutral-900 px-4 py-2"
-        >
-          Continue as guest
-        </button>
+          <div className="divider my-0 text-xs">or</div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                authClient.signIn({ provider: "github", redirect: "/todos" })
+              }
+              className="btn btn-outline w-full"
+            >
+              <GitHubIcon />
+              Continue with GitHub
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await authClient.signInAsGuest()
+                await navigate({ to: "/todos" })
+              }}
+              className="btn btn-ghost w-full"
+            >
+              Continue as guest
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   )

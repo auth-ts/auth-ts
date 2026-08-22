@@ -1,21 +1,53 @@
 import { Link } from "@tanstack/react-router"
+import { useUser } from "../hooks/use-user"
 
 export function Header() {
+  const { data: user } = useUser()
+  const label = user?.email ?? user?.phoneNumber ?? "Guest"
+
   return (
-    <header className="border-b border-neutral-800 bg-neutral-900">
-      <nav className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4 text-sm">
-        <Link to="/" className="font-medium">
-          Home
-        </Link>
+    <header className="border-b border-base-300 bg-base-100">
+      <div className="navbar mx-auto max-w-3xl px-2">
+        <div className="navbar-start">
+          <Link to="/" className="btn btn-ghost px-2 text-lg font-semibold">
+            Auth.ts
+          </Link>
+        </div>
 
-        <Link to="/todos">Todos</Link>
+        <div className="navbar-center">
+          <ul className="menu menu-horizontal gap-1 px-0">
+            <li>
+              <Link to="/todos" activeProps={{ className: "menu-active" }}>
+                Todos
+              </Link>
+            </li>
+            <li>
+              <Link to="/account" activeProps={{ className: "menu-active" }}>
+                Account
+              </Link>
+            </li>
+          </ul>
+        </div>
 
-        <Link to="/account">Account</Link>
-
-        <Link to="/login" className="ml-auto">
-          Sign in
-        </Link>
-      </nav>
+        <div className="navbar-end">
+          {user ? (
+            <Link to="/account" className="btn btn-ghost gap-2 px-2">
+              <div className="avatar avatar-placeholder">
+                <div className="w-8 rounded-full bg-primary text-primary-content">
+                  <span className="text-xs uppercase">{label.slice(0, 1)}</span>
+                </div>
+              </div>
+              <span className="hidden max-w-40 truncate font-normal sm:inline">
+                {label}
+              </span>
+            </Link>
+          ) : (
+            <Link to="/login" className="btn btn-primary btn-sm">
+              Sign in
+            </Link>
+          )}
+        </div>
+      </div>
     </header>
   )
 }
