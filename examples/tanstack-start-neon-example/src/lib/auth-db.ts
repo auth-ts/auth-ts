@@ -21,11 +21,22 @@ export const authDB: AuthDB = {
     const insert = db.insert(users).values({ id, ...user })
     // No identifier means the contract always inserts — that is what guest
     // creation is, a brand new row rather than a lookup.
+    //
+    // `updatedAt` is in every set on purpose. `$onUpdate` does not run inside
+    // ON CONFLICT, and a sign-in with no profile fields would otherwise leave
+    // nothing to SET once Drizzle drops the undefined values — a build error,
+    // not an empty update.
     const [upserted] = await (target
       ? insert.onConflictDoUpdate({
           target,
           // Merging by identifier is a sign-in: only the profile fields move.
-          set: id ? user : { name: user.name, imageURL: user.imageURL }
+          set: id
+            ? { ...user, updatedAt: new Date() }
+            : {
+                name: user.name,
+                imageURL: user.imageURL,
+                updatedAt: new Date()
+              }
         })
       : insert
     ).returning()
@@ -167,7 +178,9 @@ export const authDB: AuthDB = {
       .values(connection)
       .onConflictDoUpdate({
         target: [connections.provider, connections.providerAccountId],
-        set: { email: connection.email }
+        // `updatedAt` for the same reason as in `upsertUser`: a provider with no
+        // verified email leaves `email` undefined, and the set must not be empty.
+        set: { email: connection.email, updatedAt: new Date() }
       })
   },
 
