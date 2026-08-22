@@ -34,7 +34,7 @@ const FEATURES = [
   },
   {
     title: "Your keys, your issuer",
-    body: "RS256 or ES256, signed by you. The public half is served at a JWKS URL that any verifier can read."
+    body: "RS256 or ES256, signed by you. The public half is a static jwks.json, deployed with your app, that any verifier can read."
   },
   {
     title: "Authorization in the database",
@@ -178,7 +178,8 @@ function Hero() {
           <div className="mt-8 max-w-md">
             <DynamicCodeBlock
               lang="bash"
-              code="bun add @auth-ts/server @auth-ts/client"
+              code={`bun add @auth-ts/server @auth-ts/client
+npx @auth-ts/cli keygen >> .env`}
             />
           </div>
         </div>
@@ -245,7 +246,8 @@ function Snippets() {
           </h2>
           <p className="text-fd-muted-foreground text-sm text-pretty">
             Write the callbacks, mount <code>authServer.handler</code> once at{" "}
-            <code>/api/auth/*</code>, and point your database at the JWKS URL.
+            <code>/api/auth/*</code>, and point your database at{" "}
+            <code>/jwks.json</code>.
           </p>
           <DynamicCodeBlock lang="ts" code={SERVER_SNIPPET} />
         </div>

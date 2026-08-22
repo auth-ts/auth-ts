@@ -5,8 +5,8 @@ name: Release
 # always a deliberate act with a run log behind it.
 #
 # The run is three jobs. `verify` proves the tree is green. `version` runs
-# `nx release` on a clean runner: conventional commits pick the bump, both
-# packages move to the same version, the changelog and GitHub Release are
+# `nx release` on a clean runner: conventional commits pick the bump, every
+# package moves to the same version, the changelog and GitHub Release are
 # written, and the `vX.Y.Z` tag is pushed. `publish` builds that exact commit
 # from source and publishes to npm through trusted publishing (OIDC), so no
 # long-lived npm token exists anywhere.

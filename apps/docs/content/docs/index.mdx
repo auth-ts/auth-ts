@@ -29,12 +29,13 @@ bun add @auth-ts/server @auth-ts/client
 ### 2. Generate a signing key
 
 ```bash
-bun run keys
+npx @auth-ts/cli keygen >> .env
 ```
 
-Put the private key in `JWT_PRIVATE_KEY` and a separate random string in
-`AUTH_SECRET`. They must be different values: one signs tokens, the other keys
-the magic-code HMAC, and they have different blast radiuses.
+That prints `JWT_PRIVATE_KEY` and `AUTH_SECRET` as `.env` lines, and writes the
+public key set to `public/jwks.json` — a static file your framework serves at
+`/jwks.json`. The two values must differ: one signs tokens, the other keys the
+magic-code HMAC, and they have different blast radiuses.
 
 ### 3. Write the callbacks
 
@@ -73,9 +74,13 @@ export const Route = createFileRoute("/api/auth/$")({
 
 ### 5. Point your database at it
 
-Neon takes the JWKS URL directly: `https://your.app/api/auth/jwks.json`.
-Supabase third-party auth takes the issuer instead —
-`https://your.app/api/auth` — and discovers the keys itself.
+Neon takes the JWKS URL directly: `https://your.app/jwks.json`. Supabase
+third-party auth takes the issuer instead — `https://your.app/api/auth` — and
+discovers the keys itself.
+
+No public folder? Import the file and pass it as `jwks: { json }`, and the server
+serves it at `/api/auth/jwks` instead; `jwks: { url }` tells discovery where it
+lives if it is hosted somewhere else entirely.
 
 ## Then, in the browser
 

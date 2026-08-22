@@ -38,15 +38,15 @@ The one part of the build with no real-world evidence behind it.
 - [ ] Run each provider through: sign in, connect from the account page,
       disconnect, and sign in again to confirm the stable-id match holds.
 
-### The JWKS gist, if you keep using one
+### The JWKS gist, if you keep using one for local development
 
 - [ ] **Use the unpinned raw URL.** The one you shared is pinned to a commit SHA,
       so editing the gist will not change what Neon fetches:
       `https://gist.githubusercontent.com/daveycodez/93e780d7a7745317f3a65e7ceca93111/raw/auth-ts-jwks.json`
-- [ ] Re-run `bun run jwks` and update the gist whenever the signing key changes —
-      it is a snapshot, not a mirror.
-- [ ] **In production, skip the gist entirely** and point Neon at
-      `<baseURL>/api/auth/jwks.json`, so key rotation needs no second step.
+- [ ] Upload `public/jwks.json` to the gist again whenever you run
+      `npx @auth-ts/cli keygen` — it is a copy of the file, not a mirror.
+- [ ] **Deployed, skip the gist entirely** and point Neon at
+      `https://<your domain>/jwks.json`, the same file served by the app.
 - [ ] Treat the current key as a **development key**. Generate a separate one for
       any deployed environment.
 
@@ -81,7 +81,8 @@ long-lived npm token once the first release is out.
       shortest lifetime npm allows, add it as the `NPM_TOKEN` repository
       secret, and run **Release** with `dry-run` off and `first-release` on.
 - [ ] **Switch to trusted publishing.** On npmjs.com, for each of
-      `@auth-ts/server` and `@auth-ts/client`: package → Settings → Trusted
+      `@auth-ts/server`, `@auth-ts/client`, and `@auth-ts/cli`: package →
+      Settings → Trusted
       publishing → GitHub Actions, owner `auth-ts`, repository `auth-ts`,
       workflow `release.yml`, environment `npm`, allowed action `npm publish`.
       Then delete the `NPM_TOKEN` secret and revoke the token. Every later

@@ -1,0 +1,41 @@
+---
+title: CLI
+description: npx @auth-ts/cli keygen — the signing key, the secret, and jwks.json.
+---
+
+```bash
+npx @auth-ts/cli keygen >> .env
+```
+
+`keygen` generates a signing key and a server secret, prints them as the two
+`.env` lines `@auth-ts/server` reads, and writes the public key set to
+`public/jwks.json`.
+
+```text
+JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+AUTH_SECRET="..."
+```
+
+Those two lines are the whole of stdout; everything else goes to stderr, so the
+redirect above appends exactly the variables. The private key is quoted with its
+line breaks as literal `\n`, which dotenv, Bun, Vite, and Next all expand.
+
+## `public/jwks.json`
+
+The public half of the key, as a JWKS document. A framework with a public
+folder — TanStack Start, Next.js, Vite — serves it at `/jwks.json`, which is the
+URL you give Neon, or anything else that verifies against a JWKS. Its `kid` is
+the key's thumbprint, the same one the server stamps on every token header.
+
+The file belongs to the key: running `keygen` again writes a new key and a new
+file, and the two are deployed together. See [rotating keys](/docs/guides/key-rotation).
+
+No public folder? Import the file and pass it to `createAuthServer` as
+`jwks: { json }`; it is then served at `/api/auth/jwks`. If it is hosted
+somewhere else, `jwks: { url }` tells the discovery document where.
+
+## Options
+
+| Flag | Default | |
+| --- | --- | --- |
+| `--alg RS256\|ES256` | `RS256` | The signing algorithm. Match `jwt.alg` on the server. |

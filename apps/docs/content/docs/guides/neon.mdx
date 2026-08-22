@@ -11,12 +11,13 @@ query as the `authenticated` role, so your policies decide what comes back.
 In the Neon console, set the JWKS URL to:
 
 ```
-https://your.app/api/auth/jwks.json
+https://your.app/jwks.json
 ```
 
-Localhost is not reachable from Neon. For local development, publish the key set
-somewhere public — a gist works — and use that URL. It is a snapshot, so
-regenerate it whenever the signing key changes.
+That is the `public/jwks.json` written by `npx @auth-ts/cli keygen`, deployed
+with your app as a static file. Localhost is not reachable from Neon, so for
+local development host the same file somewhere public — a gist works — and use
+that URL. It is a copy of the file: upload it again whenever you run `keygen`.
 
 Leave the audience blank unless you set `jwt.audience`. This library omits `aud`
 by default precisely so there is nothing to mismatch.

@@ -13,6 +13,8 @@ rather than in application code.
   dependencies, `jose` and nothing else. Runs on Node 20+, Cloudflare Workers,
   Deno, and Bun.
 * `@auth-ts/client` — browser token management. Zero runtime dependencies.
+* `@auth-ts/cli` — `npx @auth-ts/cli keygen`: the signing key, the
+  `AUTH_SECRET`, and the `public/jwks.json` to deploy with your app.
 
 Sign-in methods: email or SMS magic codes, GitHub, Google, and anonymous guests.
 
@@ -20,7 +22,11 @@ Sign-in methods: email or SMS magic codes, GitHub, Google, and anonymous guests.
 
 ```bash
 bun add @auth-ts/server @auth-ts/client
+npx @auth-ts/cli keygen >> .env
 ```
+
+`keygen` prints `JWT_PRIVATE_KEY` and `AUTH_SECRET`, and writes the public key
+set to `public/jwks.json` — which your framework serves at `/jwks.json`.
 
 ```ts
 // auth-server.ts
@@ -55,8 +61,7 @@ export const Route = createFileRoute("/api/auth/$")({
 })
 ```
 
-Then point your database at `https://your.app/api/auth/jwks.json`, and in the
-browser:
+Then point your database at `https://your.app/jwks.json`, and in the browser:
 
 ```ts
 import { createAuthClient } from "@auth-ts/client"
@@ -92,6 +97,7 @@ minutes by default — which is stated plainly rather than glossed over.
 ```text
 packages/server    @auth-ts/server
 packages/client    @auth-ts/client
+packages/cli       @auth-ts/cli
 apps/docs          the documentation site
 examples/          TanStack Start + Neon reference application
 ```

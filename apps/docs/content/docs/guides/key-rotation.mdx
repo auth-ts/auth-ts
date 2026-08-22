@@ -1,59 +1,33 @@
 ---
 title: Rotating keys
-description: A four-step runbook with no downtime.
+description: Generate a new key and deploy it with its jwks.json.
 ---
 
-Rotation fails when a verifier is still holding a key you have stopped signing
-with, or has not yet seen the one you have started signing with. The fix is to
-overlap them.
+A signing key and its `public/jwks.json` travel together, so rotating is the
+setup step again:
 
-## The runbook
-
-**1. Generate the new pair.** Keep the old one exactly where it is.
-
-**2. Publish both.** Add the new *public* key to `jwt.additionalPublicKeys` and
-deploy. Your JWKS now serves two keys. You are still signing with the old key,
-and nothing has changed for anyone.
-
-```ts
-createAuthServer({
-  jwt: {
-    privateKey: process.env.JWT_PRIVATE_KEY,
-    additionalPublicKeys: [process.env.JWT_NEXT_PUBLIC_KEY]
-  }
-})
+```bash
+npx @auth-ts/cli keygen
 ```
 
-**3. Wait out the access-token lifetime,** plus however long your verifier caches
-the JWKS. Ten minutes plus the cache is typical. This step is the whole point: it
-guarantees every verifier has seen the new key before any token is signed with it.
+Set the new `JWT_PRIVATE_KEY` in the environment, keep the new `public/jwks.json`
+it wrote, and deploy. From that deploy on, tokens are signed with the new key and
+`/jwks.json` names only it.
 
-**4. Switch and clean up.** Make the new key `jwt.privateKey`, move the *old*
-public key into `additionalPublicKeys`, and deploy. Wait one more token lifetime,
-then remove the old key entirely.
+## Tokens already out there
 
-## Why the overlap is not optional
+An access token signed by the old key stops verifying once the verifier picks up
+the new key set — Neon and Supabase cache it briefly, and in-process
+`verifyToken` switches with the deploy. The client refreshes and gets a token
+under the new key, so the visible effect is one failed request at most, inside a
+window no longer than the access-token lifetime: ten minutes by default.
 
-Skip step 2 and there is a window where you are signing with a key no verifier
-has fetched yet. Every request fails with a signature error, and the cause is
-invisible from the application logs — the rejection happens inside the database.
-
-## Why the `kid` never changes
-
-Every key's `kid` is its JWK thumbprint, derived from the key itself, so a key
-carries the same `kid` whether it is currently signing or only listed in
-`additionalPublicKeys`. That is what lets step 3 do its job: a verifier that
-cached the JWKS before the switch already holds the new key under the `kid` new
-tokens will carry, and a token minted just before the switch still names a key
-the JWKS serves just after it. There is no `kid` to configure.
-
-## Local verification follows the same list
-
-`authServer.verifyToken()` picks the key by the token's `kid` from the same set
-`jwks.json` publishes — the signing key and every entry in
-`additionalPublicKeys`. The runbook above therefore covers in-process
-verification too: a token signed by the previous key keeps verifying for as long
-as that key is still published, and stops the moment you remove it.
+If you want no window at all, publish both keys for one token lifetime before
+switching: the old and new public JWKs together in `public/jwks.json`, and the
+new public key in `jwt.additionalPublicKeys` so local verification knows it too.
+Every key's `kid` is its thumbprint, so a key keeps the same `kid` whether it is
+signing or only listed, and a verifier that cached the two-key document already
+holds the new key under the `kid` new tokens carry.
 
 ## Sessions survive
 
