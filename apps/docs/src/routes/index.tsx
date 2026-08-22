@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({ component: LandingPage })
  * The three claims, lifted out of the paragraph they used to end. Set apart
  * they carry the argument; buried behind an em-dash they read as an aside.
  */
-const CLAIMS = ["No adapter packages", "No service", "No company"]
+const CLAIMS = ["No limits", "No service", "No company"]
 
 const SPECS = [
   ["Runtime", "Node 20+, Workers, Deno, Bun"],
