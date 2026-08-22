@@ -55,11 +55,11 @@ index, because the missing constraint only shows under a race.
   smallest ordering every store can express. Read it the same way you read
   `where`, by mapping over its entries; there is no reason to pull the single
   key out by hand.
-- **`insert` returns what it wrote**, as a list — the same shape `delete`
-  returns, and what `INSERT … RETURNING` already hands you. The library takes
-  the row out and decides what an empty result means, so you do not have to.
-  What comes back is how it learns anything your database decided, the `id`
-  above all. A unique violation must throw rather than merge: the library reads
+- **`insert` returns the row as stored**, or `undefined`. Stores hand it back
+  differently — `RETURNING` gives a set to pick from, a document store gives the
+  document, some give nothing — so return what you have and let the library
+  decide what having nothing means. What comes back is how it learns anything
+  your database decided, the `id` above all. A unique violation must throw rather than merge: the library reads
   before it inserts, and the constraint is deliberately the arbiter of the race
   between the two.
 - **Ids are yours.** The row arrives without one unless you set
@@ -162,7 +162,11 @@ export const authDB = defineAuthDB({
       .offset(offset),
 
   insert: ({ table, values }) =>
-    db.insert(authTables[table]).values(values).returning(),
+    db
+      .insert(authTables[table])
+      .values(values)
+      .returning()
+      .then((rows) => rows[0]),
 
   update: ({ table, where, values }) =>
     db.update(authTables[table]).set(values).where(buildWhere(table, where)),

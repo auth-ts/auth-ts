@@ -135,7 +135,7 @@ export function createMemoryDb(): MemoryDb {
       assertUnique(table, stored)
       tableOf(table).set(stored.id, stored)
 
-      return [{ ...stored }] as never
+      return { ...stored } as never
     },
 
     async update({ table, where, values }) {

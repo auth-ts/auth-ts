@@ -327,12 +327,13 @@ export interface AuthDB<
   }): Promise<AuthRow<S, T>[]>
 
   /**
-   * Inserts one row and returns what was written.
+   * Inserts one row and returns it as stored.
    *
-   * A list, because that is what `INSERT … RETURNING` hands back and what the
-   * driver already has — the library takes the row out of it and decides what
-   * an empty result means, so no implementation has to. It is the same shape
-   * {@link AuthDB.delete} returns, for the same reason.
+   * `undefined` is allowed because not every store hands the row back the same
+   * way — `RETURNING` gives a set to pick from, a document store gives the
+   * document, and some give nothing at all. Return what you have; core decides
+   * what having nothing means, so no implementation has to invent a row or
+   * phrase that failure itself.
    *
    * What comes back is how core learns anything the store decided: the `id`
    * when `generateId` is not configured, and any column default. A unique
@@ -342,7 +343,7 @@ export interface AuthDB<
   insert<T extends AuthTable>(input: {
     table: T
     values: AuthInsert<S, T>
-  }): Promise<AuthRow<S, T>[]>
+  }): Promise<AuthRow<S, T> | undefined>
 
   /**
    * Applies `fields` to every row matching `where`.
@@ -446,7 +447,7 @@ export function defineAuthDB<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 >(implementation: {
   select(input: AuthSelectInput<S>): Promise<AuthRow<S, AuthTable>[]>
-  insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable>[]>
+  insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable> | undefined>
   update(input: AuthUpdateInput<S>): Promise<unknown>
   delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
   cleanup?(): Promise<unknown>

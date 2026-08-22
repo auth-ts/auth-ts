@@ -13,7 +13,7 @@ export async function insertUser(
   db: MemoryDb,
   fields: Partial<AuthUser> = {}
 ): Promise<AuthUser> {
-  const [user] = await db.insert({
+  const user = await db.insert({
     table: "users",
     values: {
       email: null,

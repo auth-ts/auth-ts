@@ -45,7 +45,11 @@ export const authDB = defineAuthDB({
       .offset(offset),
 
   insert: ({ table, values }) =>
-    db.insert(authTables[table]).values(values).returning(),
+    db
+      .insert(authTables[table])
+      .values(values)
+      .returning()
+      .then((rows) => rows[0]),
 
   update: ({ table, where, values }) =>
     db.update(authTables[table]).set(values).where(buildWhere(table, where)),

@@ -21,7 +21,7 @@ export async function insertRow<T extends AuthTable>(
 ): Promise<AuthRow<AdditionalFieldsSchema, T>> {
   const id = await internals.config.generateId?.(table)
 
-  const [row] = await internals.db.insert({
+  const row = await internals.db.insert({
     table,
     values: id === undefined ? values : { ...values, id }
   })

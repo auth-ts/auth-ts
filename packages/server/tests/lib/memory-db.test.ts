@@ -10,7 +10,7 @@ beforeEach(() => {
 })
 
 const user = async (fields: Record<string, unknown> = {}) => {
-  const [row] = await db.insert({
+  const row = await db.insert({
     table: "users",
     values: {
       email: null,
@@ -270,7 +270,7 @@ describe("delete", () => {
   it("matches on every column, so an id that belongs to someone else matches nothing", async () => {
     const ada = await user({ email: "ada@example.com" })
     const grace = await user({ email: "grace@example.com" })
-    const [session] = await db.insert({
+    const session = await db.insert({
       table: "sessions",
       values: {
         userId: ada.id,
