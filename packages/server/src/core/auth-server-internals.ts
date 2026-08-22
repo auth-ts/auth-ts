@@ -52,6 +52,7 @@ export interface AuthServerInternals {
 export function createAuthServerInternals(
   options: ResolvedAuthServerOptions
 ): AuthServerInternals {
+  const log = createLogger(options.logLevel, options.logger)
   let keyMaterial: Promise<KeyMaterial> | undefined
 
   const loadKeys = () => {
@@ -60,11 +61,31 @@ export function createAuthServerInternals(
         options.jwt.privateKey,
         options.jwt.alg
       )
-      const additionalPublicJwks = await Promise.all(
+      const imported = await Promise.all(
         (options.jwt.additionalPublicKeys ?? []).map((publicKeyPem) =>
           importAdditionalPublicKey(publicKeyPem, options.jwt.alg)
         )
       )
+
+      // One entry per key. The kid is the key's thumbprint, so the signing key
+      // listed again in `additionalPublicKeys` — the easy slip at the rotation
+      // switch — or the same key pasted twice would publish duplicate kids, and
+      // jose refuses to pick between two matching keys: every local
+      // verification would fail. Keys import lazily, after construction, so
+      // this cannot be a startup error; it is dropped and said out loud instead.
+      const published = new Set([material.kid])
+      const additionalPublicJwks: JWK[] = []
+      for (const jwk of imported) {
+        if (jwk.kid && published.has(jwk.kid)) {
+          log.warn("ignoring a duplicate key in jwt.additionalPublicKeys", {
+            kid: jwk.kid
+          })
+          continue
+        }
+        if (jwk.kid) published.add(jwk.kid)
+        additionalPublicJwks.push(jwk)
+      }
+
       const verificationKeys = createVerificationKeySet(
         buildJwks(material.publicJwk, additionalPublicJwks)
       )
@@ -78,7 +99,7 @@ export function createAuthServerInternals(
   return {
     options,
     db: options.db,
-    log: createLogger(options.logLevel, options.logger),
+    log,
     keys: loadKeys
   }
 }
