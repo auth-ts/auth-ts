@@ -4,27 +4,34 @@ description: bun x @auth-ts/cli keygen — the signing key, the secret, and jwks
 ---
 
 ```bash
-bun x @auth-ts/cli keygen
+bun x @auth-ts/cli keygen --out public
 ```
 
 `keygen` generates a signing key and a server secret, prints them as the two
 `.env` lines `@auth-ts/server` reads, and writes the public key set to
-`public/jwks.json`.
+`jwks.json`.
+
+`--out` says where that file goes, and defaults to the working directory.
+Frameworks that serve a folder verbatim — TanStack Start, Next.js, Vite, Nuxt —
+want `--out public`, which is what puts it at `<origin>/jwks.json`.
+
+`--dry` writes nothing and prints the key set as a third line instead, for
+looking before committing to a file.
 
 ```text
 JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 AUTH_SECRET="..."
 ```
 
-Copy them into your `.env`. They are the whole of stdout and everything else
-goes to stderr, so you can redirect them somewhere instead — but into a file
-you already keep, rather than appending blind: run twice and you have two
-`JWT_PRIVATE_KEY` lines, and which one wins is up to whichever loader reads it.
+Copy them into your `.env`. They are the whole of stdout — the path it wrote
+goes to stderr — so they pipe cleanly, though into a file you already keep
+rather than appended blind: run twice and you have two `JWT_PRIVATE_KEY` lines,
+and which one wins is up to whichever loader reads it.
 
 The private key is quoted with its line breaks as literal `\n`, which dotenv,
 Bun, Vite, and Next all expand.
 
-## `public/jwks.json`
+## `jwks.json`
 
 The public half of the key, as a JWKS document. A framework with a public
 folder — TanStack Start, Next.js, Vite — serves it at `/jwks.json`, which is the

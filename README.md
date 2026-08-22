@@ -22,7 +22,7 @@ Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous 
 
 ```bash
 bun add @auth-ts/server @auth-ts/client
-bun x @auth-ts/cli keygen
+bun x @auth-ts/cli keygen --out public
 ```
 
 `keygen` prints `JWT_PRIVATE_KEY` and `AUTH_SECRET`, and writes the public key

@@ -29,12 +29,12 @@ bun add @auth-ts/server @auth-ts/client
 ### 2. Generate a signing key
 
 ```bash
-bun x @auth-ts/cli keygen
+bun x @auth-ts/cli keygen --out public
 ```
 
 That prints `JWT_PRIVATE_KEY` and `AUTH_SECRET` as `.env` lines, and writes the
 public key set to `public/jwks.json` — a static file your framework serves at
-`/jwks.json`. The two values must differ: one signs tokens, the other keys the
+`/jwks.json`. Without `--out` it lands in the working directory. The two values must differ: one signs tokens, the other keys the
 verification-code HMAC, and they have different blast radiuses.
 
 ### 3. Write the four functions

@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises"
-import { dirname, resolve } from "node:path"
+import { resolve } from "node:path"
 import type { JWK } from "jose"
 import {
   calculateJwkThumbprint,
@@ -15,11 +15,13 @@ export type JwtAlgorithm = "RS256" | "ES256"
 export interface KeygenOptions {
   /** The signing algorithm the key is for. */
   algorithm: JwtAlgorithm
-  /** The project root. `jwks.json` goes in its `public` folder. */
+  /** Where `jwks.json` is written. Created if it is not there. */
   directory: string
+  /** Generate everything and write nothing. `jwksPath` is where it would have gone. */
+  dry?: boolean
 }
 
-/** The public key set, as written to `public/jwks.json`. */
+/** The public key set, as written to `jwks.json`. */
 export interface Jwks {
   keys: JWK[]
 }
@@ -32,7 +34,7 @@ export interface KeygenResult {
   secret: string
   /** The key set that was written. */
   jwks: Jwks
-  /** Absolute path of the written `public/jwks.json`. */
+  /** Absolute path of the written `jwks.json`. */
   jwksPath: string
 }
 
@@ -52,15 +54,18 @@ async function toPublicJwk(publicKey: CryptoKey, algorithm: JwtAlgorithm) {
 
 /**
  * Generates a signing key and a server secret, and writes the public key set
- * to `public/jwks.json`.
+ * to `jwks.json`.
  *
- * A framework with a public folder serves that file at `<origin>/jwks.json`,
- * which is the URL a verifier is pointed at. The file belongs to the key: to
- * rotate, run this again and deploy the new key and the new file together.
+ * It lands in the working directory unless `directory` says otherwise —
+ * `--out public` in a framework that serves that folder, which is what makes
+ * the file reachable at `<origin>/jwks.json`, the URL a verifier is pointed at.
+ * The file belongs to the key: to rotate, run this again and deploy the new key
+ * and the new file together.
  */
 export async function keygen({
   algorithm,
-  directory
+  directory,
+  dry = false
 }: KeygenOptions): Promise<KeygenResult> {
   const { privateKey, publicKey } = await generateKeyPair(algorithm, {
     extractable: true
@@ -72,9 +77,11 @@ export async function keygen({
   ).toString("base64")
 
   const jwks: Jwks = { keys: [await toPublicJwk(publicKey, algorithm)] }
-  const jwksPath = resolve(directory, "public/jwks.json")
-  await mkdir(dirname(jwksPath), { recursive: true })
-  await writeFile(jwksPath, `${JSON.stringify(jwks, null, 2)}\n`)
+  const jwksPath = resolve(directory, "jwks.json")
+  if (!dry) {
+    await mkdir(directory, { recursive: true })
+    await writeFile(jwksPath, `${JSON.stringify(jwks, null, 2)}\n`)
+  }
 
   return { privateKeyPem, secret, jwks, jwksPath }
 }

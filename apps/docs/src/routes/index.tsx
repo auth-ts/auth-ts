@@ -187,7 +187,7 @@ function Hero() {
             <DynamicCodeBlock
               lang="bash"
               code={`bun add @auth-ts/server @auth-ts/client
-bun x @auth-ts/cli keygen`}
+bun x @auth-ts/cli keygen --out public`}
             />
           </div>
         </div>

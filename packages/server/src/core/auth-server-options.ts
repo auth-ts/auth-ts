@@ -91,14 +91,14 @@ export interface JwtOptions {
  * Where the public key set lives.
  *
  * The JWKS is a static document: `bun x @auth-ts/cli keygen` writes it to
- * `public/jwks.json`, and a framework with a public folder serves it at
+ * `jwks.json`, and a framework serving the folder you wrote it to exposes it at
  * `<origin>/jwks.json` with nothing to configure here. Both fields are for
  * when that is not the case.
  */
 export interface JwksOptions {
   /**
    * The public URL of the key set, advertised as `jwks_uri` in the discovery
-   * document. Defaults to `<baseURL>/jwks.json` — where a `public/jwks.json`
+   * document. Defaults to `<baseURL>/jwks.json` — where a `jwks.json` in a public folder
    * is served — or to the `/jwks` endpoint when {@link JwksOptions.json} is set.
    */
   url?: string

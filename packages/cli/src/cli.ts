@@ -1,12 +1,18 @@
+import { resolve } from "node:path"
 import { parseArgs } from "node:util"
-import type { JwtAlgorithm } from "./keygen"
+import type { JwtAlgorithm, KeygenOptions } from "./keygen"
 import { keygen } from "./keygen"
 
 const USAGE = `Usage: bun x @auth-ts/cli <command>
 
 Commands:
-  keygen [--alg RS256|ES256]  Generate a signing key and server secret, and
-                              write the public key set to public/jwks.json
+  keygen [--alg RS256|ES256] [--out DIR]
+                              Generate a signing key and server secret, and
+                              write the public key set to DIR/jwks.json.
+                              DIR defaults to the working directory; pass
+                              --out public where your framework serves it.
+                              --dry writes nothing and prints the key set
+                              alongside the two .env lines.
 
 The .env lines go to stdout and everything else to stderr, so they pipe
 cleanly if you want them somewhere other than your clipboard.
@@ -34,42 +40,46 @@ function fail(message: string): never {
   process.exit(1)
 }
 
-function parseKeygenArgs(args: string[]): JwtAlgorithm {
-  let algorithm: string
+function parseKeygenArgs(args: string[]): KeygenOptions {
+  let values: { alg: string; out: string; dry: boolean }
   try {
-    algorithm = parseArgs({
+    values = parseArgs({
       args,
-      options: { alg: { type: "string", default: "RS256" } },
+      options: {
+        alg: { type: "string", default: "RS256" },
+        out: { type: "string", default: "." },
+        dry: { type: "boolean", default: false }
+      },
       allowPositionals: false
-    }).values.alg
+    }).values
   } catch (error) {
     return fail(error instanceof Error ? error.message : String(error))
   }
 
-  return isAlgorithm(algorithm)
-    ? algorithm
-    : fail(`Unknown algorithm "${algorithm}". Use RS256 or ES256.`)
+  if (!isAlgorithm(values.alg)) {
+    return fail(`Unknown algorithm "${values.alg}". Use RS256 or ES256.`)
+  }
+
+  return {
+    algorithm: values.alg,
+    directory: resolve(process.cwd(), values.out),
+    dry: values.dry
+  }
 }
 
 async function runKeygen(args: string[]) {
-  const result = await keygen({
-    algorithm: parseKeygenArgs(args),
-    directory: process.cwd()
-  })
+  const options = parseKeygenArgs(args)
+  const result = await keygen(options)
 
   console.log(`JWT_PRIVATE_KEY=${quoteForEnv(result.privateKeyPem)}`)
   console.log(`AUTH_SECRET="${result.secret}"`)
 
-  console.error(
-    [
-      "",
-      "Copy the two lines above into your .env.",
-      "",
-      `Wrote ${result.jwksPath} — the public key, safe to publish.`,
-      "Deployed, it is served at <origin>/jwks.json: point Neon there. To rotate,",
-      "run this again and deploy the new key and the new file together."
-    ].join("\n")
-  )
+  if (options.dry) {
+    console.log(`JWKS=${JSON.stringify(result.jwks, null, 2)}`)
+    return
+  }
+
+  console.error(`Wrote ${result.jwksPath}`)
 }
 
 const [command, ...rest] = process.argv.slice(2)

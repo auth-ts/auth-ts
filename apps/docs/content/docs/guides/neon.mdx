@@ -14,7 +14,7 @@ In the Neon console, set the JWKS URL to:
 https://your.app/jwks.json
 ```
 
-That is the `public/jwks.json` written by `bun x @auth-ts/cli keygen`, deployed
+That is the `public/jwks.json` written by `bun x @auth-ts/cli keygen --out public`, deployed
 with your app as a static file. Localhost is not reachable from Neon, so for
 local development host the same file somewhere public — a gist works — and use
 that URL. It is a copy of the file: upload it again whenever you run `keygen`.

@@ -3,6 +3,9 @@ node_modules
 coverage
 .DS_Store
 
+# `nx keygen cli` runs the CLI in its own package, so its output lands here
+packages/cli/jwks.json
+
 .env
 .env.*
 !.env.example

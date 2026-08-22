@@ -59,10 +59,10 @@ describe("keygen", () => {
     }
   )
 
-  it("writes the key set to public/jwks.json, creating the folder", async () => {
+  it("writes the key set to jwks.json in the directory it was given", async () => {
     const result = await keygen({ algorithm: "RS256", directory })
 
-    expect(result.jwksPath).toBe(resolve(directory, "public/jwks.json"))
+    expect(result.jwksPath).toBe(resolve(directory, "jwks.json"))
     const written = await readFile(result.jwksPath, "utf8")
     expect(written.endsWith("\n")).toBe(true)
     expect(JSON.parse(written)).toEqual(result.jwks)
@@ -113,7 +113,28 @@ describe("auth-ts keygen", () => {
     })
   }
 
-  it("prints exactly the two .env lines and writes public/jwks.json in the working directory", async () => {
+  it("writes into --out, creating it", async () => {
+    run(["keygen", "--out", "public"])
+
+    const written = await readFile(join(directory, "public/jwks.json"), "utf8")
+    expect(JSON.parse(written)).toHaveProperty("keys")
+    await expect(readFile(join(directory, "jwks.json"))).rejects.toThrow()
+  })
+
+  it("writes nothing for --dry, and prints the key set as a third line", async () => {
+    const stdout = run(["keygen", "--dry"])
+
+    expect(stdout).toMatch(/^JWT_PRIVATE_KEY="/)
+    expect(stdout).toContain('\nAUTH_SECRET="')
+    const jwks = stdout.slice(stdout.indexOf("JWKS=") + "JWKS=".length)
+    expect(JSON.parse(jwks)).toHaveProperty("keys")
+    // Pretty-printed, so it can be read rather than only pasted.
+    expect(jwks).toContain("\n  ")
+
+    await expect(readFile(join(directory, "jwks.json"))).rejects.toThrow()
+  })
+
+  it("prints exactly the two .env lines and writes jwks.json in the working directory", async () => {
     const stdout = run(["keygen"])
 
     const lines = stdout.trimEnd().split("\n")
@@ -132,7 +153,7 @@ describe("auth-ts keygen", () => {
     const authServer = serverFor(privateKeyPem ?? "", secret ?? "")
     const token = await authServer.signToken({ userId: "user-1" })
     const published = JSON.parse(
-      await readFile(join(directory, "public/jwks.json"), "utf8")
+      await readFile(join(directory, "jwks.json"), "utf8")
     ) as Jwks
     await expect(
       jwtVerify(token, createLocalJWKSet(published))
@@ -153,9 +174,7 @@ describe("auth-ts keygen", () => {
     ]) {
       expect(() => run(args)).toThrow(/Usage:/)
     }
-    await expect(
-      readFile(join(directory, "public/jwks.json"))
-    ).rejects.toThrow()
+    await expect(readFile(join(directory, "jwks.json"))).rejects.toThrow()
   })
 
   it("prints usage with no command", () => {

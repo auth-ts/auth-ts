@@ -16,6 +16,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
+    "keygen": "bun src/cli.ts keygen",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

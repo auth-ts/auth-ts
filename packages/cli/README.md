@@ -3,7 +3,7 @@
 The command line for [`@auth-ts/server`](https://www.npmjs.com/package/@auth-ts/server).
 
 ```bash
-bun x @auth-ts/cli keygen
+bun x @auth-ts/cli keygen --out public
 ```
 
 `keygen` generates an RS256 signing key (`--alg ES256` for the other) and a
