@@ -216,6 +216,15 @@ testAuthDB(() => authDB) // your real callbacks, your real database
       `auth-db.ts` — the file people will copy — is proven rather than believed.
 - [ ] Add the SQL footnote to the `upsertUser` contract: if your upsert needs
       something to `SET`, touch `updatedAt`.
+- [ ] State the required uniqueness per table in the `AuthDB` reference —
+      `users.email`, `users.phoneNumber`, `sessions.tokenHash`,
+      `magicCodes.identifier`, `rateLimits.key`, and
+      `connections (provider, providerAccountId)` — as a requirement of the
+      contract, not a comment in the example's schema. The suite cannot check
+      this: calling `upsertConnection` twice and listing one row passes with or
+      without the index, because the missing constraint only shows under a
+      race. It is the one part of the contract a test cannot stand in for, and
+      the part a get-then-write implementation silently gets wrong.
 
 This is what lets the "Not building" entry below mean "we give you the spec and
 the test" rather than "good luck".
