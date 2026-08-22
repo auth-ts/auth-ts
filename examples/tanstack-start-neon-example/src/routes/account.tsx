@@ -130,8 +130,7 @@ function AccountPage() {
       await navigate({ to: "/login" })
     } catch (error) {
       // Confirming with no code re-sends one, which inside the send cooldown
-      // answers `cooldown` with a retryAfter — shown as a countdown, since a
-      // wait with no number is the least actionable error there is.
+      // answers `cooldown` with a retryAfter; the button counts it down.
       if (isAuthError(error) && error.retryAfter) {
         startDeletionCooldown(error.retryAfter)
       }
@@ -401,10 +400,7 @@ function AccountPage() {
               role="alert"
               className={`alert alert-soft text-sm ${noticeClass[deletionNotice.tone]}`}
             >
-              <span>
-                {deletionNotice.text}
-                {deletionCooldown ? ` (${deletionCooldown}s)` : null}
-              </span>
+              <span>{deletionNotice.text}</span>
             </div>
           ) : null}
           {deletionCode !== null ? (
@@ -421,12 +417,19 @@ function AccountPage() {
             </fieldset>
           ) : null}
           <div className="card-actions">
+            {/* The cooldown only gates sending a fresh code, so a typed code
+                can still be confirmed while the button counts down. */}
             <button
               type="button"
               onClick={removeAccount}
+              disabled={deletionCooldown > 0 && !deletionCode}
               className="btn btn-error"
             >
-              {deletionCode !== null ? "Confirm deletion" : "Delete my account"}
+              {deletionCooldown > 0 && !deletionCode
+                ? `Try again in ${deletionCooldown}s`
+                : deletionCode !== null
+                  ? "Confirm deletion"
+                  : "Delete my account"}
             </button>
           </div>
         </div>

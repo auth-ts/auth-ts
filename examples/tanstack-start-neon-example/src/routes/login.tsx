@@ -91,8 +91,15 @@ function LoginPage() {
                   className="input w-full"
                 />
               </fieldset>
-              <button type="submit" className="btn btn-primary w-full">
-                Email me a code
+              {/* The countdown lives on the button, not in the message: the
+                  server's text already says how long, and a disabled button
+                  that counts down is what turns that into something actionable. */}
+              <button
+                type="submit"
+                disabled={cooldown > 0}
+                className="btn btn-primary w-full"
+              >
+                {cooldown ? `Try again in ${cooldown}s` : "Email me a code"}
               </button>
             </form>
           ) : (
@@ -136,12 +143,7 @@ function LoginPage() {
                 notice.tone === "error" ? "alert-error" : "alert-info"
               }`}
             >
-              <span>
-                {notice.text}
-                {/* The countdown is the point of retryAfter: "try again later"
-                    with no number is the least useful error message in software. */}
-                {cooldown ? ` (${cooldown}s)` : null}
-              </span>
+              <span>{notice.text}</span>
             </div>
           ) : null}
 

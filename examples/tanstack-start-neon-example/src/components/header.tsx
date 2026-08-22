@@ -3,7 +3,7 @@ import { useUser } from "../hooks/use-user"
 
 export function Header() {
   const { data: user } = useUser()
-  const label = user?.email ?? user?.phoneNumber ?? "Guest"
+  const label = user?.name ?? user?.email ?? user?.phoneNumber ?? "Guest"
 
   return (
     <header className="border-b border-base-300 bg-base-100">
