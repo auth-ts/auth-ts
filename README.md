@@ -1,4 +1,4 @@
-# auth-ts
+# Auth.ts
 
 **Free forever JWT auth in TypeScript — callbacks to write into any database.**
 No adapters, no service, no company.
@@ -9,10 +9,10 @@ PostgREST — or anything that trusts a JWKS URL. Your database verifies the tok
 and your policies decide what comes back, so authorization lives in Postgres
 rather than in application code.
 
-- **`@auth-ts/server`** — the issuer. Zero framework dependencies, zero database
+* `@auth-ts/server` — the issuer. Zero framework dependencies, zero database
   dependencies, `jose` and nothing else. Runs on Node 20+, Cloudflare Workers,
   Deno, and Bun.
-- **`@auth-ts/client`** — browser token management. Zero runtime dependencies.
+* `@auth-ts/client` — browser token management. Zero runtime dependencies.
 
 Sign-in methods: email or SMS magic codes, GitHub, Google, and anonymous guests.
 
