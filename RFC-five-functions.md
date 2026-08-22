@@ -269,9 +269,9 @@ expect it to throw.
 5. Additional fields: they ride on `users` rows as before — confirm `Where`
    and `Insert` for `users` include them (generic parameter on `AuthDB`, as
    today).
-6. Do the two incremental pieces first — append-and-count inside the current
-   eighteen, and the uniqueness table in the reference — or go straight to
-   five? (The first is a contained, shippable improvement either way.)
+6. ~~Do the two incremental pieces first, or go straight to five?~~
+   **Decided: straight to five.** An intermediate append-and-count inside the
+   current eighteen would touch the same files twice for nothing.
 
 ## Files touched, for sizing
 
