@@ -241,7 +241,10 @@ function AccountPage() {
               const result = await authClient.logout({ account: "current" })
               queryClient.clear()
               if (result?.switchedTo) {
-                setMessage(`Now signed in as ${result.switchedTo.email}.`)
+                const label =
+                  result.switchedTo.email ??
+                  `Guest ${result.switchedTo.id.slice(0, 8)}`
+                setMessage(`Now signed in as ${label}.`)
                 await sessions.refetch()
               } else {
                 await navigate({ to: "/login" })
