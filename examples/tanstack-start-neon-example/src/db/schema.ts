@@ -1,6 +1,7 @@
 import type { UserType, VerificationCodePurpose } from "@auth-ts/server"
 import { sql } from "drizzle-orm"
 import { authenticatedRole } from "drizzle-orm/neon"
+import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import {
   boolean,
   index,
@@ -19,7 +20,13 @@ export const users = pgTable.withRLS("users", {
   name: text("name"),
   imageURL: text("imageURL"),
   type: text("type").$type<UserType>().notNull().default("user"),
-  primaryUserId: uuid("primaryUserId"),
+  // Set on a guest row when its sign-in resolved to an existing account. It
+  // cascades because that guest's rows are that account's data: deleting the
+  // account has to take them too, or "delete my account" leaves a row nobody
+  // can reach still holding it.
+  primaryUserId: uuid("primaryUserId").references((): AnyPgColumn => users.id, {
+    onDelete: "cascade"
+  }),
   createdAt: timestamp("createdAt", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -136,7 +143,10 @@ export const todos = pgTable.withRLS(
   "todos",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
-    userId: uuid("userId").notNull().default(sql`(auth.user_id())::uuid`),
+    userId: uuid("userId")
+      .notNull()
+      .default(sql`(auth.user_id())::uuid`)
+      .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     completed: boolean("completed").notNull().default(false),
     createdAt: timestamp("createdAt", { withTimezone: true })

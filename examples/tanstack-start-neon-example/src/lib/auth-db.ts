@@ -5,7 +5,18 @@ import type {
   AuthWhere
 } from "@auth-ts/server"
 import { defineAuthDB } from "@auth-ts/server"
-import { and, asc, desc, eq, getColumns, is, lt, sql } from "drizzle-orm"
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getColumns,
+  inArray,
+  is,
+  lt,
+  notExists,
+  sql
+} from "drizzle-orm"
 import { PgTable } from "drizzle-orm/pg-core"
 
 import { db } from "../db/db"
@@ -53,12 +64,39 @@ export const authDB = defineAuthDB({
     db.update(authTables[table]).set(values).where(buildWhere(table, where)),
   delete: ({ table, where }) =>
     db.delete(authTables[table]).where(buildWhere(table, where)).returning(),
-  cleanup: () =>
-    Promise.all(
+  cleanup: async () => {
+    await Promise.all(
       [
         authTables.sessions,
         authTables.verificationCodes,
         authTables.attempts
       ].map((table) => db.delete(table).where(lt(table.expiresAt, sql`now()`)))
     )
+
+    // A guest with no session left is unreachable: nothing identifies the
+    // account, so nobody can sign back into it. Sessions slide on every
+    // refresh, so "no session left" already means "not seen for a session's
+    // lifetime" — and `updatedAt` gives the same grace to a guest that was
+    // merged or signed out rather than simply abandoned. Their todos go with
+    // them, by the foreign key.
+    const unreachable = db
+      .select({ id: authTables.users.id })
+      .from(authTables.users)
+      .where(
+        and(
+          eq(authTables.users.type, "guest"),
+          lt(authTables.users.updatedAt, sql`now() - interval '30 days'`),
+          notExists(
+            db
+              .select()
+              .from(authTables.sessions)
+              .where(eq(authTables.sessions.userId, authTables.users.id))
+          )
+        )
+      )
+
+    await db
+      .delete(authTables.users)
+      .where(inArray(authTables.users.id, unreachable))
+  }
 })
