@@ -4,11 +4,14 @@ import { createTestServer } from "../helpers/create-test-server.ts"
 import { generateTestKeys } from "../helpers/generate-test-keys.ts"
 
 /**
- * Walks the documented runbook end to end, from the verifier's point of view.
+ * Walks the documented runbook end to end, from the local verifier's point of
+ * view.
  *
- * Each "deploy" is a fresh server over the same key files. Both things the
- * runbook promises are checked at every step: what `jwks.json` publishes, and
- * what local `authServer.verifyToken()` accepts — which must be the same set.
+ * Each "deploy" is a fresh server over the same key files. The published
+ * `jwks.json` is a static file the consumer edits by hand at each step; what is
+ * checked here is the promise about its in-process twin — that
+ * `authServer.verifyToken()` accepts exactly the signing key plus
+ * `additionalPublicKeys`, and so follows the same steps.
  */
 describe("key rotation", () => {
   it("keeps old and new tokens verifiable across the switch, then drops the old key cleanly", async () => {
@@ -22,9 +25,6 @@ describe("key rotation", () => {
         additionalPublicKeys: [next.publicKeyPem]
       }
     })
-    const publishedJwks = await publishing.authServer.getJwks(
-      undefined as never
-    )
     const oldToken = await publishing.authServer.signToken({ userId: "user-1" })
     const oldKid = decodeProtectedHeader(oldToken).kid
 
@@ -35,26 +35,22 @@ describe("key rotation", () => {
         additionalPublicKeys: [old.publicKeyPem]
       }
     })
-    const switchedJwks = await switched.authServer.getJwks(undefined as never)
     const newToken = await switched.authServer.signToken({ userId: "user-1" })
     const newKid = decodeProtectedHeader(newToken).kid
 
-    // A key's kid does not change when it moves between roles, so the two
-    // documents publish the same two kids — only the order (who signs) differs.
-    const kidsOf = (jwks: { keys: Array<{ kid?: string }> }) =>
-      jwks.keys.map((key) => key.kid).sort()
-    expect(kidsOf(publishedJwks)).toEqual(kidsOf(switchedJwks))
+    // A key's kid is its thumbprint, so it does not change when the key moves
+    // between roles — which is why the cached step-2 document already names
+    // the key new tokens carry.
     expect(oldKid).not.toBe(newKid)
-    expect(switchedJwks.keys[0]?.kid).toBe(newKid)
-    expect(switchedJwks.keys[1]?.kid).toBe(oldKid)
+    expect(newKid).toBe(
+      decodeProtectedHeader(
+        await switched.authServer.signToken({ userId: "user-2" })
+      ).kid
+    )
 
-    // A verifier that cached the step-2 document already knows the new key by
-    // the kid new tokens carry — that is what the step-3 wait is for.
-    expect(publishedJwks.keys.some((key) => key.kid === newKid)).toBe(true)
-
-    // Local verification follows the same list: the old token, still inside
-    // its lifetime, verifies on the switched server, and the new token on the
-    // step-2 server.
+    // Local verification follows the published list: the old token, still
+    // inside its lifetime, verifies on the switched server, and the new token
+    // on the step-2 server.
     expect((await switched.authServer.verifyToken(oldToken))?.sub).toBe(
       "user-1"
     )
@@ -70,14 +66,12 @@ describe("key rotation", () => {
     const cleaned = await createTestServer({
       jwt: { privateKey: next.privateKeyPem }
     })
-    const cleanedJwks = await cleaned.authServer.getJwks(undefined as never)
 
-    expect(cleanedJwks.keys.map((key) => key.kid)).toEqual([newKid])
     expect((await cleaned.authServer.verifyToken(newToken))?.sub).toBe("user-1")
     await expect(cleaned.authServer.verifyToken(oldToken)).resolves.toBeNull()
   })
 
-  it("publishes a key once even when additionalPublicKeys repeats it, so verification keeps working", async () => {
+  it("keeps verifying when additionalPublicKeys repeats a key, and says so", async () => {
     // The easy slip at the switch: the new key's public half ends up in
     // additionalPublicKeys alongside being the signing key, or an old one is
     // pasted twice. Two entries with one kid would make jose refuse to choose
@@ -95,13 +89,8 @@ describe("key rotation", () => {
       }
     })
 
-    const jwks = await context.authServer.getJwks(undefined as never)
     const token = await context.authServer.signToken({ userId: "user-1" })
-    const kids = jwks.keys.map((key) => key.kid)
 
-    expect(kids).toHaveLength(2)
-    expect(new Set(kids).size).toBe(2)
-    expect(kids[0]).toBe(decodeProtectedHeader(token).kid)
     expect((await context.authServer.verifyToken(token))?.sub).toBe("user-1")
     expect(
       context.logCalls.filter(

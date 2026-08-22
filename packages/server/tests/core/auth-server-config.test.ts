@@ -72,6 +72,23 @@ describe("construction failures", () => {
     ).toThrow(/must not be the JWT signing key/)
   })
 
+  it("refuses jwks.json that is not a parsed key set", () => {
+    for (const json of ['{"keys":[]}', "./public/jwks.json", { kid: "k1" }]) {
+      expect(() =>
+        createAuthServer({ ...baseOptions(), jwks: { json } })
+      ).toThrow(/jwks\.json must be the parsed key set/)
+    }
+    expect(() =>
+      createAuthServer({ ...baseOptions(), jwks: { json: { keys: [] } } })
+    ).not.toThrow()
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        jwks: { url: "https://app.example.com/jwks.json" }
+      })
+    ).not.toThrow()
+  })
+
   it("requires baseURL when providers are configured", () => {
     expect(() =>
       createAuthServer({

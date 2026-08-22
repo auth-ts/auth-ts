@@ -17,10 +17,9 @@ export interface KeyMaterial extends SigningKeyMaterial {
   /** Public keys published alongside the signing key during rotation. */
   additionalPublicJwks: JWK[]
   /**
-   * Every published key, for local verification.
-   *
-   * Built from the same document `jwks.json` serves, so what this server
-   * accepts and what it tells remote verifiers to accept cannot drift apart.
+   * Every key local verification accepts: the signing key and the additional
+   * public keys, as one JWKS — the same shape the published `jwks.json` has,
+   * so the two are kept in step by the same rotation runbook.
    */
   verificationKeys: VerificationKeySet
 }

@@ -86,14 +86,38 @@ export interface JwtOptions {
    */
   audience?: string
   /**
-   * SPKI PEM public keys to publish — and verify against — alongside the
-   * current one during rotation.
+   * SPKI PEM public keys that local `verifyToken` also accepts — for keeping a
+   * previous key's tokens valid through a rotation, alongside listing both keys
+   * in the published `jwks.json`.
    *
    * Every key's `kid` is its JWK thumbprint, so a key keeps the same `kid`
    * whether it is signing or listed here, and moving it between the two roles
-   * is invisible to verifiers. Local `verifyToken` consults this list too.
+   * is invisible to verifiers.
    */
   additionalPublicKeys?: string[]
+}
+
+/**
+ * Where the public key set lives.
+ *
+ * The JWKS is a static document: `npx @auth-ts/cli keygen` writes it to
+ * `public/jwks.json`, and a framework with a public folder serves it at
+ * `<origin>/jwks.json` with nothing to configure here. Both fields are for
+ * when that is not the case.
+ */
+export interface JwksOptions {
+  /**
+   * The public URL of the key set, advertised as `jwks_uri` in the discovery
+   * document. Defaults to `<baseURL>/jwks.json` — where a `public/jwks.json`
+   * is served — or to the `/jwks` endpoint when {@link JwksOptions.json} is set.
+   */
+  url?: string
+  /**
+   * The key set itself, to serve from `<basePath>/jwks` for a runtime with no
+   * public folder. Pass the parsed `jwks.json`; it is served as given and the
+   * endpoint does not exist without it.
+   */
+  json?: unknown
 }
 
 /** Refresh-token lifetime. */
@@ -219,8 +243,10 @@ export interface AuthServerOptions {
   guest?: boolean
   /** Sign-in method: OAuth. Requires {@link AuthServerOptions.baseURL}. */
   providers?: ProvidersOptions
-  /** Token signing, lifetime, claims, and key publication. */
+  /** Token signing, lifetime, claims, and the keys local verification accepts. */
   jwt?: JwtOptions
+  /** Where the public key set is hosted, or the document to serve it from. */
+  jwks?: JwksOptions
   /**
    * Server secret that keys the magic-code HMAC and signs the OAuth state
    * cookie. Defaults to the `AUTH_SECRET` environment variable.

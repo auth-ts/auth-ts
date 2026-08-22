@@ -253,7 +253,8 @@ describe("signToken and decodeToken", () => {
 
 describe("callables and handlers agree", () => {
   it("produces the same result whether called in-process or over HTTP", async () => {
-    const context = await createTestServer()
+    const jwks = { keys: [{ kty: "RSA", kid: "k1", n: "AQ", e: "AQAB" }] }
+    const context = await createTestServer({ jwks: { json: jwks } })
 
     await context.authServer.sendCode({ email: "ada@example.com" })
     expect(required(context.sentCodes.at(-1), "code").destination).toBe(
@@ -261,7 +262,7 @@ describe("callables and handlers agree", () => {
     )
 
     const overHttp = await context.authServer.handler(
-      request("GET", "/api/auth/jwks.json")
+      request("GET", "/api/auth/jwks")
     )
     const inProcess = await context.authServer.getJwks(undefined as never)
 

@@ -19,13 +19,23 @@ export const getDiscovery = defineEndpoint({
   method: "GET",
   path: "/.well-known/openid-configuration",
   run: async (internals) => {
-    const { issuer, basePath, baseURL } = internals.config
+    const { issuer, basePath, baseURL, jwks } = internals.config
     if (!issuer || !baseURL) throw new AuthApiError("notFound", 404)
+
+    // Where the key set actually is: a configured URL first; the `/jwks`
+    // endpoint when there is a document to serve from it; otherwise the
+    // public-folder convention, `<origin>/jwks.json`, which is where
+    // `npx @auth-ts/cli keygen` writes it.
+    const jwksUri =
+      jwks?.url ??
+      (jwks?.json !== undefined
+        ? `${baseURL}${basePath}/jwks`
+        : `${baseURL}/jwks.json`)
 
     return {
       data: {
         issuer,
-        jwks_uri: `${baseURL}${basePath}/jwks.json`,
+        jwks_uri: jwksUri,
         response_types_supported: ["id_token"],
         subject_types_supported: ["public"],
         id_token_signing_alg_values_supported: [internals.config.jwt.alg]

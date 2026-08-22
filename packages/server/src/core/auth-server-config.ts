@@ -12,6 +12,7 @@ import type {
   AuthServerOptions,
   CorsOptions,
   EmailOptions,
+  JwksOptions,
   JwtOptions,
   ProviderCredentials,
   ProvidersOptions,
@@ -39,6 +40,7 @@ export interface AuthServerConfig {
   providers: ProvidersOptions
   jwt: Required<Pick<JwtOptions, "privateKey" | "alg" | "ttl" | "claims">> &
     Pick<JwtOptions, "audience" | "additionalPublicKeys">
+  jwks?: JwksOptions
   secret: string
   basePath: string
   baseURL?: string
@@ -346,6 +348,7 @@ export function resolveAuthServerConfig(
         ? { additionalPublicKeys: options.jwt.additionalPublicKeys }
         : {})
     },
+    ...(options.jwks ? { jwks: requireJwks(options.jwks) } : {}),
     secret,
     basePath,
     ...(baseURL ? { baseURL, issuer: `${baseURL}${basePath}` } : {}),
@@ -375,6 +378,31 @@ export function resolveAuthServerConfig(
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {})
   }
+}
+
+/**
+ * Checks that `jwks.json`, when given, is a key set and not the path to one.
+ *
+ * Served verbatim, so only the shape is checked: an object with a `keys` array.
+ * The natural slip is passing the file's text, or its path, rather than the
+ * parsed document, and a verifier would report that as "no key matched" a long
+ * way from the mistake.
+ */
+function requireJwks(jwks: JwksOptions): JwksOptions {
+  const { json } = jwks
+  if (json === undefined) return jwks
+
+  const isKeySet =
+    typeof json === "object" &&
+    json !== null &&
+    Array.isArray((json as { keys?: unknown }).keys)
+  if (!isKeySet) {
+    throw new AuthConfigError(
+      "jwks.json must be the parsed key set — an object with a keys array — not its text or path."
+    )
+  }
+
+  return jwks
 }
 
 /** Normalizes the mount path to a leading slash and no trailing slash. */

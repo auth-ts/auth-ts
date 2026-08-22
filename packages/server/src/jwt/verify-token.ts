@@ -40,15 +40,15 @@ export interface TokenClaims extends UnverifiedClaims {
  * Resolves a token's header to one of the published public keys.
  *
  * This is the local twin of what a remote verifier does against `jwks.json`:
- * the key is picked by the header's `kid` from the whole published set — the
- * signing key and every `additionalPublicKeys` entry — so local verification
- * follows the same rotation runbook as Neon or Supabase. A token signed by the
+ * the key is picked by the header's `kid` from the whole set — the signing key
+ * and every `additionalPublicKeys` entry — so local verification follows the
+ * same rotation runbook as Neon or Supabase. A token signed by the
  * previous key, with its `kid`, keeps verifying for as long as that key is
  * still published, and stops the moment it is removed.
  */
 export type VerificationKeySet = JWTVerifyGetKey
 
-/** Builds a {@link VerificationKeySet} from the document served at `jwks.json`. */
+/** Builds a {@link VerificationKeySet} from a JWKS document. */
 export function createVerificationKeySet(jwks: Jwks): VerificationKeySet {
   return createLocalJWKSet(jwks)
 }

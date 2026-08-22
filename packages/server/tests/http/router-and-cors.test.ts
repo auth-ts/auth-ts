@@ -4,7 +4,10 @@ import { request } from "../helpers/request.ts"
 
 describe("matchRoute", () => {
   it("dispatches every documented endpoint through the catch-all", async () => {
-    const { authServer } = await createTestServer({ guest: true })
+    const { authServer } = await createTestServer({
+      guest: true,
+      jwks: { json: { keys: [] } }
+    })
 
     // Unauthenticated is fine here — what matters is that none of these 404.
     const probes: Array<[string, string]> = [
@@ -19,7 +22,7 @@ describe("matchRoute", () => {
       ["DELETE", "/api/auth/sessions/abc"],
       ["POST", "/api/auth/sign-in/guest"],
       ["GET", "/api/auth/connections"],
-      ["GET", "/api/auth/jwks.json"]
+      ["GET", "/api/auth/jwks"]
     ]
 
     for (const [method, path] of probes) {
@@ -29,9 +32,11 @@ describe("matchRoute", () => {
   })
 
   it("tolerates a trailing slash", async () => {
-    const { authServer } = await createTestServer()
+    const { authServer } = await createTestServer({
+      jwks: { json: { keys: [] } }
+    })
     expect(
-      (await authServer.handler(request("GET", "/api/auth/jwks.json/"))).status
+      (await authServer.handler(request("GET", "/api/auth/jwks/"))).status
     ).toBe(200)
   })
 
@@ -135,14 +140,17 @@ describe("matchRoute", () => {
   })
 
   it("honours a custom basePath, including one written with a trailing slash", async () => {
-    const { authServer } = await createTestServer({ basePath: "/auth/" })
+    const { authServer } = await createTestServer({
+      basePath: "/auth/",
+      jwks: { json: { keys: [] } }
+    })
 
     expect(authServer.config.basePath).toBe("/auth")
     expect(
-      (await authServer.handler(request("GET", "/auth/jwks.json"))).status
+      (await authServer.handler(request("GET", "/auth/jwks"))).status
     ).toBe(200)
     expect(
-      (await authServer.handler(request("GET", "/api/auth/jwks.json"))).status
+      (await authServer.handler(request("GET", "/api/auth/jwks"))).status
     ).toBe(404)
   })
 })
@@ -152,7 +160,10 @@ describe("origin check", () => {
   // A simple POST carries the cookie without a preflight, so state-changing
   // requests are refused unless their Origin is one this server serves.
   it("refuses a state-changing request from an origin it does not serve", async () => {
-    const { authServer } = await createTestServer({ guest: true })
+    const { authServer } = await createTestServer({
+      guest: true,
+      jwks: { json: { keys: [] } }
+    })
 
     const refused = await authServer.handler(
       request("POST", "/api/auth/sign-in/guest", {
@@ -179,7 +190,7 @@ describe("origin check", () => {
     expect(
       (
         await authServer.handler(
-          request("GET", "/api/auth/jwks.json", {
+          request("GET", "/api/auth/jwks", {
             headers: { origin: "https://evil.example.com" }
           })
         )
@@ -326,11 +337,11 @@ describe("origin check", () => {
 
 describe("cors", () => {
   it("adds no CORS headers and does not answer preflights when unset", async () => {
-    const { authServer } = await createTestServer()
+    const { authServer } = await createTestServer({
+      jwks: { json: { keys: [] } }
+    })
 
-    const response = await authServer.handler(
-      request("GET", "/api/auth/jwks.json")
-    )
+    const response = await authServer.handler(request("GET", "/api/auth/jwks"))
     expect(response.headers.get("access-control-allow-origin")).toBeNull()
 
     const preflight = await authServer.handler(
@@ -348,7 +359,8 @@ describe("cors", () => {
 
   it("answers preflights and echoes an explicit origin, never a wildcard", async () => {
     const { authServer } = await createTestServer({
-      cors: { origin: "https://app.example.com" }
+      cors: { origin: "https://app.example.com" },
+      jwks: { json: { keys: [] } }
     })
 
     const preflight = await authServer.handler(
@@ -368,9 +380,7 @@ describe("cors", () => {
       "DELETE"
     )
 
-    const response = await authServer.handler(
-      request("GET", "/api/auth/jwks.json")
-    )
+    const response = await authServer.handler(request("GET", "/api/auth/jwks"))
     expect(response.headers.get("access-control-allow-origin")).toBe(
       "https://app.example.com"
     )
@@ -379,7 +389,8 @@ describe("cors", () => {
 
   it("keeps CORS headers on error responses too", async () => {
     const { authServer } = await createTestServer({
-      cors: { origin: "https://app.example.com" }
+      cors: { origin: "https://app.example.com" },
+      jwks: { json: { keys: [] } }
     })
     const response = await authServer.handler(
       request("POST", "/api/auth/token")
@@ -393,11 +404,10 @@ describe("cors", () => {
 
   it("appends origin to Vary rather than clobbering what is already there", async () => {
     const { authServer } = await createTestServer({
-      cors: { origin: "https://app.example.com" }
+      cors: { origin: "https://app.example.com" },
+      jwks: { json: { keys: [] } }
     })
-    const response = await authServer.handler(
-      request("GET", "/api/auth/jwks.json")
-    )
+    const response = await authServer.handler(request("GET", "/api/auth/jwks"))
     expect(response.headers.get("vary")).toBe("origin")
 
     const { applyCorsHeaders } = await import("../../src/http/apply-cors.ts")

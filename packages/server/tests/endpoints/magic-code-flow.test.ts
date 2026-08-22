@@ -316,23 +316,58 @@ describe("token and user endpoints", () => {
 })
 
 describe("jwks and discovery", () => {
-  it("serves only public key material", async () => {
+  const jwks = {
+    keys: [
+      { kty: "RSA", kid: "k1", n: "AQ", e: "AQAB", alg: "RS256", use: "sig" }
+    ]
+  }
+
+  it("has no jwks endpoint unless a document is configured", async () => {
     const { authServer } = await createTestServer()
-    const response = await authServer.handler(
-      request("GET", "/api/auth/jwks.json")
-    )
-    const body = (await response.json()) as {
-      keys: Array<Record<string, unknown>>
-    }
+
+    expect(
+      (await authServer.handler(request("GET", "/api/auth/jwks"))).status
+    ).toBe(404)
+    expect(
+      (await authServer.handler(request("GET", "/api/auth/jwks.json"))).status
+    ).toBe(404)
+  })
+
+  it("serves a configured jwks.json as given", async () => {
+    const { authServer } = await createTestServer({ jwks: { json: jwks } })
+    const response = await authServer.handler(request("GET", "/api/auth/jwks"))
 
     expect(response.status).toBe(200)
-    expect(body.keys).toHaveLength(1)
-    expect(body.keys[0]).toMatchObject({
-      kty: "RSA",
-      use: "sig",
-      kid: expect.any(String)
-    })
-    expect(body.keys[0]).not.toHaveProperty("d")
+    expect(await response.json()).toEqual(jwks)
+  })
+
+  it("advertises the public-folder jwks.json unless told otherwise", async () => {
+    const discoveryOf = async (
+      overrides: Parameters<typeof createTestServer>[0]
+    ) => {
+      const { authServer } = await createTestServer({
+        baseURL: "https://app.example.com",
+        ...overrides
+      })
+      const response = await authServer.handler(
+        request("GET", "/api/auth/.well-known/openid-configuration")
+      )
+      return (await response.json()) as { jwks_uri: string }
+    }
+
+    expect((await discoveryOf({})).jwks_uri).toBe(
+      "https://app.example.com/jwks.json"
+    )
+    expect((await discoveryOf({ jwks: { json: jwks } })).jwks_uri).toBe(
+      "https://app.example.com/api/auth/jwks"
+    )
+    expect(
+      (
+        await discoveryOf({
+          jwks: { json: jwks, url: "https://cdn.example.com/keys.json" }
+        })
+      ).jwks_uri
+    ).toBe("https://cdn.example.com/keys.json")
   })
 
   it("advertises an issuer that matches the token's iss claim", async () => {
@@ -345,7 +380,6 @@ describe("jwks and discovery", () => {
     const body = (await response.json()) as { issuer: string; jwks_uri: string }
 
     expect(body.issuer).toBe("https://app.example.com/api/auth")
-    expect(body.jwks_uri).toBe("https://app.example.com/api/auth/jwks.json")
 
     await authServer.handler(
       request("POST", "/api/auth/send-code", {

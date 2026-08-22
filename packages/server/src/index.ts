@@ -23,6 +23,7 @@ export type {
   CookieOptions,
   CorsOptions,
   EmailOptions,
+  JwksOptions,
   JwtOptions,
   ProviderCredentials,
   ProvidersOptions,
