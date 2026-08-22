@@ -29,7 +29,7 @@ bun add @auth-ts/server @auth-ts/client
 ### 2. Generate a signing key
 
 ```bash
-npx @auth-ts/cli keygen >> .env
+bun x @auth-ts/cli keygen
 ```
 
 That prints `JWT_PRIVATE_KEY` and `AUTH_SECRET` as `.env` lines, and writes the

@@ -159,6 +159,6 @@ describe("auth-ts keygen", () => {
   })
 
   it("prints usage with no command", () => {
-    expect(run([])).toMatch(/^Usage: npx @auth-ts\/cli <command>/)
+    expect(run([])).toMatch(/^Usage: bun x @auth-ts\/cli <command>/)
   })
 })

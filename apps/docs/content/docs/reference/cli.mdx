@@ -1,10 +1,10 @@
 ---
 title: CLI
-description: npx @auth-ts/cli keygen — the signing key, the secret, and jwks.json.
+description: bun x @auth-ts/cli keygen — the signing key, the secret, and jwks.json.
 ---
 
 ```bash
-npx @auth-ts/cli keygen >> .env
+bun x @auth-ts/cli keygen
 ```
 
 `keygen` generates a signing key and a server secret, prints them as the two
@@ -16,9 +16,13 @@ JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 AUTH_SECRET="..."
 ```
 
-Those two lines are the whole of stdout; everything else goes to stderr, so the
-redirect above appends exactly the variables. The private key is quoted with its
-line breaks as literal `\n`, which dotenv, Bun, Vite, and Next all expand.
+Copy them into your `.env`. They are the whole of stdout and everything else
+goes to stderr, so you can redirect them somewhere instead — but into a file
+you already keep, rather than appending blind: run twice and you have two
+`JWT_PRIVATE_KEY` lines, and which one wins is up to whichever loader reads it.
+
+The private key is quoted with its line breaks as literal `\n`, which dotenv,
+Bun, Vite, and Next all expand.
 
 ## `public/jwks.json`
 

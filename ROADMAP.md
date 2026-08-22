@@ -48,7 +48,7 @@ The one part of the build with no real-world evidence behind it.
       so editing the gist will not change what Neon fetches:
       `https://gist.githubusercontent.com/daveycodez/93e780d7a7745317f3a65e7ceca93111/raw/auth-ts-jwks.json`
 - [ ] Upload `public/jwks.json` to the gist again whenever you run
-      `npx @auth-ts/cli keygen` — it is a copy of the file, not a mirror.
+      `bun x @auth-ts/cli keygen` — it is a copy of the file, not a mirror.
 - [ ] **Deployed, skip the gist entirely** and point Neon at
       `https://<your domain>/jwks.json`, the same file served by the app.
 - [ ] Treat the current key as a **development key**. Generate a separate one for

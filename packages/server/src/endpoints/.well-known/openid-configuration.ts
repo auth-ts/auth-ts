@@ -25,7 +25,7 @@ export const getDiscovery = defineEndpoint({
     // Where the key set actually is: a configured URL first; the `/jwks`
     // endpoint when there is a document to serve from it; otherwise the
     // public-folder convention, `<origin>/jwks.json`, which is where
-    // `npx @auth-ts/cli keygen` writes it.
+    // `bun x @auth-ts/cli keygen` writes it.
     const jwksUri =
       jwks?.url ??
       (jwks?.json !== undefined

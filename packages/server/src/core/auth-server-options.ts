@@ -90,7 +90,7 @@ export interface JwtOptions {
 /**
  * Where the public key set lives.
  *
- * The JWKS is a static document: `npx @auth-ts/cli keygen` writes it to
+ * The JWKS is a static document: `bun x @auth-ts/cli keygen` writes it to
  * `public/jwks.json`, and a framework with a public folder serves it at
  * `<origin>/jwks.json` with nothing to configure here. Both fields are for
  * when that is not the case.

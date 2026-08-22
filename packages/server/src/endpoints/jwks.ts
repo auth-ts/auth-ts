@@ -5,7 +5,7 @@ import { defineEndpoint } from "../http/define-endpoint"
  * Serves the configured public key set.
  *
  * Normally there is nothing to serve: the JWKS is a static file in the
- * application's public folder, written by `npx @auth-ts/cli keygen`, and the
+ * application's public folder, written by `bun x @auth-ts/cli keygen`, and the
  * verifier is pointed straight at it. This endpoint is for a runtime with no
  * public folder — pass the parsed document as `jwks.json` and it is served
  * from inside the mount, as given.

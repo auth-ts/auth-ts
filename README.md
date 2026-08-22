@@ -13,7 +13,7 @@ rather than in application code.
   dependencies, `jose` and nothing else. Runs on Node 20+, Cloudflare Workers,
   Deno, and Bun.
 * `@auth-ts/client` — browser token management. Zero runtime dependencies.
-* `@auth-ts/cli` — `npx @auth-ts/cli keygen`: the signing key, the
+* `@auth-ts/cli` — `bun x @auth-ts/cli keygen`: the signing key, the
   `AUTH_SECRET`, and the `public/jwks.json` to deploy with your app.
 
 Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous guests.
@@ -22,7 +22,7 @@ Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous 
 
 ```bash
 bun add @auth-ts/server @auth-ts/client
-npx @auth-ts/cli keygen >> .env
+bun x @auth-ts/cli keygen
 ```
 
 `keygen` prints `JWT_PRIVATE_KEY` and `AUTH_SECRET`, and writes the public key

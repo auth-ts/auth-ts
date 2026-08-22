@@ -7,7 +7,7 @@ A signing key and its `public/jwks.json` travel together, so rotating is the
 setup step again:
 
 ```bash
-npx @auth-ts/cli keygen
+bun x @auth-ts/cli keygen
 ```
 
 Set the new `JWT_PRIVATE_KEY` in the environment, keep the new `public/jwks.json`

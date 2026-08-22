@@ -2,14 +2,14 @@ import { parseArgs } from "node:util"
 import type { JwtAlgorithm } from "./keygen"
 import { keygen } from "./keygen"
 
-const USAGE = `Usage: npx @auth-ts/cli <command>
+const USAGE = `Usage: bun x @auth-ts/cli <command>
 
 Commands:
   keygen [--alg RS256|ES256]  Generate a signing key and server secret, and
                               write the public key set to public/jwks.json
 
-The .env lines go to stdout and everything else to stderr, so
-\`npx @auth-ts/cli keygen >> .env\` appends exactly the two variables.
+The .env lines go to stdout and everything else to stderr, so they pipe
+cleanly if you want them somewhere other than your clipboard.
 `
 
 const ALGORITHMS: readonly JwtAlgorithm[] = ["RS256", "ES256"]
@@ -62,6 +62,8 @@ async function runKeygen(args: string[]) {
 
   console.error(
     [
+      "",
+      "Copy the two lines above into your .env.",
       "",
       `Wrote ${result.jwksPath} — the public key, safe to publish.`,
       "Deployed, it is served at <origin>/jwks.json: point Neon there. To rotate,",
