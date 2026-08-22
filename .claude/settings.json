@@ -12,9 +12,7 @@
   },
   "sandbox": {
     "network": {
-      "allowedDomains": [
-        "www.google-analytics.com"
-      ]
+      "allowedDomains": ["www.google-analytics.com"]
     }
   }
 }
