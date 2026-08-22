@@ -11,7 +11,6 @@ import {
   desc,
   eq,
   getColumns,
-  inArray,
   is,
   lt,
   notExists,
@@ -73,9 +72,8 @@ export const authDB = defineAuthDB({
       ].map((table) => db.delete(table).where(lt(table.expiresAt, sql`now()`)))
     )
 
-    const staleGuests = db
-      .select({ id: authTables.users.id })
-      .from(authTables.users)
+    await db
+      .delete(authTables.users)
       .where(
         and(
           eq(authTables.users.type, "guest"),
@@ -88,9 +86,5 @@ export const authDB = defineAuthDB({
           )
         )
       )
-
-    await db
-      .delete(authTables.users)
-      .where(inArray(authTables.users.id, staleGuests))
   }
 })

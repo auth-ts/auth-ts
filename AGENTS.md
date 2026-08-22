@@ -1,3 +1,23 @@
+# Comments
+
+Write fewer. Most code here has none, and that is the intended state.
+
+- **Never restate the code.** If the comment and the line say the same thing,
+  delete the comment.
+- **One line, not a paragraph.** A comment that needs three lines is usually
+  arguing with a reader who has not objected.
+- **No JSDoc on internal helpers.** Reserve doc blocks for exported API that
+  someone reads without opening the file.
+- **Comment the constraint, not the intent.** The only comment worth keeping is
+  one stating something the code cannot: why an obvious simplification does not
+  compile, which of two orderings is load bearing, what a cast is standing in
+  for. Say the consequence, so the next person does not have to discover it.
+- **Do not explain a decision the diff already makes.** That belongs in the
+  commit message.
+
+The same restraint applies to code: prefer one function over two, and do not
+introduce a helper that only wraps a single call.
+
 <!-- nx configuration start-->
 <!-- Leave the start & end comments to automatically receive updates. -->
 
