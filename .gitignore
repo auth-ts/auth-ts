@@ -7,6 +7,7 @@ dist
 .nx
 coverage
 *.tsbuildinfo
+.tanstack
 
 # Declarations belong in dist/. These only ever appear in src/ when a build is
 # misconfigured, and once committed nothing regenerates them — so they drift
