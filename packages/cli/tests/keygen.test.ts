@@ -130,11 +130,10 @@ describe("auth-ts keygen", () => {
   it("prints all three and writes nothing without an answer", async () => {
     const stdout = run(["keygen"])
 
-    const [privateKey, secret] = stdout.split("\n")
-    expect(privateKey).toMatch(
-      /^JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n[^"\n]+\\n-----END PRIVATE KEY-----"$/
+    expect(stdout).toMatch(
+      /^JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n[^"\n]+\\n-----END PRIVATE KEY-----"$/m
     )
-    expect(secret).toMatch(/^AUTH_SECRET="[A-Za-z0-9+/]{43}="$/)
+    expect(stdout).toMatch(/^AUTH_SECRET="[A-Za-z0-9+/]{43}="$/m)
     const jwks = stdout.slice(stdout.indexOf("JWKS=") + "JWKS=".length)
     expect(JSON.parse(jwks)).toHaveProperty("keys")
     // Pretty-printed, so it reads rather than only pastes.
@@ -154,9 +153,9 @@ describe("auth-ts keygen", () => {
     expect(env).toContain("JWT_PRIVATE_KEY=")
     expect(env).toContain("AUTH_SECRET=")
 
-    const privateKeyPem = stdout
-      .slice('JWT_PRIVATE_KEY="'.length, stdout.indexOf('"\nAUTH_SECRET'))
-      .replace(/\\n/g, "\n")
+    const privateKeyPem = (
+      stdout.match(/^JWT_PRIVATE_KEY="(.+)"$/m)?.[1] ?? ""
+    ).replace(/\\n/g, "\n")
     const secret = env.match(/^AUTH_SECRET="(.+)"$/m)?.[1]
     const authServer = serverFor(privateKeyPem, secret ?? "")
     const token = await authServer.signToken({ userId: "user-1" })

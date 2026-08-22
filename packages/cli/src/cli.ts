@@ -24,6 +24,22 @@ Everything printed goes to stdout and everything said goes to stderr, so the
 three lines pipe cleanly on their own.
 `
 
+/**
+ * Colour, only where someone is looking at it.
+ *
+ * Each stream is checked on its own: piping the values into a file must not
+ * put escape codes in it, and that is true even while the questions on stderr
+ * are still going to a terminal. `NO_COLOR` turns the lot off.
+ */
+function styler(stream: { isTTY?: boolean }) {
+  const plain = !stream.isTTY || process.env.NO_COLOR
+  return (code: number, value: string) =>
+    plain ? value : `\u001B[${code}m${value}\u001B[39m`
+}
+
+const out = styler(process.stdout)
+const say = styler(process.stderr)
+
 const ALGORITHMS: readonly JwtAlgorithm[] = ["RS256", "ES256"]
 
 function isAlgorithm(value: string): value is JwtAlgorithm {
@@ -99,9 +115,8 @@ async function confirm(question: string) {
     output: process.stderr
   })
   try {
-    return /^y(es)?$/i.test(
-      (await prompt.question(`${question} [y/N] `)).trim()
-    )
+    const answer = await prompt.question(`${question} ${say(90, "[y/N]")} `)
+    return /^y(es)?$/i.test(answer.trim())
   } finally {
     prompt.close()
   }
@@ -111,9 +126,9 @@ async function runKeygen(args: string[]) {
   const options = parseKeygenArgs(args)
   const { privateKeyPem, secret, jwks } = await keygen(options)
 
-  console.log(`JWT_PRIVATE_KEY=${quoteForEnv(privateKeyPem)}`)
-  console.log(`AUTH_SECRET="${secret}"`)
-  console.log(`JWKS=${JSON.stringify(jwks, null, 2)}`)
+  console.log(`${out(36, "JWT_PRIVATE_KEY")}=${quoteForEnv(privateKeyPem)}\n`)
+  console.log(`${out(36, "AUTH_SECRET")}="${secret}"\n`)
+  console.log(`${out(36, "JWKS")}=${JSON.stringify(jwks, null, 2)}`)
 
   const values = {
     JWT_PRIVATE_KEY: quoteForEnv(privateKeyPem),
@@ -139,7 +154,7 @@ async function runKeygen(args: string[]) {
       `${name} is already set in ${options.envPath}. Overwrite it?`
     )
     if (overwrite) replace.push(name)
-    else console.error(`Left ${name} as it was.`)
+    else console.error(say(33, `Left ${name} as it was.`))
   }
 
   await writeEnvFile(options.envPath, values, replace)
@@ -152,14 +167,17 @@ async function runKeygen(args: string[]) {
     !replace.includes("JWT_PRIVATE_KEY")
   if (keptKey) {
     console.error(
-      `Left ${options.directory}/jwks.json alone: it belongs to the key already in ${options.envPath}.`
+      say(
+        33,
+        `Left ${options.directory}/jwks.json alone: it belongs to the key already in ${options.envPath}.`
+      )
     )
     return
   }
 
   const jwksPath = await writeKeySet(options.directory, jwks)
 
-  console.error(`Wrote ${options.envPath} and ${jwksPath}`)
+  console.error(say(32, `Wrote ${options.envPath} and ${jwksPath}`))
 }
 
 const [command, ...rest] = process.argv.slice(2)
