@@ -16,3 +16,6 @@ src/**/*.d.ts.map
 .env.local
 .DS_Store
 jwks.json
+
+.claude/worktrees
+.claude/settings.local.json
