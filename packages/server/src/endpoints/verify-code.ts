@@ -50,6 +50,14 @@ export const verifyCode = defineEndpoint({
       })
     }
 
+    // Validate the whole body before the code is spent. The code is a one-shot
+    // credential, so a 400 here must be free to retry; burning it on a typo in
+    // additionalFields would force the user to request another code.
+    const additionalFields = validateAdditionalFields(
+      internals.options.user.additionalFields,
+      input.additionalFields
+    )
+
     if (internals.options.rateLimit !== false) {
       const clientIp = getClientIp(headers, internals.options.clientIp)
       if (clientIp) {
@@ -66,11 +74,6 @@ export const verifyCode = defineEndpoint({
       code: input.code,
       purpose: "signIn"
     })
-
-    const additionalFields = validateAdditionalFields(
-      internals.options.user.additionalFields,
-      input.additionalFields
-    )
 
     const active = await resolveSession(internals, headers)
     const user =
