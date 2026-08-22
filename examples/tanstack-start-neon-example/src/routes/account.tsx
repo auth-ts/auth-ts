@@ -139,11 +139,20 @@ function AccountPage() {
 
   return (
     <section className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Account</h1>
-        <p className="text-sm text-base-content/60">
-          {user.email ?? user.phoneNumber ?? "Guest account"}
-        </p>
+      <div className="flex items-center gap-4">
+        {user.imageURL ? (
+          <div className="avatar">
+            <div className="w-14 rounded-full">
+              <img src={user.imageURL} alt="" />
+            </div>
+          </div>
+        ) : null}
+        <div>
+          <h1 className="text-2xl font-semibold">Account</h1>
+          <p className="text-sm text-base-content/60">
+            {user.email ?? user.phoneNumber ?? "Guest account"}
+          </p>
+        </div>
       </div>
 
       {notice ? (

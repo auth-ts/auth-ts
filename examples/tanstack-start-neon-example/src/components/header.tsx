@@ -32,11 +32,21 @@ export function Header() {
         <div className="navbar-end">
           {user ? (
             <Link to="/account" className="btn btn-ghost gap-2 px-2">
-              <div className="avatar avatar-placeholder">
-                <div className="w-8 rounded-full bg-primary text-primary-content">
-                  <span className="text-xs uppercase">{label.slice(0, 1)}</span>
+              {user.imageURL ? (
+                <div className="avatar">
+                  <div className="w-8 rounded-full">
+                    <img src={user.imageURL} alt="" />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="avatar avatar-placeholder">
+                  <div className="w-8 rounded-full bg-primary text-primary-content">
+                    <span className="text-xs uppercase">
+                      {label.slice(0, 1)}
+                    </span>
+                  </div>
+                </div>
+              )}
               <span className="hidden max-w-40 truncate font-normal sm:inline">
                 {label}
               </span>
