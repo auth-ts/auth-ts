@@ -10,7 +10,16 @@ import { readCookie } from "../lib/parse-cookies.ts"
  */
 export const PARKED_ACCOUNT_LIMIT = 5
 
-/** Reads the parked refresh tokens, most recently used first. */
+/**
+ * Reads the parked refresh tokens, most recently used first.
+ *
+ * The cookie is untrusted input that turns directly into work: every entry
+ * costs a hash and a database lookup in {@link pruneDeadAccounts}. A cookie
+ * this server wrote never holds more than {@link PARKED_ACCOUNT_LIMIT}
+ * entries, so one that does is forged or corrupt, and is treated like any
+ * other unreadable cookie — no parked accounts — rather than as a request to
+ * run a thousand queries. Duplicates are collapsed for the same reason.
+ */
 export function readAccountsCookie(
   internals: AuthServerInternals,
   headers: Headers
@@ -20,8 +29,15 @@ export function readAccountsCookie(
 
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((entry): entry is string => typeof entry === "string")
+    if (
+      !Array.isArray(parsed) ||
+      parsed.length > PARKED_ACCOUNT_LIMIT ||
+      !parsed.every((entry): entry is string => typeof entry === "string")
+    ) {
+      internals.log.debug("discarding malformed accounts cookie")
+      return []
+    }
+    return [...new Set(parsed)]
   } catch {
     // A corrupted cookie means "no parked accounts", never a failed request.
     internals.log.debug("discarding unparseable accounts cookie")
