@@ -402,7 +402,7 @@ export interface AuthDB<
 }
 
 /**
- * Types an implementation written as one function per table with a `switch`.
+ * Types an implementation of this contract, so that yours needs no casts.
  *
  * Core's own calls are precise because {@link AuthDB} is generic, but a generic
  * signature cannot be *proven* by a union-typed implementation, only asserted —
@@ -423,7 +423,8 @@ export interface AuthDB<
  * })
  * ```
  *
- * A table map needs neither the switch nor this helper — see the reference.
+ * A table map needs no switch, but it does want this helper for the same
+ * reason — see the reference.
  */
 export function defineAuthDB<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema

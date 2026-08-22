@@ -105,42 +105,47 @@ regardless — nothing in front of this server can enforce it.
 
 ## Writing your implementation
 
-Two shapes work. A **table dictionary** needs no `switch` and no casts of its
-own — this is the whole implementation from the reference application:
+Wrap it in `defineAuthDB` and write it either of two ways. Both are free of
+casts, and the helper is what makes that true: a union-typed implementation
+cannot be *proven* to satisfy a generic signature, only asserted — the same
+reason an overload has an implementation signature. The helper holds that one
+assertion, so your code holds none.
 
-```ts
-const tables = {
-  users,
-  sessions,
-  verificationCodes,
-  attempts,
-  connections
-} satisfies Record<AuthTable, AnyPgTable>
-
-export const authDB: AuthDB = {
-  select: (async ({ table, where, limit, offset, orderBy }) => {
-    const [[name, direction] = ["id", "asc"]] = Object.entries(orderBy)
-    const order = direction === "asc" ? asc : desc
-
-    return db
-      .select()
-      .from(tableOf(table))
-      .where(matches(table, where))
-      .orderBy(order(columnOf(table, name)))
-      .limit(limit)
-      .offset(offset)
-  }) as AuthDB["select"]
-  // ...
-}
-```
-
-A **`switch` per table** is the shape to reach for with raw SQL, where each
-table's query is genuinely different. Wrap it in `defineAuthDB` and the input
-narrows with the table name:
+A **table dictionary** is one query per function, whatever the table. This is
+the whole read path from the reference application:
 
 ```ts
 import { defineAuthDB } from "@auth-ts/server"
 
+const tables = { users, sessions, verificationCodes, attempts, connections }
+
+export const authDB = defineAuthDB({
+  async select({ table, where, limit, offset, orderBy }) {
+    const [[name = "id", direction = "asc"] = []] = Object.entries(orderBy)
+
+    return db
+      .select()
+      .from(tables[table])
+      .where(matches(table, where))
+      .orderBy((direction === "asc" ? asc : desc)(columnsOf(table)[name]))
+      .limit(limit)
+      .offset(offset)
+  }
+  // ...
+})
+```
+
+Keep the dictionary's own types. It is tempting to widen it — `satisfies
+Record<AuthTable, AnyPgTable>`, or a `tableOf()` helper returning `AnyPgTable`
+— and that is what forces casts back into every function: an erased table type
+means an erased row type, so the query no longer returns anything the contract
+recognizes. Left alone, `tables[table]` is the union of your five concrete
+tables and the rows come back typed.
+
+A **`switch` per table** is the shape to reach for with raw SQL, where each
+table's query is genuinely different. The input narrows with the table name:
+
+```ts
 export const authDB = defineAuthDB({
   async select({ table, where, limit }) {
     switch (table) {
@@ -162,11 +167,6 @@ export const authDB = defineAuthDB({
   // ...
 })
 ```
-
-`defineAuthDB` exists for one reason: a union-typed implementation cannot be
-*proven* to satisfy a generic signature, only asserted — the same reason an
-overload has an implementation signature. The helper holds that assertion once,
-so your code has none.
 
 ## Typing your implementation
 
