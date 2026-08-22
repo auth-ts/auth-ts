@@ -88,8 +88,8 @@ interface AuthDB<S extends AdditionalFieldsSchema = AdditionalFieldsSchema> {
     table: T
     where: Where<S, T>
     limit: number
-    offset?: number
-    orderBy?: { column: keyof Row<S, T>; direction: "asc" | "desc" }
+    offset: number
+    orderBy: { column: keyof Row<S, T>; direction: "asc" | "desc" }
   }): Promise<Row<S, T>[]>
   insert<T extends Table>(input: { table: T; row: Insert<S, T> }): Promise<Row<S, T>>
   update<T extends Table>(input: { table: T; where: Where<S, T>; fields: Partial<Row<S, T>> }): Promise<void>
@@ -98,15 +98,17 @@ interface AuthDB<S extends AdditionalFieldsSchema = AdditionalFieldsSchema> {
 }
 ```
 
-- **`limit` is required; `offset` and `orderBy` are optional.** An unbounded
-  read is a type error. Every list core makes has a ceiling — the devices
-  list, the connections list, the append-and-count check (`max + 1`), the
-  single-row lookups (`1`). `offset` and `orderBy` are in the contract from
-  day one so that paging (a long devices list, an admin view) never needs a
-  contract change. `orderBy` is one column and a direction — enough for
-  paging and for "newest", and the smallest thing every store can express.
-  When `orderBy` is omitted the store returns rows in insertion order (the
-  uuidv7 `id`), which is what makes `offset` stable by default.
+- **Nothing on `select` is optional.** The implementer always receives
+  `limit`, `offset`, and `orderBy`, so there is no `undefined` to branch on —
+  one code path per store. Core fills the defaults at its own call sites:
+  `offset: 0`, `orderBy: { column: "id", direction: "asc" }` (uuidv7 ids sort
+  by insertion time, which is what makes `offset` stable). An unbounded read is
+  a type error; every list core makes has a ceiling — the devices list, the
+  connections list, the append-and-count check (`max + 1`), the single-row
+  lookups (`1`). `offset` and `orderBy` are in the contract from day one so
+  that paging (a long devices list, an admin view) never needs a contract
+  change. `orderBy` is one column and a direction — enough for paging and for
+  "newest", and the smallest thing every store can express.
 - **`update` returns `void`.** Core always holds the row it is updating — it
   just selected it, or it came from the resolved session — so the result is
   `{ ...existing, ...fields }` composed in core, and `AuthUser` has no
@@ -183,8 +185,8 @@ Verified on TypeScript 7.0.2 (scratch files compiled with `--strict`, caller
 
    ```ts
    type SelectInput = { [K in Table]: {
-     table: K; where: Where<K>; limit: number; offset?: number
-     orderBy?: { column: keyof Row<K>; direction: "asc" | "desc" }
+     table: K; where: Where<K>; limit: number; offset: number
+     orderBy: { column: keyof Row<K>; direction: "asc" | "desc" }
    } }[Table]
    type InsertInput = { [K in Table]: { table: K; row: Insert<K> } }[Table]
    // …UpdateInput, DeleteInput likewise
