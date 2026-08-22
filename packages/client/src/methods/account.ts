@@ -1,4 +1,8 @@
-import type { AuthUser, SessionInfo } from "@auth-ts/server"
+import type {
+  AuthUser,
+  RevokeSessionResult,
+  SessionInfo
+} from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals.ts"
 import { AuthError } from "../lib/auth-error.ts"
 
@@ -22,12 +26,22 @@ export function createUpdateUser(internals: AuthClientInternals) {
   }
 }
 
-/** How far a sign-out reaches. */
+/** How far a sign-out reaches, for each account it applies to. */
 export type LogoutScope = "local" | "others" | "global"
+
+/**
+ * Which of this browser's accounts a sign-out applies to, under `multiAccount`.
+ *
+ * `"all"` — the default, as in Clerk and Better Auth — signs out every account
+ * in this browser. `"current"` signs out only the active one and the server
+ * promotes the next parked account, if any. Ignored for `scope: "others"`.
+ */
+export type LogoutAccount = "all" | "current"
 
 /** Input for signing out. */
 export interface LogoutInput {
   scope?: LogoutScope
+  account?: LogoutAccount
 }
 
 /**
@@ -35,9 +49,9 @@ export interface LogoutInput {
  *
  * `"others"` deliberately clears nothing locally — it is the "sign out my other
  * devices" button, and this device is meant to survive it. The other two scopes
- * clear the token and the user mirror, and with multiple accounts the server may
- * promote the next one, in which case the caches are primed with that user
- * instead of emptied.
+ * clear the token and the user mirror; with `account: "current"` under multiple
+ * accounts the server may promote the next one, in which case the caches are
+ * primed with that user instead of emptied.
  */
 export function createLogout(
   internals: AuthClientInternals,
@@ -52,7 +66,7 @@ export function createLogout(
     >({
       method: "POST",
       path: "/logout",
-      body: { scope }
+      body: { scope, ...(input.account ? { account: input.account } : {}) }
     })
 
     if (scope === "others") return null
@@ -148,26 +162,19 @@ export interface RevokeSessionInput {
  * Revokes one session by id.
  *
  * Revoking the current one is a local sign-out, so the caches are cleared to
- * match — the server has already cleared the cookie.
+ * match — the server has already cleared the cookie, and says in the response
+ * that it did, so there is no need to list the sessions first to find out.
  */
-export function createRevokeSession(
-  internals: AuthClientInternals,
-  getSessions: () => Promise<SessionInfo[]>
-) {
+export function createRevokeSession(internals: AuthClientInternals) {
   return async function revokeSession(
     input: RevokeSessionInput
   ): Promise<void> {
-    const sessions = await getSessions()
-    const revokingCurrent = sessions.some(
-      (session) => session.id === input.id && session.current
-    )
-
-    await internals.fetchJson({
+    const result = await internals.fetchJson<RevokeSessionResult | undefined>({
       method: "DELETE",
       path: `/sessions/${encodeURIComponent(input.id)}`
     })
 
-    if (revokingCurrent) {
+    if (result?.current) {
       internals.tokenStore.clear()
       internals.userStore.set(null)
     }

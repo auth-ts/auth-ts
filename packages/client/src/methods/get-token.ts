@@ -1,26 +1,12 @@
 import type { AuthUser } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals.ts"
 import { AuthError } from "../lib/auth-error.ts"
+import { readLifetimeClaims } from "../lib/read-lifetime-claims.ts"
 
 /** What the refresh endpoint returns. */
 interface TokenResponse {
   accessToken: string
   user: AuthUser
-}
-
-/** Decodes a token's `iat` and `exp` without verifying it — the browser cannot verify anyway. */
-function readLifetimeClaims(token: string) {
-  try {
-    const payload = token.split(".")[1]
-    if (!payload) return {}
-
-    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as {
-      iat?: number
-      exp?: number
-    }
-  } catch {
-    return {}
-  }
 }
 
 /**

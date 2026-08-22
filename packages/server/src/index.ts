@@ -15,6 +15,7 @@ export type {
   UpsertUserInput,
   UserType
 } from "./core/auth-db.ts"
+export type { AuthServerConfig } from "./core/auth-server-config.ts"
 export type {
   AdditionalFieldsSchema,
   AdditionalFieldType,
@@ -27,7 +28,6 @@ export type {
   ProvidersOptions,
   RateLimitOptions,
   RateLimitWindow,
-  ResolvedAuthServerOptions,
   SendCodeContext,
   SessionOptions,
   SmsOptions,
@@ -46,9 +46,16 @@ export type { CallbackProviderInput } from "./endpoints/callback/$provider.ts"
 export type { ConnectProviderInput } from "./endpoints/connect/$provider.ts"
 export type { DisconnectProviderInput } from "./endpoints/connections/$provider.ts"
 export type { ConnectionInfo } from "./endpoints/connections.ts"
-export type { LogoutInput, LogoutScope } from "./endpoints/logout.ts"
+export type {
+  LogoutAccount,
+  LogoutInput,
+  LogoutScope
+} from "./endpoints/logout.ts"
 export type { SendCodeInput } from "./endpoints/send-code.ts"
-export type { RevokeSessionInput } from "./endpoints/sessions/$id.ts"
+export type {
+  RevokeSessionInput,
+  RevokeSessionResult
+} from "./endpoints/sessions/$id.ts"
 export type { SessionInfo } from "./endpoints/sessions.ts"
 export type { SignInProviderInput } from "./endpoints/sign-in/$provider.ts"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest.ts"
@@ -68,8 +75,8 @@ export type { JwtAlgorithm } from "./jwt/import-signing-key.ts"
 export type { SignTokenClaims } from "./jwt/sign-token.ts"
 export type { TokenClaims, UnverifiedClaims } from "./jwt/verify-token.ts"
 export type {
-  ClientIpOptions,
-  ResolvedClientIpOptions
+  ClientIpConfig,
+  ClientIpOptions
 } from "./lib/get-client-ip.ts"
 export { isIpAddress } from "./lib/get-client-ip.ts"
 export type { LeveledLogger, Logger, LogLevel } from "./lib/logger.ts"
@@ -78,7 +85,7 @@ export type {
   OAuthProvider,
   ProviderIdentity
 } from "./oauth/providers/oauth-provider.ts"
-export type { OAuthStatePayload } from "./oauth/state-cookie.ts"
+export type { OAuthStatePayload, StateCookie } from "./oauth/state-cookie.ts"
 export type { GuestConversion, GuestIdentity } from "./session/convert-guest.ts"
 export type { IssueMode } from "./session/issue-session.ts"
 export type { HeadersInput } from "./session/resolve-session.ts"

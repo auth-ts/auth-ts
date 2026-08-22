@@ -23,6 +23,15 @@ so a resend cannot widen the set of values an attacker may guess. No slow hashin
 — the ten-minute lifetime and the attempt cap do that job, and bcrypt here would
 only slow down honest sign-ins.
 
+One live code per identifier also means sign-in codes and account-deletion codes
+share a row: a stranger spamming `/send-code` at your address keeps you inside
+the send cooldown for the deletion challenge too. Purposes are checked on verify,
+so a sign-in code can never authorize a deletion — this is a bounded nuisance,
+not a bypass.
+
+A code whose delivery fails is rolled back rather than left live, so a sender
+outage does not start the cooldown against the person who never received it.
+
 ## Rate limiting
 
 On by default, backed by your database through two callbacks. Sending is limited
@@ -46,7 +55,17 @@ sign-in as the attacker. The cookie is also **HMAC-signed under `secret`**, so
 its contents — the return path, whether the flow is a sign-in or a connect, and
 any sign-up fields — cannot be rewritten by anything else able to set cookies for
 your host; an unsigned or edited cookie is treated as missing. The callback
-re-validates the sign-up fields against the declared schema regardless.
+re-validates the sign-up fields against the declared schema regardless. The
+payload carries when it was issued, and a flow older than ten minutes is refused
+on the server's clock — the cookie's own expiry is a browser courtesy, not the
+rule.
+
+**PKCE on every exchange, and a nonce for Google.** The state cookie also holds
+an S256 code verifier; only its challenge travels through the browser, and the
+provider refuses to exchange an authorization code without the verifier — so a
+code intercepted on the way back is worthless to whoever has it. Google's ID
+token must additionally echo the nonce the authorize request carried, which ties
+the token to this flow rather than to any flow.
 
 **Google's ID token is verified, not decoded.** Signature against Google's
 published keys, issuer, audience (your client id), and expiry — even though it
@@ -130,8 +149,11 @@ freely — so IP-keyed limits derive nothing until you say how many proxies you
 run, and the real client is read from that fixed position in the chain rather
 than the spoofable leftmost entry. Set it wrong-low and you get no IP limiting
 (the per-identifier limits still hold); leave it at the default zero and the
-same is true. The extracted value is validated as an IP, so an oversized or
-forged header can never become a rate-limit key or a stored column.
+same is true — and `createAuthServer` logs a warning at construction saying so,
+so the gap is in your logs rather than discovered under attack. On Vercel,
+Cloudflare, and most platforms the answer is `1`. The extracted value is
+validated as an IP, so an oversized or forged header can never become a
+rate-limit key or a stored column.
 
 If your database exposes a REST API, check what it grants by default. Neon, for
 example, grants the `authenticated` role full access to everything in `public`

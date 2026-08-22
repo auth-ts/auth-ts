@@ -1,4 +1,5 @@
 import type { AuthUser } from "@auth-ts/server"
+import { readLifetimeClaims } from "../lib/read-lifetime-claims.ts"
 import {
   createDeleteUser,
   createListSessions,
@@ -24,21 +25,6 @@ import {
 import { createAuthClientInternals } from "./auth-client-internals.ts"
 import type { AuthClientOptions } from "./auth-client-options.ts"
 import type { UserListener } from "./user-store.ts"
-
-/** Decodes `iat` and `exp` from a token so the store knows its lifetime. */
-function readLifetimeClaims(token: string) {
-  try {
-    const payload = token.split(".")[1]
-    if (!payload) return {}
-
-    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as {
-      iat?: number
-      exp?: number
-    }
-  } catch {
-    return {}
-  }
-}
 
 /**
  * The browser client.
@@ -101,7 +87,6 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   }
 
   const getToken = createGetToken(internals)
-  const listSessions = createListSessions(internals)
 
   return {
     getToken,
@@ -115,8 +100,8 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     connect: createConnect(internals),
     listConnections: createListConnections(internals),
     disconnect: createDisconnect(internals),
-    listSessions,
-    revokeSession: createRevokeSession(internals, listSessions),
+    listSessions: createListSessions(internals),
+    revokeSession: createRevokeSession(internals),
     listAccounts: createListAccounts(internals),
     switchAccount: createSwitchAccount(internals, primeSession),
     updateUser: createUpdateUser(internals),

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { codeChallengeS256 } from "../../src/oauth/pkce.ts"
 import { createTestServer } from "../helpers/create-test-server.ts"
 import { readSetCookies, request } from "../helpers/request.ts"
 import { required } from "../helpers/required.ts"
@@ -54,6 +55,23 @@ describe("oauth start", () => {
       "https://app.example.com/api/auth/callback/github"
     )
     expect(location.searchParams.get("scope")).toBe("read:user user:email")
+  })
+
+  it("sends a PKCE S256 challenge derived from the verifier it signed into the state", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+    const { response, stateCookie } = await startSignIn(authServer)
+    const location = new URL(
+      required(response.headers.get("location"), "location")
+    )
+    const payload = decodeState(stateCookie)
+
+    expect(payload.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(location.searchParams.get("code_challenge_method")).toBe("S256")
+    expect(location.searchParams.get("code_challenge")).toBe(
+      await codeChallengeS256(payload.codeVerifier)
+    )
+    // The verifier itself never travels through the browser.
+    expect(location.href).not.toContain(payload.codeVerifier)
   })
 
   it("scopes the state cookie to the callback path only", async () => {
@@ -145,6 +163,86 @@ describe("oauth callback", () => {
     expect(user?.email).toBe("ada@example.com")
     expect(user?.name).toBe("Ada")
     expect(user?.type).toBe("user")
+  })
+
+  it("sends the PKCE verifier from the state cookie to the token endpoint", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer)
+    const fetchSpy = stubGitHub({
+      id: 4242,
+      emails: verifiedEmails("ada@example.com")
+    })
+
+    await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: { "auth-ts.state": stateCookie }
+      })
+    )
+
+    const tokenCall = fetchSpy.mock.calls.find(([input]) =>
+      String(input).includes("login/oauth/access_token")
+    )
+    const tokenBody = JSON.parse(
+      String(required(tokenCall, "token call")[1]?.body)
+    ) as { code_verifier?: string }
+    expect(tokenBody.code_verifier).toBe(decodeState(stateCookie).codeVerifier)
+  })
+
+  it("refuses a state that has aged out, whatever the cookie jar thinks", async () => {
+    // The cookie's Max-Age is a browser courtesy. The payload's issuedAt is
+    // signed, so a genuine cookie replayed from a jar that never expires
+    // anything is refused on the server's clock.
+    const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+    const payload = decodeState(stateCookie)
+
+    for (const stale of [
+      { ...payload, issuedAt: Date.now() - 11 * 60_000 },
+      { ...payload, issuedAt: Date.now() + 5 * 60_000 },
+      { ...payload, issuedAt: "yesterday" as unknown as number },
+      (({ issuedAt: _issuedAt, ...rest }) => rest)(payload) as typeof payload
+    ]) {
+      const response = await authServer.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          cookies: { "auth-ts.state": await forgeState(stale) }
+        })
+      )
+      expect(response.status, JSON.stringify(stale.issuedAt)).toBe(401)
+    }
+    expect(db.users()).toHaveLength(0)
+
+    // Within the tolerance, a clock slightly ahead is fine.
+    const slightlyAhead = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: {
+          "auth-ts.state": await forgeState({
+            ...payload,
+            issuedAt: Date.now() + 30_000
+          })
+        }
+      })
+    )
+    expect(slightlyAhead.status).toBe(302)
+  })
+
+  it("refuses a genuine state that lacks a verifier or nonce", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer)
+    stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+    const payload = decodeState(stateCookie)
+
+    for (const broken of [
+      { ...payload, codeVerifier: "" },
+      { ...payload, nonce: "" }
+    ]) {
+      const response = await authServer.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          cookies: { "auth-ts.state": await forgeState(broken) }
+        })
+      )
+      expect(response.status).toBe(401)
+    }
   })
 
   it("gives the provider a deadline and renders a page when it is not met", async () => {
@@ -331,6 +429,47 @@ describe("oauth callback", () => {
         )
       ).status
     ).toBe(401)
+  })
+
+  it("applies sign-up additionalFields when a guest is upgraded in place", async () => {
+    const context = await createTestServer({
+      ...OAUTH_OPTIONS,
+      guest: true,
+      user: { additionalFields: { plan: "string" } }
+    })
+    const { authServer } = context
+    const guestResponse = await authServer.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const guestRefresh = required(
+      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      "guest refresh"
+    ).value
+    const guest = ((await guestResponse.json()) as { user: { id: string } })
+      .user
+
+    const { stateCookie, state } = await startSignIn(
+      authServer,
+      `?additionalFields=${encodeURIComponent(JSON.stringify({ plan: "pro" }))}`
+    )
+    stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+
+    const response = await authServer.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: {
+          "auth-ts.state": stateCookie,
+          "auth-ts.refresh": guestRefresh
+        }
+      })
+    )
+
+    expect(response.status).toBe(302)
+    const upgraded = (await context.db.getUser({
+      id: guest.id
+    })) as unknown as Record<string, unknown>
+    expect(upgraded.type).toBe("user")
+    expect(upgraded.email).toBe("ada@example.com")
+    expect(upgraded.plan).toBe("pro")
   })
 
   it("treats a guest's connect as a sign-in: merges into the linked account rather than refusing", async () => {
@@ -856,13 +995,74 @@ describe("google", () => {
     identity: Parameters<typeof stubGoogle>[0]
   ) {
     const { stateCookie, state } = await startGoogle(authServer)
-    stubGoogle(identity)
+    // The fake Google echoes the nonce this flow asked for, as the real one
+    // would — unless a test deliberately hands it a different one.
+    stubGoogle({ nonce: decodeState(stateCookie).nonce, ...identity })
     return authServer.handler(
       request("GET", `/api/auth/callback/google?code=abc&state=${state}`, {
         cookies: { "auth-ts.state": stateCookie }
       })
     )
   }
+
+  it("sends a PKCE challenge and a nonce, and requires the nonce back in the ID token", async () => {
+    const { authServer } = await createTestServer(GOOGLE_OPTIONS)
+    const start = await authServer.handler(
+      request("GET", "/api/auth/sign-in/google")
+    )
+    const location = new URL(
+      required(start.headers.get("location"), "location")
+    )
+    const stateCookie = required(
+      readSetCookies(start).get("auth-ts.state"),
+      "state cookie"
+    ).value
+    const payload = decodeState(stateCookie)
+
+    expect(location.searchParams.get("code_challenge_method")).toBe("S256")
+    expect(location.searchParams.get("code_challenge")).toBe(
+      await codeChallengeS256(payload.codeVerifier)
+    )
+    expect(location.searchParams.get("nonce")).toBe(payload.nonce)
+
+    const fetchSpy = stubGoogle({
+      sub: "g-1",
+      email: "ada@example.com",
+      emailVerified: true,
+      nonce: payload.nonce
+    })
+    const response = await authServer.handler(
+      request(
+        "GET",
+        `/api/auth/callback/google?code=abc&state=${payload.state}`,
+        { cookies: { "auth-ts.state": stateCookie } }
+      )
+    )
+    expect(response.status).toBe(302)
+
+    const tokenCall = fetchSpy.mock.calls.find(([input]) =>
+      String(input).includes("oauth2.googleapis.com/token")
+    )
+    const tokenBody = new URLSearchParams(
+      String(required(tokenCall, "token call")[1]?.body)
+    )
+    expect(tokenBody.get("code_verifier")).toBe(payload.codeVerifier)
+  })
+
+  it("refuses an ID token whose nonce is not this flow's", async () => {
+    const { authServer, db } = await createTestServer(GOOGLE_OPTIONS)
+
+    for (const nonce of ["someone-elses-flow", ""]) {
+      const response = await callback(authServer, {
+        sub: "g-1",
+        email: "ada@example.com",
+        emailVerified: true,
+        nonce
+      })
+      expect(response.status, JSON.stringify(nonce)).toBe(401)
+    }
+    expect(db.users()).toHaveLength(0)
+  })
 
   it("signs in with a verified ID token and takes only a verified email", async () => {
     const { authServer, db } = await createTestServer(GOOGLE_OPTIONS)
@@ -953,6 +1153,8 @@ describe("google", () => {
         credentials: { clientId: "client-id", clientSecret: "client-secret" },
         redirectURI: "https://app.example.com/api/auth/callback/google",
         code: "abc",
+        codeVerifier: "verifier",
+        nonce: "nonce",
         signal: AbortSignal.timeout(5_000)
       })
     ).rejects.toMatchObject({ code: "providerUnavailable", status: 502 })

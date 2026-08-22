@@ -56,10 +56,7 @@ export function matchRoute(
   routes: CompiledRoute[]
 ): RouteMatch {
   const { pathname } = new URL(request.url)
-  const requestSegments = splitPathSegments(
-    pathname,
-    internals.options.basePath
-  )
+  const requestSegments = splitPathSegments(pathname, internals.config.basePath)
   if (!requestSegments) throw new AuthApiError("notFound", 404)
 
   let pathMatchedWithOtherMethod = false
@@ -117,10 +114,7 @@ export function matchEndpointParams(
   path: string
 ) {
   const { pathname } = new URL(request.url)
-  const requestSegments = splitPathSegments(
-    pathname,
-    internals.options.basePath
-  )
+  const requestSegments = splitPathSegments(pathname, internals.config.basePath)
   if (!requestSegments) return {}
 
   const routeSegments = path.split("/").filter((segment) => segment.length > 0)

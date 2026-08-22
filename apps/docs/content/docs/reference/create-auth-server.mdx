@@ -19,6 +19,12 @@ one instance per tenant. Everything that can be wrong with a configuration throw
 here — a missing key, no sign-in method, a reserved field name — with the
 offending option named, rather than surfacing on the first user's sign-in.
 
+Two words are used deliberately. **Options** are what you pass: the partial,
+human-written `AuthServerOptions` below. **Config** is what resolving them
+produces: `AuthServerConfig`, with every default applied and every value
+validated, exposed as `authServer.config`. When options cannot be resolved into
+a config, construction throws an `AuthConfigError`.
+
 <auto-type-table path="../../../../../packages/server/src/core/auth-server-options.ts" name="AuthServerOptions" />
 
 ## What you get back

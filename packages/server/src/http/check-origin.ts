@@ -1,5 +1,5 @@
+import type { AuthServerConfig } from "../core/auth-server-config.ts"
 import type { AuthServerInternals } from "../core/auth-server-internals.ts"
-import type { ResolvedAuthServerOptions } from "../core/auth-server-options.ts"
 import { AuthApiError } from "./auth-api-error.ts"
 
 /** Methods that must not have side effects, and so need no origin check. */
@@ -40,20 +40,17 @@ function originOf(url: string) {
  * is allowed because it is, by configuration, the one other origin this server
  * serves.
  */
-function allowedOrigins(
-  options: ResolvedAuthServerOptions,
-  requestURL: string
-) {
+function allowedOrigins(config: AuthServerConfig, requestURL: string) {
   const allowed = new Set<string>()
   const self = originOf(requestURL)
   if (self) allowed.add(self)
-  if (options.baseURL) {
-    const base = originOf(options.baseURL)
+  if (config.baseURL) {
+    const base = originOf(config.baseURL)
     if (base) allowed.add(base)
   }
-  if (options.cors) {
-    allowed.add(options.cors.origin)
-    const cors = originOf(options.cors.origin)
+  if (config.cors) {
+    allowed.add(config.cors.origin)
+    const cors = originOf(config.cors.origin)
     if (cors) allowed.add(cors)
   }
   return allowed
@@ -101,7 +98,7 @@ export function assertAllowedOrigin(
     originOf(request.headers.get("referer") ?? "")
   if (
     origin !== null &&
-    !allowedOrigins(internals.options, request.url).has(origin)
+    !allowedOrigins(internals.config, request.url).has(origin)
   ) {
     internals.log.warn("refused a request from a disallowed origin", {
       origin

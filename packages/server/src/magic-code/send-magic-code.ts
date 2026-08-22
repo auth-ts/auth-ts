@@ -42,17 +42,17 @@ export async function sendMagicCode(
   internals: AuthServerInternals,
   input: SendMagicCodeInput
 ) {
-  const { options } = internals
+  const { config } = internals
   const { identifier, purpose, locale, headers } = input
 
-  if (options.rateLimit !== false) {
+  if (config.rateLimit !== false) {
     const live = await internals.db.getMagicCode({
       identifier: identifier.value
     })
     const cooldownRemaining = getCooldownRemaining(
       live,
       MAGIC_CODE_TTL,
-      options.rateLimit.sendCodeCooldown
+      config.rateLimit.sendCodeCooldown
     )
     if (cooldownRemaining > 0) {
       throw new AuthApiError("cooldown", 429, { retryAfter: cooldownRemaining })
@@ -60,8 +60,8 @@ export async function sendMagicCode(
 
     const perIdentifier =
       purpose === "deleteUser"
-        ? options.rateLimit.deleteUserPerIdentifier
-        : options.rateLimit.sendCodePerIdentifier
+        ? config.rateLimit.deleteUserPerIdentifier
+        : config.rateLimit.sendCodePerIdentifier
     const scope = purpose === "deleteUser" ? "deleteUser" : "sendCode"
     await checkRateLimit(
       internals,
@@ -69,25 +69,45 @@ export async function sendMagicCode(
       perIdentifier
     )
 
-    const clientIp = getClientIp(headers, internals.options.clientIp)
+    const clientIp = getClientIp(headers, internals.config.clientIp)
     if (clientIp)
       await checkRateLimit(
         internals,
         `sendCode:ip:${clientIp}`,
-        options.rateLimit.sendCodePerIP
+        config.rateLimit.sendCodePerIP
       )
   }
 
   const code = randomSixDigitCode()
+  const codeHash = await hmacSha256Hex(code, config.secret)
   await internals.db.upsertMagicCode({
     identifier: identifier.value,
-    codeHash: await hmacSha256Hex(code, options.secret),
+    codeHash,
     expiresAt: new Date(Date.now() + parseDuration(MAGIC_CODE_TTL)),
     attempts: 0,
     purpose
   })
 
-  await deliver(internals, identifier, code, locale, purpose, headers)
+  // Stored first, then delivered, and rolled back if delivery throws. The order
+  // keeps "one live code per identifier" true at every instant — the row always
+  // describes the most recently stored code — and the rollback keeps a sender
+  // outage from costing the user anything: the cooldown is derived from the
+  // live row, so a row left behind by a code nobody received would refuse
+  // their retry for a minute. The delete matches on the hash, so a resend that
+  // landed in between keeps its own fresh code.
+  try {
+    await deliver(internals, identifier, code, locale, purpose, headers)
+  } catch (error) {
+    await internals.db.deleteMagicCode({
+      identifier: identifier.value,
+      codeHash
+    })
+    internals.log.error("magic code delivery failed", {
+      channel: identifier.kind,
+      purpose
+    })
+    throw error
+  }
   // Channel and purpose only: the address is personal data and the code is a
   // credential, so neither is ever handed to a log sink.
   internals.log.info("magic code sent", { channel: identifier.kind, purpose })
@@ -102,11 +122,11 @@ async function deliver(
   purpose: MagicCodePurpose,
   headers: Headers
 ) {
-  const { options } = internals
+  const { config } = internals
 
   if (identifier.kind === "email") {
-    if (!options.email) throw new AuthApiError("channelNotConfigured", 400)
-    await options.email.sendCode({
+    if (!config.email) throw new AuthApiError("channelNotConfigured", 400)
+    await config.email.sendCode({
       email: identifier.value,
       code,
       locale,
@@ -116,8 +136,8 @@ async function deliver(
     return
   }
 
-  if (!options.sms) throw new AuthApiError("channelNotConfigured", 400)
-  await options.sms.sendCode({
+  if (!config.sms) throw new AuthApiError("channelNotConfigured", 400)
+  await config.sms.sendCode({
     phoneNumber: identifier.value,
     code,
     locale,

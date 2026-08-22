@@ -86,7 +86,7 @@ export async function consumeMagicCode(
     throw new AuthApiError("invalidCode", 401)
   }
 
-  const presented = await hmacSha256Hex(input.code, internals.options.secret)
+  const presented = await hmacSha256Hex(input.code, internals.config.secret)
   if (!timingSafeEqualHex(presented, stored.codeHash)) {
     await countWrongGuess(internals, input.identifier, stored)
     throw new AuthApiError("invalidCode", 401)

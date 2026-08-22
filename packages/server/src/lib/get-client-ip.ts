@@ -30,7 +30,9 @@ export interface ClientIpOptions {
    * dodge the per-IP limit and store arbitrary values as the `ipAddress`
    * column. IP-keyed rate limits simply do not apply until you set this to your
    * real hop count — the per-identifier limits and the cooldown, which are what
-   * actually protect a target inbox, are unaffected.
+   * actually protect a target inbox, are unaffected. `createAuthServer` logs a
+   * warning at construction while this is the case and rate limiting is on,
+   * so the gap is in your logs rather than discovered under attack.
    *
    * `true` is shorthand for 1. Anything other than a whole number of hops is
    * refused at construction, since it could never address an entry.
@@ -41,7 +43,7 @@ export interface ClientIpOptions {
 }
 
 /** {@link ClientIpOptions} after defaults. */
-export interface ResolvedClientIpOptions {
+export interface ClientIpConfig {
   header: string
   trustedProxies: number
 }
@@ -145,7 +147,7 @@ function stripPort(entry: string): string {
  */
 export function getClientIp(
   headers: Headers,
-  options: ResolvedClientIpOptions
+  options: ClientIpConfig
 ): string | undefined {
   if (options.trustedProxies < 1) return undefined
 
@@ -169,9 +171,9 @@ export function getClientIp(
 }
 
 /** Resolves {@link ClientIpOptions}, turning the `true` shorthand into 1. */
-export function resolveClientIpOptions(
+export function resolveClientIpConfig(
   options: ClientIpOptions | undefined
-): ResolvedClientIpOptions {
+): ClientIpConfig {
   const trustedProxies = options?.trustedProxies
   return {
     header: options?.header ?? "x-forwarded-for",

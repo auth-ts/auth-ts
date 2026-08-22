@@ -54,7 +54,7 @@ export function resolveCodeIdentifier(
   }
 
   if (hasEmail) {
-    if (!internals.options.email)
+    if (!internals.config.email)
       throw new AuthApiError("channelNotConfigured", 400)
     const value = normalizeEmail(body.email as string)
     if (
@@ -68,8 +68,7 @@ export function resolveCodeIdentifier(
     return { kind: "email", value }
   }
 
-  if (!internals.options.sms)
-    throw new AuthApiError("channelNotConfigured", 400)
+  if (!internals.config.sms) throw new AuthApiError("channelNotConfigured", 400)
 
   try {
     return {

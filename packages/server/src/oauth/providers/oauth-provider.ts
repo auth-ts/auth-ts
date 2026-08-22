@@ -27,6 +27,17 @@ export interface AuthorizeURLInput {
   credentials: ProviderCredentials
   redirectURI: string
   state: string
+  /**
+   * The PKCE S256 challenge. Every provider sends it as `code_challenge` with
+   * `code_challenge_method=S256`; the verifier it was derived from arrives in
+   * {@link ExchangeCodeInput.codeVerifier} and never touches the browser.
+   */
+  codeChallenge: string
+  /**
+   * The OIDC nonce. Providers that return an ID token send it as `nonce` and
+   * refuse a token that does not echo it; plain OAuth providers ignore it.
+   */
+  nonce: string
 }
 
 /** What exchanging an authorization code needs. */
@@ -34,6 +45,10 @@ export interface ExchangeCodeInput {
   credentials: ProviderCredentials
   redirectURI: string
   code: string
+  /** The PKCE verifier, sent as `code_verifier` to the token endpoint. */
+  codeVerifier: string
+  /** The nonce the authorize request carried, for providers that verify an ID token. */
+  nonce: string
   /**
    * Deadline for the whole exchange, owned by the callback endpoint. Every
    * network call a provider makes must pass it to `fetch`, so a stalled provider

@@ -81,6 +81,52 @@ describe("construction failures", () => {
     ).toThrow(/baseURL is required/)
   })
 
+  it("refuses a provider whose credentials are missing or empty", () => {
+    // `process.env.GITHUB_CLIENT_ID as string` is the documented pattern, and
+    // an unset variable makes that undefined with no help from the types.
+    for (const credentials of [
+      { clientId: undefined, clientSecret: "secret" },
+      { clientId: "", clientSecret: "secret" },
+      { clientId: "id", clientSecret: undefined },
+      { clientId: "id", clientSecret: "" },
+      { clientId: 42, clientSecret: "secret" }
+    ]) {
+      expect(() =>
+        createAuthServer({
+          ...baseOptions(),
+          baseURL: "https://app.example.com",
+          providers: {
+            github: credentials as unknown as {
+              clientId: string
+              clientSecret: string
+            }
+          }
+        })
+      ).toThrow(/providers\.github\.client(Id|Secret) is missing or empty/)
+    }
+  })
+
+  it("warns at construction when per-IP limits cannot apply", () => {
+    // The default trustedProxies of 0 derives no address, which is safe and
+    // silent. The warning is what makes it not silent.
+    const warnings = (overrides: Record<string, unknown>) => {
+      const calls: string[] = []
+      createAuthServer({
+        ...baseOptions(),
+        logger: (level, message) => {
+          if (level === "warn") calls.push(message)
+        },
+        ...overrides
+      })
+      return calls.filter((message) => message.includes("per-IP rate limits"))
+    }
+
+    expect(warnings({})).toHaveLength(1)
+    expect(warnings({})[0]).toMatch(/clientIp\.trustedProxies is 0/)
+    expect(warnings({ clientIp: { trustedProxies: 1 } })).toHaveLength(0)
+    expect(warnings({ rateLimit: false })).toHaveLength(0)
+  })
+
   it("rejects a reserved key declared as an additional field", () => {
     for (const reserved of [
       "email",
@@ -256,7 +302,7 @@ describe("construction failures", () => {
       createAuthServer({
         ...baseOptions(),
         jwt: { ...baseOptions().jwt, claims: { role: "app_user", tier: 2 } }
-      }).options.jwt.claims
+      }).config.jwt.claims
     ).toEqual({ role: "app_user", tier: 2 })
   })
 
@@ -285,7 +331,7 @@ describe("construction failures", () => {
     ] as const) {
       expect(
         createAuthServer({ ...baseOptions(), clientIp: { trustedProxies } })
-          .options.clientIp.trustedProxies
+          .config.clientIp.trustedProxies
       ).toBe(expected)
     }
   })
@@ -293,12 +339,12 @@ describe("construction failures", () => {
   it("treats an explicit undefined override as absent, keeping the default", () => {
     // Regression: a spread copied `undefined` over the default, so the limiter
     // read `.max` off `undefined` and every send failed with internalError.
-    const { options } = createAuthServer({
+    const { config } = createAuthServer({
       ...baseOptions(),
       rateLimit: { sendCodePerIP: undefined }
     })
 
-    expect(options.rateLimit).toMatchObject({
+    expect(config.rateLimit).toMatchObject({
       sendCodePerIP: { max: 30, window: "10m" }
     })
   })
@@ -318,60 +364,60 @@ describe("construction failures", () => {
 
 describe("resolved defaults", () => {
   it("applies every documented default", () => {
-    const { options } = createAuthServer(baseOptions())
+    const { config } = createAuthServer(baseOptions())
 
-    expect(options.basePath).toBe("/api/auth")
-    expect(options.jwt.alg).toBe("RS256")
-    expect(options.jwt.ttl).toBe("10m")
-    expect(options.jwt.claims).toEqual({ role: "authenticated" })
-    expect(options.session).toEqual({ ttl: "30d", sliding: true })
-    expect(options.cookie.name).toBe("auth-ts.refresh")
-    expect(options.cookie.path).toBe("/api/auth")
-    expect(options.user.deleteFreshWindow).toBe("15m")
-    expect(options.multiAccount).toBe(false)
-    expect(options.cleanup).toBe(true)
-    expect(options.guest).toBe(false)
-    expect(options.logLevel).toBe("warn")
+    expect(config.basePath).toBe("/api/auth")
+    expect(config.jwt.alg).toBe("RS256")
+    expect(config.jwt.ttl).toBe("10m")
+    expect(config.jwt.claims).toEqual({ role: "authenticated" })
+    expect(config.session).toEqual({ ttl: "30d", sliding: true })
+    expect(config.cookie.name).toBe("auth-ts.refresh")
+    expect(config.cookie.path).toBe("/api/auth")
+    expect(config.user.deleteFreshWindow).toBe("15m")
+    expect(config.multiAccount).toBe(false)
+    expect(config.cleanup).toBe(true)
+    expect(config.guest).toBe(false)
+    expect(config.logLevel).toBe("warn")
   })
 
   it("leaves aud unset unless configured, so nothing has to match by accident", () => {
-    expect(createAuthServer(baseOptions()).options.jwt.audience).toBeUndefined()
+    expect(createAuthServer(baseOptions()).config.jwt.audience).toBeUndefined()
     expect(
       createAuthServer({
         ...baseOptions(),
         jwt: { ...baseOptions().jwt, audience: "authenticated" }
-      }).options.jwt.audience
+      }).config.jwt.audience
     ).toBe("authenticated")
   })
 
   it("derives the issuer from baseURL and basePath", () => {
-    const { options } = createAuthServer({
+    const { config } = createAuthServer({
       ...baseOptions(),
       baseURL: "https://app.example.com/"
     })
 
-    expect(options.baseURL).toBe("https://app.example.com")
-    expect(options.issuer).toBe("https://app.example.com/api/auth")
+    expect(config.baseURL).toBe("https://app.example.com")
+    expect(config.issuer).toBe("https://app.example.com/api/auth")
   })
 
   it("defaults the cookie path to basePath and keeps an explicit override", () => {
     expect(
-      createAuthServer({ ...baseOptions(), basePath: "/auth" }).options.cookie
+      createAuthServer({ ...baseOptions(), basePath: "/auth" }).config.cookie
         .path
     ).toBe("/auth")
     expect(
-      createAuthServer({ ...baseOptions(), cookie: { path: "/" } }).options
+      createAuthServer({ ...baseOptions(), cookie: { path: "/" } }).config
         .cookie.path
     ).toBe("/")
   })
 
   it("merges partial rate limits over the defaults", () => {
-    const { options } = createAuthServer({
+    const { config } = createAuthServer({
       ...baseOptions(),
       rateLimit: { sendCodePerIdentifier: { max: 9, window: "1h" } }
     })
 
-    expect(options.rateLimit).toMatchObject({
+    expect(config.rateLimit).toMatchObject({
       sendCodePerIdentifier: { max: 9, window: "1h" },
       sendCodePerIP: { max: 30, window: "10m" },
       sendCodeCooldown: "60s"
@@ -385,7 +431,7 @@ describe("resolved defaults", () => {
 
     // Cleanup belongs to afterEach, so a failure here cannot leave the variables
     // set for whatever runs next.
-    expect(createAuthServer(fromEnvironment).options.secret).toBe(
+    expect(createAuthServer(fromEnvironment).config.secret).toBe(
       "environment-secret"
     )
   })

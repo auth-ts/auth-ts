@@ -59,6 +59,34 @@ describe("multiAccount disabled", () => {
       ((await whoami.json()) as { user: { email: string } }).user.email
     ).toBe("grace@example.com")
     expect(second.cookies["auth-ts.refresh.accounts"]).toBeUndefined()
+
+    // Replaced means replaced: the browser overwrote its cookie, so the row the
+    // first sign-in created is deleted rather than left live for a month where
+    // nothing can reach it to revoke it.
+    expect(context.db.sessions()).toHaveLength(1)
+    expect(
+      (
+        await context.authServer.handler(
+          request("POST", "/api/auth/token", {
+            cookies: {
+              "auth-ts.refresh": required(
+                first.cookies["auth-ts.refresh"],
+                "refresh"
+              )
+            }
+          })
+        )
+      ).status
+    ).toBe(401)
+  })
+
+  it("leaves a session alone when the same token signs in again", async () => {
+    // Presenting a session and then being issued a different one deletes the
+    // presented row; a request that presents nothing deletes nothing.
+    const context = await createTestServer()
+    await signIn(context, "ada@example.com")
+    await signIn(context, "grace@example.com")
+    expect(context.db.sessions()).toHaveLength(2)
   })
 })
 
@@ -260,8 +288,9 @@ describe("multiAccount enabled", () => {
     ).toBe("[]")
 
     // Within the cap, duplicates collapse: three copies of the active token are
-    // one parked entry, so the endpoint's three lookups (resolve, prune, build)
-    // rather than the seven the un-deduped list would cost.
+    // one parked entry, so the endpoint's two lookups (resolve, prune — the
+    // listing reuses what the prune read) rather than the four the un-deduped
+    // list would cost.
     getSession.mockClear()
     const active = cookies["auth-ts.refresh"]
     await context.authServer.handler(
@@ -272,7 +301,7 @@ describe("multiAccount enabled", () => {
         }
       })
     )
-    expect(getSession).toHaveBeenCalledTimes(3)
+    expect(getSession).toHaveBeenCalledTimes(2)
 
     getSession.mockClear()
     await context.authServer.handler(
@@ -286,13 +315,55 @@ describe("multiAccount enabled", () => {
     expect(getSession).toHaveBeenCalledTimes(1)
   })
 
-  it("promotes the next account on local sign-out instead of leaving the browser empty", async () => {
+  it("signs out every account in the browser by default, revoking each parked session", async () => {
+    // The Clerk and Better Auth default: "sign out" on a shared computer means
+    // everyone. The parked rows are deleted, not merely dropped from the cookie
+    // — a token the browser forgot but the database still honoured would be a
+    // live session nobody can see to revoke.
+    const context = await createTestServer(options)
+    const first = await signIn(context, "ada@example.com")
+    const second = await signIn(context, "grace@example.com", first.cookies)
+    expect(context.db.sessions()).toHaveLength(2)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/logout", { cookies: second.cookies })
+    )
+    const cleared = readSetCookies(response)
+
+    expect(response.status).toBe(204)
+    expect(
+      required(cleared.get("auth-ts.refresh"), "refresh").attributes
+    ).toContain("Max-Age=0")
+    expect(
+      required(cleared.get("auth-ts.refresh.accounts"), "accounts").attributes
+    ).toContain("Max-Age=0")
+    expect(context.db.sessions()).toHaveLength(0)
+    expect(
+      (
+        await context.authServer.handler(
+          request("POST", "/api/auth/token", {
+            cookies: {
+              "auth-ts.refresh": required(
+                first.cookies["auth-ts.refresh"],
+                "refresh"
+              )
+            }
+          })
+        )
+      ).status
+    ).toBe(401)
+  })
+
+  it("signs out only the active account with account: current, promoting the next", async () => {
     const context = await createTestServer(options)
     const first = await signIn(context, "ada@example.com")
     const second = await signIn(context, "grace@example.com", first.cookies)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/logout", { cookies: second.cookies })
+      request("POST", "/api/auth/logout", {
+        cookies: second.cookies,
+        body: { account: "current" }
+      })
     )
     const body = (await response.json()) as {
       switchedTo: { email: string }
@@ -301,8 +372,12 @@ describe("multiAccount enabled", () => {
 
     expect(response.status).toBe(200)
     expect(body.switchedTo.email).toBe("ada@example.com")
+    expect(context.db.sessions()).toHaveLength(1)
 
     const promoted = readSetCookies(response)
+    expect(
+      required(promoted.get("auth-ts.refresh.accounts"), "accounts").value
+    ).toBe("[]")
     const whoami = await context.authServer.handler(
       request("GET", "/api/auth/user", {
         cookies: {
@@ -316,6 +391,109 @@ describe("multiAccount enabled", () => {
     expect(
       ((await whoami.json()) as { user: { email: string } }).user.email
     ).toBe("ada@example.com")
+  })
+
+  it("reaches every parked account's other devices under scope: global", async () => {
+    // Ada is signed in on a second device too; a browser-wide global sign-out
+    // ends that session as well as the parked one.
+    const context = await createTestServer(options)
+    const adaElsewhere = await signIn(context, "ada@example.com")
+    const first = await signIn(context, "ada@example.com")
+    const second = await signIn(context, "grace@example.com", first.cookies)
+    expect(context.db.sessions()).toHaveLength(3)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/logout", {
+        cookies: second.cookies,
+        body: { scope: "global" }
+      })
+    )
+
+    expect(response.status).toBe(204)
+    expect(context.db.sessions()).toHaveLength(0)
+    expect(
+      (
+        await context.authServer.handler(
+          request("POST", "/api/auth/token", {
+            cookies: {
+              "auth-ts.refresh": required(
+                adaElsewhere.cookies["auth-ts.refresh"],
+                "refresh"
+              )
+            }
+          })
+        )
+      ).status
+    ).toBe(401)
+  })
+
+  it("promotes the next account after a global sign-out of the current one", async () => {
+    const context = await createTestServer(options)
+    const graceElsewhere = await signIn(context, "grace@example.com")
+    const first = await signIn(context, "ada@example.com")
+    const second = await signIn(context, "grace@example.com", first.cookies)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/logout", {
+        cookies: second.cookies,
+        body: { scope: "global", account: "current" }
+      })
+    )
+    const body = (await response.json()) as { switchedTo: { email: string } }
+
+    expect(response.status).toBe(200)
+    expect(body.switchedTo.email).toBe("ada@example.com")
+    // Grace is gone everywhere, Ada is untouched.
+    expect(context.db.sessions().map((session) => session.userId)).toHaveLength(
+      1
+    )
+    expect(
+      (
+        await context.authServer.handler(
+          request("POST", "/api/auth/token", {
+            cookies: {
+              "auth-ts.refresh": required(
+                graceElsewhere.cookies["auth-ts.refresh"],
+                "refresh"
+              )
+            }
+          })
+        )
+      ).status
+    ).toBe(401)
+  })
+
+  it("ignores account for scope: others, which reaches devices rather than accounts", async () => {
+    const context = await createTestServer(options)
+    const adaElsewhere = await signIn(context, "ada@example.com")
+    const first = await signIn(context, "ada@example.com")
+    const second = await signIn(context, "grace@example.com", first.cookies)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/logout", {
+        cookies: second.cookies,
+        body: { scope: "others", account: "all" }
+      })
+    )
+
+    expect(response.status).toBe(204)
+    expect(readSetCookies(response).size).toBe(0)
+    // Grace's and Ada's sessions in this browser survive; so does Ada elsewhere.
+    expect(context.db.sessions()).toHaveLength(3)
+    expect(
+      (
+        await context.authServer.handler(
+          request("POST", "/api/auth/token", {
+            cookies: {
+              "auth-ts.refresh": required(
+                adaElsewhere.cookies["auth-ts.refresh"],
+                "refresh"
+              )
+            }
+          })
+        )
+      ).status
+    ).toBe(200)
   })
 
   it("clears both cookies when the last account signs out", async () => {

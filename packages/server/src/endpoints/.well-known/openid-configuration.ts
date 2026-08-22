@@ -19,7 +19,7 @@ export const getDiscovery = defineEndpoint({
   method: "GET",
   path: "/.well-known/openid-configuration",
   run: async (internals) => {
-    const { issuer, basePath, baseURL } = internals.options
+    const { issuer, basePath, baseURL } = internals.config
     if (!issuer || !baseURL) throw new AuthApiError("notFound", 404)
 
     return {
@@ -28,7 +28,7 @@ export const getDiscovery = defineEndpoint({
         jwks_uri: `${baseURL}${basePath}/jwks.json`,
         response_types_supported: ["id_token"],
         subject_types_supported: ["public"],
-        id_token_signing_alg_values_supported: [internals.options.jwt.alg]
+        id_token_signing_alg_values_supported: [internals.config.jwt.alg]
       }
     }
   }

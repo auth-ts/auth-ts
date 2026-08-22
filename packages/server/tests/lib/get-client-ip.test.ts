@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   getClientIp,
   isIpAddress,
-  resolveClientIpOptions
+  resolveClientIpConfig
 } from "../../src/lib/get-client-ip.ts"
 
 const xff = (value: string) => new Headers({ "x-forwarded-for": value })
@@ -53,7 +53,7 @@ describe("getClientIp", () => {
     // Azure's front door and IIS ARR write `address:port`; brackets are how an
     // IPv6 entry carries a port at all. What comes back is the bare address —
     // that is what becomes the rate-limit key and the stored column.
-    const one = resolveClientIpOptions({ trustedProxies: 1 })
+    const one = resolveClientIpConfig({ trustedProxies: 1 })
     expect(getClientIp(xff("203.0.113.7:54321"), one)).toBe("203.0.113.7")
     expect(getClientIp(xff("[2001:db8::1]:443"), one)).toBe("2001:db8::1")
     expect(getClientIp(xff("[2001:db8::1]"), one)).toBe("2001:db8::1")
@@ -72,7 +72,7 @@ describe("getClientIp", () => {
     // The header is client-controlled, so without a declared proxy no entry is
     // trustworthy — deriving one would let a caller rotate the header to dodge
     // the per-IP limit.
-    const options = resolveClientIpOptions(undefined)
+    const options = resolveClientIpConfig(undefined)
     expect(getClientIp(xff("203.0.113.7"), options)).toBeUndefined()
     expect(getClientIp(xff("203.0.113.7, 10.0.0.1"), options)).toBeUndefined()
   })
@@ -80,13 +80,13 @@ describe("getClientIp", () => {
   it("takes the entry the trusted proxy wrote — the client cannot inject past it", () => {
     // One proxy appends the real client to the right of anything the client
     // sent, so a spoofed leftmost hop is ignored.
-    const oneProxy = resolveClientIpOptions({ trustedProxies: 1 })
+    const oneProxy = resolveClientIpConfig({ trustedProxies: 1 })
     expect(getClientIp(xff("9.9.9.9, 203.0.113.7"), oneProxy)).toBe(
       "203.0.113.7"
     )
     expect(getClientIp(xff("203.0.113.7"), oneProxy)).toBe("203.0.113.7")
 
-    const twoProxies = resolveClientIpOptions({ trustedProxies: 2 })
+    const twoProxies = resolveClientIpConfig({ trustedProxies: 2 })
     expect(getClientIp(xff("9.9.9.9, 203.0.113.7, 10.0.0.1"), twoProxies)).toBe(
       "203.0.113.7"
     )
@@ -96,7 +96,7 @@ describe("getClientIp", () => {
     expect(
       getClientIp(
         xff("9.9.9.9, 203.0.113.7"),
-        resolveClientIpOptions({ trustedProxies: true })
+        resolveClientIpConfig({ trustedProxies: true })
       )
     ).toBe("203.0.113.7")
   })
@@ -107,7 +107,7 @@ describe("getClientIp", () => {
     expect(
       getClientIp(
         xff("203.0.113.7"),
-        resolveClientIpOptions({ trustedProxies: 2 })
+        resolveClientIpConfig({ trustedProxies: 2 })
       )
     ).toBeUndefined()
   })
@@ -116,7 +116,7 @@ describe("getClientIp", () => {
     expect(
       getClientIp(
         xff("x".repeat(5000)),
-        resolveClientIpOptions({ trustedProxies: 1 })
+        resolveClientIpConfig({ trustedProxies: 1 })
       )
     ).toBeUndefined()
   })
@@ -125,13 +125,13 @@ describe("getClientIp", () => {
     expect(
       getClientIp(
         xff("not-an-ip"),
-        resolveClientIpOptions({ trustedProxies: 1 })
+        resolveClientIpConfig({ trustedProxies: 1 })
       )
     ).toBeUndefined()
   })
 
   it("reads a configured single-value header, such as a CDN's", () => {
-    const options = resolveClientIpOptions({
+    const options = resolveClientIpConfig({
       header: "cf-connecting-ip",
       trustedProxies: 1
     })

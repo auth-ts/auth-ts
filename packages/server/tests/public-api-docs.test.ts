@@ -73,10 +73,11 @@ describe("public API documentation", () => {
       join(sourceRoot, "core/auth-server-options.ts"),
       "utf8"
     )
+    // The options interface is the last declaration in its file — the resolver
+    // and the resulting `AuthServerConfig` live in auth-server-config.ts.
     const optionsBlock = sliceBetweenMarkers(
       source,
-      "export interface AuthServerOptions {",
-      "/** Options after defaults"
+      "export interface AuthServerOptions {"
     )
     const lines = optionsBlock.split("\n")
 

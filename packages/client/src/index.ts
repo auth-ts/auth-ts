@@ -1,7 +1,5 @@
-export type {
-  AuthClientOptions,
-  ResolvedAuthClientOptions
-} from "./core/auth-client-options.ts"
+export type { AuthClientConfig } from "./core/auth-client-config.ts"
+export type { AuthClientOptions } from "./core/auth-client-options.ts"
 export type { AuthClient } from "./core/create-auth-client.ts"
 export { createAuthClient } from "./core/create-auth-client.ts"
 export type { TokenState } from "./core/token-store.ts"
@@ -14,6 +12,7 @@ export type { LeveledLogger, Logger, LogLevel } from "./lib/logger.ts"
 export type {
   DeleteUserInput,
   DeleteUserResult,
+  LogoutAccount,
   LogoutInput,
   LogoutScope,
   RevokeSessionInput,

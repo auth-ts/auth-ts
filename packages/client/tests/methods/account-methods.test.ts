@@ -101,6 +101,21 @@ describe("logout", () => {
     expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
   })
 
+  it("sends the account axis only when it is given", async () => {
+    server.on("POST", "/api/auth/logout", { status: 204 })
+    server.on("POST", "/api/auth/logout", { status: 204 })
+    const client = createAuthClient()
+
+    await client.logout()
+    expect(server.requests.at(-1)?.body).toEqual({ scope: "local" })
+
+    await client.logout({ scope: "global", account: "current" })
+    expect(server.requests.at(-1)?.body).toEqual({
+      scope: "global",
+      account: "current"
+    })
+  })
+
   it("adopts the promoted account when the server switches to one", async () => {
     server.on("POST", "/api/auth/verify-code", {
       body: { accessToken: fakeAccessToken(), user }
@@ -180,7 +195,7 @@ describe("sessions and accounts", () => {
         ]
       }
     })
-    server.on("DELETE", "/api/auth/sessions/b", { status: 204 })
+    server.on("DELETE", "/api/auth/sessions/b", { body: { current: false } })
     server.on("POST", "/api/auth/verify-code", {
       body: { accessToken: fakeAccessToken(), user }
     })
@@ -201,13 +216,15 @@ describe("sessions and accounts", () => {
     await client.revokeSession({ id: "b" })
 
     expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
+    // One DELETE, and no second GET /sessions to work out whether it was the
+    // current one — the server says so in the response.
+    expect(
+      server.requests.filter((request) => request.path === "/api/auth/sessions")
+    ).toHaveLength(1)
   })
 
-  it("clears local state when revoking the current session", async () => {
-    server.on("GET", "/api/auth/sessions", {
-      body: { sessions: [{ id: "a", current: true }] }
-    })
-    server.on("DELETE", "/api/auth/sessions/a", { status: 204 })
+  it("clears local state when the server reports the revoked session as current", async () => {
+    server.on("DELETE", "/api/auth/sessions/a", { body: { current: true } })
     server.on("POST", "/api/auth/verify-code", {
       body: { accessToken: fakeAccessToken(), user }
     })

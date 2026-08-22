@@ -24,6 +24,35 @@ export async function sha256Hex(value: string) {
 }
 
 /**
+ * HMAC keys, imported once per secret.
+ *
+ * Importing a raw key is the expensive half of an HMAC, and the secret does not
+ * change between requests — so it is done on first use and kept. Keyed by the
+ * secret string because one process may serve several tenants, each with its
+ * own; the map grows to the number of distinct secrets it has seen and no
+ * further. The secret is already in memory in the resolved config, so holding
+ * the imported key beside it reveals nothing new.
+ */
+const hmacKeys = new Map<string, Promise<CryptoKey>>()
+
+function hmacKey(secret: string) {
+  let key = hmacKeys.get(secret)
+  if (!key) {
+    key = crypto.subtle.importKey(
+      "raw",
+      textEncoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    )
+    hmacKeys.set(secret, key)
+    // A failed import must not be cached as a permanently rejected promise.
+    key.catch(() => hmacKeys.delete(secret))
+  }
+  return key
+}
+
+/**
  * Signs a value with HMAC-SHA-256 under the server secret and returns lowercase hex.
  *
  * Magic codes are stored this way rather than as a bare hash. Six digits is only
@@ -32,16 +61,9 @@ export async function sha256Hex(value: string) {
  * never holds means a database leak alone does not yield working codes.
  */
 export async function hmacSha256Hex(value: string, secret: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    textEncoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  )
   const signature = await crypto.subtle.sign(
     "HMAC",
-    key,
+    await hmacKey(secret),
     textEncoder.encode(value)
   )
   return toHex(signature)

@@ -13,6 +13,17 @@ export interface RevokeSessionInput {
   requestURL?: string
 }
 
+/** What revoking a session reports back. */
+export interface RevokeSessionResult {
+  /**
+   * Whether the revoked session was the one making the request — in which
+   * case this was a local sign-out, the cookie has been cleared, and a client
+   * should drop its own state too. Reported here so the client does not have
+   * to list every session first just to learn what the server already knew.
+   */
+  current: boolean
+}
+
 /**
  * Revokes one of the signed-in user's sessions.
  *
@@ -46,20 +57,22 @@ export const revokeSession = defineEndpoint({
     // Revoking the session you are using is a local sign-out, so the cookie has
     // to go too — otherwise the browser keeps presenting a token that no longer
     // resolves and every later request looks mysteriously unauthenticated.
-    if (revoked.tokenHash === resolved.tokenHash) {
-      const responseHeaders = new Headers()
+    const current = revoked.tokenHash === resolved.tokenHash
+    const responseHeaders = new Headers()
+    if (current) {
       responseHeaders.append(
         "set-cookie",
         clearCookie(
-          internals.options.cookie.name,
-          internals.options.cookie.path,
+          internals.config.cookie.name,
+          internals.config.cookie.path,
           shouldUseSecureCookies(input.requestURL ?? "https://localhost")
         )
       )
-
-      return { data: undefined, status: 204, headers: responseHeaders }
     }
 
-    return { data: undefined, status: 204 }
+    return {
+      data: { current } satisfies RevokeSessionResult,
+      headers: responseHeaders
+    }
   }
 })

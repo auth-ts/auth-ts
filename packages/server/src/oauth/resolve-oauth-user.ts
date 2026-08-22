@@ -82,7 +82,8 @@ export async function resolveOAuthUser(
         await convertGuest(internals, guest, {
           email: identity.email,
           ...(identity.name ? { name: identity.name } : {}),
-          ...(identity.imageURL ? { imageURL: identity.imageURL } : {})
+          ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
+          additionalFields
         })
       ).user
     : await internals.db.upsertUser({
