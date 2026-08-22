@@ -203,7 +203,7 @@ reference should show the switch.
 | `upsertUser` (no identifier) | `insert(users, {type: "guest", …})` |
 | `upsertUser` (id) | `update(users, {id}, fields)` |
 | `getUser` | `select(users, {id | email | phoneNumber}, {limit: 1})` |
-| `deleteUser` | `delete(users, {id})` — **cascade to sessions/connections/codes stays a stated requirement** (or core deletes them first; decide tomorrow) |
+| `deleteUser` | core deletes the children itself, in this order: `delete(sessions, {userId})`, `delete(connections, {userId})`, `delete(magicCodes, {identifier})` for the user's email and phone, then `delete(users, {id})`. Sessions go first so a failure part-way leaves an account with no live token rather than a live token with no account. No cascade requirement on the store. |
 | `upsertSession` (issue) | `insert(sessions, …)` |
 | `upsertSession` (slide) | `update(sessions, {id}, {expiresAt, userAgent, ipAddress})` |
 | `getSession` | `select(sessions, {tokenHash}, {limit: 1})` |
@@ -258,8 +258,12 @@ expect it to throw.
 
 ## Open questions for tomorrow
 
-1. `deleteUser` cascade: requirement on the store, or core deletes children
-   first (three extra deletes, no requirement)?
+1. ~~`deleteUser` cascade: requirement on the store, or core deletes children
+   first?~~ **Decided: core deletes the children.** A forgotten `ON DELETE
+   CASCADE` is silent until a deleted account signs in with a refresh token
+   that still works; three extra deletes cost nothing and remove the
+   requirement entirely. Guest merge (`primaryUserId`) is not a cascade — the
+   merged guest row stays, as today.
 2. `update` returning rows vs `void` — rows are useful for `upsertUser`'s
    return and cost nothing in SQL; confirm for the Data API / InstantDB.
 3. Should `select`'s `limit` be required rather than optional, to make the
