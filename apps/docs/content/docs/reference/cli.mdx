@@ -33,6 +33,12 @@ whole of stdout; the question and everything after it go to stderr, so
 redirecting gets you the values and nothing else — without the highlighting,
 which is only ever printed to a terminal, and never when `NO_COLOR` is set.
 
+The highlighting uses only the sixteen colours a terminal remaps to its own
+theme, so it reads on a light background and a dark one alike. The values
+themselves are left at your default foreground: they are the part you read, and
+the one colour that would break on half of all terminals is the one that means
+"white".
+
 The private key is quoted with its line breaks as literal `\n`, which dotenv,
 Bun, Vite, and Next all expand.
 

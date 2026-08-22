@@ -30,6 +30,10 @@ three lines pipe cleanly on their own.
  * Each stream is styled on its own: piping the values into a file must not put
  * escape codes in it, and that stays true while the questions on stderr are
  * still going to a terminal. `NO_COLOR` turns the lot off.
+ *
+ * Only the sixteen basic colours, which a terminal remaps to its own theme, so
+ * this reads on a light background and a dark one without asking which it is —
+ * there is no portable way to ask, and a fixed hex would be wrong half the time.
  */
 function styler(stream: { isTTY?: boolean }) {
   const plain = !stream.isTTY || process.env.NO_COLOR
@@ -40,13 +44,18 @@ function styler(stream: { isTTY?: boolean }) {
 
   return {
     name: paint(36),
-    string: paint(32),
+    key: paint(35),
+    // Never 37: white is one of the two colours a terminal cannot remap safely,
+    // so on a light background it is white on white. Values are left at the
+    // default foreground, which is readable against whatever is behind it by
+    // definition — and they are the part you read, so they should be plainest.
+    value: (value: string) => value,
+    punctuation: paint(90),
     path: paint(36),
     ok: paint(32),
     warn: paint(33),
     yes: paint(32),
-    no: paint(31),
-    dim: paint(2, 22)
+    no: paint(31)
   }
 }
 
@@ -63,9 +72,9 @@ function highlightJson(json: string, style: Style) {
   return json.replace(
     /("(?:[^"\\]|\\.)*")(\s*:)|("(?:[^"\\]|\\.)*")|([[\]{},])/g,
     (match, key, colon, string, punctuation) => {
-      if (key) return `${style.name(key)}${style.dim(colon)}`
-      if (string) return style.string(string)
-      if (punctuation) return style.dim(punctuation)
+      if (key) return `${style.key(key)}${style.punctuation(colon)}`
+      if (string) return style.value(string)
+      if (punctuation) return style.punctuation(punctuation)
       return match
     }
   )
@@ -146,7 +155,7 @@ async function confirm(question: string) {
     output: process.stderr
   })
   try {
-    const choices = `${say.dim("[")}${say.yes("y")}${say.dim("/")}${say.no("N")}${say.dim("]")}`
+    const choices = `${say.punctuation("[")}${say.yes("y")}${say.punctuation("/")}${say.no("N")}${say.punctuation("]")}`
     // End of input — a Ctrl-D at the question — is an answer of no, not a
     // crash on the way out.
     const answer = await prompt
@@ -163,7 +172,7 @@ async function runKeygen(args: string[]) {
   const { privateKeyPem, secret, jwks } = await keygen(options)
 
   const variable = (name: string, value: string) =>
-    `${out.name(name)}${out.dim("=")}${out.string(value)}\n`
+    `${out.name(name)}${out.punctuation("=")}${out.value(value)}\n`
 
   console.log(variable("JWT_PRIVATE_KEY", quoteForEnv(privateKeyPem)))
   console.log(variable("AUTH_SECRET", `"${secret}"`))
