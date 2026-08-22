@@ -194,7 +194,11 @@ export interface RateLimitOptions {
 
 /** Cross-origin access, for a client configured with a different `baseURL`. */
 export interface CorsOptions {
-  /** The exact allowed origin. Never `*`, because these responses carry credentials. */
+  /**
+   * The exact allowed origin. Never `*`, because these responses carry
+   * credentials. It is also the one origin besides the server's own that may
+   * make state-changing requests — see the origin check in `createHandler`.
+   */
   origin: string
 }
 

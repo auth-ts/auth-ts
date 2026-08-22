@@ -24,6 +24,7 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   invalidField: "Some of the submitted fields are not accepted.",
   notFound: "Not found.",
   methodNotAllowed: "That method is not allowed here.",
+  forbiddenOrigin: "This request came from a site that is not allowed.",
   guestCannotReceiveCode:
     "Add an email address or phone number before continuing.",
   providerUnavailable:
