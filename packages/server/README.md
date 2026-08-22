@@ -12,7 +12,7 @@ import { createAuthServer } from "@auth-ts/server"
 
 export const authServer = createAuthServer({
   db: {
-    /* the nineteen callbacks, written against your own tables */
+    /* the eighteen callbacks, written against your own tables */
   },
   email: { sendCode: async ({ email, code }) => {} }
 })

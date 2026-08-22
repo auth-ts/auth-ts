@@ -26,13 +26,29 @@ export interface UserStore {
  */
 const STORAGE_KEY = "auth-ts.user"
 
+/**
+ * Parses a persisted user, treating anything unreadable as "no user".
+ *
+ * Shared by the first read and the cross-tab storage event, so a value written
+ * by an older app version or another same-origin script is handled the same
+ * way in both: it cannot throw out of an event listener and leave this tab's
+ * token alive while the others have signed out.
+ */
+function parseStoredUser(raw: string | null | undefined): AuthUser | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as AuthUser
+  } catch {
+    return null
+  }
+}
+
 function readStorage(): AuthUser | null {
   try {
-    const raw = globalThis.localStorage?.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as AuthUser) : null
+    return parseStoredUser(globalThis.localStorage?.getItem(STORAGE_KEY))
   } catch {
-    // Private browsing, disabled storage, or corrupt JSON. None of these are a
-    // reason to fail: the mirror is an optimisation, not a source of truth.
+    // Private browsing or disabled storage. Not a reason to fail: the mirror
+    // is an optimisation, not a source of truth.
     return null
   }
 }
@@ -81,9 +97,7 @@ export function createUserStore(
       // Update memory and notify only — never fetch. Every open tab hitting the
       // refresh endpoint the moment one of them signs in is a stampede against
       // your own server.
-      user = storageEvent.newValue
-        ? (JSON.parse(storageEvent.newValue) as AuthUser)
-        : null
+      user = parseStoredUser(storageEvent.newValue)
 
       // The access token is per-tab memory, so the storage event does not cover
       // it. Without this, a tab informed of a sign-out elsewhere would render as

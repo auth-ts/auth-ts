@@ -4,7 +4,7 @@ Browser token management for `@auth-ts/server`. Zero runtime dependencies; it
 imports the server package for types only.
 
 ```bash
-bun add @auth-ts/client
+bun add @auth-ts/client @auth-ts/server
 ```
 
 ```ts

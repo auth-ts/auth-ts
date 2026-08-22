@@ -342,6 +342,37 @@ describe("cross-tab sync", () => {
     expect(server.requests).toHaveLength(2)
   })
 
+  it("treats an unreadable value from another tab as signed out rather than throwing", async () => {
+    // Another tab — an older app version, another same-origin script — wrote
+    // something that is not JSON. A throw inside the listener would leave this
+    // tab's token alive while every other tab has moved on.
+    server.on("POST", "/api/auth/token", {
+      body: { accessToken: fakeAccessToken(), user }
+    })
+    const client = createAuthClient()
+    await client.getToken()
+    const seen: Array<string | null> = []
+    client.subscribe((next) => seen.push(next?.email ?? null))
+
+    globalThis.dispatchEvent(
+      new StorageEvent("storage", {
+        key: "auth-ts.user",
+        newValue: "{not json"
+      })
+    )
+
+    expect(seen).toEqual([null])
+    server.on("POST", "/api/auth/token", {
+      status: 401,
+      body: {
+        error: { code: "unauthenticated", message: "You are not signed in." }
+      }
+    })
+    await expect(client.getToken()).rejects.toMatchObject({
+      code: "unauthenticated"
+    })
+  })
+
   it("ignores storage events for unrelated keys", async () => {
     server.on("POST", "/api/auth/token", {
       body: { accessToken: fakeAccessToken(), user }
