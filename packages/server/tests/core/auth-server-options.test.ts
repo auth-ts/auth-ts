@@ -128,6 +128,30 @@ describe("construction failures", () => {
     ).toThrow(/rateLimit.sendCodeCooldown/)
   })
 
+  it("rejects a token or session lifetime under one second, which rounds to zero", () => {
+    // `exp` and `Max-Age` are whole seconds, rounded down: a sub-second TTL
+    // mints tokens with `exp === iat` and cookies the browser drops on arrival.
+    for (const ttl of ["0s", "0.5s"]) {
+      expect(() =>
+        createAuthServer({
+          ...baseOptions(),
+          jwt: { ...baseOptions().jwt, ttl }
+        })
+      ).toThrow(/jwt\.ttl: must be at least one second/)
+      expect(() =>
+        createAuthServer({ ...baseOptions(), session: { ttl } })
+      ).toThrow(/session\.ttl: must be at least one second/)
+    }
+    // One whole second is the floor, not a mistake.
+    expect(() =>
+      createAuthServer({
+        ...baseOptions(),
+        jwt: { ...baseOptions().jwt, ttl: "1s" },
+        session: { ttl: "1s" }
+      })
+    ).not.toThrow()
+  })
+
   it("rejects a negative duration, which parses but expires everything at birth", () => {
     // The duration grammar accepts a leading `-`, so these are well-formed and
     // used to pass. A negative TTL hands out sessions and tokens that expired

@@ -377,6 +377,28 @@ function requireDuration(value: Duration, optionName: string) {
   return value
 }
 
+/**
+ * Validates a lifetime — a duration something must stay valid for.
+ *
+ * Stricter than {@link requireDuration}: zero is never a setting here, only a
+ * mistake, and the bound is a whole second rather than zero because that is the
+ * precision these lifetimes actually get. A token's `exp` and a cookie's
+ * `Max-Age` are whole seconds, rounded down, so anything under one second
+ * mints a token with `exp === iat` or a cookie the browser deletes on arrival —
+ * and nothing fails until the first request with it.
+ */
+function requireLifetime(value: Duration, optionName: string) {
+  requireDuration(value, optionName)
+
+  if (parseDuration(value) < 1000) {
+    throw new AuthConfigError(
+      `${optionName}: must be at least one second. ${JSON.stringify(value)} rounds down to zero whole seconds, so everything it governs would expire the moment it was issued.`
+    )
+  }
+
+  return value
+}
+
 /** Claims `signToken` owns outright; a configured default for one is a misconfiguration. */
 const SERVER_OWNED_CLAIMS = ["sub", "iat", "exp"] as const
 
@@ -541,7 +563,7 @@ export function resolveAuthServerOptions(
     jwt: {
       privateKey,
       alg: options.jwt?.alg ?? "RS256",
-      ttl: requireDuration(options.jwt?.ttl ?? "10m", "jwt.ttl"),
+      ttl: requireLifetime(options.jwt?.ttl ?? "10m", "jwt.ttl"),
       claims: requireClaims(options.jwt?.claims),
       ...(options.jwt?.audience ? { audience: options.jwt.audience } : {}),
       ...(options.jwt?.additionalPublicKeys
@@ -552,7 +574,7 @@ export function resolveAuthServerOptions(
     basePath,
     ...(baseURL ? { baseURL, issuer: `${baseURL}${basePath}` } : {}),
     session: {
-      ttl: requireDuration(options.session?.ttl ?? "30d", "session.ttl"),
+      ttl: requireLifetime(options.session?.ttl ?? "30d", "session.ttl"),
       sliding: options.session?.sliding ?? true
     },
     cookie: {
