@@ -7,9 +7,18 @@ import type { SVGProps } from "react"
  * The viewBox is cropped to the artwork rather than left at the exported
  * `0 0 1254 1254`, which padded the shape with 17% dead space on every side and
  * made the mark render small and float away from anything set beside it. The
- * box is square and centred on the path's bounding box (820 × 905 at 217,168),
- * sized so the longer axis fills 20/24 of it — the same proportion lucide uses,
- * so `size-*` means the same thing here as on every other icon on the page.
+ * box is square, sized so the longer axis fills 20/24 of it — the same
+ * proportion lucide uses, so `size-*` means the same thing here as on every
+ * other icon on the page.
+ *
+ * The box is centred on the bounding box, which makes the margins exactly
+ * equal at every size. Worth knowing that the ink is not evenly spread inside
+ * it: three quarters of the mark's mass sits in the left half, because the
+ * right side is the even-odd counter and reads mostly hollow. So the silhouette
+ * is centred while the weight leans left, and the two cannot both be satisfied
+ * by one offset. Nudging the box right to balance the weight throws the
+ * silhouette off by twice the nudge — the left margin grows as the right one
+ * shrinks — which shows up long before the weight looks corrected.
  */
 export function Logo(props: SVGProps<SVGSVGElement>) {
   return (

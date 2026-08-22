@@ -17,12 +17,14 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Auth.ts" },
+      { title: "Auth.ts | Free forever auth" },
       {
         name: "description",
         content:
           "Free forever JWT auth in TypeScript — callbacks to write into any database."
-      }
+      },
+      // The home-screen label, which has room for far less than the title.
+      { name: "apple-mobile-web-app-title", content: "Auth.ts" }
     ],
     links: [{ rel: "stylesheet", href: styles }]
   }),
@@ -42,6 +44,19 @@ function RootDocument({ children }: { children: ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        {/*
+         * Written into the document rather than the route's `links`: these are
+         * the same on every route, so route-level head management buys nothing,
+         * and React's head hoisting drops them on the way through it.
+         *
+         * The .ico comes first and the SVG second with `sizes="any"` — browsers
+         * that understand SVG icons prefer it on that hint, and the rest stop at
+         * the first entry they can read.
+         */}
+        <link rel="icon" href="/favicon.ico" sizes="48x48" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/site.webmanifest" />
       </head>
       <body className="flex min-h-screen flex-col">
         <RootProvider

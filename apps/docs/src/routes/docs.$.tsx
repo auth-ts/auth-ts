@@ -27,7 +27,7 @@ export const Route = createFileRoute("/docs/$")({
   head: ({ loaderData }) => ({
     meta: loaderData
       ? [
-          { title: `${loaderData.title} — Auth.ts` },
+          { title: `${loaderData.title} | Auth.ts` },
           { name: "description", content: loaderData.description }
         ]
       : []
