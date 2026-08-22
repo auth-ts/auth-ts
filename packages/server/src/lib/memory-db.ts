@@ -1,6 +1,6 @@
 import type {
   AuthConnection,
-  AuthDb,
+  AuthDB,
   AuthMagicCode,
   AuthRateLimit,
   AuthSession,
@@ -14,8 +14,8 @@ import type {
 } from "../core/auth-db.ts"
 import { randomUUID } from "./generate-random.ts"
 
-/** An in-memory {@link AuthDb} plus a few helpers for inspecting it in tests. */
-export interface MemoryDb extends AuthDb {
+/** An in-memory {@link AuthDB} plus a few helpers for inspecting it in tests. */
+export interface MemoryDb extends AuthDB {
   /** Every stored user, in insertion order. */
   users(): AuthUser[]
   /** Every stored session, in insertion order. */

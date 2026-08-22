@@ -9,7 +9,7 @@ import type { VerificationKeySet } from "../jwt/verify-token.ts"
 import { createVerificationKeySet } from "../jwt/verify-token.ts"
 import type { LeveledLogger } from "../lib/logger.ts"
 import { createLogger } from "../lib/logger.ts"
-import type { AuthDb } from "./auth-db.ts"
+import type { AuthDB } from "./auth-db.ts"
 import type { AuthServerConfig } from "./auth-server-config.ts"
 
 /** Key material, imported once on first use. */
@@ -37,7 +37,7 @@ export interface KeyMaterial extends SigningKeyMaterial {
 export interface AuthServerInternals {
   /** The resolved configuration — options after defaults and validation. */
   config: AuthServerConfig
-  db: AuthDb
+  db: AuthDB
   log: LeveledLogger
   /**
    * Imports the key material, memoized.

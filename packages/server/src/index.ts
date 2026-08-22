@@ -1,6 +1,6 @@
 export type {
   AuthConnection,
-  AuthDb,
+  AuthDB,
   AuthMagicCode,
   AuthRateLimit,
   AuthSession,

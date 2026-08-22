@@ -3,7 +3,7 @@ import type { JwtAlgorithm } from "../jwt/import-signing-key.ts"
 import type { ClientIpOptions } from "../lib/get-client-ip.ts"
 import type { Logger, LogLevel } from "../lib/logger.ts"
 import type { Duration } from "../lib/parse-duration.ts"
-import type { AuthDb } from "./auth-db.ts"
+import type { AuthDB } from "./auth-db.ts"
 
 // The shapes `createAuthServer` accepts — and nothing else. Options are the
 // partial, human-written input; what they resolve to is `AuthServerConfig`, in
@@ -204,7 +204,7 @@ export interface CorsOptions {
 /** Options accepted by `createAuthServer`. */
 export interface AuthServerOptions {
   /** The callbacks that read and write your database. */
-  db: AuthDb
+  db: AuthDB
   /** Sign-in method: magic codes over email. */
   email?: EmailOptions
   /** Sign-in method: magic codes over SMS. */

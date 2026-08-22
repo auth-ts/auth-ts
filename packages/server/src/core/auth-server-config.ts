@@ -6,7 +6,7 @@ import { resolveClientIpConfig } from "../lib/get-client-ip.ts"
 import type { Logger, LogLevel } from "../lib/logger.ts"
 import type { Duration } from "../lib/parse-duration.ts"
 import { parseDuration } from "../lib/parse-duration.ts"
-import type { AuthDb } from "./auth-db.ts"
+import type { AuthDB } from "./auth-db.ts"
 import type {
   AdditionalFieldsSchema,
   AuthServerOptions,
@@ -32,7 +32,7 @@ import type {
  * downstream of construction ever re-derives a default or re-checks a value.
  */
 export interface AuthServerConfig {
-  db: AuthDb
+  db: AuthDB
   email?: EmailOptions
   sms?: SmsOptions
   guest: boolean

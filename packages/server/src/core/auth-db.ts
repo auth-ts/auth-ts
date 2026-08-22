@@ -71,7 +71,7 @@ export interface AuthMagicCode {
   codeHash: string
   expiresAt: Date
   /**
-   * Always `0`. Core counts wrong guesses through {@link AuthDb.upsertRateLimit},
+   * Always `0`. Core counts wrong guesses through {@link AuthDB.upsertRateLimit},
    * keyed on `codeHash` — that increment is atomic, and a field here could not
    * be without a callback to make it so. Nothing reads this field.
    */
@@ -96,7 +96,7 @@ export interface AuthConnection {
   email?: string | null
 }
 
-/** Fields accepted by {@link AuthDb.upsertUser}. */
+/** Fields accepted by {@link AuthDB.upsertUser}. */
 export interface UpsertUserInput {
   /**
    * When present, targets that exact row by id instead of looking up by
@@ -120,7 +120,7 @@ export interface UpsertUserInput {
   additionalFields?: Record<string, string | number | boolean>
 }
 
-/** Fields written by {@link AuthDb.upsertSession}. */
+/** Fields written by {@link AuthDB.upsertSession}. */
 export interface UpsertSessionInput {
   /** Core-generated uuid — the browser-safe address of this session. */
   id: string
@@ -138,7 +138,7 @@ export interface UpsertSessionInput {
   ipAddress?: string | null
 }
 
-/** Fields written by {@link AuthDb.upsertMagicCode}. */
+/** Fields written by {@link AuthDB.upsertMagicCode}. */
 export interface UpsertMagicCodeInput {
   identifier: string
   codeHash: string
@@ -148,7 +148,7 @@ export interface UpsertMagicCodeInput {
   purpose: MagicCodePurpose
 }
 
-/** Fields written by {@link AuthDb.upsertConnection}. */
+/** Fields written by {@link AuthDB.upsertConnection}. */
 export interface UpsertConnectionInput {
   userId: string
   provider: string
@@ -157,7 +157,7 @@ export interface UpsertConnectionInput {
 }
 
 /**
- * Fields written by {@link AuthDb.upsertRateLimit}.
+ * Fields written by {@link AuthDB.upsertRateLimit}.
  *
  * There is no `count` on purpose: the store owns it. `resetAt` is what the
  * window end should be *if this call starts a new window*; the store decides
@@ -168,13 +168,13 @@ export interface UpsertRateLimitInput {
   resetAt: Date
 }
 
-/** Query accepted by {@link AuthDb.getUser} — exactly one key. */
+/** Query accepted by {@link AuthDB.getUser} — exactly one key. */
 export type GetUserWhere =
   | { id: string }
   | { email: string }
   | { phoneNumber: string }
 
-/** Query accepted by {@link AuthDb.deleteSession}. */
+/** Query accepted by {@link AuthDB.deleteSession}. */
 export type DeleteSessionWhere =
   | { tokenHash: string }
   | { id: string; userId: string }
@@ -198,7 +198,7 @@ export type DeleteSessionWhere =
  * directly. For multi-tenancy, close over the tenant when constructing the
  * server instead.
  */
-export interface AuthDb {
+export interface AuthDB {
   /**
    * Creates or merges a user.
    *
@@ -261,7 +261,7 @@ export interface AuthDb {
    * Deletes all of a user's sessions, optionally sparing the current one.
    *
    * `exceptTokenHash` powers "sign out my other devices". This also satisfies the
-   * cascade required by {@link AuthDb.deleteUser} if you reuse it there.
+   * cascade required by {@link AuthDB.deleteUser} if you reuse it there.
    */
   deleteSessions(where: {
     userId: string
@@ -305,7 +305,7 @@ export interface AuthDb {
    * Reads a rate-limit counter. Never called when `rateLimit: false`.
    *
    * For inspection and tests. The limiter itself never reads first — see
-   * {@link AuthDb.upsertRateLimit}.
+   * {@link AuthDB.upsertRateLimit}.
    */
   getRateLimit(where: { key: string }): Promise<AuthRateLimit | null>
 

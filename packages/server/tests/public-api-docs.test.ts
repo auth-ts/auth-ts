@@ -53,7 +53,7 @@ describe("public API documentation", () => {
 
   it("documents every field of the database contract, which consumers implement by hand", () => {
     const source = readFileSync(join(sourceRoot, "core/auth-db.ts"), "utf8")
-    const contract = sliceBetweenMarkers(source, "export interface AuthDb {")
+    const contract = sliceBetweenMarkers(source, "export interface AuthDB {")
     const lines = contract.split("\n")
 
     const undocumented: string[] = []
@@ -146,22 +146,22 @@ describe("public API documentation", () => {
   })
 
   it("fails loudly when a sentinel is renamed, instead of scanning nothing", () => {
-    const source = "export interface AuthDb {\n  getUser(): void\n}\n"
+    const source = "export interface AuthDB {\n  getUser(): void\n}\n"
 
     // Without the guard this returns "\n" and every check below it passes.
     expect(() =>
       sliceBetweenMarkers(source, "export interface Renamed {")
     ).toThrow(/Renamed/)
     expect(() =>
-      sliceBetweenMarkers(source, "export interface AuthDb {", "/** reworded")
+      sliceBetweenMarkers(source, "export interface AuthDB {", "/** reworded")
     ).toThrow(/reworded/)
 
     // And the happy path still returns the block it was asked for.
-    expect(sliceBetweenMarkers(source, "export interface AuthDb {")).toContain(
+    expect(sliceBetweenMarkers(source, "export interface AuthDB {")).toContain(
       "getUser"
     )
     expect(
-      sliceBetweenMarkers(source, "export interface AuthDb {", "  getUser")
-    ).toBe("export interface AuthDb {\n")
+      sliceBetweenMarkers(source, "export interface AuthDB {", "  getUser")
+    ).toBe("export interface AuthDB {\n")
   })
 })

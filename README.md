@@ -28,7 +28,7 @@ import { createAuthServer } from "@auth-ts/server"
 
 export const authServer = createAuthServer({
   db: {
-    /* your queries — see the AuthDb reference */
+    /* your queries — see the AuthDB reference */
   },
   email: {
     sendCode: async ({ email, code }) => {
