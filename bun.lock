@@ -65,6 +65,17 @@
         "wrangler": "4.125.0",
       },
     },
+    "packages/cli": {
+      "name": "@auth-ts/cli",
+      "version": "0.1.0",
+      "bin": {
+        "auth-ts": "./dist/cli.js",
+      },
+      "dependencies": {
+        "@auth-ts/server": "workspace:*",
+        "jose": "6.2.9",
+      },
+    },
     "packages/client": {
       "name": "@auth-ts/client",
       "version": "0.1.0",
@@ -87,6 +98,8 @@
     },
   },
   "packages": {
+    "@auth-ts/cli": ["@auth-ts/cli@workspace:packages/cli"],
+
     "@auth-ts/client": ["@auth-ts/client@workspace:packages/client"],
 
     "@auth-ts/server": ["@auth-ts/server@workspace:packages/server"],
