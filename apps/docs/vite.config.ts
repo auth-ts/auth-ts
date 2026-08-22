@@ -36,6 +36,35 @@ export default defineConfig({
             outputPath: "/api/search.json",
             crawlLinks: false
           }
+        },
+        // The two llms.txt documents, written once at build time for the same
+        // reason: text, not pages, and nothing in them to crawl.
+        {
+          path: "/llms.txt",
+          prerender: {
+            enabled: true,
+            outputPath: "/llms.txt",
+            crawlLinks: false
+          }
+        },
+        {
+          path: "/llms-full.txt",
+          prerender: {
+            enabled: true,
+            outputPath: "/llms-full.txt",
+            crawlLinks: false
+          }
+        },
+        {
+          // Cloudflare Pages serves 404.html for anything that matches no file,
+          // which is the only way the not-found component reaches a cold visit
+          // to a dead link.
+          path: "/404",
+          prerender: {
+            enabled: true,
+            outputPath: "/404.html",
+            crawlLinks: false
+          }
         }
       ]
     }),

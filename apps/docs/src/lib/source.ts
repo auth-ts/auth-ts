@@ -18,3 +18,16 @@ export const source = loader({
     }
   }
 })
+
+/**
+ * One page rendered as the Markdown an LLM should read.
+ *
+ * The processed text is used rather than the raw file so the output carries no
+ * frontmatter or JSX — an `<auto-type-table />` in the source becomes the
+ * generated table here, which is the part worth reading.
+ */
+export async function getLLMText(page: (typeof source)["$inferPage"]) {
+  const processed = await page.data.getText("processed")
+
+  return `# ${page.data.title} (${page.url})\n\n${processed}`
+}

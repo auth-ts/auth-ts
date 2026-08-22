@@ -11,7 +11,15 @@ import { createGenerator, remarkAutoTypeTable } from "fumadocs-typescript"
  */
 const generator = createGenerator({ tsconfigPath: "tsconfig.docgen.json" })
 
-export const docs = defineDocs({ dir: "content/docs" })
+/**
+ * `includeProcessedMarkdown` is what makes `page.data.getText("processed")`
+ * available, and that is the whole content of `/llms-full.txt`: the pages after
+ * MDX processing, rather than the raw files with their JSX and frontmatter.
+ */
+export const docs = defineDocs({
+  dir: "content/docs",
+  docs: { postprocess: { includeProcessedMarkdown: true } }
+})
 
 export default defineConfig({
   mdxOptions: {
