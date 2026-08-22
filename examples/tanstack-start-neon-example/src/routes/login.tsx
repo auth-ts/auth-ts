@@ -2,6 +2,7 @@ import { isAuthError } from "@auth-ts/client"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/icons"
+import { useCountdown } from "../hooks/use-countdown"
 import { authClient } from "../lib/auth-client"
 
 export const Route = createFileRoute("/login")({ component: LoginPage })
@@ -18,13 +19,13 @@ function LoginPage() {
   const [code, setCode] = useState("")
   const [stage, setStage] = useState<"email" | "code">("email")
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [cooldown, setCooldown] = useState(0)
+  const [cooldown, startCooldown] = useCountdown()
 
   const report = (error: unknown) => {
     // Errors are switched on by code, never by message text: the message is
     // localized and free to change, the code is the contract.
     if (isAuthError(error) && error.retryAfter) {
-      setCooldown(error.retryAfter)
+      startCooldown(error.retryAfter)
       setNotice({ text: error.message, tone: "error" })
       return
     }

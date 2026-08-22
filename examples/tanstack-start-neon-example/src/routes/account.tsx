@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/icons"
+import { useCountdown } from "../hooks/use-countdown"
 import { useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 
@@ -29,6 +30,11 @@ function AccountPage() {
   const [draftName, setDraftName] = useState<string | null>(null)
   const [deletionCode, setDeletionCode] = useState<string | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  // Deletion gets its own notice, rendered inside its card: the page-level
+  // alert sits at the top, and the Delete button is at the bottom, so an error
+  // reported up there is invisible from where the click happened.
+  const [deletionNotice, setDeletionNotice] = useState<Notice | null>(null)
+  const [deletionCooldown, startDeletionCooldown] = useCountdown()
 
   const sessions = useQuery({
     queryKey: ["sessions", user?.id],
@@ -103,7 +109,7 @@ function AccountPage() {
   }
 
   const removeAccount = async () => {
-    setNotice(null)
+    setDeletionNotice(null)
     try {
       const result = await authClient.deleteUser(
         deletionCode ? { code: deletionCode } : {}
@@ -113,7 +119,7 @@ function AccountPage() {
       // expected branch of a working flow rather than a failure.
       if (result.status === "codeRequired") {
         setDeletionCode("")
-        setNotice({
+        setDeletionNotice({
           text: "For your security, enter the code we just sent.",
           tone: "info"
         })
@@ -123,7 +129,13 @@ function AccountPage() {
       queryClient.clear()
       await navigate({ to: "/login" })
     } catch (error) {
-      setNotice({
+      // Confirming with no code re-sends one, which inside the send cooldown
+      // answers `cooldown` with a retryAfter — shown as a countdown, since a
+      // wait with no number is the least actionable error there is.
+      if (isAuthError(error) && error.retryAfter) {
+        startDeletionCooldown(error.retryAfter)
+      }
+      setDeletionNotice({
         text: isAuthError(error)
           ? error.message
           : "Could not delete the account.",
@@ -384,6 +396,17 @@ function AccountPage() {
           <p className="text-sm text-base-content/60">
             This removes your account and everything in it. There is no undo.
           </p>
+          {deletionNotice ? (
+            <div
+              role="alert"
+              className={`alert alert-soft text-sm ${noticeClass[deletionNotice.tone]}`}
+            >
+              <span>
+                {deletionNotice.text}
+                {deletionCooldown ? ` (${deletionCooldown}s)` : null}
+              </span>
+            </div>
+          ) : null}
           {deletionCode !== null ? (
             <fieldset className="fieldset">
               <legend className="fieldset-legend">Confirmation code</legend>
