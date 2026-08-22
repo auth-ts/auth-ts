@@ -80,7 +80,7 @@ describe("multiAccount disabled", () => {
     ).toBe(401)
   })
 
-  it("leaves a session alone when the same token signs in again", async () => {
+  it("leaves the existing session alone when a sign-in presents no cookie", async () => {
     // Presenting a session and then being issued a different one deletes the
     // presented row; a request that presents nothing deletes nothing.
     const context = await createTestServer()
@@ -444,9 +444,10 @@ describe("multiAccount enabled", () => {
     expect(response.status).toBe(200)
     expect(body.switchedTo.email).toBe("ada@example.com")
     // Grace is gone everywhere, Ada is untouched.
-    expect(context.db.sessions().map((session) => session.userId)).toHaveLength(
-      1
-    )
+    const remaining = context.db.sessions()
+    const ada = await context.db.getUser({ email: "ada@example.com" })
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]?.userId).toBe(ada?.id)
     expect(
       (
         await context.authServer.handler(
