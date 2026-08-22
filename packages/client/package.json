@@ -25,11 +25,6 @@
   "peerDependencies": {
     "@auth-ts/server": "workspace:*"
   },
-  "peerDependenciesMeta": {
-    "@auth-ts/server": {
-      "optional": true
-    }
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/auth-ts/auth-ts.git",

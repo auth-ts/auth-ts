@@ -73,7 +73,7 @@ const token = await authClient.getToken()
 ## Why no adapters
 
 Adapters are a promise to track someone else's schema conventions forever, and
-they always leak. The nineteen callbacks are the same code an adapter would
+they always leak. The eighteen callbacks are the same code an adapter would
 generate, except you can read them and they are already written against your own
 tables. That is the whole integration surface, and it is where the semver
 discipline goes.
