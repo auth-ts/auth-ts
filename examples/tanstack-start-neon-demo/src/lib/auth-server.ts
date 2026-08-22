@@ -5,14 +5,9 @@ export const authServer = createAuthServer({
   db: authDB,
   email: {
     sendCode: ({ email, code, purpose }) => {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(
-          "The console email transport must not run in production. Replace sendCode with a real email provider."
-        )
+      if (process.env.NODE_ENV === "development") {
+        console.log(`${purpose} code for ${email}: ${code}`)
       }
-      console.log(
-        `\n  ✉️  ${purpose === "deleteUser" ? "Deletion" : "Sign-in"} code for ${email}: ${code}\n`
-      )
     }
   },
   guest: true,
