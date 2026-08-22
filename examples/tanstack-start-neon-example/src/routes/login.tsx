@@ -41,7 +41,7 @@ function LoginPage() {
     setMessage(null)
     try {
       await authClient.verifyCode({ email, code })
-      await navigate({ to: "/" })
+      await navigate({ to: "/todos" })
     } catch (error) {
       report(error)
     }
@@ -119,7 +119,7 @@ function LoginPage() {
         <button
           type="button"
           onClick={() =>
-            authClient.signIn({ provider: "github", redirect: "/" })
+            authClient.signIn({ provider: "github", redirect: "/todos" })
           }
           className="w-full rounded border border-neutral-300 px-4 py-2"
         >
@@ -129,7 +129,7 @@ function LoginPage() {
           type="button"
           onClick={async () => {
             await authClient.signInAsGuest()
-            await navigate({ to: "/" })
+            await navigate({ to: "/todos" })
           }}
           className="w-full rounded border border-neutral-300 px-4 py-2"
         >

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
+
 import { useUser } from "../hooks/use-user"
 import {
   createTodo,
@@ -9,7 +10,7 @@ import {
   setTodoCompleted
 } from "../lib/todos"
 
-export const Route = createFileRoute("/")({ component: TodosPage })
+export const Route = createFileRoute("/todos")({ component: TodosPage })
 
 /**
  * The todo list — the whole point of the demo.

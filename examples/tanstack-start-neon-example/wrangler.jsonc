@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "tanstack-start-neon-demo",
+  "name": "tanstack-start-neon-example",
   "compatibility_date": "2026-08-21",
   // `nodejs_compat` is what lets the Neon driver and the auth server run
   // unchanged here. With a compatibility date after 2025-04-01 it also

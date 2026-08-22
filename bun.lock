@@ -38,8 +38,8 @@
         "zod": "4.4.3",
       },
     },
-    "examples/tanstack-start-neon-demo": {
-      "name": "tanstack-start-neon-demo",
+    "examples/tanstack-start-neon-example": {
+      "name": "tanstack-start-neon-example",
       "dependencies": {
         "@auth-ts/client": "workspace:*",
         "@auth-ts/server": "workspace:*",
@@ -1609,7 +1609,7 @@
 
     "tailwindcss": ["tailwindcss@4.3.3", "", {}, "sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ=="],
 
-    "tanstack-start-neon-demo": ["tanstack-start-neon-demo@workspace:examples/tanstack-start-neon-demo"],
+    "tanstack-start-neon-example": ["tanstack-start-neon-example@workspace:examples/tanstack-start-neon-example"],
 
     "tapable": ["tapable@2.3.3", "", {}, "sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A=="],
 
