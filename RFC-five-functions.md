@@ -1,6 +1,29 @@
 # RFC: five functions
 
-**Status:** draft, 2026-08-22. To be worked through together on 2026-08-23.
+**Status:** implemented, 2026-08-22. Kept as the design record; where it and the
+code disagree, the code is right. Read
+[the AuthDB reference](apps/docs/content/docs/reference/auth-db.mdx) for the
+shipped contract.
+
+Four things landed differently from the draft below, decided while building it.
+The title is the first of them: the contract is **four** functions — `select`,
+`insert`, `update`, `delete` — plus an optional `cleanup`, not five.
+
+1. **`orderBy` is `{ column: "asc" | "desc" }`**, Prisma's shape, with exactly
+   one key — not `{ column, direction }`.
+2. **Ids belong to the store.** There is no uuidv7 in core. Rows are inserted
+   without an `id` and the store's own default names them; `insert` returns the
+   stored row, which is how core learns it. `createAuthServer({ generateId })`
+   is there for deployments that mint their own. Nothing in core assumes ids
+   sort by time, so the "newest code" read orders by `expiresAt` and the devices
+   list by `createdAt`.
+3. **Cleanup is an optional `AuthDB.cleanup()`**, not a `createAuthServer`
+   option and not a required `deleteExpired`. Implement it and core sweeps for
+   you — awaited, throttled to once a minute per server, skipped on `GET`;
+   leave it out and cleanup is yours. The interval is a constant, not a knob.
+4. **`magicCodes` is `verificationCodes`**, and the row's write payload is
+   `values` on both `insert` and `update` rather than `row` and `fields`.
+
 **Scope:** replace the eighteen named `AuthDB` callbacks with five generic ones,
 and replace the counter-based rate limiter with append-and-count.
 

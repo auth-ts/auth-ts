@@ -12,7 +12,7 @@ import { createAuthServer } from "@auth-ts/server"
 
 export const authServer = createAuthServer({
   db: {
-    /* the eighteen callbacks, written against your own tables */
+    /* select, insert, update, delete — written against your own tables */
   },
   email: { sendCode: async ({ email, code }) => {} }
 })
@@ -23,8 +23,8 @@ disagree: callable directly from your backend (`authServer.getToken({ headers })
 as one catch-all handler (`authServer.handler`), or as individual handlers
 (`authServer.handlers.sendCode`).
 
-Test your own callbacks against the same in-memory implementation this library's
-test suite runs on:
+Test your own four functions against the same in-memory implementation this
+library's test suite runs on:
 
 ```ts
 import { createMemoryDb } from "@auth-ts/server/testing"

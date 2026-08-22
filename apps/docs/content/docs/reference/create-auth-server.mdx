@@ -8,7 +8,7 @@ import { createAuthServer } from "@auth-ts/server"
 
 export const authServer = createAuthServer({
   db: {
-    /* the callbacks */
+    /* four functions — see the AuthDB reference */
   },
   email: { sendCode: async ({ email, code }) => {} }
 })
@@ -26,6 +26,33 @@ validated, exposed as `authServer.config`. When options cannot be resolved into
 a config, construction throws an `AuthConfigError`.
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-server-options.ts" name="AuthServerOptions" />
+
+## Generating ids
+
+Unset by default, and unset is usually right: rows go to your store without an
+`id` and your own column default fills it — `uuidv7()`, a `$defaultFn`, an
+identity column, whatever the table already does. `insert` hands the stored row
+back, so the library reads the id it was given rather than assuming one.
+
+```ts
+createAuthServer({
+  db: authDB,
+  generateId: (table) => `${table}_${crypto.randomUUID()}`
+})
+```
+
+Set it when ids are the application's to mint: a store with no default of its
+own, a prefixed id, or an id you need to know before the write. It is called
+once per inserted row, awaited, with the table name, and the result becomes that
+row's `id`.
+
+## Cleanup
+
+There is no `cleanup` option. Sweeping expired rows is a query, so it lives on
+[`AuthDB.cleanup`](/docs/reference/auth-db) — implement it and the library runs
+it for you, at most once a minute after a request that could have written
+something; leave it out and the schedule is yours. Something has to run it:
+the `attempts` table gains a row per rate-limited request.
 
 ## What you get back
 
@@ -51,8 +78,8 @@ Plus the JWT-plane functions:
   private key with a function signature; never expose it through a route.
 - `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
   Never authorize with it.
-- `getSession({ headers })` — resolves the cookie to a session and user. One
-  database round-trip, and instant revocation truth.
+- `getSession({ headers })` — resolves the cookie to a session and user. Two
+  database reads, and instant revocation truth.
 
 <auto-type-table path="../../../../../packages/server/src/jwt/sign-token.ts" name="SignTokenClaims" />
 

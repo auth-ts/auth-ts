@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({ component: LandingPage })
  * The three claims, lifted out of the paragraph they used to end. Set apart
  * they carry the argument; buried behind an em-dash they read as an aside.
  */
-const CLAIMS = ["No adapters", "No service", "No company"]
+const CLAIMS = ["No adapter packages", "No service", "No company"]
 
 const SPECS = [
   ["Runtime", "Node 20+, Workers, Deno, Bun"],
@@ -29,8 +29,8 @@ const SPECS = [
 
 const FEATURES = [
   {
-    title: "No adapters",
-    body: "A handful of callbacks against your own tables. The library never sees your schema, your migrations, or your data."
+    title: "No adapter packages",
+    body: "Four functions — select, insert, update, delete — against your own tables. The library never sees your schema, your migrations, or your data."
   },
   {
     title: "Your keys, your issuer",
@@ -46,7 +46,7 @@ const FEATURES = [
   },
   {
     title: "Sign-in that people use",
-    body: "Email and SMS magic codes, GitHub, Google, and anonymous guests that can be upgraded in place."
+    body: "Email and SMS verification codes, GitHub, Google, and anonymous guests that can be upgraded in place."
   },
   {
     title: "Free forever",
@@ -58,7 +58,7 @@ const SERVER_SNIPPET = `import { createAuthServer } from "@auth-ts/server"
 
 export const authServer = createAuthServer({
   db: {
-    /* your queries — see the AuthDB reference */
+    /* four functions — see the AuthDB reference */
   },
   email: {
     sendCode: async ({ email, code }) => {
@@ -151,8 +151,8 @@ function Hero() {
             </span>
           </h1>
           <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty">
-            Callbacks to write into any database. Your application issues its
-            own JWTs, verified by anything that trusts a JWKS URL.
+            Four functions to write against any database. Your application
+            issues its own JWTs, verified by anything that trusts a JWKS URL.
           </p>
           <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-medium">
             {CLAIMS.map((claim, index) => (
@@ -253,8 +253,8 @@ function Snippets() {
             <span className="text-fd-primary">01</span> On the server
           </h2>
           <p className="text-fd-muted-foreground text-sm text-pretty">
-            Write the callbacks, mount <code>authServer.handler</code> once at{" "}
-            <code>/api/auth/*</code>, and point your database at{" "}
+            Write the four functions, mount <code>authServer.handler</code> once
+            at <code>/api/auth/*</code>, and point your database at{" "}
             <code>/jwks.json</code>.
           </p>
           <DynamicCodeBlock lang="ts" code={SERVER_SNIPPET} />
@@ -282,8 +282,8 @@ function Closing() {
           Five steps to a signed token
         </h2>
         <p className="text-fd-muted-foreground mt-2 max-w-md text-pretty">
-          Install, generate a key, write the callbacks, mount one route, and
-          point your database at it.
+          Install, generate a key, write the four functions, mount one route,
+          and point your database at it.
         </p>
       </div>
       <Link

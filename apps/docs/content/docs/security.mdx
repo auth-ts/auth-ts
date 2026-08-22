@@ -7,7 +7,7 @@ icon: ShieldCheck
 Every item here has a test. Several exist because the failure mode is a full
 account takeover rather than a bug.
 
-## Magic codes
+## Verification codes
 
 Six digits, drawn from a CSPRNG with rejection sampling — never
 `Math.random()`, and never a plain modulo, which biases the range and therefore
@@ -18,29 +18,37 @@ million possibilities means an unkeyed digest is reversible from a database read
 in about a second; keyed with a secret the database never holds, a database leak
 alone yields no working codes.
 
-Five wrong guesses burn the code. Sending a new one **replaces** the live code,
+Five wrong guesses burn the code, counted per code rather than per caller, so a
+resend is a fresh budget and a guess against a superseded code spends nothing.
+Sending a new code deletes the previous ones and **latest wins** on verification,
 so a resend cannot widen the set of values an attacker may guess. No slow hashing
 — the ten-minute lifetime and the attempt cap do that job, and bcrypt here would
 only slow down honest sign-ins.
 
-One live code per identifier also means sign-in codes and account-deletion codes
-share a row: a stranger spamming `/send-code` at your address keeps you inside
-the send cooldown for the deletion challenge too. Purposes are checked on verify,
-so a sign-in code can never authorize a deletion — this is a bounded nuisance,
-not a bypass.
+Sign-in codes and account-deletion codes share an identifier, so a stranger
+spamming `/send-code` at your address keeps you inside the send cooldown for the
+deletion challenge too. Purposes are checked on verify, so a sign-in code can
+never authorize a deletion — this is a bounded nuisance, not a bypass.
 
 A code whose delivery fails is rolled back rather than left live, so a sender
 outage does not start the cooldown against the person who never received it.
 
 ## Rate limiting
 
-On by default, backed by your database through two callbacks. Sending is limited
-per identifier and per IP, verification per IP, and deletion codes per identifier.
-There is also a sixty-second cooldown between sends to one address, derived from
-the live code's own expiry so it needs no extra state.
+On by default, backed by your database through one insert and one bounded read —
+approximate under a simultaneous burst, by design, in the way described below.
+Sending is limited per identifier and per IP, verification per IP, and deletion
+codes per identifier. There is also a sixty-second cooldown between sends to one
+address, derived from the newest code's own expiry so it needs no extra state.
 
-The per-identifier send window is what closes the loop where an attacker resends
-a code repeatedly to reset the attempt counter.
+Each counted request appends a row to `attempts` under a key containing the
+window, and the check reads at most `max + 1` of them. Nothing is
+read-modify-written, so no request can be lost — but the count is not exact
+either: requests that are genuinely simultaneous can each read a number below
+the cap before the others land. The overshoot is bounded by that one burst and
+cannot be repeated. If you want exactness, enforce it at your edge on
+`/send-code` and `/verify-code` and set `rateLimit: false`; the five-guess cap
+on each code is keyed on the code rather than the caller and stays on regardless.
 
 Scope is authentication abuse only — email flooding and credential guessing. It
 is not a general API limiter; that belongs in infrastructure in front of
@@ -103,8 +111,12 @@ provider identity already linked elsewhere is never re-pointed.
 
 The browser receives the refresh token only as an `HttpOnly`, `Secure`,
 `SameSite=Lax` cookie with **no `Domain` attribute**, so it is never
-broadcast to sibling subdomains. The database sees only the hash, so a leaked
-table yields nothing replayable. The cookie is not the symmetric case: it *is*
+broadcast to sibling subdomains. `Secure` is dropped in exactly one case —
+plain-HTTP `localhost`, where a browser would refuse the cookie outright and
+local development would not work at all. Every other origin gets it, including
+an endpoint called in-process where there is no request URL to judge by.
+
+The database sees only the hash, so a leaked table yields nothing replayable. The cookie is not the symmetric case: it *is*
 the credential. `HttpOnly` keeps script from reading it, but whatever does
 obtain it — a stolen browser profile, a device backup, a proxy terminating
 TLS — holds the session until that session is revoked or expires. Hashing

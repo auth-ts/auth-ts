@@ -136,8 +136,8 @@ session converted in place with email, name, and avatar.
 
 Still unproven against a live provider: Google entirely, and for GitHub the
 connect, disconnect, and repeat-sign-in paths. The first live run also surfaced
-a database the schema had drifted from (a plain index where `upsertConnection`
-needs a unique one) — the kind of thing only a real round trip catches.
+a database the schema had drifted from (a plain index where linking a
+connection needs a unique one) — the kind of thing only a real round trip catches.
 
 To close it: register a Google client, point the callback at
 `<origin>/api/auth/callback/google`, and run both providers through connect and
@@ -186,15 +186,14 @@ has to do the things that are easy to skip:
 - **Replace the console email transport.** It prints codes to the server console,
   which is a sign-in-as-anyone hole the moment those logs are readable.
 
-### A conformance suite for the callbacks
+### A conformance suite for the four functions
 
-"No adapters" is a promise that the contract is learnable. Right now it is
-learnable by reading the JSDoc carefully and then getting 500s. The first live
-day against Neon produced two bugs, neither of them in the library: a plain index
-where `upsertConnection`'s `ON CONFLICT` needed a unique one, and an empty `SET`
-because a magic-code sign-in carries no `name` or `imageURL` and `undefined`
-means "leave alone". Every consumer who writes these eighteen callbacks against
-SQL will meet both, and nothing tells them before production.
+"No adapter packages" is a promise that the contract is learnable. The contract
+is now much smaller — `select`, `insert`, `update`, `delete`, and an optional
+`cleanup`, all filtered by equality — and every semantic that used to be the
+consumer's to get right lives in core and is tested once. What is left to get
+wrong is real but narrow, and mostly structural: the unique constraints, and a
+`delete` that actually returns what it removed.
 
 The fix is the other half of `@auth-ts/server/testing`. `createMemoryDb` already
 encodes the exact semantics the library's own suite runs against; the missing
@@ -203,28 +202,23 @@ piece is that same suite pointed at *your* implementation:
 ```ts
 import { testAuthDB } from "@auth-ts/server/testing"
 
-testAuthDB(() => authDB) // your real callbacks, your real database
+testAuthDB(() => authDB) // your four functions, your real database
 ```
 
-- [ ] Lift the memory-db cases into a parameterised suite: the three `upsertUser`
-      shapes (identifier-keyed merge touching only `name` and `imageURL`, bare
-      insert for guests, id-targeted full update), `type` insert-only on the
-      identifier path, connection upsert with and without an email, deletes that
-      return what they removed and cascade to sessions, `deleteExpired`, and the
-      rate-limit window reset.
+- [ ] Lift the memory-db cases into a parameterised suite: equality `where` on
+      one column and on several, `limit` and `offset`, `orderBy` in both
+      directions and over a date column, `insert` returning the stored row,
+      `update` applying only what it was given, `delete` returning every row it
+      removed, and `cleanup` sweeping the three tables that expire.
+- [ ] Add the duplicate-insert check for each unique set, which is the one thing
+      a consumer can get structurally wrong: `users.email`,
+      `users.phoneNumber`, `sessions.tokenHash`, and
+      `connections (provider, providerAccountId)` must throw rather than merge.
+      Note the limit honestly — a test can prove the constraint exists by
+      inserting twice in sequence, but the failure it prevents only shows under
+      a race.
 - [ ] Run it from the reference application against Neon in CI, so the example's
       `auth-db.ts` — the file people will copy — is proven rather than believed.
-- [ ] Add the SQL footnote to the `upsertUser` contract: if your upsert needs
-      something to `SET`, touch `updatedAt`.
-- [ ] State the required uniqueness per table in the `AuthDB` reference —
-      `users.email`, `users.phoneNumber`, `sessions.tokenHash`,
-      `magicCodes.identifier`, `rateLimits.key`, and
-      `connections (provider, providerAccountId)` — as a requirement of the
-      contract, not a comment in the example's schema. The suite cannot check
-      this: calling `upsertConnection` twice and listing one row passes with or
-      without the index, because the missing constraint only shows under a
-      race. It is the one part of the contract a test cannot stand in for, and
-      the part a get-then-write implementation silently gets wrong.
 
 This is what lets the "Not building" entry below mean "we give you the spec and
 the test" rather than "good luck".
@@ -285,9 +279,10 @@ flag that revokes on sign-in.
 
 ### Lifecycle webhooks
 
-Mostly unnecessary by construction: **the callbacks are the hooks.** Your
-`upsertUser` knows when it inserts, which is where the welcome email belongs. A
-webhook layer would be a second, worse copy of information you already have.
+Mostly unnecessary by construction: **your four functions are the hooks.** Your
+`insert` knows when a `users` row is created, which is where the welcome email
+belongs. A webhook layer would be a second, worse copy of information you
+already have.
 
 ### Native application OAuth
 
@@ -300,22 +295,22 @@ with no cookie jar, so this is the redirect handling rather than the token model
 
 Declining these is a design position, not a backlog.
 
-### Database adapters — ever
+### Database adapter packages — ever
 
 Adapters are a standing promise to track someone else's schema conventions, and
-they always leak: your table has an extra required column, a different id type, or
-a naming convention the adapter cannot express. The eighteen callbacks are the
-same code an adapter would generate, except you can read them and they are
-already written against your own tables.
+they always leak: your table has an extra required column, a different id type,
+or a naming convention the adapter cannot express. Four generic table functions
+are the same code an adapter would generate, except you can read them and they
+are already written against your own tables.
 
-**The callback interface is the product.** That is where the semver discipline
+**The database contract is the product.** That is where the semver discipline
 goes — and where the conformance suite above goes, because a contract you are
 asked to implement yourself owes you a way to check your work.
 
 ### Rotating the refresh token on every use
 
 Refresh tokens themselves are core to the design — stable per session, revoked
-through `deleteSession`. Only the rotate-on-every-refresh pattern is excluded.
+through `DELETE /sessions/:id`. Only the rotate-on-every-refresh pattern is excluded.
 
 The cookie is `HttpOnly`, host-only, and never crosses an origin, so rotation
 mostly defends against theft requiring a compromise that defeats rotation anyway.

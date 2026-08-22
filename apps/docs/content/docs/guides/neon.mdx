@@ -54,7 +54,7 @@ query on your owner connection silently sees everything.
 ## 4. Protect the auth tables — this one bites
 
 **Neon grants the `authenticated` role full access to everything in `public` when
-the Data API is enabled.** Your `users`, `sessions`, and `magicCodes` tables are
+the Data API is enabled.** Your `users`, `sessions`, and `verificationCodes` tables are
 not private by default, which means any signed-in user could read every account
 and every session hash straight from the REST endpoint.
 
@@ -64,8 +64,8 @@ except the owner, so your server keeps working and the Data API sees nothing:
 ```sql
 alter table "users" enable row level security;
 alter table "sessions" enable row level security;
-alter table "magicCodes" enable row level security;
-alter table "rateLimits" enable row level security;
+alter table "verificationCodes" enable row level security;
+alter table "attempts" enable row level security;
 alter table "connections" enable row level security;
 ```
 
@@ -111,7 +111,10 @@ the database returns only yours.
 ## If you are on Postgres 17
 
 `uuidv7()` is native in Postgres 18. On 17, install the `pg_uuidv7` extension —
-Neon supports it — or use `gen_random_uuid()`.
+Neon supports it — or use `gen_random_uuid()`. Either works: the library does not
+generate ids unless you hand it `generateId`, and never assumes they sort — it
+reads back whatever your column default produced. Time-sortable ids are worth having anyway, for the
+index locality rather than for anything the library does with them.
 
 ## If you use drizzle-kit push
 

@@ -1,7 +1,7 @@
 # Auth.ts
 
-**Free forever JWT auth in TypeScript — callbacks to write into any database.**
-No adapters, no service, no company.
+**Free forever JWT auth in TypeScript — four functions to write against any database.**
+No adapter packages, no service, no company.
 
 For applications that issue **their own** RS256 or ES256 tokens, for PostgREST
 and row-level-security backends — Neon's Data API, Supabase, self-hosted
@@ -16,7 +16,7 @@ rather than in application code.
 * `@auth-ts/cli` — `npx @auth-ts/cli keygen`: the signing key, the
   `AUTH_SECRET`, and the `public/jwks.json` to deploy with your app.
 
-Sign-in methods: email or SMS magic codes, GitHub, Google, and anonymous guests.
+Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous guests.
 
 ## Quickstart
 
@@ -34,7 +34,7 @@ import { createAuthServer } from "@auth-ts/server"
 
 export const authServer = createAuthServer({
   db: {
-    /* your queries — see the AuthDB reference */
+    /* four functions — see the AuthDB reference */
   },
   email: {
     sendCode: async ({ email, code }) => {
@@ -75,13 +75,14 @@ await authClient.verifyCode({ email, code })
 const token = await authClient.getToken()
 ```
 
-## Why no adapters
+## Why no adapter packages
 
 Adapters are a promise to track someone else's schema conventions forever, and
-they always leak. The eighteen callbacks are the same code an adapter would
-generate, except you can read them and they are already written against your own
-tables. That is the whole integration surface, and it is where the semver
-discipline goes.
+they always leak. Instead there are four functions — `select`, `insert`,
+`update`, `delete`, filtered by equality on columns the library names — plus an
+optional sweep. It is the same code an adapter would generate, except you can
+read it and it is already written against your own tables. That is the whole
+integration surface, and it is where the semver discipline goes.
 
 ## Design in one paragraph
 

@@ -4,16 +4,18 @@ description: Why the design is shaped like this.
 icon: CircleQuestionMark
 ---
 
-## Why no database adapters?
+## Why no database adapter packages?
 
 Because adapters are where this kind of library goes to die. Each one is a
 promise to track someone else's schema conventions forever, and they always leak —
 your table has an extra required column, or a different id type, or a naming
 convention the adapter cannot express.
 
-The callbacks are the same amount of code an adapter would generate, except you
-can read them, and they are already in the language your database queries are
-written in.
+Four generic table functions are the same amount of code an adapter would
+generate, except you can read them, and they are already in the language your
+database queries are written in. What the library asks in return is small and
+written down: five table names, a handful of unique constraints, and a `delete`
+that returns what it removed.
 
 ## Why not store the token in localStorage?
 

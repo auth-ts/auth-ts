@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Free forever JWT auth in TypeScript — callbacks to write into any database.
+description: Free forever JWT auth in TypeScript — four functions to write against any database.
 icon: BookOpen
 ---
 
@@ -8,15 +8,15 @@ A library for applications that issue **their own** RS256 or ES256 tokens, for
 PostgREST and row-level-security backends — Neon's Data API, Supabase,
 self-hosted PostgREST — or anything that trusts a JWKS URL.
 
-The library owns the authentication logic. You own the routing, the database, and
-email delivery, through callbacks.
+The library owns the authentication logic. You own the routing, the database,
+and email delivery — the database through four functions you write yourself.
 
 ## What it is not
 
 An OAuth authorization server, a hosted service, or the owner of your schema.
-There are no database adapters and there never will be: the callback interface
-*is* the integration point, which is why the library never needs to know what
-your tables look like.
+There are no database adapter packages and there never will be: four generic
+table functions *are* the integration point, which is why the library never
+needs to own your schema.
 
 ## Five steps
 
@@ -35,16 +35,16 @@ npx @auth-ts/cli keygen >> .env
 That prints `JWT_PRIVATE_KEY` and `AUTH_SECRET` as `.env` lines, and writes the
 public key set to `public/jwks.json` — a static file your framework serves at
 `/jwks.json`. The two values must differ: one signs tokens, the other keys the
-magic-code HMAC, and they have different blast radiuses.
+verification-code HMAC, and they have different blast radiuses.
 
-### 3. Write the callbacks
+### 3. Write the four functions
 
 ```ts
 import { createAuthServer } from "@auth-ts/server"
 
 export const authServer = createAuthServer({
   db: {
-    /* the callbacks — see the AuthDB reference */
+    /* select, insert, update, delete — see the AuthDB reference */
   },
   email: {
     sendCode: async ({ email, code }) => {

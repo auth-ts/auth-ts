@@ -1,65 +1,172 @@
 ---
 title: AuthDB
-description: The eighteen callbacks that connect this library to your database.
+description: The four functions that connect this library to your database.
 ---
 
 This interface is the product. You write these functions against your own tables,
 and in exchange the library never owns your schema, your migrations, or your data.
 
-Two conventions run through it. `upsert*` takes the entity; `get*`, `list*`, and
-`delete*` take a `where` query. And upserts are deliberate rather than split into
-create-and-update: the create-or-merge race is delegated to your store, where
-`ON CONFLICT`, `MERGE`, or `$setOnInsert` settles it atomically, instead of being
-relocated into this library as a read-then-write on every sign-in.
+There are four of them — `select`, `insert`, `update`, `delete` — plus an
+optional `cleanup`. Every query the library makes is one of those four against
+one of five tables, filtered by equality on named columns. There is no operator
+language to learn and none to implement: that is the property that makes the
+same four functions trivial against Drizzle, raw SQL, a data API, or a document
+store.
 
-Callbacks never receive request headers. Header-dependent session resolution is a
+Nothing here receives request headers. Header-dependent session resolution is a
 spoofable authentication bypass, and non-HTTP callers — tests, migrations, the
 in-memory fixture — drive this contract directly. For multi-tenancy, close over
 the tenant when you construct the server.
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthDB" />
 
-## The rules that are easy to get wrong
+## The tables
 
-These are not enforced by types, so they are worth reading once:
+The library names the tables and the columns it reads. If your schema names them
+differently, map them inside your four functions — that mapping is the entire
+cost of not having an adapter package.
 
-- **`upsertUser` has three shapes.** An identifier with no `id` looks up and
-  merges. No identifier at all always inserts — that is guest creation. An `id`
-  targets exactly that row, which is guest conversion and profile updates.
-- **On the identifier-keyed path, merge `name` and `imageURL` only.** That call
-  is a sign-in. `type` and your declared fields are insert-only there: merging
-  `type` would demote an administrator on their next sign-in, and merging your
-  fields would let any sign-in body rewrite profile columns. The id-targeted
-  form applies everything it is given — that is how `PATCH /user` edits.
-- **Your declared fields arrive flat**, beside the core ones, exactly as they sit
-  on the row — `values({ id, ...user })` is the whole insert.
-- **`deleteUser` must remove the user's sessions.** A cascade does this for free.
-  An account that keeps a live refresh token is still a working login.
-- **The single-row deletes return what they deleted** — `deleteUser`,
-  `deleteSession`, `deleteMagicCode`, and `deleteConnection` resolve to the row
-  (`DELETE … RETURNING *`, `findOneAndDelete`, `OUTPUT deleted.*`) or `null` when
-  nothing matched. Core relies on that: it is how a revoke answers 404 without a
-  second query, and how a magic code becomes usable exactly once.
-  `deleteSessions` returns the array of rows it removed, and `deleteExpired`
-  returns nothing.
-- **`deleteMagicCode` must match on `codeHash` when it is given**, in one
-  statement. Two requests can both read the row and both pass the HMAC check;
-  the database lets only one of them delete it. That single conditional delete
-  is the whole one-time guarantee — the same conditional delete that Auth.js's
-  `useVerificationToken` and InstantDB's `consume!` rely on.
-- **`upsertRateLimit` is an atomic increment, and the store owns the count.**
-  Insert with `count = 1` if the key is absent or its window has passed;
-  otherwise add one and keep the existing `resetAt` — in one statement
-  (`ON CONFLICT … DO UPDATE SET count = CASE …`). Core never reads the counter
-  first: a read-then-write lets ten parallel requests each see the same value
-  and register as one, which is exactly the burst a limiter exists to stop. The
-  same increment carries the five-guess cap on magic codes, keyed on the code's
-  hash, so it is called on a wrong guess even with `rateLimit: false`.
-- **`deleteSession({ id, userId })` must filter on both columns**, so that
-  revoking another user's session id matches nothing.
-- **`deleteExpired` takes no arguments.** Expired means expired now, and your
-  database already knows the time — `expiresAt < now()` avoids any skew between
-  your application server and Postgres.
+| table | columns | unique | indexed | swept |
+| --- | --- | --- | --- | --- |
+| `users` | `id`, `email`, `phoneNumber`, `name`, `imageURL`, `type`, `primaryUserId`, + your declared fields | `email`, `phoneNumber` | | |
+| `sessions` | `id`, `userId`, `tokenHash`, `createdAt`, `expiresAt`, `userAgent`, `ipAddress` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
+| `verificationCodes` | `id`, `identifier`, `codeHash`, `purpose`, `expiresAt` | | `identifier`, `expiresAt` | `expiresAt` |
+| `attempts` | `id`, `key`, `expiresAt` | | `key`, `expiresAt` | `expiresAt` |
+| `connections` | `id`, `userId`, `provider`, `providerAccountId`, `email` | `(provider, providerAccountId)` | `userId` | |
+
+**The unique constraints are a requirement, not hygiene.** The library reads
+before it writes — that is what a generic contract can express — so two first
+sign-ins for one email both find nothing and both insert. The unique index is
+what turns that race into one failed request instead of two accounts for the
+same person, and the same is true of `(provider, providerAccountId)` for
+provider links. Nothing else in the design defends against it, and no test can
+stand in for it: inserting twice and reading one row passes with or without the
+index, because the missing constraint only shows under a race.
+
+## The rules
+
+- **`where` is equality only** — a plain object of column/value pairs, all of
+  which must match. No operators, no ranges, no `OR`. One operator would be the
+  thin end of a query language.
+- **`select` takes `limit`, `offset`, and `orderBy`, always.** Nothing is
+  optional, so there is no `undefined` to branch on and your implementation has
+  one code path. `orderBy` is one column and a direction — `{ createdAt: "desc" }`
+  — which is enough for "newest" and for paging, and the smallest ordering every
+  store can express.
+- **`insert` returns the row as stored.** That is how the library learns
+  anything your database decided, the `id` above all. A unique violation must
+  throw rather than merge: the library reads before it inserts, and the
+  constraint is deliberately the arbiter of the race between the two.
+- **Ids are yours.** The row arrives without one unless you set
+  [`generateId`](/docs/reference/create-auth-server#generating-ids), so your `uuidv7()` default,
+  `$defaultFn`, or identity column fills it as it always would.
+- **`update` never receives an empty set.** The library composes the fields
+  itself and skips the call entirely when a request changes nothing, so you need
+  no guard against the `UPDATE … SET` with no columns that most query builders
+  reject. It returns nothing: the library already holds the row it is updating.
+- **`delete` returns what it removed**, as an array. Those rows are proof: they
+  are how a revoke answers 404 rather than 204 without a second query, and how a
+  verification code becomes usable exactly once. Two verifiers can both read a code and
+  both pass the check; only one of them deletes the row, and the other gets an
+  empty array. That single atomic conditional delete is the one concurrency
+  property this contract asks of your store.
+- **`cleanup` is optional and takes no arguments.** Implement it and the library
+  calls it for you — awaited, at most once a minute, and only after a request
+  that could have written something. Leave it out and the schedule is yours: a
+  cron, a scheduled worker, a partitioned table. **Something has to do it**:
+  `attempts` grows by a row per counted request, so a deployment that sweeps
+  nowhere grows without bound under a flood. Expired means expired *now*, and
+  your database already knows the time, so `expiresAt < now()` avoids any skew
+  between your application server and it.
+
+## Rate limiting is a log, not a counter
+
+The `attempts` table holds one row per counted request, under a key that
+contains the window: `sendCode:ip:203.0.113.7:1755864000000`. Counting is an
+insert and a read capped at `max + 1`; a window that has passed is simply a set
+of old rows waiting for the sweep — which is why something has to sweep, whether
+that is `cleanup` or a cron of your own. Nothing is read-modify-written, so no attempt
+can be lost and no atomic increment is required of your store — which is what
+lets rate limiting stay inside these four functions instead of needing a
+special-purpose fifth.
+
+The honest trade: this is not exact. Each request's read sees every insert
+committed before it ran, so requests that are genuinely simultaneous can each
+read a number below the cap in the instant before the others land. The overshoot
+is bounded by that burst's concurrency and cannot be repeated — once it settles,
+the rest of the window is refused. For a six-digit code that is roughly twenty
+guesses instead of five, once, against a million values.
+
+If you want exactness, put it in front: a rule at your edge on `/send-code` and
+`/verify-code` counts a burst more precisely than any database round trip, and
+you can then set `rateLimit: false`. The five-guess cap on each individual code
+is not a rate limit, is keyed on the code rather than the caller, and stays on
+regardless — nothing in front of this server can enforce it.
+
+## Writing your implementation
+
+Two shapes work. A **table dictionary** needs no `switch` and no casts of its
+own — this is the whole implementation from the reference application:
+
+```ts
+const tables = {
+  users,
+  sessions,
+  verificationCodes,
+  attempts,
+  connections
+} satisfies Record<AuthTable, AnyPgTable>
+
+export const authDB: AuthDB = {
+  select: (async ({ table, where, limit, offset, orderBy }) => {
+    const [[name, direction] = ["id", "asc"]] = Object.entries(orderBy)
+    const order = direction === "asc" ? asc : desc
+
+    return db
+      .select()
+      .from(tableOf(table))
+      .where(matches(table, where))
+      .orderBy(order(columnOf(table, name)))
+      .limit(limit)
+      .offset(offset)
+  }) as AuthDB["select"]
+  // ...
+}
+```
+
+A **`switch` per table** is the shape to reach for with raw SQL, where each
+table's query is genuinely different. Wrap it in `defineAuthDB` and the input
+narrows with the table name:
+
+```ts
+import { defineAuthDB } from "@auth-ts/server"
+
+export const authDB = defineAuthDB({
+  async select({ table, where, limit }) {
+    switch (table) {
+      // `where` is Partial<AuthUser> in this branch,
+      case "users":
+        return run(`select * from users where email = $1 limit $2`, [
+          where.email,
+          limit
+        ])
+      // and Partial<AuthAttempt> in this one.
+      case "attempts":
+        return run(`select * from attempts where key = $1 limit $2`, [
+          where.key,
+          limit
+        ])
+      // ...
+    }
+  }
+  // ...
+})
+```
+
+`defineAuthDB` exists for one reason: a union-typed implementation cannot be
+*proven* to satisfy a generic signature, only asserted — the same reason an
+overload has an implementation signature. The helper holds that assertion once,
+so your code has none.
 
 ## Typing your implementation
 
@@ -67,30 +174,38 @@ These are not enforced by types, so they are worth reading once:
 schema once, and both sides agree:
 
 ```ts
-import type { AdditionalFieldsSchema, AuthDB } from "@auth-ts/server"
+import type { AdditionalFieldsSchema } from "@auth-ts/server"
+import { defineAuthDB } from "@auth-ts/server"
 
 export const additionalFields = {
   plan: "string",
   seats: "number"
 } satisfies AdditionalFieldsSchema
 
-export const authDB: AuthDB<typeof additionalFields> = {
-  async upsertUser({ id, ...user }) {
-    // user.plan is string | undefined here, and the row you return
-    // is checked for plan?: string | null
+export const authDB = defineAuthDB<typeof additionalFields>({
+  async insert({ table, values }) {
+    switch (table) {
+      case "users":
+        // row.plan is string | undefined here, and the row you hand back
+        // is checked for plan?: string | null
+        return run(`insert into users … returning *`, [row.plan, row.seats])
+      // ...
+    }
   }
   // ...
-}
+})
 
 createAuthServer({ db: authDB, user: { additionalFields } })
 ```
 
-The bare `AuthDB` is accepted by any server: it sees the fields as an open map,
-which is what a `select *` returns anyway. A server checks a typed adapter
-against the schema it was given rather than inferring the schema from it, so
-`user.additionalFields` stays the one source of truth.
+Your declared fields ride flat on the `users` row, beside the core ones, so
+`values(row)` is the whole insert. The bare `AuthDB` is accepted by any server:
+it sees those fields as an open map, which is what a `select *` returns anyway.
+A server checks a typed implementation against the schema it was given rather
+than inferring the schema from it, so `user.additionalFields` stays the one
+source of truth.
 
-## The entities
+## The rows
 
 The core fields of a user. Your declared additional fields sit beside them on
 `AuthUser`, typed from the schema you declare.
@@ -99,11 +214,11 @@ The core fields of a user. Your declared additional fields sit beside them on
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthSession" />
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthMagicCode" />
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthVerificationCode" />
+
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthAttempt" />
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthConnection" />
-
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthRateLimit" />
 
 ## Testing your implementation
 
@@ -116,4 +231,5 @@ const db = createMemoryDb()
 ```
 
 Testing against it means testing against the same semantics the library verifies
-itself with, rather than a simplified mock that agrees with your assumptions.
+itself with, rather than a simplified mock that agrees with your assumptions —
+including the unique constraints above, which it enforces and throws on.
