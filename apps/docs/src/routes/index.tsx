@@ -1,10 +1,31 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock"
 import { HomeLayout } from "fumadocs-ui/layouts/home"
+import { ArrowRight } from "lucide-react"
+import { Fragment } from "react"
+import { GitHubIcon } from "~/components/github-icon"
 import { Logo } from "~/components/logo"
 import { baseOptions, REPO_URL } from "~/lib/layout.shared"
 
 export const Route = createFileRoute("/")({ component: LandingPage })
+
+/**
+ * The facts a reader would otherwise have to open package.json for. Kept beside
+ * the mark rather than buried in the feature list because they are the questions
+ * that decide whether the rest of the page is worth reading.
+ */
+/**
+ * The three claims, lifted out of the paragraph they used to end. Set apart
+ * they carry the argument; buried behind an em-dash they read as an aside.
+ */
+const CLAIMS = ["No adapters", "No service", "No company"]
+
+const SPECS = [
+  ["Runtime", "Node 20+, Workers, Deno, Bun"],
+  ["Algorithms", "RS256, ES256"],
+  ["Dependencies", "jose"],
+  ["License", "Apache-2.0"]
+]
 
 const FEATURES = [
   {
@@ -72,40 +93,85 @@ function LandingPage() {
 
 function Hero() {
   return (
-    <section className="border-fd-border relative overflow-hidden border-b">
-      {/* A soft wash behind the fold, so the first screen is not flat white. */}
-      <div
-        aria-hidden
-        className="from-fd-primary/10 pointer-events-none absolute inset-0 bg-radial-[at_50%_0%] to-transparent to-70%"
-      />
-      <div className="relative mx-auto flex max-w-5xl flex-col items-center gap-6 px-6 py-24 text-center md:py-32">
-        <Logo className="text-fd-primary size-14" />
-        <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-6xl">
-          Free forever JWT auth in TypeScript
-        </h1>
-        <p className="text-fd-muted-foreground max-w-2xl text-lg text-pretty md:text-xl">
-          Callbacks to write into any database. No adapters, no service, no
-          company — your application issues its own tokens, and Postgres decides
-          what they can reach.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <Link
-            to="/docs/$"
-            params={{ _splat: "" }}
-            className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
-          >
-            Get started
-          </Link>
-          <a
-            href={REPO_URL}
-            className="border-fd-border bg-fd-card hover:bg-fd-accent hover:text-fd-accent-foreground rounded-lg border px-5 py-2.5 text-sm font-medium transition-colors"
-          >
-            GitHub
-          </a>
+    <section className="border-fd-border border-b">
+      <div className="mx-auto grid max-w-5xl gap-x-12 gap-y-10 px-6 py-20 md:py-28 lg:grid-cols-[1.5fr_1fr] lg:items-end">
+        <div>
+          {/*
+           * The mark and the wordmark are one line and the largest thing here.
+           * The sentence under them is the descriptive half of the heading, so
+           * it stays inside the h1 rather than becoming a second element.
+           */}
+          <h1 className="flex flex-col gap-4">
+            <span className="flex items-center gap-2 text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
+              <Logo className="text-fd-primary size-14 md:size-20" />
+              Auth.ts
+            </span>
+            <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl">
+              {/*
+               * A drawn double rule rather than `underline`: text-decoration
+               * sits at a fixed offset and hugs the descenders, so at display
+               * sizes it reads as a typo'd link. These two bars are in `em`, so
+               * the weight and the space between them hold as the heading
+               * changes size. "Free forever" has no descenders to clear, which
+               * is what lets them sit this close to the baseline.
+               */}
+              <span className="relative whitespace-nowrap before:absolute before:inset-x-0 before:-bottom-[0.08em] before:h-[0.055em] before:rounded-full before:bg-fd-primary before:content-[''] after:absolute after:inset-x-0 after:bottom-[0.05em] after:h-[0.055em] after:rounded-full after:bg-fd-primary after:content-['']">
+                Free forever
+              </span>{" "}
+              auth in TypeScript.
+            </span>
+          </h1>
+          <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty">
+            Callbacks to write into any database. Your application issues its
+            own JWTs, verified by anything that trusts a JWKS URL.
+          </p>
+          <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-medium">
+            {CLAIMS.map((claim, index) => (
+              <Fragment key={claim}>
+                {index > 0 && (
+                  <span aria-hidden className="text-fd-primary">
+                    /
+                  </span>
+                )}
+                {claim}
+              </Fragment>
+            ))}
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link
+              to="/docs/$"
+              params={{ _splat: "" }}
+              className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
+            >
+              Get started
+              <ArrowRight className="size-4" />
+            </Link>
+            <a
+              href={REPO_URL}
+              className="hover:text-fd-primary inline-flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <GitHubIcon className="size-4" />
+              GitHub
+            </a>
+          </div>
+          <div className="mt-8 max-w-md">
+            <DynamicCodeBlock
+              lang="bash"
+              code="bun add @auth-ts/server @auth-ts/client"
+            />
+          </div>
         </div>
-        <code className="border-fd-border bg-fd-card text-fd-muted-foreground mt-2 rounded-lg border px-4 py-2 font-mono text-sm">
-          bun add @auth-ts/server @auth-ts/client
-        </code>
+        <dl className="text-sm">
+          {SPECS.map(([term, value]) => (
+            <div
+              key={term}
+              className="border-fd-border flex items-baseline justify-between gap-6 border-b py-2.5 first:border-t"
+            >
+              <dt className="text-fd-muted-foreground">{term}</dt>
+              <dd className="text-end font-mono">{value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   )
@@ -113,27 +179,31 @@ function Hero() {
 
 function Features() {
   return (
-    <section className="border-fd-border mx-auto grid max-w-5xl border-b sm:grid-cols-2 lg:grid-cols-3">
-      {FEATURES.map((feature) => (
-        <div
-          key={feature.title}
-          className="border-fd-border border-t p-6 sm:[&:nth-child(-n+2)]:border-t-0 sm:odd:border-r lg:[&:nth-child(-n+3)]:border-t-0 lg:odd:border-r-0 lg:[&:not(:nth-child(3n))]:border-r"
-        >
-          <h2 className="font-medium">{feature.title}</h2>
-          <p className="text-fd-muted-foreground mt-2 text-sm text-pretty">
-            {feature.body}
-          </p>
-        </div>
-      ))}
+    <section className="border-fd-border border-b">
+      <div className="mx-auto grid max-w-5xl gap-x-10 gap-y-9 px-6 py-16 sm:grid-cols-2 lg:grid-cols-3">
+        {FEATURES.map((feature, index) => (
+          <div key={feature.title} className="border-fd-border border-t pt-4">
+            <span className="text-fd-primary font-mono text-xs">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <h2 className="mt-2 font-medium">{feature.title}</h2>
+            <p className="text-fd-muted-foreground mt-1.5 text-sm text-pretty">
+              {feature.body}
+            </p>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }
 
 function Snippets() {
   return (
-    <section className="mx-auto grid max-w-5xl gap-8 px-6 py-16 lg:grid-cols-2">
+    <section className="border-fd-border mx-auto grid max-w-5xl gap-10 border-b px-6 py-16 lg:grid-cols-2">
       <div className="space-y-3">
-        <h2 className="text-xl font-semibold tracking-tight">On the server</h2>
+        <h2 className="font-mono text-sm">
+          <span className="text-fd-primary">01</span> On the server
+        </h2>
         <p className="text-fd-muted-foreground text-sm text-pretty">
           Write the callbacks, mount <code>authServer.handler</code> once at{" "}
           <code>/api/auth/*</code>, and point your database at the JWKS URL.
@@ -141,7 +211,9 @@ function Snippets() {
         <DynamicCodeBlock lang="ts" code={SERVER_SNIPPET} />
       </div>
       <div className="space-y-3">
-        <h2 className="text-xl font-semibold tracking-tight">In the browser</h2>
+        <h2 className="font-mono text-sm">
+          <span className="text-fd-primary">02</span> In the browser
+        </h2>
         <p className="text-fd-muted-foreground text-sm text-pretty">
           Zero runtime dependencies. The access token lives in memory only, and
           is refreshed from an httpOnly cookie.
@@ -154,23 +226,23 @@ function Snippets() {
 
 function Closing() {
   return (
-    <section className="border-fd-border border-t">
-      <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-6 py-16 text-center">
+    <section className="mx-auto flex max-w-5xl flex-wrap items-end justify-between gap-6 px-6 py-16">
+      <div>
         <h2 className="text-2xl font-semibold tracking-tight">
           Five steps to a signed token
         </h2>
-        <p className="text-fd-muted-foreground max-w-xl text-pretty">
+        <p className="text-fd-muted-foreground mt-2 max-w-md text-pretty">
           Install, generate a key, write the callbacks, mount one route, and
           point your database at it.
         </p>
-        <Link
-          to="/docs/$"
-          params={{ _splat: "" }}
-          className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 mt-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
-        >
-          Read the introduction
-        </Link>
       </div>
+      <Link
+        to="/docs/$"
+        params={{ _splat: "" }}
+        className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
+      >
+        Read the introduction
+      </Link>
     </section>
   )
 }

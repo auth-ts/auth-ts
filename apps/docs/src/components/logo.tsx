@@ -3,12 +3,19 @@ import type { SVGProps } from "react"
 /**
  * The Auth.ts mark. It paints with `currentColor`, so it takes whatever text
  * colour surrounds it and needs no light/dark variants.
+ *
+ * The viewBox is cropped to the artwork rather than left at the exported
+ * `0 0 1254 1254`, which padded the shape with 17% dead space on every side and
+ * made the mark render small and float away from anything set beside it. The
+ * box is square and centred on the path's bounding box (820 × 905 at 217,168),
+ * sized so the longer axis fills 20/24 of it — the same proportion lucide uses,
+ * so `size-*` means the same thing here as on every other icon on the page.
  */
 export function Logo(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 1254 1254"
+      viewBox="84 78 1086 1086"
       fill="currentColor"
       aria-hidden="true"
       {...props}
