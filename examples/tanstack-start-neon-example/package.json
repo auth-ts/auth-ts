@@ -17,7 +17,8 @@
     "preview": "vite preview",
     "deploy": "bun run build && wrangler deploy",
     "typecheck": "tsc -p tsconfig.json",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "keygen": "bun x auth-ts keygen"
   },
   "dependencies": {
     "@auth-ts/client": "workspace:*",
