@@ -25,6 +25,7 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   notFound: "Not found.",
   methodNotAllowed: "That method is not allowed here.",
   forbiddenOrigin: "This request came from a site that is not allowed.",
+  unsupportedMediaType: "Request bodies must be sent as JSON.",
   guestCannotReceiveCode:
     "Add an email address or phone number before continuing.",
   providerUnavailable:

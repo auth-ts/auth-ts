@@ -90,11 +90,19 @@ simple content type goes out without a preflight, cookie attached. `SameSite=Lax
 confines that to the same site, which still leaves a sibling subdomain — or a
 browser that does not enforce it — able to sign the user out, sign them into
 someone else's account, or have a guest's session merged into an attacker's. So
-every non-`GET` request that carries an `Origin` must name the server's own
-origin, its `baseURL`, or its `cors.origin`; anything else is refused with
-**403 `forbiddenOrigin`** before the body is parsed. A request with no `Origin`
-is a non-browser client, which holds no cookie and cannot be made to act for
-anyone.
+every non-`GET` request that carries an `Origin` (or, failing that, a `Referer`)
+must name the server's own origin, its `baseURL`, or its `cors.origin`; anything
+else is refused with **403 `forbiddenOrigin`** before the body is parsed. A
+request with neither header is a non-browser client, which holds no cookie and
+cannot be made to act for anyone.
+
+**Request bodies must be `application/json`**, or the answer is **415
+`unsupportedMediaType`**. This is the second, independent layer: a page cannot
+send that content type cross-origin without a preflight, and the preflight
+approves only `cors.origin` — so the browser enforces it before any header
+reaches the server, including when a privacy extension has stripped `Origin`.
+The client already sends it; bodiless requests such as `POST /token` are
+untouched.
 
 ## Accounts
 
