@@ -361,15 +361,19 @@ describe("multiAccount enabled", () => {
     ).toBe(401)
   })
 
-  it("signs out only the active account with account: current, promoting the next", async () => {
+  it("signs out the named account and promotes the next", async () => {
     const context = await createTestServer(options)
     const first = await signIn(context, "ada@example.com")
     const second = await signIn(context, "grace@example.com", first.cookies)
+    const grace = required(
+      context.db.users().find((user) => user.email === "grace@example.com"),
+      "grace"
+    )
 
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { account: "current" }
+        body: { userId: grace.id }
       })
     )
     const body = (await response.json()) as {
@@ -439,11 +443,15 @@ describe("multiAccount enabled", () => {
     const graceElsewhere = await signIn(context, "grace@example.com")
     const first = await signIn(context, "ada@example.com")
     const second = await signIn(context, "grace@example.com", first.cookies)
+    const graceId = required(
+      context.db.users().find((user) => user.email === "grace@example.com"),
+      "grace"
+    ).id
 
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { scope: "global", account: "current" }
+        body: { scope: "global", userId: graceId }
       })
     )
     const body = (await response.json()) as { switchedTo: { email: string } }
@@ -473,7 +481,7 @@ describe("multiAccount enabled", () => {
     ).toBe(401)
   })
 
-  it("ignores account for scope: others, which reaches devices rather than accounts", async () => {
+  it("reaches every signed-in account's other devices, and none of this browser's", async () => {
     const context = await createTestServer(options)
     const adaElsewhere = await signIn(context, "ada@example.com")
     const first = await signIn(context, "ada@example.com")
@@ -482,14 +490,16 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { scope: "others", account: "all" }
+        body: { scope: "others" }
       })
     )
 
     expect(response.status).toBe(204)
     expect(readSetCookies(response).size).toBe(0)
-    // Grace's and Ada's sessions in this browser survive; so does Ada elsewhere.
-    expect(context.db.sessions()).toHaveLength(3)
+    // Naming no account means every account here, and `others` says how far
+    // each one reaches: Ada's session elsewhere goes, both of this browser's
+    // stay. Name a `userId` to reach only that account's other devices.
+    expect(context.db.sessions()).toHaveLength(2)
     expect(
       (
         await context.authServer.handler(
@@ -503,7 +513,96 @@ describe("multiAccount enabled", () => {
           })
         )
       ).status
+    ).toBe(401)
+    expect(
+      (
+        await context.authServer.handler(
+          request("POST", "/api/auth/token", { cookies: second.cookies })
+        )
+      ).status
     ).toBe(200)
+  })
+
+  it("signs out a parked account and leaves the active one alone", async () => {
+    const context = await createTestServer(options)
+    const first = await signIn(context, "ada@example.com")
+    const second = await signIn(context, "grace@example.com", first.cookies)
+    const adaId = required(
+      context.db.users().find((user) => user.email === "ada@example.com"),
+      "ada"
+    ).id
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", {
+        cookies: second.cookies,
+        body: { userId: adaId }
+      })
+    )
+
+    // Grace is still the active account, so the refresh cookie does not move —
+    // only the parked list does.
+    expect(response.status).toBe(204)
+    expect(readSetCookies(response).has("auth-ts.refresh")).toBe(false)
+    expect(context.db.sessions()).toHaveLength(1)
+    expect(
+      (
+        await context.authServer.handler(
+          request("POST", "/api/auth/token", { cookies: second.cookies })
+        )
+      ).status
+    ).toBe(200)
+  })
+
+  it("refuses an account that is not signed in here", async () => {
+    const context = await createTestServer(options)
+    await signIn(context, "grace@example.com")
+    const session = await signIn(context, "ada@example.com")
+    const graceId = required(
+      context.db.users().find((user) => user.email === "grace@example.com"),
+      "grace"
+    ).id
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", {
+        cookies: session.cookies,
+        body: { userId: graceId }
+      })
+    )
+
+    expect(response.status).toBe(404)
+    expect(context.db.sessions()).toHaveLength(2)
+  })
+
+  it("moves to the next account when the current session is revoked from the devices list", async () => {
+    // Revoking the session you are using is a local sign-out. Clearing the
+    // cookie without promoting would leave the browser signed out while its
+    // accounts cookie still listed live sessions it could no longer reach.
+    const context = await createTestServer(options)
+    const first = await signIn(context, "ada@example.com")
+    const second = await signIn(context, "grace@example.com", first.cookies)
+
+    const listed = await context.authServer.handler(
+      request("GET", "/api/auth/sessions", { cookies: second.cookies })
+    )
+    const { sessions } = (await listed.json()) as {
+      sessions: { id: string; current: boolean }[]
+    }
+    const current = required(
+      sessions.find((session) => session.current),
+      "current session"
+    )
+    const response = await context.authServer.handler(
+      request("DELETE", `/api/auth/sessions/${current.id}`, {
+        cookies: second.cookies
+      })
+    )
+    const body = (await response.json()) as {
+      current: boolean
+      switchedTo?: { email: string }
+    }
+
+    expect(body.current).toBe(true)
+    expect(body.switchedTo?.email).toBe("ada@example.com")
+    expect(readSetCookies(response).get("auth-ts.refresh")).toBeTruthy()
   })
 
   it("clears both cookies when the last account signs out", async () => {

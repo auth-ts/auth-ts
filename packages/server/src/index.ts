@@ -65,7 +65,6 @@ export type {
 export type { SignInProviderInput } from "./endpoints/sign-in/$provider"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest"
 export type {
-  SignOutAccount,
   SignOutInput,
   SignOutScope
 } from "./endpoints/sign-out"

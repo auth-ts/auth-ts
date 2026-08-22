@@ -101,7 +101,7 @@ describe("signOut", () => {
     expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
   })
 
-  it("sends the account axis only when it is given", async () => {
+  it("names an account only when it is given one", async () => {
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
@@ -109,10 +109,10 @@ describe("signOut", () => {
     await client.signOut()
     expect(server.requests.at(-1)?.body).toEqual({ scope: "local" })
 
-    await client.signOut({ scope: "global", account: "current" })
+    await client.signOut({ scope: "global", userId: "user_ada" })
     expect(server.requests.at(-1)?.body).toEqual({
       scope: "global",
-      account: "current"
+      userId: "user_ada"
     })
   })
 

@@ -29,19 +29,18 @@ export function createUpdateUser(internals: AuthClientInternals) {
 /** How far a sign-out reaches, for each account it applies to. */
 export type SignOutScope = "local" | "others" | "global"
 
-/**
- * Which of this browser's accounts a sign-out applies to, under `multiAccount`.
- *
- * `"all"` — the default, as in Clerk — signs out every account
- * in this browser. `"current"` signs out only the active one and the server
- * promotes the next parked account, if any. Ignored for `scope: "others"`.
- */
-export type SignOutAccount = "all" | "current"
-
 /** Input for signing out. */
 export interface SignOutInput {
   scope?: SignOutScope
-  account?: SignOutAccount
+  /**
+   * Which of this browser's accounts to sign out, under `multiAccount`.
+   *
+   * Omit it — the default, as in Clerk — and every account signed in here
+   * goes. Name one and only that account goes: the active one, in which case
+   * the server promotes the next parked account, or a parked one, which leaves
+   * the active session untouched.
+   */
+  userId?: string
 }
 
 /**
@@ -49,8 +48,8 @@ export interface SignOutInput {
  *
  * `"others"` deliberately clears nothing locally — it is the "sign out my other
  * devices" button, and this device is meant to survive it. The other two scopes
- * clear the token and the user mirror; with `account: "current"` under multiple
- * accounts the server may promote the next one, in which case the caches are
+ * clear the token and the user mirror; when the account signed out was the
+ * active one and another is parked, the server promotes it and the caches are
  * primed with that user instead of emptied.
  */
 export function createSignOut(
@@ -66,7 +65,7 @@ export function createSignOut(
     >({
       method: "POST",
       path: "/sign-out",
-      body: { scope, ...(input.account ? { account: input.account } : {}) }
+      body: { scope, ...(input.userId ? { userId: input.userId } : {}) }
     })
 
     if (scope === "others") return null

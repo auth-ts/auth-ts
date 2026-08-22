@@ -1,6 +1,12 @@
+import type { AuthUser } from "../../core/auth-db"
 import { AuthApiError, unauthenticated } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { clearCookie, shouldUseSecureCookies } from "../../lib/serialize-cookie"
+import {
+  pruneDeadAccounts,
+  readAccountsCookie
+} from "../../session/accounts-cookie"
+import { promoteNextAccount } from "../../session/promote-account"
 import { resolveSession } from "../../session/resolve-session"
 
 /** Input for revoking one session. */
@@ -19,6 +25,14 @@ export interface RevokeSessionResult {
    * to list every session first just to learn what the server already knew.
    */
   current: boolean
+  /**
+   * The account the browser moved to, when revoking the current session left
+   * another one parked here under `multiAccount`. Revoking the session you are
+   * using is a local sign-out, and a sign-out that stranded the browser on no
+   * account while it still held live ones would be a session nobody could see
+   * to revoke.
+   */
+  switchedTo?: AuthUser
 }
 
 /**
@@ -55,21 +69,38 @@ export const revokeSession = defineEndpoint({
     // to go too — otherwise the browser keeps presenting a token that no longer
     // resolves and every later request looks mysteriously unauthenticated.
     const current = revoked.tokenHash === resolved.tokenHash
-    const responseHeaders = new Headers()
-    if (current) {
-      responseHeaders.append(
-        "set-cookie",
-        clearCookie(
-          internals.config.cookie.name,
-          internals.config.cookie.path,
-          shouldUseSecureCookies(input.requestURL)
-        )
-      )
+    if (!current) {
+      const data: RevokeSessionResult = { current }
+      return { data }
     }
 
-    return {
-      data: { current } satisfies RevokeSessionResult,
-      headers: responseHeaders
+    const secure = shouldUseSecureCookies(input.requestURL)
+    const parked = internals.config.multiAccount
+      ? await pruneDeadAccounts(
+          internals,
+          readAccountsCookie(internals, headers)
+        )
+      : []
+    const promoted = await promoteNextAccount(internals, parked, secure)
+    if (promoted) {
+      const data: RevokeSessionResult = {
+        current,
+        switchedTo: promoted.user
+      }
+      return { data, headers: promoted.headers }
     }
+
+    const responseHeaders = new Headers()
+    responseHeaders.append(
+      "set-cookie",
+      clearCookie(
+        internals.config.cookie.name,
+        internals.config.cookie.path,
+        secure
+      )
+    )
+
+    const data: RevokeSessionResult = { current }
+    return { data, headers: responseHeaders }
   }
 })

@@ -341,7 +341,7 @@ function AccountPage() {
             <button
               type="button"
               onClick={async () => {
-                const result = await authClient.signOut({ account: "current" })
+                const result = await authClient.signOut({ userId: user.id })
                 queryClient.clear()
                 if (result?.switchedTo) {
                   const label =

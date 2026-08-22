@@ -1,14 +1,11 @@
-import type { AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
-import { unauthenticated } from "../http/auth-api-error"
+import { AuthApiError, unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
-import { selectOne } from "../lib/select-one"
 import {
   clearCookie,
   serializeCookie,
   shouldUseSecureCookies
 } from "../lib/serialize-cookie"
-import type { ParkedAccount } from "../session/accounts-cookie"
 import {
   parkedTokens,
   pruneDeadAccounts,
@@ -16,6 +13,7 @@ import {
   serializeAccounts
 } from "../session/accounts-cookie"
 import { mintAccessToken } from "../session/issue-session"
+import { promoteNextAccount } from "../session/promote-account"
 import { resolveSession } from "../session/resolve-session"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
 
@@ -27,25 +25,22 @@ import { revokeOtherSessions } from "../session/revoke-other-sessions"
  */
 export type SignOutScope = "local" | "others" | "global"
 
-/**
- * Which of this browser's accounts a sign-out applies to, under `multiAccount`.
- *
- * `"all"` is the default — the same default Clerk uses — because
- * the person clicking "sign out" on a shared computer means *everyone*, and a
- * button that quietly left four other accounts one click away would be the
- * surprising behaviour. `"current"` is the account switcher's "sign out of this
- * one": the active account goes, and the browser moves to the next parked one.
- *
- * Without `multiAccount` there is nothing parked and the two are the same.
- * `scope: "others"` ignores this entirely: it reaches other devices, never
- * other accounts.
- */
-export type SignOutAccount = "all" | "current"
-
 /** Body accepted by `POST /sign-out`. */
 export interface SignOutInput {
   scope?: SignOutScope
-  account?: SignOutAccount
+  /**
+   * Which of this browser's accounts to sign out, under `multiAccount`.
+   *
+   * Omit it and every account signed in here goes — the person clicking "sign
+   * out" on a shared computer means *everyone*, and a button that quietly left
+   * four other accounts one click away would be the surprising behaviour. Name
+   * one and only that account goes, whether it is the active one or a parked
+   * one; this is what the account switcher's per-row sign-out needs, and it is
+   * the same id `accounts/switch` takes.
+   *
+   * An id that is not signed in here is a 404 rather than a silent no-op.
+   */
+  userId?: string
   headers?: Headers
   requestURL?: string
 }
@@ -67,7 +62,7 @@ export const signOut = defineEndpoint({
   parse: async ({ request }): Promise<SignOutInput> => {
     const body = (await request.json().catch(() => ({}))) as {
       scope?: SignOutScope
-      account?: SignOutAccount
+      userId?: string
     }
 
     return { ...body, headers: request.headers, requestURL: request.url }
@@ -79,17 +74,8 @@ export const signOut = defineEndpoint({
 
     const { config } = internals
     const scope = input.scope ?? "local"
-    const account = input.account ?? "all"
-    internals.log.info("signing out", { scope, account })
-
-    if (scope === "others") {
-      // The current session and its cookie survive: this is the "sign out my
-      // other devices" button, and clearing anything locally would be wrong.
-      await revokeOtherSessions(internals, resolved.user.id, resolved.tokenHash)
-      return { data: undefined, status: 204 }
-    }
-
     const secure = shouldUseSecureCookies(input.requestURL)
+
     const parked = config.multiAccount
       ? await pruneDeadAccounts(
           internals,
@@ -97,44 +83,77 @@ export const signOut = defineEndpoint({
         )
       : []
 
-    // The active account first, as far as scope says. Under `"current"` its
-    // other parked sessions in this browser go with it: they are the same
-    // account on the same device, and leaving one parked would be a sign-out
-    // that signs nobody out.
-    if (scope === "global") {
-      await internals.db.delete({
-        table: "sessions",
-        where: { userId: resolved.user.id }
-      })
-    } else {
-      await deleteSessionByToken(internals, resolved.tokenHash)
-      for (const { session } of parked) {
-        if (session.userId === resolved.user.id) {
-          await deleteSessionByToken(internals, session.tokenHash)
-        }
+    // Everything signed in here, the active account first. A parked entry for
+    // the account already active is one of its sessions, not another account.
+    const accounts = [
+      { userId: resolved.user.id, tokenHash: resolved.tokenHash, active: true },
+      ...parked.map(({ session }) => ({
+        userId: session.userId,
+        tokenHash: session.tokenHash,
+        active: false
+      }))
+    ]
+
+    const targets =
+      input.userId === undefined
+        ? accounts
+        : accounts.filter(({ userId }) => userId === input.userId)
+    if (targets.length === 0) throw new AuthApiError("notFound", 404)
+
+    internals.log.info("signing out", {
+      scope,
+      accounts: input.userId === undefined ? "all" : "one"
+    })
+
+    // `others` reaches other devices and never this one, so no cookie moves and
+    // whoever is signed in here stays signed in.
+    if (scope === "others") {
+      for (const target of targets) {
+        await revokeOtherSessions(internals, target.userId, target.tokenHash)
       }
+      return { data: undefined, status: 204 }
     }
-    const others = parked.filter(
-      ({ session }) => session.userId !== resolved.user.id
+
+    for (const target of targets) {
+      if (scope === "global") {
+        await internals.db.delete({
+          table: "sessions",
+          where: { userId: target.userId }
+        })
+        continue
+      }
+      await deleteSessionByToken(internals, target.tokenHash)
+    }
+
+    const signedOut = new Set(targets.map(({ userId }) => userId))
+    const remaining = parked.filter(
+      ({ session }) => !signedOut.has(session.userId)
     )
 
-    if (account === "current") {
-      const promoted = await promoteNextAccount(internals, others, secure)
-      if (promoted) return promoted
-    } else {
-      // Every other parked account as well — each one exactly as far as the
-      // active account went. Rows are revoked, not merely forgotten: a token
-      // dropped from the cookie but left live would be a session nobody can
-      // see to revoke.
-      if (scope === "global") {
-        const userIds = new Set(others.map(({ session }) => session.userId))
-        for (const userId of userIds) {
-          await internals.db.delete({ table: "sessions", where: { userId } })
-        }
-      } else {
-        for (const { session } of others) {
-          await deleteSessionByToken(internals, session.tokenHash)
-        }
+    // The active account survived, so only the parked list changed.
+    if (!signedOut.has(resolved.user.id)) {
+      const responseHeaders = new Headers()
+      responseHeaders.append(
+        "set-cookie",
+        serializeCookie({
+          name: config.cookie.accountsName,
+          value: serializeAccounts(parkedTokens(remaining)),
+          path: config.cookie.path,
+          maxAge: config.session.ttl,
+          secure
+        })
+      )
+      return { data: undefined, status: 204, headers: responseHeaders }
+    }
+
+    const promoted = await promoteNextAccount(internals, remaining, secure)
+    if (promoted) {
+      return {
+        data: {
+          switchedTo: promoted.user,
+          accessToken: await mintAccessToken(internals, promoted.user)
+        },
+        headers: promoted.headers
       }
     }
 
@@ -153,64 +172,6 @@ export const signOut = defineEndpoint({
     return { data: undefined, status: 204, headers: responseHeaders }
   }
 })
-
-/**
- * Moves the browser to the next parked account, when there is one.
- *
- * The first parked entry whose user still exists becomes active: its token
- * moves into the refresh cookie, the rest stay parked, and a token for it is
- * minted so the client can carry on without a second round-trip.
- *
- * @returns The endpoint result, or `null` when no parked account can take over
- * — in which case the caller clears the cookies instead.
- */
-async function promoteNextAccount(
-  internals: AuthServerInternals,
-  parked: ParkedAccount[],
-  secure: boolean
-) {
-  const { config } = internals
-
-  for (const [index, next] of parked.entries()) {
-    const nextUser: AuthUser | null = await selectOne(internals, "users", {
-      id: next.session.userId
-    })
-    if (!nextUser) continue
-
-    const remaining = parkedTokens(parked.filter((_, at) => at !== index))
-    const responseHeaders = new Headers()
-    responseHeaders.append(
-      "set-cookie",
-      serializeCookie({
-        name: config.cookie.name,
-        value: next.token,
-        path: config.cookie.path,
-        maxAge: config.session.ttl,
-        secure
-      })
-    )
-    responseHeaders.append(
-      "set-cookie",
-      serializeCookie({
-        name: config.cookie.accountsName,
-        value: serializeAccounts(remaining),
-        path: config.cookie.path,
-        maxAge: config.session.ttl,
-        secure
-      })
-    )
-
-    return {
-      data: {
-        switchedTo: nextUser,
-        accessToken: await mintAccessToken(internals, nextUser)
-      },
-      headers: responseHeaders
-    }
-  }
-
-  return null
-}
 
 /** Deletes one session by its token hash — the shape most sign-outs need. */
 function deleteSessionByToken(

@@ -13,7 +13,6 @@ export type {
   DeleteUserInput,
   DeleteUserResult,
   RevokeSessionInput,
-  SignOutAccount,
   SignOutInput,
   SignOutScope,
   UpdateUserInput
