@@ -129,14 +129,22 @@ function Hero() {
             </span>
             <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl">
               {/*
-               * A drawn double rule rather than `underline`: text-decoration
-               * sits at a fixed offset and hugs the descenders, so at display
-               * sizes it reads as a typo'd link. These two bars are in `em`, so
-               * the weight and the space between them hold as the heading
-               * changes size. "Free forever" has no descenders to clear, which
-               * is what lets them sit this close to the baseline.
+               * A drawn rule rather than `underline`: text-decoration hugs the
+               * descenders, so at display sizes it reads as a typo'd link. One
+               * bar carries the emphasis better than the two hairlines it
+               * replaces — a pair set that close reads as an accounting rule,
+               * and at 0.055em neither of them landed on a whole pixel, so
+               * both rendered as a grey smear rather than a line.
+               *
+               * `max()` is what keeps it crisp: the weight holds at a solid 3px
+               * across both of the heading's sizes and only starts scaling with
+               * the type well past them. The bar grows upward from its `bottom`,
+               * so that edge sits just below the inline box to keep the air
+               * under the baseline where the thinner rule had it — about a
+               * seventh of an em, far enough to read as a mark rather than a
+               * link, close enough to still belong to the words.
                */}
-              <span className="relative whitespace-nowrap before:absolute before:inset-x-0 before:-bottom-[0.08em] before:h-[0.055em] before:rounded-full before:bg-fd-primary before:content-[''] after:absolute after:inset-x-0 after:bottom-[0.05em] after:h-[0.055em] after:rounded-full after:bg-fd-primary after:content-['']">
+              <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:-bottom-[0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
                 Free forever
               </span>{" "}
               auth in TypeScript.

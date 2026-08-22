@@ -19,8 +19,8 @@ export function baseOptions(): BaseLayoutProps {
       // the title slot, which is too airy for a mark this size. One child
       // leaves that gap nothing to act on, so the spacing below is what shows.
       title: (
-        <span className="inline-flex items-center gap-2">
-          <Logo className="text-fd-primary size-5" />
+        <span className="inline-flex items-center gap-1.5">
+          <Logo className="text-fd-primary size-6" />
           Auth.ts
         </span>
       )
