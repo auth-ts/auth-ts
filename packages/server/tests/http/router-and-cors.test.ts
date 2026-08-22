@@ -247,6 +247,81 @@ describe("origin check", () => {
         .status
     ).toBe(200)
   })
+
+  it("falls back to Referer when a privacy setting has stripped Origin", async () => {
+    const { authServer } = await createTestServer({ guest: true })
+    expect(
+      (
+        await authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            headers: { referer: "https://evil.example.com/page" }
+          })
+        )
+      ).status
+    ).toBe(403)
+    expect(
+      (
+        await authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            headers: { referer: "https://app.example.com/page" }
+          })
+        )
+      ).status
+    ).toBe(200)
+  })
+
+  it("requires a body to be JSON, so a cross-origin body cannot avoid the preflight", async () => {
+    // A page can send text/plain, a form encoding, or a typeless Blob without
+    // a preflight; it cannot send application/json without one. So the browser
+    // enforces this layer itself, even when Origin has been stripped.
+    const { authServer } = await createTestServer({ guest: true })
+    const post = (headers: Record<string, string>, body: string) =>
+      authServer.handler(
+        new Request("https://app.example.com/api/auth/verify-code", {
+          method: "POST",
+          headers,
+          body
+        })
+      )
+    const payload = JSON.stringify({ email: "ada@example.com", code: "123456" })
+
+    const textPlain = await post({ "content-type": "text/plain" }, payload)
+    expect(textPlain.status).toBe(415)
+    expect(
+      ((await textPlain.json()) as { error: { code: string } }).error.code
+    ).toBe("unsupportedMediaType")
+    expect(
+      (
+        await post(
+          { "content-type": "application/x-www-form-urlencoded" },
+          "email=ada%40example.com&code=123456"
+        )
+      ).status
+    ).toBe(415)
+    // A typeless body still has a length; the missing type is not a pass.
+    expect(
+      (await post({ "content-length": String(payload.length) }, payload)).status
+    ).toBe(415)
+
+    // JSON — with or without a charset parameter — reaches the endpoint.
+    expect(
+      (await post({ "content-type": "application/json" }, payload)).status
+    ).toBe(401)
+    expect(
+      (
+        await post(
+          { "content-type": "Application/JSON; charset=utf-8" },
+          payload
+        )
+      ).status
+    ).toBe(401)
+
+    // Bodiless requests have no content type to check and are untouched.
+    expect(
+      (await authServer.handler(request("POST", "/api/auth/sign-in/guest")))
+        .status
+    ).toBe(200)
+  })
 })
 
 describe("cors", () => {
