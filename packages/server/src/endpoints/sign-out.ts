@@ -25,7 +25,7 @@ import { revokeOtherSessions } from "../session/revoke-other-sessions"
  * `"local"` is the default because the alternative is a well-known footgun:
  * signing out on a shared computer should not kill the session on your phone.
  */
-export type LogoutScope = "local" | "others" | "global"
+export type SignOutScope = "local" | "others" | "global"
 
 /**
  * Which of this browser's accounts a sign-out applies to, under `multiAccount`.
@@ -40,12 +40,12 @@ export type LogoutScope = "local" | "others" | "global"
  * `scope: "others"` ignores this entirely: it reaches other devices, never
  * other accounts.
  */
-export type LogoutAccount = "all" | "current"
+export type SignOutAccount = "all" | "current"
 
-/** Body accepted by `POST /logout`. */
-export interface LogoutInput {
-  scope?: LogoutScope
-  account?: LogoutAccount
+/** Body accepted by `POST /sign-out`. */
+export interface SignOutInput {
+  scope?: SignOutScope
+  account?: SignOutAccount
   headers?: Headers
   requestURL?: string
 }
@@ -61,18 +61,18 @@ export interface LogoutInput {
  * their current access token expires, so "signed out everywhere" means within
  * `jwt.ttl`. That is the same bound the data plane has, by design.
  */
-export const logout = defineEndpoint({
+export const signOut = defineEndpoint({
   method: "POST",
-  path: "/logout",
-  parse: async ({ request }): Promise<LogoutInput> => {
+  path: "/sign-out",
+  parse: async ({ request }): Promise<SignOutInput> => {
     const body = (await request.json().catch(() => ({}))) as {
-      scope?: LogoutScope
-      account?: LogoutAccount
+      scope?: SignOutScope
+      account?: SignOutAccount
     }
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },
-  run: async (internals, input: LogoutInput) => {
+  run: async (internals, input: SignOutInput) => {
     const headers = input.headers ?? new Headers()
     const resolved = await resolveSession(internals, headers)
     if (!resolved) throw unauthenticated()

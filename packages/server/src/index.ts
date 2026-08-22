@@ -56,11 +56,6 @@ export type { CallbackProviderInput } from "./endpoints/callback/$provider"
 export type { ConnectProviderInput } from "./endpoints/connect/$provider"
 export type { ConnectionInfo } from "./endpoints/connections"
 export type { DisconnectProviderInput } from "./endpoints/connections/$provider"
-export type {
-  LogoutAccount,
-  LogoutInput,
-  LogoutScope
-} from "./endpoints/logout"
 export type { SendCodeInput } from "./endpoints/send-code"
 export type { SessionInfo } from "./endpoints/sessions"
 export type {
@@ -69,6 +64,11 @@ export type {
 } from "./endpoints/sessions/$id"
 export type { SignInProviderInput } from "./endpoints/sign-in/$provider"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest"
+export type {
+  SignOutAccount,
+  SignOutInput,
+  SignOutScope
+} from "./endpoints/sign-out"
 export type { AuthTokenResult, TokenSession } from "./endpoints/token"
 export type { DeleteUserInput, UpdateUserInput } from "./endpoints/user"
 export type { VerifyCodeInput } from "./endpoints/verify-code"

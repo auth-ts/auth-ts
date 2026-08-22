@@ -22,6 +22,7 @@ function HomePage() {
             <Link to="/todos" className="btn btn-primary">
               Open your todos
             </Link>
+
             <Link to="/login" className="btn btn-ghost">
               Sign in
             </Link>

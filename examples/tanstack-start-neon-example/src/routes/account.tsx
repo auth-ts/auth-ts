@@ -330,7 +330,7 @@ function AccountPage() {
                 // Every account in this browser — the default, as in Clerk.
                 // "Sign out this account" below is the switcher's narrower
                 // version.
-                await authClient.logout()
+                await authClient.signOut()
                 queryClient.clear()
                 await navigate({ to: "/login" })
               }}
@@ -341,7 +341,7 @@ function AccountPage() {
             <button
               type="button"
               onClick={async () => {
-                const result = await authClient.logout({ account: "current" })
+                const result = await authClient.signOut({ account: "current" })
                 queryClient.clear()
                 if (result?.switchedTo) {
                   const label =
@@ -363,7 +363,7 @@ function AccountPage() {
             <button
               type="button"
               onClick={async () => {
-                await authClient.logout({ scope: "others" })
+                await authClient.signOut({ scope: "others" })
                 setNotice({
                   text: "Signed out on your other devices.",
                   tone: "success"
@@ -377,7 +377,7 @@ function AccountPage() {
             <button
               type="button"
               onClick={async () => {
-                await authClient.logout({ scope: "global" })
+                await authClient.signOut({ scope: "global" })
                 queryClient.clear()
                 await navigate({ to: "/login" })
               }}

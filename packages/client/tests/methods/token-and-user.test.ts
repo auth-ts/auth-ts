@@ -272,7 +272,7 @@ describe("subscribe", () => {
     server.on("POST", "/api/auth/token", {
       body: { accessToken: fakeAccessToken(), user }
     })
-    server.on("POST", "/api/auth/logout", { status: 204 })
+    server.on("POST", "/api/auth/sign-out", { status: 204 })
 
     const client = createAuthClient()
     const seen: Array<string | null> = []
@@ -281,7 +281,7 @@ describe("subscribe", () => {
     )
 
     await client.getUser()
-    await client.logout()
+    await client.signOut()
 
     expect(seen).toEqual(["ada@example.com", null])
 

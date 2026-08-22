@@ -254,7 +254,7 @@ function notFoundEndpoint(error: AuthApiError, request: Request): AnyEndpoint {
 }
 
 /**
- * Explains the "server-side rendering is always logged out" trap before it happens.
+ * Explains the "server-side rendering is always signed out" trap before it happens.
  *
  * A `cookie.path` narrowed to the auth mount means the refresh cookie is never
  * sent to a page request, so a server-side read would quietly return null

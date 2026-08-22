@@ -12,10 +12,10 @@ export type { LeveledLogger, Logger, LogLevel } from "./lib/logger"
 export type {
   DeleteUserInput,
   DeleteUserResult,
-  LogoutAccount,
-  LogoutInput,
-  LogoutScope,
   RevokeSessionInput,
+  SignOutAccount,
+  SignOutInput,
+  SignOutScope,
   UpdateUserInput
 } from "./methods/account"
 export type {

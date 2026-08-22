@@ -14,7 +14,7 @@ describe("matchRoute", () => {
       ["POST", "/api/auth/send-code"],
       ["POST", "/api/auth/verify-code"],
       ["POST", "/api/auth/token"],
-      ["POST", "/api/auth/logout"],
+      ["POST", "/api/auth/sign-out"],
       ["GET", "/api/auth/user"],
       ["PATCH", "/api/auth/user"],
       ["DELETE", "/api/auth/user"],

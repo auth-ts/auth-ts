@@ -293,7 +293,7 @@ describe("token and user endpoints", () => {
     const { authServer, refreshToken } = await signIn()
 
     const response = await authServer.handler(
-      request("POST", "/api/auth/logout", {
+      request("POST", "/api/auth/sign-out", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
@@ -306,12 +306,12 @@ describe("token and user endpoints", () => {
       ).attributes
     ).toContain("Max-Age=0")
 
-    const afterLogout = await authServer.handler(
+    const afterSignOut = await authServer.handler(
       request("POST", "/api/auth/token", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
-    expect(afterLogout.status).toBe(401)
+    expect(afterSignOut.status).toBe(401)
   })
 })
 

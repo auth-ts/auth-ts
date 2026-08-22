@@ -3,8 +3,8 @@ import { readLifetimeClaims } from "../lib/read-lifetime-claims"
 import {
   createDeleteUser,
   createListSessions,
-  createLogout,
   createRevokeSession,
+  createSignOut,
   createUpdateUser
 } from "../methods/account"
 import {
@@ -57,7 +57,7 @@ export interface AuthClient {
   switchAccount: ReturnType<typeof createSwitchAccount>
   updateUser: ReturnType<typeof createUpdateUser>
   deleteUser: ReturnType<typeof createDeleteUser>
-  logout: ReturnType<typeof createLogout>
+  signOut: ReturnType<typeof createSignOut>
   /** Changes the locale sent on subsequent requests. */
   setLocale: (locale: string | undefined) => void
   /** Drops the in-memory token only — the 401-retry helper. Leaves the session alone. */
@@ -106,7 +106,7 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     switchAccount: createSwitchAccount(internals, primeSession),
     updateUser: createUpdateUser(internals),
     deleteUser: createDeleteUser(internals),
-    logout: createLogout(internals, primeSession),
+    signOut: createSignOut(internals, primeSession),
     setLocale: (locale) => {
       internals.locale = locale
     },

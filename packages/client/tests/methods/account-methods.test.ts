@@ -73,16 +73,16 @@ describe("updateUser", () => {
   })
 })
 
-describe("logout", () => {
+describe("signOut", () => {
   it("clears local state for the local scope", async () => {
     server.on("POST", "/api/auth/verify-code", {
       body: { accessToken: fakeAccessToken(), user }
     })
-    server.on("POST", "/api/auth/logout", { status: 204 })
+    server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    await client.logout()
+    await client.signOut()
 
     expect(client.getCachedUser()).toBeNull()
     expect(localStorage.getItem("auth-ts.user")).toBeNull()
@@ -92,24 +92,24 @@ describe("logout", () => {
     server.on("POST", "/api/auth/verify-code", {
       body: { accessToken: fakeAccessToken(), user }
     })
-    server.on("POST", "/api/auth/logout", { status: 204 })
+    server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    await client.logout({ scope: "others" })
+    await client.signOut({ scope: "others" })
 
     expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
   })
 
   it("sends the account axis only when it is given", async () => {
-    server.on("POST", "/api/auth/logout", { status: 204 })
-    server.on("POST", "/api/auth/logout", { status: 204 })
+    server.on("POST", "/api/auth/sign-out", { status: 204 })
+    server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
 
-    await client.logout()
+    await client.signOut()
     expect(server.requests.at(-1)?.body).toEqual({ scope: "local" })
 
-    await client.logout({ scope: "global", account: "current" })
+    await client.signOut({ scope: "global", account: "current" })
     expect(server.requests.at(-1)?.body).toEqual({
       scope: "global",
       account: "current"
@@ -120,13 +120,13 @@ describe("logout", () => {
     server.on("POST", "/api/auth/verify-code", {
       body: { accessToken: fakeAccessToken(), user }
     })
-    server.on("POST", "/api/auth/logout", {
+    server.on("POST", "/api/auth/sign-out", {
       body: { switchedTo: other, accessToken: fakeAccessToken() }
     })
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    const result = await client.logout()
+    const result = await client.signOut()
 
     expect(result?.switchedTo.email).toBe("grace@example.com")
     expect(client.getCachedUser()?.email).toBe("grace@example.com")

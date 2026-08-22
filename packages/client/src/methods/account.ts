@@ -27,7 +27,7 @@ export function createUpdateUser(internals: AuthClientInternals) {
 }
 
 /** How far a sign-out reaches, for each account it applies to. */
-export type LogoutScope = "local" | "others" | "global"
+export type SignOutScope = "local" | "others" | "global"
 
 /**
  * Which of this browser's accounts a sign-out applies to, under `multiAccount`.
@@ -36,12 +36,12 @@ export type LogoutScope = "local" | "others" | "global"
  * in this browser. `"current"` signs out only the active one and the server
  * promotes the next parked account, if any. Ignored for `scope: "others"`.
  */
-export type LogoutAccount = "all" | "current"
+export type SignOutAccount = "all" | "current"
 
 /** Input for signing out. */
-export interface LogoutInput {
-  scope?: LogoutScope
-  account?: LogoutAccount
+export interface SignOutInput {
+  scope?: SignOutScope
+  account?: SignOutAccount
 }
 
 /**
@@ -53,19 +53,19 @@ export interface LogoutInput {
  * accounts the server may promote the next one, in which case the caches are
  * primed with that user instead of emptied.
  */
-export function createLogout(
+export function createSignOut(
   internals: AuthClientInternals,
   primeSession: (result: { accessToken: string; user: AuthUser }) => void
 ) {
-  return async function logout(
-    input: LogoutInput = {}
+  return async function signOut(
+    input: SignOutInput = {}
   ): Promise<{ switchedTo: AuthUser } | null> {
     const scope = input.scope ?? "local"
     const result = await internals.fetchJson<
       { switchedTo?: AuthUser; accessToken?: string } | undefined
     >({
       method: "POST",
-      path: "/logout",
+      path: "/sign-out",
       body: { scope, ...(input.account ? { account: input.account } : {}) }
     })
 

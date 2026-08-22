@@ -333,7 +333,7 @@ describe("multiAccount enabled", () => {
     expect(context.db.sessions()).toHaveLength(2)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/logout", { cookies: second.cookies })
+      request("POST", "/api/auth/sign-out", { cookies: second.cookies })
     )
     const cleared = readSetCookies(response)
 
@@ -367,7 +367,7 @@ describe("multiAccount enabled", () => {
     const second = await signIn(context, "grace@example.com", first.cookies)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/logout", {
+      request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
         body: { account: "current" }
       })
@@ -410,7 +410,7 @@ describe("multiAccount enabled", () => {
     expect(context.db.sessions()).toHaveLength(3)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/logout", {
+      request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
         body: { scope: "global" }
       })
@@ -441,7 +441,7 @@ describe("multiAccount enabled", () => {
     const second = await signIn(context, "grace@example.com", first.cookies)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/logout", {
+      request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
         body: { scope: "global", account: "current" }
       })
@@ -480,7 +480,7 @@ describe("multiAccount enabled", () => {
     const second = await signIn(context, "grace@example.com", first.cookies)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/logout", {
+      request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
         body: { scope: "others", account: "all" }
       })
@@ -511,7 +511,7 @@ describe("multiAccount enabled", () => {
     const { cookies } = await signIn(context, "ada@example.com")
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/logout", { cookies })
+      request("POST", "/api/auth/sign-out", { cookies })
     )
     const cleared = readSetCookies(response)
 

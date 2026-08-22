@@ -8,7 +8,7 @@
  *
  * The one runtime case is `getSession`/`getToken` finding no cookie while
  * `cookie.path` is still scoped to the auth mount: returning null there would
- * present as "SSR is always logged out", which is a bug report rather than a
+ * present as "SSR is always signed out", which is a bug report rather than a
  * clue.
  */
 export class AuthConfigError extends Error {

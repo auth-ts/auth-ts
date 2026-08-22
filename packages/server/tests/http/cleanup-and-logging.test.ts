@@ -130,7 +130,7 @@ describe("logging redaction", () => {
     )
     await context.authServer.handler(request("POST", "/api/auth/sign-in/guest"))
     await context.authServer.handler(
-      request("POST", "/api/auth/logout", { cookies })
+      request("POST", "/api/auth/sign-out", { cookies })
     )
     await settle()
 
