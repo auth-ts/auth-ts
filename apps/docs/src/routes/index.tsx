@@ -30,14 +30,14 @@ const SPECS = [
 const FEATURES = [
   {
     title: "No adapters",
-    body: "Nineteen callbacks against your own tables. The library never sees your schema, your migrations, or your data."
+    body: "A handful of callbacks against your own tables. The library never sees your schema, your migrations, or your data."
   },
   {
     title: "Your keys, your issuer",
     body: "RS256 or ES256, signed by you. The public half is served at a JWKS URL that any verifier can read."
   },
   {
-    title: "Authorization in Postgres",
+    title: "Authorization in the database",
     body: "Built for PostgREST and row-level security — Neon's Data API, Supabase, or self-hosted. Your policies decide what comes back."
   },
   {
@@ -91,10 +91,31 @@ function LandingPage() {
   )
 }
 
+/**
+ * Drifting glows over two parallax star layers. Decorative and inert: no JS, no
+ * canvas, `aria-hidden`, and it holds still under `prefers-reduced-motion`.
+ * The layer geometry and keyframes live in `styles.css`.
+ */
+function HeroBackdrop() {
+  return (
+    <div
+      aria-hidden
+      className="hero-backdrop pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+    >
+      <div className="hero-stars hero-stars-far" />
+      <div className="hero-stars hero-stars-near" />
+      <div className="hero-glow hero-glow-near" />
+      <div className="hero-glow hero-glow-far" />
+      <div className="hero-noise" />
+    </div>
+  )
+}
+
 function Hero() {
   return (
-    <section className="border-fd-border border-b">
-      <div className="mx-auto grid max-w-5xl gap-x-12 gap-y-10 px-6 py-20 md:py-28 lg:grid-cols-[1.5fr_1fr] lg:items-end">
+    <section className="border-fd-border relative isolate overflow-hidden border-b">
+      <HeroBackdrop />
+      <div className="relative mx-auto grid max-w-5xl gap-x-12 gap-y-10 px-6 py-20 md:py-28 lg:grid-cols-[1.5fr_1fr] lg:items-end">
         <div>
           {/*
            * The mark and the wordmark are one line and the largest thing here.
@@ -161,17 +182,28 @@ function Hero() {
             />
           </div>
         </div>
-        <dl className="text-sm">
-          {SPECS.map(([term, value]) => (
-            <div
-              key={term}
-              className="border-fd-border flex items-baseline justify-between gap-6 border-b py-2.5 first:border-t"
-            >
-              <dt className="text-fd-muted-foreground">{term}</dt>
-              <dd className="text-end font-mono">{value}</dd>
-            </div>
-          ))}
-        </dl>
+        {/*
+         * Bottom-aligned with the install command rather than floated beside
+         * the heading, so both columns finish on the same line. The caption is
+         * what keeps that reading as a decision — without a top edge the panel
+         * looks dropped into the whitespace.
+         */}
+        <div>
+          <p className="text-fd-muted-foreground mb-3 font-mono text-xs tracking-wider uppercase">
+            Package
+          </p>
+          <dl className="text-sm">
+            {SPECS.map(([term, value]) => (
+              <div
+                key={term}
+                className="border-fd-border flex items-baseline justify-between gap-6 border-b py-2.5 first:border-t"
+              >
+                <dt className="text-fd-muted-foreground">{term}</dt>
+                <dd className="text-end font-mono">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </div>
     </section>
   )
@@ -199,26 +231,28 @@ function Features() {
 
 function Snippets() {
   return (
-    <section className="border-fd-border mx-auto grid max-w-5xl gap-10 border-b px-6 py-16 lg:grid-cols-2">
-      <div className="space-y-3">
-        <h2 className="font-mono text-sm">
-          <span className="text-fd-primary">01</span> On the server
-        </h2>
-        <p className="text-fd-muted-foreground text-sm text-pretty">
-          Write the callbacks, mount <code>authServer.handler</code> once at{" "}
-          <code>/api/auth/*</code>, and point your database at the JWKS URL.
-        </p>
-        <DynamicCodeBlock lang="ts" code={SERVER_SNIPPET} />
-      </div>
-      <div className="space-y-3">
-        <h2 className="font-mono text-sm">
-          <span className="text-fd-primary">02</span> In the browser
-        </h2>
-        <p className="text-fd-muted-foreground text-sm text-pretty">
-          Zero runtime dependencies. The access token lives in memory only, and
-          is refreshed from an httpOnly cookie.
-        </p>
-        <DynamicCodeBlock lang="ts" code={CLIENT_SNIPPET} />
+    <section className="border-fd-border border-b">
+      <div className="mx-auto grid max-w-5xl gap-10 px-6 py-16 lg:grid-cols-2">
+        <div className="space-y-3">
+          <h2 className="font-mono text-sm">
+            <span className="text-fd-primary">01</span> On the server
+          </h2>
+          <p className="text-fd-muted-foreground text-sm text-pretty">
+            Write the callbacks, mount <code>authServer.handler</code> once at{" "}
+            <code>/api/auth/*</code>, and point your database at the JWKS URL.
+          </p>
+          <DynamicCodeBlock lang="ts" code={SERVER_SNIPPET} />
+        </div>
+        <div className="space-y-3">
+          <h2 className="font-mono text-sm">
+            <span className="text-fd-primary">02</span> In the browser
+          </h2>
+          <p className="text-fd-muted-foreground text-sm text-pretty">
+            Zero runtime dependencies. The access token lives in memory only,
+            and is refreshed from an httpOnly cookie.
+          </p>
+          <DynamicCodeBlock lang="ts" code={CLIENT_SNIPPET} />
+        </div>
       </div>
     </section>
   )
