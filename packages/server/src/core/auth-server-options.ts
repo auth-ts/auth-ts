@@ -1,6 +1,6 @@
 import type { LocalizationOptions } from "../http/get-error-message"
 import type { JwtAlgorithm } from "../jwt/import-signing-key"
-import type { ClientIpOptions } from "../lib/get-client-ip"
+import type { IpAddressOptions } from "../lib/ip-address"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
 import type { AuthDB } from "./auth-db"
@@ -306,11 +306,15 @@ export interface AuthServerOptions {
   /** Server-side localization of error messages. Codes stay stable; only messages translate. */
   localization?: LocalizationOptions
   /**
-   * How the client IP is derived from proxy headers — the rate-limit key and
-   * the stored `ipAddress`. Defaults to deriving nothing until you declare how
-   * many proxies you run; see {@link ClientIpOptions.trustedProxies}.
+   * How the client's IP address is derived from proxy headers — the per-IP
+   * rate-limit key and the stored `session.ipAddress`.
+   *
+   * Works unconfigured on any platform that overwrites `x-forwarded-for`.
+   * Declare {@link IpAddressOptions.trustedProxies} when a chain reaches this
+   * server, or point {@link IpAddressOptions.headers} at a single-value header
+   * your platform controls.
    */
-  clientIp?: ClientIpOptions
+  ipAddress?: IpAddressOptions
   /** Cross-origin access, needed when the client is configured with a different `baseURL`. */
   cors?: CorsOptions
   /** @default "warn" */

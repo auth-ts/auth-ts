@@ -172,28 +172,26 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
 }
 
 /**
- * Says out loud, once, that the per-IP limits are not going to fire.
+ * Says out loud that the per-IP limits are configured and cannot fire.
  *
- * With the default `clientIp.trustedProxies: 0` no client address is derived,
- * which is the right default — trusting a forwarded header blindly lets a
- * caller pick their own rate-limit key — but it means `sendCodePerIP`,
- * `verifyCodePerIP`, and `guestPerIP` are configured and inert, and
- * `session.ipAddress` is never set. That is a safe failure, and exactly the kind
- * that is never noticed until someone sprays `/send-code` across a thousand
- * addresses. A warning, not an error, because a server reached directly has
- * no proxies to declare and `createAuthServer({ db, email })` must keep
- * working out of the box.
+ * `ipAddress.disableTracking` derives no address at all, which leaves
+ * `sendCodePerIP`, `verifyCodePerIP`, and `guestPerIP` inert and
+ * `session.ipAddress` null — a safe failure, and exactly the kind that is never
+ * noticed until someone sprays `/send-code` across a thousand addresses. A
+ * warning rather than an error, because turning tracking off on purpose is a
+ * legitimate thing to do and `rateLimit` is on by default.
+ *
+ * The other way the limits go quiet — a deployment where no header ever carries
+ * a usable address — cannot be seen from here: it takes a request to find out.
+ * That one is warned about once, at the point it happens, in `ipRateLimitKey`.
  */
 function warnAboutInertIpLimits(internals: AuthServerInternals) {
   const { config } = internals
-  if (config.rateLimit === false || config.clientIp.trustedProxies > 0) return
+  if (config.rateLimit === false || !config.ipAddress.disableTracking) return
 
   internals.log.warn(
-    "per-IP rate limits are configured but will not apply: clientIp.trustedProxies is 0, so no client address is derived. " +
-      "sendCodePerIP, verifyCodePerIP, and guestPerIP are inert and session.ipAddress will be null. " +
-      "Set clientIp.trustedProxies to the number of proxies in front of this server (1 on Vercel, Cloudflare, and most platforms), " +
-      "or rateLimit: false if something in front of it already limits by address.",
-    { header: config.clientIp.header }
+    "per-IP rate limits are configured but will not apply: ipAddress.disableTracking is on, so no client address is derived. " +
+      "sendCodePerIP, verifyCodePerIP, and guestPerIP are inert and session.ipAddress will be null."
   )
 }
 

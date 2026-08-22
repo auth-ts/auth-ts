@@ -155,17 +155,40 @@ code cannot sign anyone in.
 
 ## Deploying
 
-Declare your proxy topology with `clientIp.trustedProxies`. The forwarded
-header is written by whoever talks to your outermost proxy, and a client sets it
-freely — so IP-keyed limits derive nothing until you say how many proxies you
-run, and the real client is read from that fixed position in the chain rather
-than the spoofable leftmost entry. Set it wrong-low and you get no IP limiting
-(the per-identifier limits still hold); leave it at the default zero and the
-same is true — and `createAuthServer` logs a warning at construction saying so,
-so the gap is in your logs rather than discovered under attack. On Vercel,
-Cloudflare, and most platforms the answer is `1`. The extracted value is
-validated as an IP, so an oversized or forged header can never become a
-rate-limit key or a stored column.
+The client's IP address needs no configuration to work: `x-forwarded-for` is
+read, and a header carrying a single entry is taken as the client. That is
+correct on any platform whose proxy overwrites the header rather than appending
+to it, which is most of them.
+
+What is never trusted is a chain nobody vouched for. Proxies *append*, and the
+header starts as whatever the client typed — so with two or more entries and no
+declared topology, none of them is used, and the per-IP limits sit out that
+request rather than keying on an address the caller chose. Two ways to make a
+chain readable, both under `ipAddress`:
+
+- `trustedProxies: 1` — the number of proxies you run. The client is that many
+  hops from the right. Use this where proxy addresses are not enumerable, which
+  includes Cloudflare and Vercel.
+- `trustedProxies: ["10.0.0.0/24"]` — their addresses or ranges, when you run
+  them yourself. The chain is walked right to left, your hops are skipped, and
+  the first entry that is not yours is the client.
+
+Stronger than either: point `headers` at a single-value header your platform
+sets and a client cannot append to — `cf-connecting-ip` on Cloudflare,
+`true-client-ip` on Akamai. Neither form verifies who actually connected, only
+how the header is read, so keep the app reachable only through those proxies.
+
+Whatever arrives is validated as an IP address before it becomes a rate-limit
+key or a stored column, and normalized first, so `2001:DB8::1`,
+`2001:db8:0:0:0:0:0:1`, and `::ffff:203.0.113.7` cannot buy a caller three
+buckets for two addresses. IPv6 limits count per `/64` — a residential client
+owns the whole prefix, so per-address counters would be rotated past for free.
+
+When no address can be derived at all, the per-IP limits do not apply and
+nothing is written to `session.ipAddress`; the per-identifier limits and the
+cooldown are unaffected, and the first request it happens to says so in your
+logs. Requests are never merged into one shared bucket in that case, which
+would let a single caller lock everyone out of a flow.
 
 If your database exposes a REST API, check what it grants by default. Neon, for
 example, grants the `authenticated` role full access to everything in `public`

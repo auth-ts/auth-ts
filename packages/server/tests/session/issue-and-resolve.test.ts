@@ -78,7 +78,7 @@ describe("issueSession", () => {
   it("stamps user agent and the client ip from proxy headers", async () => {
     // Two entries with one trusted proxy: the rightmost is what the proxy wrote.
     const { internals, db } = await createTestInternals({
-      clientIp: { trustedProxies: 1 }
+      ipAddress: { trustedProxies: 1 }
     })
     const user = await db.upsertUser({ email: "ada@example.com" })
     const headers = new Headers({

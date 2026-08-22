@@ -1,10 +1,9 @@
 import type { MagicCodePurpose } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
-import { checkRateLimit } from "../http/check-rate-limit"
+import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
 import { getCooldownRemaining } from "../http/get-cooldown-remaining"
 import { randomSixDigitCode } from "../lib/generate-random"
-import { getClientIp } from "../lib/get-client-ip"
 import { hmacSha256Hex } from "../lib/hash"
 import { parseDuration } from "../lib/parse-duration"
 import type { CodeIdentifier } from "./resolve-code-identifier"
@@ -69,13 +68,9 @@ export async function sendMagicCode(
       perIdentifier
     )
 
-    const clientIp = getClientIp(headers, internals.config.clientIp)
-    if (clientIp)
-      await checkRateLimit(
-        internals,
-        `sendCode:ip:${clientIp}`,
-        config.rateLimit.sendCodePerIP
-      )
+    const ipKey = ipRateLimitKey(internals, headers, "sendCode")
+    if (ipKey)
+      await checkRateLimit(internals, ipKey, config.rateLimit.sendCodePerIP)
   }
 
   const code = randomSixDigitCode()

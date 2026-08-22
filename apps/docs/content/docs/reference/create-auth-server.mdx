@@ -56,6 +56,33 @@ Plus the JWT-plane functions:
 
 <auto-type-table path="../../../../../packages/server/src/jwt/sign-token.ts" name="SignTokenClaims" />
 
+## Client IP
+
+`ipAddress` decides how the client's address is read from proxy headers — the
+per-IP rate-limit key, and the `ipAddress` stored on each session. It needs no
+configuration where the platform overwrites `x-forwarded-for`; a chain of two or
+more entries is ambiguous until you say what your topology is, and until then no
+address is derived from it. See [Security](/docs/security#deploying) for what
+each form is worth.
+
+```ts
+createAuthServer({
+  // Cloudflare, Akamai: a header the edge controls and a client cannot append to.
+  ipAddress: { headers: ["cf-connecting-ip"] }
+})
+
+createAuthServer({
+  // Behind proxies you run: their count, or their addresses.
+  ipAddress: { trustedProxies: 1 }
+})
+```
+
+<auto-type-table path="../../../../../packages/server/src/lib/ip-address.ts" name="IpAddressOptions" />
+
+During development — `NODE_ENV=development` — a request with no forwarded header
+reports `127.0.0.1` rather than nothing, so per-IP limits are testable on the one
+machine where you want to try them. Nothing is invented in production.
+
 ## Durations
 
 Every duration uses one format — `"10m"`, `"30d"`, `"60s"` — and one parser, so

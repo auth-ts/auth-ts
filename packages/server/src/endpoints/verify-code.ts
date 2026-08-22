@@ -1,8 +1,7 @@
 import { AuthApiError } from "../http/auth-api-error"
-import { checkRateLimit } from "../http/check-rate-limit"
+import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
 import { defineEndpoint } from "../http/define-endpoint"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
-import { getClientIp } from "../lib/get-client-ip"
 import { consumeMagicCode } from "../magic-code/consume-magic-code"
 import type { IdentifierBody } from "../magic-code/resolve-code-identifier"
 import { resolveCodeIdentifier } from "../magic-code/resolve-code-identifier"
@@ -59,11 +58,11 @@ export const verifyCode = defineEndpoint({
     )
 
     if (internals.config.rateLimit !== false) {
-      const clientIp = getClientIp(headers, internals.config.clientIp)
-      if (clientIp) {
+      const ipKey = ipRateLimitKey(internals, headers, "verifyCode")
+      if (ipKey) {
         await checkRateLimit(
           internals,
-          `verifyCode:ip:${clientIp}`,
+          ipKey,
           internals.config.rateLimit.verifyCodePerIP
         )
       }

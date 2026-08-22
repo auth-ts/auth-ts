@@ -2,8 +2,8 @@ import type { AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { signToken } from "../jwt/sign-token"
 import { randomBytesBase64url, randomUUID } from "../lib/generate-random"
-import { getClientIp } from "../lib/get-client-ip"
 import { sha256Hex } from "../lib/hash"
+import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import {
   serializeCookie,
@@ -31,7 +31,7 @@ export type IssueMode = "cookie" | "token"
 /** User-agent and validated client IP for a session row, from the request headers. */
 function sessionStamp(internals: AuthServerInternals, headers: Headers) {
   const userAgent = headers.get("user-agent")
-  const ipAddress = getClientIp(headers, internals.config.clientIp)
+  const ipAddress = getIpAddress(headers, internals.config.ipAddress)
 
   return {
     ...(userAgent ? { userAgent } : {}),

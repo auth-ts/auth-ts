@@ -131,9 +131,11 @@ describe("construction failures", () => {
     }
   })
 
-  it("warns at construction when per-IP limits cannot apply", () => {
-    // The default trustedProxies of 0 derives no address, which is safe and
-    // silent. The warning is what makes it not silent.
+  it("warns at construction only when tracking is off, not by default", () => {
+    // Deriving an address needs no configuration, so the default must not nag.
+    // Turning tracking off leaves the per-IP limits configured and inert, which
+    // is the one case construction can see; a deployment where no usable header
+    // ever arrives is a request-time discovery, warned about there.
     const warnings = (overrides: Record<string, unknown>) => {
       const calls: string[] = []
       createAuthServer({
@@ -146,10 +148,15 @@ describe("construction failures", () => {
       return calls.filter((message) => message.includes("per-IP rate limits"))
     }
 
-    expect(warnings({})).toHaveLength(1)
-    expect(warnings({})[0]).toMatch(/clientIp\.trustedProxies is 0/)
-    expect(warnings({ clientIp: { trustedProxies: 1 } })).toHaveLength(0)
-    expect(warnings({ rateLimit: false })).toHaveLength(0)
+    expect(warnings({})).toHaveLength(0)
+    expect(warnings({ ipAddress: { trustedProxies: 1 } })).toHaveLength(0)
+    expect(warnings({ ipAddress: { disableTracking: true } })).toHaveLength(1)
+    expect(warnings({ ipAddress: { disableTracking: true } })[0]).toMatch(
+      /disableTracking is on/
+    )
+    expect(
+      warnings({ ipAddress: { disableTracking: true }, rateLimit: false })
+    ).toHaveLength(0)
   })
 
   it("rejects a reserved key declared as an additional field", () => {
@@ -332,7 +339,7 @@ describe("construction failures", () => {
   })
 
   it("rejects a trustedProxies count that could never address an entry", () => {
-    // Each of these would not error at request time — getClientIp would index
+    // Each of these would not error at request time — getIpAddress would index
     // the chain at a position that does not exist, derive nothing, and every
     // per-IP limit would be silently off.
     for (const trustedProxies of [1.5, -1, Infinity, Number.NaN]) {
@@ -340,10 +347,10 @@ describe("construction failures", () => {
         () =>
           createAuthServer({
             ...baseOptions(),
-            clientIp: { trustedProxies }
+            ipAddress: { trustedProxies }
           }),
         String(trustedProxies)
-      ).toThrow(/clientIp\.trustedProxies/)
+      ).toThrow(/ipAddress\.trustedProxies/)
     }
   })
 
@@ -355,10 +362,52 @@ describe("construction failures", () => {
       [false, 0]
     ] as const) {
       expect(
-        createAuthServer({ ...baseOptions(), clientIp: { trustedProxies } })
-          .config.clientIp.trustedProxies
+        createAuthServer({ ...baseOptions(), ipAddress: { trustedProxies } })
+          .config.ipAddress.trustedProxies
       ).toBe(expected)
     }
+  })
+
+  it("rejects a trusted proxy entry that is not an address or range", () => {
+    // An entry that parses as neither matches no hop, so a typo would quietly
+    // turn the list into "trust nothing" and take every per-IP limit with it.
+    for (const entry of ["not-an-ip", "10.0.0.0/33", "10.0.0.0/", ""]) {
+      expect(
+        () =>
+          createAuthServer({
+            ...baseOptions(),
+            ipAddress: { trustedProxies: [entry] }
+          }),
+        entry
+      ).toThrow(/ipAddress\.trustedProxies/)
+    }
+
+    expect(
+      createAuthServer({
+        ...baseOptions(),
+        ipAddress: { trustedProxies: ["203.0.113.7", "10.0.0.0/24", "::1"] }
+      }).config.ipAddress.trustedProxies
+    ).toEqual(["203.0.113.7", "10.0.0.0/24", "::1"])
+  })
+
+  it("rejects a prefix length that is not somewhere inside an IPv6 address", () => {
+    for (const ipv6Subnet of [-1, 129, 64.5, Number.NaN]) {
+      expect(
+        () => createAuthServer({ ...baseOptions(), ipAddress: { ipv6Subnet } }),
+        String(ipv6Subnet)
+      ).toThrow(/ipAddress\.ipv6Subnet/)
+    }
+
+    expect(createAuthServer(baseOptions()).config.ipAddress.ipv6Subnet).toBe(64)
+  })
+
+  it("rejects an empty header list, which would leave nothing to read", () => {
+    expect(() =>
+      createAuthServer({ ...baseOptions(), ipAddress: { headers: [] } })
+    ).toThrow(/ipAddress\.headers/)
+    expect(() =>
+      createAuthServer({ ...baseOptions(), ipAddress: { headers: [""] } })
+    ).toThrow(/ipAddress\.headers/)
   })
 
   it("treats an explicit undefined override as absent, keeping the default", () => {

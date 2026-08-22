@@ -59,7 +59,7 @@ describe("guest sign-in", () => {
   it("is rate limited per ip", async () => {
     const context = await createTestServer({
       ...guestOptions,
-      clientIp: { trustedProxies: 1 },
+      ipAddress: { trustedProxies: 1 },
       rateLimit: { guestPerIP: { max: 2, window: "10m" } }
     })
     const headers = { "x-forwarded-for": "203.0.113.7" }

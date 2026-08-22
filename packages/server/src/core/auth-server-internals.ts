@@ -39,6 +39,16 @@ export interface AuthServerInternals {
   db: AuthDB
   log: LeveledLogger
   /**
+   * Logs a warning the first time each `key` is seen, and never again.
+   *
+   * For conditions only a request can discover — a forwarded header that turns
+   * out to be unusable, say. Saying it on every request would bury the log it
+   * belongs in; saying it once is what makes it readable. Per server, not per
+   * process, so two servers in one process each get their say and tests do not
+   * inherit a warning from the test before.
+   */
+  warnOnce(key: string, message: string, data?: Record<string, unknown>): void
+  /**
    * Imports the key material, memoized.
    *
    * Lazy because importing a PKCS#8 key is asynchronous while construction is
@@ -53,6 +63,7 @@ export function createAuthServerInternals(
   config: AuthServerConfig
 ): AuthServerInternals {
   const log = createLogger(config.logLevel, config.logger)
+  const warned = new Set<string>()
   let keyMaterial: Promise<KeyMaterial> | undefined
 
   const loadKeys = () => {
@@ -100,6 +111,11 @@ export function createAuthServerInternals(
     config,
     db: config.db,
     log,
+    warnOnce(key, message, data) {
+      if (warned.has(key)) return
+      warned.add(key)
+      log.warn(message, data)
+    },
     keys: loadKeys
   }
 }

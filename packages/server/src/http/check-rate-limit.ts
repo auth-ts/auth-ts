@@ -1,5 +1,6 @@
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import type { RateLimitWindow } from "../core/auth-server-options"
+import { getIpAddress, getIpAddressKey } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import { AuthApiError } from "./auth-api-error"
 
@@ -44,4 +45,43 @@ export async function checkRateLimit(
 
     throw new AuthApiError("rateLimited", 429, { retryAfter })
   }
+}
+
+/**
+ * The per-IP rate-limit key for a request, or `undefined` when no address could
+ * be trusted and the limit therefore does not apply.
+ *
+ * The key is the address grouped by {@link IpAddressOptions.ipv6Subnet}, not
+ * the address itself, so an IPv6 client cannot spend its prefix on fresh
+ * buckets. Whether a limit applies at all is decided here rather than at each
+ * call site, and the one case that is easy to miss in production — a deployment
+ * where nothing usable ever arrives, leaving the limits configured and inert —
+ * is said out loud the first time it happens.
+ *
+ * Requests are never funnelled into a single shared bucket when the address is
+ * unknown: one caller could then lock every user out of the flow, which is a
+ * worse outcome than the per-identifier limits carrying it alone.
+ */
+export function ipRateLimitKey(
+  internals: AuthServerInternals,
+  headers: Headers,
+  scope: string
+): string | undefined {
+  const { config } = internals
+  const address = getIpAddress(headers, config.ipAddress)
+
+  if (!address) {
+    if (!config.ipAddress.disableTracking) {
+      internals.warnOnce(
+        "ip-address",
+        "no client IP could be derived from the request, so per-IP rate limits do not apply and session.ipAddress will be null. " +
+          "Point ipAddress.headers at the header your platform sets (cf-connecting-ip on Cloudflare, x-forwarded-for elsewhere), " +
+          "or declare ipAddress.trustedProxies when a proxy chain reaches this server.",
+        { headers: config.ipAddress.headers }
+      )
+    }
+    return undefined
+  }
+
+  return `${scope}:ip:${getIpAddressKey(address, config.ipAddress)}`
 }

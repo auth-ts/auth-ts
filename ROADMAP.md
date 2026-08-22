@@ -61,9 +61,10 @@ The one part of the build with no real-world evidence behind it.
 - [ ] Register the deployed origin's callback URL with each OAuth provider. The
       redirect URI is derived per request, so nothing is configured on this side
       — but the provider only redirects to a URI listed in its own console.
-- [ ] Set `AUTH_TRUSTED_PROXIES` to the platform's real proxy count (1 on
-      Vercel and most PaaS). Unset, per-IP rate limits stay off; too high, and
-      they key on an `X-Forwarded-For` entry the client wrote.
+- [ ] Confirm a client IP is being derived — sign in and check `session.ipAddress`
+      is set. Nothing to configure where the platform overwrites
+      `x-forwarded-for`; behind an appending proxy, set `ipAddress.trustedProxies`
+      or point `ipAddress.headers` at the header the edge controls.
 
 ### Publish the packages
 
@@ -163,7 +164,7 @@ ownership — two users, each seeing only their own rows, with `userId` derived
 from the verified token rather than sent by the client. A new deployment still
 has to do the things that are easy to skip:
 
-- **Set `clientIp.trustedProxies` to your proxy count.** IP-keyed rate limits
+- **Set `ipAddress.trustedProxies` to your proxy count.** IP-keyed rate limits
   derive nothing until you declare your topology — the forwarded header is
   client-controlled, so the real address is read from a fixed offset from the
   right rather than the spoofable leftmost entry, and only after validating it

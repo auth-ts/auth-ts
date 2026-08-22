@@ -1,8 +1,8 @@
 import { AuthConfigError } from "../http/auth-config-error"
 import type { LocalizationOptions } from "../http/get-error-message"
 import { assertNoReservedFields } from "../http/validate-additional-fields"
-import type { ClientIpConfig, ClientIpOptions } from "../lib/get-client-ip"
-import { resolveClientIpConfig } from "../lib/get-client-ip"
+import type { IpAddressConfig, IpAddressOptions } from "../lib/ip-address"
+import { isTrustedProxyEntry, resolveIpAddressConfig } from "../lib/ip-address"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
 import { parseDuration } from "../lib/parse-duration"
@@ -60,7 +60,7 @@ export interface AuthServerConfig {
   multiAccount: boolean
   cleanup: boolean
   localization?: LocalizationOptions
-  clientIp: ClientIpConfig
+  ipAddress: IpAddressConfig
   cors?: CorsOptions
   logLevel: LogLevel
   logger?: Logger
@@ -176,23 +176,52 @@ function requireClaims(claims: Record<string, unknown> | undefined) {
 }
 
 /**
- * Resolves `clientIp` and refuses a proxy count that cannot index the chain.
+ * Resolves `ipAddress` and refuses a shape that could never derive an address.
  *
- * `getClientIp` reads the entry `trustedProxies` from the right, so a fractional,
- * negative, or non-finite count matches no entry at all. That would not error —
- * it would derive no address and silently switch off every per-IP limit, which
- * is exactly the failure mode that is easiest to miss in production.
+ * Each of these would pass silently and switch off every per-IP limit at
+ * request time instead: a hop count that indexes no entry in the chain, a proxy
+ * entry that is not an address or range and so matches nothing, a header list
+ * with nothing in it, or a prefix length outside an IPv6 address. Refusing them
+ * at construction is the difference between a typo you fix now and per-IP
+ * limits that were never on.
  */
-function requireClientIp(options: ClientIpOptions | undefined) {
-  const resolved = resolveClientIpConfig(options)
-  if (
+function requireIpAddress(options: IpAddressOptions | undefined) {
+  const resolved = resolveIpAddressConfig(options)
+
+  if (resolved.headers.length === 0 || resolved.headers.some((h) => h === "")) {
+    throw new AuthConfigError(
+      "ipAddress.headers must be a non-empty list of header names. An empty list leaves no header to read the client address from."
+    )
+  }
+
+  if (Array.isArray(resolved.trustedProxies)) {
+    const invalid = resolved.trustedProxies.filter(
+      (entry) => !isTrustedProxyEntry(entry)
+    )
+    if (invalid.length > 0) {
+      throw new AuthConfigError(
+        `ipAddress.trustedProxies must be IP addresses or CIDR ranges, not ${invalid.map((entry) => JSON.stringify(entry)).join(", ")}. An entry that parses as neither matches no hop, so the whole chain would be treated as untrusted.`
+      )
+    }
+  } else if (
     !Number.isSafeInteger(resolved.trustedProxies) ||
     resolved.trustedProxies < 0
   ) {
     throw new AuthConfigError(
-      `clientIp.trustedProxies must be a non-negative integer or a boolean, not ${String(options?.trustedProxies)}. A count that cannot address an entry in the forwarded chain would derive no client IP and silently disable every per-IP limit.`
+      `ipAddress.trustedProxies must be a non-negative integer, a boolean, or a list of addresses, not ${String(options?.trustedProxies)}. A count that cannot address an entry in the forwarded chain would derive no client IP and silently disable every per-IP limit.`
     )
   }
+
+  if (
+    !Number.isSafeInteger(resolved.ipv6Subnet) ||
+    resolved.ipv6Subnet < 0 ||
+    resolved.ipv6Subnet > 128
+  ) {
+    throw new AuthConfigError(
+      `ipAddress.ipv6Subnet must be a whole number of bits between 0 and 128, not ${String(options?.ipv6Subnet)}.`
+    )
+  }
+
   return resolved
 }
 
@@ -368,7 +397,7 @@ export function resolveAuthServerConfig(
     multiAccount: options.multiAccount ?? false,
     cleanup: options.cleanup ?? true,
     ...(options.localization ? { localization: options.localization } : {}),
-    clientIp: requireClientIp(options.clientIp),
+    ipAddress: requireIpAddress(options.ipAddress),
     ...(options.cors ? { cors: options.cors } : {}),
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {})

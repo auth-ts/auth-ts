@@ -76,10 +76,10 @@ export type { JwtAlgorithm } from "./jwt/import-signing-key"
 export type { SignTokenClaims } from "./jwt/sign-token"
 export type { TokenClaims, UnverifiedClaims } from "./jwt/verify-token"
 export type {
-  ClientIpConfig,
-  ClientIpOptions
-} from "./lib/get-client-ip"
-export { isIpAddress } from "./lib/get-client-ip"
+  IpAddressConfig,
+  IpAddressOptions
+} from "./lib/ip-address"
+export { isIpAddress } from "./lib/ip-address"
 export type { LeveledLogger, Logger, LogLevel } from "./lib/logger"
 export type { Duration } from "./lib/parse-duration"
 export type {

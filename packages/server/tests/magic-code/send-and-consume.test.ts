@@ -148,10 +148,17 @@ describe("sendMagicCode", () => {
       })
 
     const outcomes = await Promise.allSettled([send(), send()])
-    expect(outcomes.map((outcome) => outcome.status)).toEqual([
+    // One of the two loses the race for the second delivery and is the
+    // rejection — which one is the scheduler's business, not the contract's.
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual([
       "fulfilled",
       "rejected"
     ])
+    const rejected = outcomes.find(
+      (outcome): outcome is PromiseRejectedResult =>
+        outcome.status === "rejected"
+    )
+    expect(String(rejected?.reason)).toContain("SMTP blip")
     // The code that did arrive belonged to the superseded send.
     await expect(
       consumeMagicCode(internals, {
@@ -387,7 +394,7 @@ describe("sendMagicCode", () => {
 
   it("counts per-ip sends from the proxy header", async () => {
     const { internals, db } = await createTestInternals({
-      clientIp: { trustedProxies: 1 }
+      ipAddress: { trustedProxies: 1 }
     })
     const headers = new Headers({ "x-forwarded-for": "203.0.113.7" })
 

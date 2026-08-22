@@ -1,8 +1,7 @@
 import { AuthApiError } from "../../http/auth-api-error"
-import { checkRateLimit } from "../../http/check-rate-limit"
+import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
-import { getClientIp } from "../../lib/get-client-ip"
 import type { IssueMode } from "../../session/issue-session"
 import { issueSession } from "../../session/issue-session"
 
@@ -43,13 +42,9 @@ export const signInGuest = defineEndpoint({
     const headers = input.headers ?? new Headers()
 
     if (config.rateLimit !== false) {
-      const clientIp = getClientIp(headers, config.clientIp)
-      if (clientIp)
-        await checkRateLimit(
-          internals,
-          `guest:ip:${clientIp}`,
-          config.rateLimit.guestPerIP
-        )
+      const ipKey = ipRateLimitKey(internals, headers, "guest")
+      if (ipKey)
+        await checkRateLimit(internals, ipKey, config.rateLimit.guestPerIP)
     }
 
     const additionalFields = validateAdditionalFields(
