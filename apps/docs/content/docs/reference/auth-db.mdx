@@ -45,8 +45,8 @@ These are not enforced by types, so they are worth reading once:
 - **`deleteMagicCode` must match on `codeHash` when it is given**, in one
   statement. Two requests can both read the row and both pass the HMAC check;
   the database lets only one of them delete it. That single conditional delete
-  is the whole one-time guarantee — it is exactly what Better Auth's
-  `consumeOne`, Auth.js's `useVerificationToken`, and InstantDB's `consume!` do.
+  is the whole one-time guarantee — the same conditional delete that Auth.js's
+  `useVerificationToken` and InstantDB's `consume!` rely on.
 - **`upsertRateLimit` is an atomic increment, and the store owns the count.**
   Insert with `count = 1` if the key is absent or its window has passed;
   otherwise add one and keep the existing `resetAt` — in one statement

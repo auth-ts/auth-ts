@@ -29,7 +29,7 @@ while reliably causing a race between concurrent tabs. If you store the refresh
 token somewhere else, rotation becomes mandatory — which is why that mode is not
 supported.
 
-## How is this different from Better Auth or Auth.js?
+## How is this different from session-based auth libraries?
 
 They own your session and hand your application a session object. This library
 issues a JWT your **database** verifies, so authorization happens in Postgres via

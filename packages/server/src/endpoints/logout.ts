@@ -28,7 +28,7 @@ export type LogoutScope = "local" | "others" | "global"
 /**
  * Which of this browser's accounts a sign-out applies to, under `multiAccount`.
  *
- * `"all"` is the default — the same default Clerk and Better Auth use — because
+ * `"all"` is the default — the same default Clerk uses — because
  * the person clicking "sign out" on a shared computer means *everyone*, and a
  * button that quietly left four other accounts one click away would be the
  * surprising behaviour. `"current"` is the account switcher's "sign out of this

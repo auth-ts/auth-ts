@@ -327,9 +327,9 @@ function AccountPage() {
             <button
               type="button"
               onClick={async () => {
-                // Every account in this browser — the default, as in Clerk and
-                // Better Auth. "Sign out this account" below is the switcher's
-                // narrower version.
+                // Every account in this browser — the default, as in Clerk.
+                // "Sign out this account" below is the switcher's narrower
+                // version.
                 await authClient.logout()
                 queryClient.clear()
                 await navigate({ to: "/login" })

@@ -32,7 +32,7 @@ export type LogoutScope = "local" | "others" | "global"
 /**
  * Which of this browser's accounts a sign-out applies to, under `multiAccount`.
  *
- * `"all"` — the default, as in Clerk and Better Auth — signs out every account
+ * `"all"` — the default, as in Clerk — signs out every account
  * in this browser. `"current"` signs out only the active one and the server
  * promotes the next parked account, if any. Ignored for `scope: "others"`.
  */

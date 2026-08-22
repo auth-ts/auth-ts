@@ -316,8 +316,7 @@ describe("multiAccount enabled", () => {
   })
 
   it("signs out every account in the browser by default, revoking each parked session", async () => {
-    // The Clerk and Better Auth default: "sign out" on a shared computer means
-    // everyone. The parked rows are deleted, not merely dropped from the cookie
+    // The Clerk default: "sign out" on a shared computer means everyone. The parked rows are deleted, not merely dropped from the cookie
     // — a token the browser forgot but the database still honoured would be a
     // live session nobody can see to revoke.
     const context = await createTestServer(options)
