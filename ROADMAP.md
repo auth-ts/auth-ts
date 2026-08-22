@@ -266,7 +266,7 @@ goes.
 Refresh tokens themselves are core to the design — stable per session, revoked
 through `deleteSession`. Only the rotate-on-every-refresh pattern is excluded.
 
-The cookie is `HttpOnly`, path-scoped, and never crosses an origin, so rotation
+The cookie is `HttpOnly`, host-only, and never crosses an origin, so rotation
 mostly defends against theft requiring a compromise that defeats rotation anyway.
 What it reliably causes is a race between concurrent tabs, where the second
 presents a token the first has already spent.

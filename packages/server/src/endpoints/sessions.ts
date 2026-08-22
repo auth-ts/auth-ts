@@ -28,9 +28,10 @@ export interface SessionInfo {
  * `tokenHash` never crosses to the browser — `id` is the only address a client
  * ever sees, and it is the only thing revocation needs.
  *
- * This has to live in core rather than in application code: the refresh cookie is
- * path-scoped to the auth mount, so an application route cannot see it and
- * therefore cannot tell which session is the current one.
+ * This lives in core rather than in application code because marking the
+ * current session means hashing the raw refresh token and comparing, and the
+ * raw token is something application code never handles — and, once
+ * `cookie.path` is narrowed to the auth mount, cannot even see.
  */
 export const listSessions = defineEndpoint({
   method: "GET",

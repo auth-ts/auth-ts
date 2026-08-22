@@ -102,7 +102,7 @@ provider identity already linked elsewhere is never re-pointed.
 ## Sessions
 
 The browser receives the refresh token only as an `HttpOnly`, `Secure`,
-`SameSite=Lax`, path-scoped cookie with **no `Domain` attribute**, so it is never
+`SameSite=Lax` cookie with **no `Domain` attribute**, so it is never
 broadcast to sibling subdomains. The database sees only the hash, so a leaked
 table yields nothing replayable. The cookie is not the symmetric case: it *is*
 the credential. `HttpOnly` keeps script from reading it, but whatever does

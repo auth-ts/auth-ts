@@ -39,7 +39,7 @@ JavaScript by construction.
 ## Why the refresh token is not rotated
 
 Rotation exists to limit the damage of a stolen refresh token. This one is
-`HttpOnly`, path-scoped, and never crosses an origin, so the theft it defends
+`HttpOnly`, host-only, and never crosses an origin, so the theft it defends
 against mostly requires a compromise that defeats rotation anyway. What rotation
 reliably *does* cause is a race between concurrent tabs, where the second tab
 presents a token the first has already spent.

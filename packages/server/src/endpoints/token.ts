@@ -32,7 +32,7 @@ export interface AuthTokenResult {
 /**
  * Exchanges the refresh cookie for a fresh access token.
  *
- * The refresh token is **not** rotated. The cookie is `HttpOnly`, path-scoped, and
+ * The refresh token is **not** rotated. The cookie is `HttpOnly`, host-only, and
  * never crosses an origin, so rotation would buy very little; what it would
  * reliably buy is a race between concurrent tabs, where the second tab presents
  * a token the first has already spent. Consumers who store the refresh token
