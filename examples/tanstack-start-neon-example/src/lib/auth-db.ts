@@ -6,21 +6,15 @@ import { db } from "../db/db"
 import * as schema from "../db/schema"
 
 /**
- * The schema module, as a dictionary the contract's table names index.
+ * The five tables the contract names, keyed by the name it uses.
  *
- * Only the tables, so the schema is free to hold anything else — a helper, an
- * enum, a relation — without it turning up where a table is expected. The
- * assertion is the one step TypeScript cannot take on its own: it has no way to
- * see that the predicate keeps exactly the keys the type keeps.
+ * The schema module is already that dictionary, so there is no second list of
+ * table names to drift from it. The filter keeps tables and nothing else, so
+ * the schema is free to export a helper or a relation alongside them.
  */
-type Tables = {
-  [K in keyof typeof schema as (typeof schema)[K] extends PgTable
-    ? K
-    : never]: (typeof schema)[K]
-}
 const tables = Object.fromEntries(
   Object.entries(schema).filter(([, value]) => is(value, PgTable))
-) as Tables
+) as Pick<typeof schema, AuthTable>
 
 /**
  * `Object.entries` types its keys as `string`, which is the one thing here that
