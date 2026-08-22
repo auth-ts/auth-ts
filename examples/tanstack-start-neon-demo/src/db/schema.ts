@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid
 } from "drizzle-orm/pg-core"
 
@@ -133,7 +134,10 @@ export const connections = pgTable.withRLS(
   },
   (table) => [
     index("connectionsUserIdIndex").on(table.userId),
-    index("connectionsProviderAccountIndex").on(
+    // Unique, not merely indexed: `upsertConnection` names these two columns
+    // as its ON CONFLICT target, which Postgres only accepts against a unique
+    // index or constraint — and a provider identity belongs to one user.
+    uniqueIndex("connectionsProviderAccountIndex").on(
       table.provider,
       table.providerAccountId
     )
