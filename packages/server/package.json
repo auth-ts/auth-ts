@@ -1,7 +1,7 @@
 {
   "name": "@auth-ts/server",
   "version": "0.1.0",
-  "description": "Free forever JWT auth in TypeScript \u2014 callbacks to write into any database.",
+  "description": "Free forever JWT auth in TypeScript.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
