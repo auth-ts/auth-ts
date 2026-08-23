@@ -1,18 +1,27 @@
 import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
-import type { Todo, todos } from "../db/schema"
+import type { InferInsertModel, InferSelectModel } from "drizzle-orm"
+import type { PgTable } from "drizzle-orm/pg-core"
+
+import type * as schema from "../db/schema"
 import { authClient } from "./auth-client"
 
-/** The tables the browser reaches through the Data API, typed from the schema. */
-interface Database {
-  public: {
-    Tables: {
-      todos: {
-        Row: Todo
-        Insert: typeof todos.$inferInsert
-        Update: Partial<typeof todos.$inferInsert>
+/** The PostgREST view of a drizzle schema: every table, keyed by its SQL name. */
+type Tables<Schema> = {
+  [K in keyof Schema as Schema[K] extends PgTable
+    ? Schema[K]["_"]["name"]
+    : never]: Schema[K] extends PgTable
+    ? {
+        Row: InferSelectModel<Schema[K]>
+        Insert: InferInsertModel<Schema[K]>
+        Update: Partial<InferInsertModel<Schema[K]>>
         Relationships: []
       }
-    }
+    : never
+}
+
+type Database<Schema> = {
+  public: {
+    Tables: Tables<Schema>
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
     Enums: { [_ in never]: never }
@@ -35,7 +44,7 @@ const withRetry: typeof fetch = async (input, init) => {
 }
 
 /** The data plane: PostgREST over Neon, authenticated by our access token. */
-export const dataApi = new NeonPostgrestClient<Database>({
-  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL ?? "",
+export const dataApi = new NeonPostgrestClient<Database<typeof schema>>({
+  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL as string,
   options: { global: { fetch: withRetry } }
 })
