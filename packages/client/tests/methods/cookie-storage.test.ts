@@ -140,9 +140,7 @@ describe("cookieStorage", () => {
     )
     server.on("GET", "/api/auth/token", {
       status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
+      body: { code: "unauthenticated", message: "You are not signed in." }
     })
 
     expect(

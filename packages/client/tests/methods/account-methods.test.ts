@@ -57,9 +57,7 @@ describe("sendCode", () => {
     server.on("POST", "/api/auth/send-code", { body: { sent: true } })
     server.on("POST", "/api/auth/send-code", {
       status: 429,
-      body: {
-        error: { code: "cooldown", message: "Wait 60 seconds.", retryAfter: 60 }
-      }
+      body: { code: "cooldown", message: "Wait 60 seconds.", retryAfter: 60 }
     })
     const client = createAuthClient()
 
@@ -72,6 +70,79 @@ describe("sendCode", () => {
       code: "cooldown",
       retryAfter: 60
     })
+  })
+
+  it("throws a real Error, carrying name and the server's message", async () => {
+    server.on("POST", "/api/auth/send-code", {
+      status: 429,
+      body: { code: "cooldown", message: "Wait 60 seconds.", retryAfter: 60 }
+    })
+    const client = createAuthClient()
+
+    const thrown = await client
+      .sendCode({ email: "ada@example.com" })
+      .then(() => null)
+      .catch((error: unknown) => error)
+
+    expect(thrown).toBeInstanceOf(Error)
+    expect(thrown).toMatchObject({
+      name: "AuthError",
+      message: "Wait 60 seconds."
+    })
+  })
+
+  it("throws matching the wire body on a 401, plus the status", async () => {
+    const wireBody = {
+      name: "AuthError",
+      code: "unauthenticated",
+      message: "You are not signed in."
+    }
+    // A 401 makes the client refresh its token and retry once, so both the
+    // refresh and the retried request need answers.
+    server.on("DELETE", "/api/auth/sessions/other", {
+      status: 401,
+      body: wireBody
+    })
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    server.on("DELETE", "/api/auth/sessions/other", {
+      status: 401,
+      body: wireBody
+    })
+    const client = await signedIn()
+
+    const thrown = await client
+      .revokeSession({ id: "other" })
+      .then(() => null)
+      .catch((error: unknown) => error)
+
+    expect(thrown).toBeInstanceOf(Error)
+    expect(thrown).toMatchObject({ ...wireBody, status: 401 })
+  })
+})
+
+describe("signInAsGuest", () => {
+  it("throws the error body's fields when the browser is already signed in", async () => {
+    const wireBody = {
+      name: "AuthError",
+      code: "alreadySignedIn",
+      message: "You are already signed in."
+    }
+    server.on("POST", "/api/auth/sign-in/guest", {
+      status: 409,
+      body: wireBody
+    })
+    const client = createAuthClient()
+
+    const thrown = await client
+      .signInAsGuest()
+      .then(() => null)
+      .catch((error: unknown) => error)
+
+    expect(thrown).toBeInstanceOf(Error)
+    expect(thrown).toMatchObject({ ...wireBody, status: 409 })
   })
 })
 
@@ -162,9 +233,7 @@ describe("deleteUser", () => {
   it("reports the code challenge as a value, not an error", async () => {
     server.on("DELETE", "/api/auth/user", {
       status: 403,
-      body: {
-        error: { code: "codeSent", message: "Confirm with the code we sent." }
-      }
+      body: { code: "codeSent", message: "Confirm with the code we sent." }
     })
     const client = await signedIn()
 
@@ -183,9 +252,7 @@ describe("deleteUser", () => {
   it("still throws for a wrong code", async () => {
     server.on("DELETE", "/api/auth/user", {
       status: 401,
-      body: {
-        error: { code: "invalidCode", message: "That code is not valid." }
-      }
+      body: { code: "invalidCode", message: "That code is not valid." }
     })
     const client = await signedIn()
 

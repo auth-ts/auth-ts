@@ -70,11 +70,16 @@ describe("verification code sign-in over HTTP", () => {
 
     expect(response.status).toBe(401)
     const body = (await response.json()) as {
-      error: { code: string; message: string }
+      name: string
+      code: string
+      message: string
     }
-    expect(body.error.code).toBe("invalidCode")
-    expect(body.error.message.length).toBeGreaterThan(0)
-    expect(body.error.message).not.toContain("ada@example.com")
+    // `name` + `message` make the body a complete structural `Error`, so a raw
+    // fetch caller can throw it into anything typed `Error` without wrapping.
+    expect(body.name).toBe("AuthError")
+    expect(body.code).toBe("invalidCode")
+    expect(body.message.length).toBeGreaterThan(0)
+    expect(body.message).not.toContain("ada@example.com")
   })
 
   it("returns 429 with Retry-After and a cooldown code on a rapid resend", async () => {
@@ -95,11 +100,13 @@ describe("verification code sign-in over HTTP", () => {
     expect(response.headers.get("retry-after")).toBe("60")
 
     const body = (await response.json()) as {
-      error: { code: string; retryAfter: number; message: string }
+      code: string
+      retryAfter: number
+      message: string
     }
-    expect(body.error.code).toBe("cooldown")
-    expect(body.error.retryAfter).toBe(60)
-    expect(body.error.message).toContain("60")
+    expect(body.code).toBe("cooldown")
+    expect(body.retryAfter).toBe(60)
+    expect(body.message).toContain("60")
     expect(sentCodes).toHaveLength(1)
   })
 
@@ -124,10 +131,11 @@ describe("verification code sign-in over HTTP", () => {
     )
 
     const body = (await response.json()) as {
-      error: { code: string; message: string }
+      code: string
+      message: string
     }
-    expect(body.error.code).toBe("cooldown")
-    expect(body.error.message).toBe("Bitte warte 60 Sekunden.")
+    expect(body.code).toBe("cooldown")
+    expect(body.message).toBe("Bitte warte 60 Sekunden.")
   })
 
   it("passes the resolved locale through to the sender", async () => {
@@ -236,9 +244,9 @@ describe("token and user endpoints", () => {
     const response = await authServer.handler(request("GET", "/api/auth/user"))
 
     expect(response.status).toBe(401)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("unauthenticated")
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "unauthenticated"
+    )
   })
 
   it("reads the current user and 401s without a session", async () => {
@@ -284,9 +292,9 @@ describe("token and user endpoints", () => {
         request("POST", "/api/auth/user", { token, body: rejected })
       )
       expect(response.status).toBe(400)
-      expect(
-        ((await response.json()) as { error: { code: string } }).error.code
-      ).toBe("invalidField")
+      expect(((await response.json()) as { code: string }).code).toBe(
+        "invalidField"
+      )
     }
   })
 

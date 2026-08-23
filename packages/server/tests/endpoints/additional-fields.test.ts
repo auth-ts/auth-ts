@@ -71,9 +71,9 @@ describe("additionalFields on sign-up", () => {
     })
 
     expect(response.status).toBe(400)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("invalidField")
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "invalidField"
+    )
   })
 
   it("rejects the body before the code is consumed, so the corrected retry still works", async () => {
@@ -107,9 +107,9 @@ describe("additionalFields on sign-up", () => {
     })
 
     expect(response.status).toBe(400)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("invalidField")
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "invalidField"
+    )
   })
 
   it("accepts them on guest sign-in too", async () => {
@@ -232,9 +232,9 @@ describe("additionalFields on update", () => {
         request("POST", "/api/auth/user", { token, body })
       )
       expect(response.status).toBe(400)
-      expect(
-        ((await response.json()) as { error: { code: string } }).error.code
-      ).toBe("invalidField")
+      expect(((await response.json()) as { code: string }).code).toBe(
+        "invalidField"
+      )
     }
     // The token authenticates, so nothing is written at all — not the session,
     // and certainly not the user.

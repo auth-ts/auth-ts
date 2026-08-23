@@ -41,15 +41,22 @@ export type AuthErrorCode =
   /** Something threw that this library did not anticipate. */
   | "internalError"
 
-/** The single shape of every non-2xx JSON body. */
+/**
+ * The single shape of every non-2xx JSON body.
+ *
+ * Flat, with no `error` wrapper: the status code already says this is an
+ * error, and no success body shares these keys. Carrying `name` alongside
+ * `message` makes the parsed body a complete structural `Error`, so a raw
+ * `fetch` caller can `throw await response.json()` straight into anything
+ * typed `Error` — an error boundary, TanStack Query — without wrapping it.
+ */
 export interface AuthErrorBody {
-  error: {
-    code: AuthErrorCode
-    /** Human-readable, localized, and free of identifiers and secrets. */
-    message: string
-    /** Seconds to wait, present on `cooldown` and `rateLimited`. */
-    retryAfter?: number
-  }
+  name: "AuthError"
+  code: AuthErrorCode
+  /** Human-readable, localized, and free of identifiers and secrets. */
+  message: string
+  /** Seconds to wait, present on `cooldown` and `rateLimited`. */
+  retryAfter?: number
 }
 
 /** Builds the JSON error response. `Retry-After` is mirrored into a real header. */
@@ -65,13 +72,12 @@ export function errorResponse(
     headers.set("retry-after", String(options.retryAfter))
 
   const body: AuthErrorBody = {
-    error: {
-      code,
-      message,
-      ...(options.retryAfter === undefined
-        ? {}
-        : { retryAfter: options.retryAfter })
-    }
+    name: "AuthError",
+    code,
+    message,
+    ...(options.retryAfter === undefined
+      ? {}
+      : { retryAfter: options.retryAfter })
   }
 
   return new Response(JSON.stringify(body), { status, headers })

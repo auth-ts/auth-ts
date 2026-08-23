@@ -122,7 +122,7 @@ export function fakeAuthServer(): FakeAuthServer {
 
       if (!reply) {
         return new Response(
-          JSON.stringify({ error: { code: "notFound", message: "No stub." } }),
+          JSON.stringify({ code: "notFound", message: "No stub." }),
           { status: 404 }
         )
       }

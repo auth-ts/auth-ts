@@ -108,9 +108,9 @@ describe("oauth start", () => {
     )
 
     expect(response.status).toBe(400)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("invalidField")
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "invalidField"
+    )
   })
 
   it("404s an unconfigured provider, the reserved guest name, and prototype keys", async () => {

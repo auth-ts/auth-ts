@@ -130,6 +130,31 @@ describe("getToken as a function", () => {
     ).rejects.toThrow(/cookie.path/)
   })
 
+  it("throws real Errors: instanceof, name, and a human message", async () => {
+    // Compile-time: the wire body is a structural `Error`, so a raw fetch
+    // caller can throw the parsed JSON into anything typed `Error`.
+    const wireBodyIsAnError: Error = {} as import("../../src").AuthErrorBody
+    void wireBodyIsAnError
+
+    // What an error boundary renders is `.message`, and it cannot switch on
+    // `code` first — so the default message is the built-in text, never the
+    // bare code.
+    const context = await createTestServer()
+
+    const thrown = await context.authServer
+      .getUser({ headers: new Headers() })
+      .then(() => null)
+      .catch((error: unknown) => error)
+
+    expect(thrown).toBeInstanceOf(Error)
+    expect(thrown).toMatchObject({
+      name: "AuthApiError",
+      code: "unauthenticated",
+      status: 401,
+      message: "You are not signed in."
+    })
+  })
+
   it("is the only callable that reads the cookie", async () => {
     const context = await createTestServer()
     const { refreshToken } = await signIn(context)

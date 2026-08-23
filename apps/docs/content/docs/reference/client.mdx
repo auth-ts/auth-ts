@@ -259,6 +259,35 @@ try {
 A dropped connection raises `AuthNetworkError` instead, because only one of those
 two should clear local state.
 
+The wire body is throwable as-is. Every non-2xx response is a flat
+`{ name: "AuthError", code, message, retryAfter? }` — `name` and `message` make
+it a complete structural `Error`, so code that talks to the API with raw
+`fetch` can hand the body to anything typed `Error` without wrapping it:
+
+```ts
+useQuery({
+  queryFn: async () => {
+    const response = await fetch("/api/auth/session")
+    if (!response.ok) throw await response.json()
+    return response.json()
+  }
+})
+```
+
+Reading `error.code` off a value typed `Error` needs one of two things. Inside a
+`catch`, narrow with `isAuthError(error)`. In TanStack Query, register the error
+type once and every `error` in the app carries `code` without a guard:
+
+```ts
+import type { AuthError } from "@auth-ts/client"
+
+declare module "@tanstack/react-query" {
+  interface Register {
+    defaultError: AuthError
+  }
+}
+```
+
 ## Retrying a data request
 
 On a 401 from your data API, drop the token, fetch a new one, and retry **once**.

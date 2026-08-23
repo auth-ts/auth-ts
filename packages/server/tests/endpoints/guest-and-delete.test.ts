@@ -94,9 +94,9 @@ describe("guests and multiAccount never mix", () => {
     )
 
     expect(refused.status).toBe(409)
-    expect(
-      ((await refused.json()) as { error: { code: string } }).error.code
-    ).toBe("alreadySignedIn")
+    expect(((await refused.json()) as { code: string }).code).toBe(
+      "alreadySignedIn"
+    )
     expect(context.db.users()).toHaveLength(1)
   })
 
@@ -577,9 +577,7 @@ describe("account deletion", () => {
     )
 
     expect(response.status).toBe(403)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("codeSent")
+    expect(((await response.json()) as { code: string }).code).toBe("codeSent")
     expect(context.db.users()).toHaveLength(1)
     expect(required(context.sentCodes.at(-1), "code").action).toBe("deleteUser")
   })
@@ -756,8 +754,8 @@ describe("account deletion", () => {
     )
 
     expect(response.status).toBe(409)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("guestCannotReceiveCode")
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "guestCannotReceiveCode"
+    )
   })
 })

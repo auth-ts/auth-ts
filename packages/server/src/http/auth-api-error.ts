@@ -1,4 +1,5 @@
 import type { AuthErrorCode } from "./error-response"
+import { getErrorMessage } from "./get-error-message"
 
 /**
  * The error every endpoint throws when it cannot complete.
@@ -7,6 +8,13 @@ import type { AuthErrorCode } from "./error-response"
  * or in-process. `createHandler` catches it and serializes the standard
  * envelope; a direct caller catches it and switches on `code`. Either way there
  * is one definition of what went wrong.
+ *
+ * A real `Error` subclass on a modern target, so `instanceof Error`, `.name`,
+ * `.message`, and `.stack` all hold wherever it surfaces. `.message` defaults
+ * to the built-in English text for the code — never the bare code — because an
+ * error boundary rendering `.message` is the one consumer that cannot switch
+ * on `code` first. Localization stays an HTTP concern: the handler re-derives
+ * the message in the request's locale and ignores this one.
  */
 export class AuthApiError extends Error {
   /** The stable, machine-readable reason. */
@@ -21,7 +29,17 @@ export class AuthApiError extends Error {
     status: number,
     options: { retryAfter?: number; message?: string } = {}
   ) {
-    super(options.message ?? code)
+    super(
+      options.message ??
+        getErrorMessage(
+          code,
+          undefined,
+          undefined,
+          options.retryAfter === undefined
+            ? {}
+            : { retryAfter: options.retryAfter }
+        )
+    )
     this.name = "AuthApiError"
     this.code = code
     this.status = status

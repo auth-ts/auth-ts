@@ -56,11 +56,10 @@ export function createFetchJson(
       .catch(() => null)) as AuthErrorBody | null
 
     return {
-      code: parsed?.error?.code ?? "internalError",
+      code: parsed?.code ?? "internalError",
       message:
-        parsed?.error?.message ??
-        `Request failed with status ${response.status}.`,
-      retryAfter: parsed?.error?.retryAfter
+        parsed?.message ?? `Request failed with status ${response.status}.`,
+      retryAfter: parsed?.retryAfter
     }
   }
 

@@ -48,9 +48,9 @@ describe("matchRoute", () => {
     )
 
     expect(response.status).toBe(405)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("methodNotAllowed")
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "methodNotAllowed"
+    )
   })
 
   it("refuses the wrong method on a directly mounted handler before parsing", async () => {
@@ -62,9 +62,9 @@ describe("matchRoute", () => {
     )
 
     expect(response.status).toBe(405)
-    expect(
-      ((await response.json()) as { error: { code: string } }).error.code
-    ).toBe("methodNotAllowed")
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "methodNotAllowed"
+    )
   })
 
   it("keeps the router's 404 for an unknown path, whatever the method", async () => {
@@ -172,9 +172,9 @@ describe("origin check", () => {
       })
     )
     expect(refused.status).toBe(403)
-    expect(
-      ((await refused.json()) as { error: { code: string } }).error.code
-    ).toBe("forbiddenOrigin")
+    expect(((await refused.json()) as { code: string }).code).toBe(
+      "forbiddenOrigin"
+    )
 
     // A sandboxed or redirected context sends the literal string "null".
     expect(
@@ -337,9 +337,9 @@ describe("origin check", () => {
 
     const textPlain = await post({ "content-type": "text/plain" }, payload)
     expect(textPlain.status).toBe(415)
-    expect(
-      ((await textPlain.json()) as { error: { code: string } }).error.code
-    ).toBe("unsupportedMediaType")
+    expect(((await textPlain.json()) as { code: string }).code).toBe(
+      "unsupportedMediaType"
+    )
     expect(
       (
         await post(

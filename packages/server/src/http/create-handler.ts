@@ -148,7 +148,9 @@ function toErrorResponse(
 
   return new Response(
     JSON.stringify({
-      error: { code: "internalError", message: "Something went wrong." }
+      name: "AuthError",
+      code: "internalError",
+      message: "Something went wrong."
     }),
     { status: 500, headers }
   )

@@ -159,9 +159,7 @@ describe("getToken", () => {
     server = fakeAuthServer()
     server.on("GET", "/api/auth/token", {
       status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
+      body: { code: "unauthenticated", message: "You are not signed in." }
     })
     client.clearToken()
 
@@ -191,9 +189,7 @@ describe("getToken", () => {
   it("still throws from the methods that need a credential", async () => {
     server.on("GET", "/api/auth/token", {
       status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
+      body: { code: "unauthenticated", message: "You are not signed in." }
     })
     const client = createAuthClient()
 
@@ -217,13 +213,13 @@ describe("getToken", () => {
     for (const reply of [
       {
         status: 500,
-        body: { error: { code: "internalError", message: "Something broke." } }
+        body: { code: "internalError", message: "Something broke." }
       },
       // A proxy answering for the server, with no JSON envelope at all.
       { status: 502, body: "Bad Gateway" },
       {
         status: 429,
-        body: { error: { code: "rateLimited", message: "Slow down." } }
+        body: { code: "rateLimited", message: "Slow down." }
       }
     ]) {
       server.restore()
@@ -242,11 +238,9 @@ describe("getToken", () => {
     server.on("GET", "/api/auth/token", {
       status: 429,
       body: {
-        error: {
-          code: "rateLimited",
-          message: "Too many attempts.",
-          retryAfter: 42
-        }
+        code: "rateLimited",
+        message: "Too many attempts.",
+        retryAfter: 42
       }
     })
 
@@ -343,9 +337,7 @@ describe("a refused token", () => {
     })
     server.on("GET", "/api/auth/sessions", {
       status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
+      body: { code: "unauthenticated", message: "You are not signed in." }
     })
     server.on("GET", "/api/auth/sessions", { body: [] })
     server.on("GET", "/api/auth/token", {
@@ -364,9 +356,7 @@ describe("a refused token", () => {
   it("gives up when the refresh is refused too, rather than looping", async () => {
     const refused = {
       status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
+      body: { code: "unauthenticated", message: "You are not signed in." }
     }
     server.on("POST", "/api/auth/verify-code", {
       body: { user },
@@ -424,9 +414,7 @@ describe("getUser", () => {
   it("resolves null when the session is gone", async () => {
     server.on("GET", "/api/auth/token", {
       status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
+      body: { code: "unauthenticated", message: "You are not signed in." }
     })
 
     expect(await createAuthClient().getUser()).toBeNull()
