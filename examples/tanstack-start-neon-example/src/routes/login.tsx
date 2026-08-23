@@ -65,6 +65,17 @@ function LoginPage() {
     }
   }
 
+  const continueAsGuest = async () => {
+    setNotice(null)
+    try {
+      await authClient.signInAsGuest()
+      await refetchToken()
+      await navigate({ to: "/todos" })
+    } catch (error) {
+      report(error)
+    }
+  }
+
   return (
     <section className="mx-auto max-w-sm">
       <div className="card bg-base-100 shadow-sm">
@@ -167,11 +178,7 @@ function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={async () => {
-                await authClient.signInAsGuest()
-                await refetchToken()
-                await navigate({ to: "/todos" })
-              }}
+              onClick={() => void continueAsGuest()}
               className="btn btn-ghost w-full"
             >
               Continue as guest
