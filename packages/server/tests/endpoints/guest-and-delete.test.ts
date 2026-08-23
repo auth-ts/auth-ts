@@ -344,9 +344,7 @@ describe("account deletion", () => {
       ((await response.json()) as { error: { code: string } }).error.code
     ).toBe("codeSent")
     expect(context.db.users()).toHaveLength(1)
-    expect(required(context.sentCodes.at(-1), "code").purpose).toBe(
-      "deleteUser"
-    )
+    expect(required(context.sentCodes.at(-1), "code").action).toBe("deleteUser")
   })
 
   it("treats a zero-length freshness window as always requiring a code", async () => {
@@ -456,7 +454,7 @@ describe("account deletion", () => {
       })
     )
     const signInCode = required(context.sentCodes.at(-1), "sign-in code")
-    expect(signInCode.purpose).toBe("signIn")
+    expect(signInCode.action).toBe("signIn")
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {

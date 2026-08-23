@@ -108,8 +108,8 @@ export interface AuthSession {
   ipAddress?: string | null
 }
 
-/** What a live verification code is for. Checked on every verify so codes cannot cross purposes. */
-export type VerificationCodePurpose = "signIn" | "deleteUser"
+/** What a live verification code authorizes. Checked on every verify, so a code cannot cross actions. */
+export type VerificationCodeAction = "signIn" | "deleteUser"
 
 /**
  * A verification code, stored as an HMAC of the six digits.
@@ -124,7 +124,7 @@ export interface AuthVerificationCode {
   identifier: string
   codeHash: string
   expiresAt: Date
-  purpose: VerificationCodePurpose
+  action: VerificationCodeAction
 }
 
 /**

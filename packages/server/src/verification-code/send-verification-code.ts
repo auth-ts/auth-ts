@@ -1,4 +1,4 @@
-import type { VerificationCodePurpose } from "../core/auth-db"
+import type { VerificationCodeAction } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
@@ -22,7 +22,7 @@ export const VERIFICATION_CODE_TTL = "10m"
 /** What sending a code needs to know. */
 export interface SendVerificationCodeInput {
   identifier: CodeIdentifier
-  purpose: VerificationCodePurpose
+  action: VerificationCodeAction
   locale: string
   headers: Headers
 }
@@ -44,7 +44,7 @@ export async function sendVerificationCode(
   input: SendVerificationCodeInput
 ) {
   const { config } = internals
-  const { identifier, purpose, locale, headers } = input
+  const { identifier, action, locale, headers } = input
 
   if (config.rateLimit !== false) {
     const live = await selectOne(
@@ -63,10 +63,10 @@ export async function sendVerificationCode(
     }
 
     const perIdentifier =
-      purpose === "deleteUser"
+      action === "deleteUser"
         ? config.rateLimit.deleteUserPerIdentifier
         : config.rateLimit.sendCodePerIdentifier
-    const scope = purpose === "deleteUser" ? "deleteUser" : "sendCode"
+    const scope = action === "deleteUser" ? "deleteUser" : "sendCode"
     await checkRateLimit(
       internals,
       `${scope}:id:${identifier.value}`,
@@ -91,7 +91,7 @@ export async function sendVerificationCode(
     identifier: identifier.value,
     codeHash,
     expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
-    purpose
+    action
   })
 
   // Stored first, then delivered, and rolled back if delivery throws. The
@@ -106,7 +106,7 @@ export async function sendVerificationCode(
   // still in flight to the inbox. Serializing that would take a lock primitive
   // the database contract deliberately does not have.
   try {
-    await deliver(internals, identifier, code, locale, purpose, headers)
+    await deliver(internals, identifier, code, locale, action, headers)
   } catch (error) {
     await internals.db.delete({
       table: "verificationCodes",
@@ -114,15 +114,15 @@ export async function sendVerificationCode(
     })
     internals.log.error("verification code delivery failed", {
       channel: identifier.kind,
-      purpose
+      action
     })
     throw error
   }
-  // Channel and purpose only: the address is personal data and the code is a
+  // Channel and action only: the address is personal data and the code is a
   // credential, so neither is ever handed to a log sink.
   internals.log.info("verification code sent", {
     channel: identifier.kind,
-    purpose
+    action
   })
 }
 
@@ -132,7 +132,7 @@ async function deliver(
   identifier: CodeIdentifier,
   code: string,
   locale: string,
-  purpose: VerificationCodePurpose,
+  action: VerificationCodeAction,
   headers: Headers
 ) {
   const { config } = internals
@@ -143,7 +143,7 @@ async function deliver(
       email: identifier.value,
       code,
       locale,
-      purpose,
+      action,
       headers
     })
     return
@@ -154,7 +154,7 @@ async function deliver(
     phoneNumber: identifier.value,
     code,
     locale,
-    purpose,
+    action,
     headers
   })
 }

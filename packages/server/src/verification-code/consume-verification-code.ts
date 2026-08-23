@@ -1,6 +1,6 @@
 import type {
   AuthVerificationCode,
-  VerificationCodePurpose
+  VerificationCodeAction
 } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
@@ -21,7 +21,7 @@ export const MAX_CODE_ATTEMPTS = 5
 export interface ConsumeVerificationCodeInput {
   identifier: string
   code: string
-  purpose: VerificationCodePurpose
+  action: VerificationCodeAction
 }
 
 /**
@@ -68,10 +68,10 @@ async function countWrongGuess(
  * Verifies and burns a verification code.
  *
  * Every failure returns the same `invalidCode` error — missing, expired, wrong
- * purpose, or simply wrong. Distinguishing them would tell an attacker which
+ * action, or simply wrong. Distinguishing them would tell an attacker which
  * addresses have codes outstanding.
  *
- * The purpose check is what stops a sign-in code from authorizing account
+ * The action check is what stops a sign-in code from authorizing account
  * deletion and vice versa; both are codes for the same identifier, so without
  * it a code obtained for one flow would silently work in the other.
  *
@@ -90,7 +90,7 @@ export async function consumeVerificationCode(
     { expiresAt: "desc" }
   )
 
-  if (!stored || stored.purpose !== input.purpose) {
+  if (!stored || stored.action !== input.action) {
     throw new AuthApiError("invalidCode", 401)
   }
 

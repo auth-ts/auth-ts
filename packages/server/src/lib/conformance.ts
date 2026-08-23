@@ -370,7 +370,7 @@ export const authDBChecks: AuthDBCheck[] = [
           identifier,
           codeHash: `${unique()}`,
           expiresAt,
-          purpose: "signIn"
+          action: "signIn"
         })
       }
       try {

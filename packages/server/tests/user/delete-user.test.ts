@@ -39,7 +39,7 @@ async function seed() {
         identifier,
         codeHash: `code-${identifier}`,
         expiresAt: new Date(Date.now() + 60_000),
-        purpose: "signIn"
+        action: "signIn"
       }
     })
   }

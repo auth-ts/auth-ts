@@ -164,7 +164,7 @@ describe("select", () => {
         identifier,
         codeHash: "old",
         expiresAt: older,
-        purpose: "signIn"
+        action: "signIn"
       }
     })
     await db.insert({
@@ -173,7 +173,7 @@ describe("select", () => {
         identifier,
         codeHash: "new",
         expiresAt: newer,
-        purpose: "signIn"
+        action: "signIn"
       }
     })
 
@@ -316,7 +316,7 @@ describe("cleanup", () => {
           identifier: "ada@example.com",
           codeHash: `code-${expiresAt.getTime()}`,
           expiresAt,
-          purpose: "signIn"
+          action: "signIn"
         }
       })
       await attempt(`key-${expiresAt.getTime()}`, expiresAt)

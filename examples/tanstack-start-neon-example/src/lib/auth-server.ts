@@ -4,9 +4,9 @@ import { authDB } from "./auth-db"
 export const authServer = createAuthServer({
   db: authDB,
   email: {
-    sendCode: ({ email, code, purpose }) => {
+    sendCode: ({ email, code, action }) => {
       if (process.env.NODE_ENV === "development") {
-        console.log(`${purpose} code for ${email}: ${code}`)
+        console.log(`${action} code for ${email}: ${code}`)
       }
     }
   },

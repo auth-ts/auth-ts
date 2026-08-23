@@ -23,7 +23,7 @@ export type {
   AuthWhere,
   CoreUserFields,
   UserType,
-  VerificationCodePurpose
+  VerificationCodeAction
 } from "./core/auth-db"
 export { defineAuthDB } from "./core/auth-db"
 export type { AuthServerConfig } from "./core/auth-server-config"

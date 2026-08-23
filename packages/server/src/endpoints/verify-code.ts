@@ -72,7 +72,7 @@ export const verifyCode = defineEndpoint({
     await consumeVerificationCode(internals, {
       identifier: identifier.value,
       code: input.code,
-      purpose: "signIn"
+      action: "signIn"
     })
 
     const active = await resolveSession(internals, headers)

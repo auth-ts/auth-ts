@@ -10,7 +10,7 @@ export type AuthErrorCode =
   | "cooldown"
   /** A fixed-window rate limit was exceeded. */
   | "rateLimited"
-  /** Wrong, expired, already-used, or wrong-purpose verification code. */
+  /** Wrong, expired, already-used, or for a different action. */
   | "invalidCode"
   /** Deletion needs confirmation; a code has been sent. */
   | "codeSent"

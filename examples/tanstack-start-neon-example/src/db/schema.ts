@@ -1,4 +1,4 @@
-import type { UserType, VerificationCodePurpose } from "@auth-ts/server"
+import type { UserType, VerificationCodeAction } from "@auth-ts/server"
 import { sql } from "drizzle-orm"
 import { authenticatedRole } from "drizzle-orm/neon"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
@@ -68,8 +68,8 @@ export const verificationCodes = pgTable.withRLS(
     identifier: text("identifier").notNull(),
     codeHash: text("codeHash").notNull(),
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
-    purpose: text("purpose")
-      .$type<VerificationCodePurpose>()
+    action: text("action")
+      .$type<VerificationCodeAction>()
       .notNull()
       .default("signIn"),
     createdAt: timestamp("createdAt", { withTimezone: true })

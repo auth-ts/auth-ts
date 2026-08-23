@@ -30,7 +30,7 @@ cost of not having an adapter package.
 | --- | --- | --- | --- | --- |
 | `users` | `id`, `email`, `phoneNumber`, `name`, `imageURL`, `type`, `primaryUserId`, + your declared fields | `email`, `phoneNumber` | | |
 | `sessions` | `id`, `userId`, `tokenHash`, `createdAt`, `expiresAt`, `userAgent`, `ipAddress` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
-| `verificationCodes` | `id`, `identifier`, `codeHash`, `purpose`, `expiresAt` | | `identifier`, `expiresAt` | `expiresAt` |
+| `verificationCodes` | `id`, `identifier`, `codeHash`, `action`, `expiresAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt` | | `key`, `expiresAt` | `expiresAt` |
 | `connections` | `id`, `userId`, `provider`, `providerAccountId`, `email` | `(provider, providerAccountId)` | `userId` | |
 

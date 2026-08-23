@@ -143,7 +143,7 @@ export interface DeleteUserInput {
  *
  * The deletion code shares an identifier with sign-in codes, so a stranger
  * spamming `/send-code` at this address keeps the challenge inside the send
- * cooldown. Bounded nuisance, not a bypass: the purpose is checked on verify,
+ * cooldown. Bounded nuisance, not a bypass: the action is checked on verify,
  * so a sign-in code never authorizes a deletion.
  */
 export const deleteUser = defineEndpoint({
@@ -169,7 +169,7 @@ export const deleteUser = defineEndpoint({
       await consumeVerificationCode(internals, {
         identifier,
         code: input.code,
-        purpose: "deleteUser"
+        action: "deleteUser"
       })
       return finishDeletion()
     }
@@ -193,7 +193,7 @@ export const deleteUser = defineEndpoint({
 
     await sendVerificationCode(internals, {
       identifier,
-      purpose: "deleteUser",
+      action: "deleteUser",
       locale: resolveLocale(
         headers.get("accept-language"),
         config.localization
