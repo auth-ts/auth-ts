@@ -179,12 +179,12 @@ export const todos = pgTable.withRLS(
       .defaultNow()
       .$onUpdate(() => new Date())
   },
-  () => [
-    pgPolicy("own todos", {
+  (table) => [
+    pgPolicy("manage_own_todos", {
       for: "all",
       to: authenticatedRole,
-      using: sql`"userId" = (auth.user_id())::uuid`,
-      withCheck: sql`"userId" = (auth.user_id())::uuid`
+      using: authUuid(table.userId),
+      withCheck: authUuid(table.userId)
     })
   ]
 )
