@@ -24,13 +24,14 @@ import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
 
 /**
- * The browser client.
+ * The client.
  *
- * Two planes, one cookie: every method except `getToken` is authenticated
- * server-side by the refresh cookie, and the access token exists purely as the
+ * Two planes, one cookie: every method presents the access token it holds and
+ * falls back to the refresh cookie, and the access token doubles as the
  * data-plane credential for something like PostgREST. An application that never
  * calls `getToken` still gets working sign-in, profile updates, and a correct
- * user.
+ * user. In a browser the cookie is the browser's; anywhere else, `cookieStorage`
+ * is where the client keeps it.
  */
 export interface AuthClient {
   /** A valid access token, refreshed when needed. Hand this to your data client. */

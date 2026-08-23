@@ -6,6 +6,7 @@ export type { TokenState } from "./core/token-store"
 export { REFRESH_AHEAD_MS } from "./core/token-store"
 
 export { AuthError, AuthNetworkError, isAuthError } from "./lib/auth-error"
+export type { CookieStorage } from "./lib/cookie-jar"
 export type { FetchJson, FetchJsonOptions } from "./lib/fetch-json"
 export type { LeveledLogger, Logger, LogLevel } from "./lib/logger"
 export type {

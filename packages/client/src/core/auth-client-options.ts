@@ -1,3 +1,4 @@
+import type { CookieStorage } from "../lib/cookie-jar"
 import type { Logger, LogLevel } from "../lib/logger"
 
 // The shape `createAuthClient` accepts — and nothing else. Options are the
@@ -25,6 +26,17 @@ export interface AuthClientOptions {
    * it falls out of the mechanism.
    */
   locale?: string
+  /**
+   * Where to keep the auth cookies, for a runtime with no cookie jar of its own.
+   *
+   * A browser holds the refresh cookie itself and never shows it to
+   * JavaScript, so leave this unset there. A native app has no such jar: pass
+   * a storage the platform protects — the keychain or keystore — and the
+   * client keeps whatever the server sets and sends it back as the `Cookie`
+   * header on every auth request, with `credentials: "omit"`. The server is
+   * none the wiser, and the refresh token still travels nowhere else.
+   */
+  cookieStorage?: CookieStorage
   /** @default "error" — quiet in other people's consoles. */
   logLevel?: LogLevel
   /** Log sink override. Defaults to `console`. */

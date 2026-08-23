@@ -1,3 +1,4 @@
+import type { CookieStorage } from "../lib/cookie-jar"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { AuthClientOptions } from "./auth-client-options"
 
@@ -13,6 +14,7 @@ export interface AuthClientConfig {
   basePath: string
   baseURL: string
   locale?: string
+  cookieStorage?: CookieStorage
   logLevel: LogLevel
   logger?: Logger
 }
@@ -29,6 +31,7 @@ export function resolveAuthClientConfig(
       : `/${basePath}`,
     baseURL: options.baseURL?.replace(/\/+$/, "") ?? "",
     ...(options.locale ? { locale: options.locale } : {}),
+    ...(options.cookieStorage ? { cookieStorage: options.cookieStorage } : {}),
     logLevel: options.logLevel ?? "error",
     ...(options.logger ? { logger: options.logger } : {})
   }

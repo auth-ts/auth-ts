@@ -1,6 +1,6 @@
 ---
 title: createAuthClient
-description: The browser client. Zero dependencies, token in memory only.
+description: The client. Zero dependencies, token in memory only.
 ---
 
 ```ts
@@ -111,6 +111,37 @@ queryClient.clear()
 
 Persistence across a cold load, if you want it, is your query client's persister
 — the same one you would use for any other data.
+
+## Native
+
+A browser holds the refresh cookie itself and never shows it to JavaScript. A
+native app has no such jar, so the client can be one: pass `cookieStorage` and it
+keeps whatever the server sets in the storage you give it, sends it back as the
+`Cookie` header on every auth request, and drops what the server clears. The
+server is none the wiser, and the refresh token still travels nowhere but the
+cookie header.
+
+```ts
+import * as SecureStore from "expo-secure-store"
+
+export const authClient = createAuthClient({
+  baseURL: "https://app.example.com",
+  cookieStorage: {
+    getItem: (key) => SecureStore.getItemAsync(key),
+    setItem: (key, value) => SecureStore.setItemAsync(key, value),
+    removeItem: (key) => SecureStore.deleteItemAsync(key)
+  }
+})
+```
+
+The shape is the web `Storage` interface, so a store that already has
+`getItem`/`setItem`/`removeItem` passes straight through. Use one the platform
+protects — the keychain or keystore — because what lands in it is the session.
+
+Everything else is unchanged: `getToken()` still serves the JWT from memory for
+your data client, and the app never touches the cookie. OAuth is the exception
+for now — `signIn` and `connect` navigate the page, which a native app cannot do;
+deep-link flows are on the roadmap.
 
 ## Errors
 

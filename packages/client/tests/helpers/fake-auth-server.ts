@@ -7,6 +7,7 @@ export interface RecordedRequest {
   body: unknown
   credentials: RequestCredentials | undefined
   acceptLanguage: string | null
+  cookie: string | null
 }
 
 /** A queued reply, matched by method and path. */
@@ -15,6 +16,8 @@ export interface StubbedReply {
   body?: unknown
   /** A token to send back the way the server does — in the response header. */
   token?: string
+  /** `Set-Cookie` headers to send back, one per cookie. */
+  setCookies?: string[]
   /** Throw a network failure instead of replying. */
   networkError?: boolean
 }
@@ -84,7 +87,8 @@ export function fakeAuthServer(): FakeAuthServer {
         path: url.pathname,
         body: init?.body ? JSON.parse(init.body as string) : undefined,
         credentials: init?.credentials,
-        acceptLanguage: headers.get("accept-language")
+        acceptLanguage: headers.get("accept-language"),
+        cookie: headers.get("cookie")
       })
 
       // Replies are consumed in the order they were queued; once the queue runs
@@ -109,16 +113,24 @@ export function fakeAuthServer(): FakeAuthServer {
       const responseHeaders = new Headers(
         reply.token ? { "x-auth-token": reply.token } : {}
       )
+      for (const setCookie of reply.setCookies ?? []) {
+        responseHeaders.append("set-cookie", setCookie)
+      }
+      // A browser's fetch hides `Set-Cookie` from scripts and the DOM shim here
+      // does the same, so the headers are put back as a runtime that does show
+      // them — a native one — would present them.
+      const withHeaders = (response: Response) =>
+        Object.defineProperty(response, "headers", { value: responseHeaders })
+
       if (status === 204) {
-        return new Response(null, { status, headers: responseHeaders })
+        return withHeaders(new Response(null, { status }))
       }
 
       responseHeaders.set("content-type", "application/json")
 
-      return new Response(JSON.stringify(reply.body ?? {}), {
-        status,
-        headers: responseHeaders
-      })
+      return withHeaders(
+        new Response(JSON.stringify(reply.body ?? {}), { status })
+      )
     })
 
   return {

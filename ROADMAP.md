@@ -295,12 +295,45 @@ Mostly unnecessary by construction: **your four functions are the hooks.** Your
 belongs. A webhook layer would be a second, worse copy of information you
 already have.
 
-### Native application OAuth
+### Native applications
 
-Deep-link flows for iOS and Android, and with them a decision on how a client
-with no cookie jar holds the refresh token — today it travels only in the
-`HttpOnly` cookie, on purpose, so this is the token model as much as the
-redirect handling.
+The token model is settled and shipped: the refresh token travels only as a
+cookie, and a runtime with no cookie jar passes `cookieStorage` to
+`createAuthClient` — the client keeps what the server sets in the platform's
+keychain and sends it back as the `Cookie` header. No second credential, no
+server change. What remains is the OAuth half:
+
+- **Deep-link redirects.** `validateRedirect` and the origin check admit only
+  same-origin paths and http(s) origins. A native flow needs `myapp://…` as an
+  allowed post-OAuth redirect and as an acceptable (or absent) `Origin`, behind
+  a new option naming the trusted schemes. `signIn` and `connect` on the client
+  navigate with `location.assign`; native needs the URL to hand to the system
+  browser instead.
+- **ID-token sign-in.** Sign in with Apple and Google on a device is the native
+  SDK producing an ID token, not a redirect. A `POST /sign-in/$provider` body
+  carrying `idToken` (and the nonce it was minted with), verified against the
+  provider's published keys and resolved through the same identity path the
+  callback uses. App Store review effectively requires the Apple one.
+
+Neither is built until there is an Expo example to test it against — see
+**Examples** below.
+
+### Examples
+
+One exists, and it is the reference application. The others each prove a
+different edge of the design and should be built in roughly this order:
+
+- **Next.js.** Server components and route handlers reading the session with
+  `authServer.getUser({ headers })`, the cookie-path trap, and the
+  `x-auth-token` header surviving a framework's response plumbing.
+- **Supabase with row-level security.** The same data-plane story as Neon, with
+  `auth.jwt()` policies instead of `auth.session()`, and the JWKS published
+  where Supabase's verifier can find it. Proves the token is portable.
+- **Expo.** `cookieStorage` over `expo-secure-store`, and the test bed for
+  deep-link OAuth and ID-token sign-in above. Nothing native ships as "done"
+  until this runs on a device.
+- **Solid.js 2.0 with SolidStart.** A non-React client consumer, so nothing in
+  the client turns out to assume React's render model.
 
 ---
 

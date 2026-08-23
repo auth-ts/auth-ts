@@ -1,6 +1,7 @@
 import type { AuthErrorBody } from "@auth-ts/server"
 import type { AuthClientConfig } from "../core/auth-client-config"
 import { AuthError, AuthNetworkError } from "./auth-error"
+import { createCookieJar } from "./cookie-jar"
 
 /** Per-request options. */
 export interface FetchJsonOptions {
@@ -20,7 +21,9 @@ export type FetchJson = <Result>(options: FetchJsonOptions) => Promise<Result>
  *
  * `credentials: "include"` is what makes the refresh cookie travel, and is the
  * reason a cross-origin server must answer with an explicit origin rather than a
- * wildcard.
+ * wildcard. With `cookieStorage` configured the client is the cookie jar
+ * instead: it sends what it holds as the `Cookie` header and keeps what comes
+ * back in `Set-Cookie`, with credentials omitted so the two cannot disagree.
  *
  * A failed request and a refused one are turned into different errors on
  * purpose: the caller must be able to tell "your session is gone" from "the
@@ -35,6 +38,9 @@ export function createFetchJson(
   onToken: (token: string) => void
 ): FetchJson {
   const base = `${config.baseURL}${config.basePath}`
+  const jar = config.cookieStorage
+    ? createCookieJar(config.cookieStorage)
+    : undefined
 
   return async <Result>({ method, path, body }: FetchJsonOptions) => {
     const headers = new Headers()
@@ -46,19 +52,22 @@ export function createFetchJson(
     // entirely; `/user` reads it to decide whether to mint a replacement.
     const bearer = getBearer()
     if (bearer) headers.set("authorization", `Bearer ${bearer}`)
+    const cookie = await jar?.header()
+    if (cookie) headers.set("cookie", cookie)
 
     let response: Response
     try {
       response = await fetch(`${base}${path}`, {
         method,
         headers,
-        credentials: "include",
+        credentials: jar ? "omit" : "include",
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       })
     } catch (cause) {
       throw new AuthNetworkError(cause)
     }
 
+    await jar?.absorb(response)
     const minted = response.headers.get(TOKEN_HEADER)
     if (minted) onToken(minted)
 
