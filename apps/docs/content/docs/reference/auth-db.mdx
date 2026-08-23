@@ -304,6 +304,32 @@ inserting twice in sequence. The failure it prevents only shows under a race,
 which no test can stage reliably — the constraint is the fix, and this is only
 evidence that you have one.
 
+### Running them without a connection string
+
+CI usually has no database, and pointing it at a shared one makes the checks
+race each other. The reference application solves this with
+[PGlite](https://pglite.dev) — Postgres 18 compiled to WebAssembly, running in
+the test process:
+
+```ts
+import { PGlite } from "@electric-sql/pglite"
+import { drizzle } from "drizzle-orm/pglite"
+
+const client = new PGlite()
+// Pass the client: `drizzle(client)` reads it as connection config and starts a
+// second, empty database instead.
+export const db = drizzle({ client })
+```
+
+Generate the tables from your schema rather than writing the DDL out again, and
+the database the checks run against cannot drift from the one you deploy. With
+Drizzle that is `generateMigration` from `drizzle-kit/api-postgres`. The
+constraints are real, so the duplicate checks are testing something.
+
+What this does not cover is your driver: the SQL is the same, the transport is
+not. That is a fair trade for a suite that runs on every commit, but it is a
+reason to run the checks against your real database at least once as well.
+
 ### The in-memory implementation
 
 The store the library's own suite runs against is public too:

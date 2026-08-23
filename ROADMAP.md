@@ -214,9 +214,21 @@ that matches on any column rather than all of them, a `select` that ignores
 `limit`, a `cleanup` that sweeps nothing — so the checks are known to fail when
 the contract is broken, not merely to pass when it is not.
 
-- [ ] Run them from the reference application against Neon in CI, so the
-      example's `auth-db.ts` — the file people will copy — stays proven rather
-      than believed. Today it is proven by hand.
+They also run in CI, from the reference application, against its own
+`src/lib/auth-db.ts` — the file people copy — so it stays proven rather than
+believed. No connection string: PGlite is Postgres 18 compiled to WebAssembly,
+running in the test process, and the schema is real enough to matter because the
+DDL is generated from `schema.ts` rather than written out again. The unique
+constraints, the cascades, and `uuidv7()` are all the deployed ones.
+
+Two things that setup does not cover, worth saying rather than implying:
+
+- **The driver.** Tests reach Postgres through PGlite; production goes through
+  Neon's HTTP driver. Drizzle emits the same SQL for both, so this proves the
+  schema and the four functions, not the transport.
+- **Row-level security.** The auth tables are created without the policies, and
+  `todos` is left out entirely. RLS is what the Data API enforces against
+  application queries, and nothing in `AuthDB` depends on it.
 
 One limit is stated in the docs and worth repeating: a duplicate-insert check
 proves a constraint exists by inserting twice in sequence. The failure it
