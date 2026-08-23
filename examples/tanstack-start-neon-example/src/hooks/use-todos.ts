@@ -1,18 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { postgrest } from "../db/postgrest"
 
-/** Unwraps a PostgREST result, throwing so the query library sees the failure. */
-function unwrap<T>({
-  data,
-  error
-}: {
-  data: T
-  error: { message: string } | null
-}) {
-  if (error) throw new Error(error.message)
-  return data
-}
-
 /**
  * This user's todos, and the three ways to change them.
  *
@@ -33,28 +21,42 @@ export function useTodos(userId: string | undefined) {
 
   const todos = useQuery({
     queryKey,
-    queryFn: async () =>
-      unwrap(
-        await postgrest
-          .from("todos")
-          .select()
-          .order("createdAt", { ascending: false })
-      ),
+    queryFn: async () => {
+      const { data } = await postgrest
+        .from("todos")
+        .select()
+        .order("createdAt", { ascending: false })
+        .throwOnError()
+      return data
+    },
     enabled: Boolean(userId)
   })
   const add = useMutation({
-    mutationFn: async (title: string) =>
-      unwrap(await postgrest.from("todos").insert({ title })),
+    mutationFn: async (title: string) => {
+      await postgrest.from("todos").insert({ title }).throwOnError()
+    },
     onSuccess
   })
   const toggle = useMutation({
-    mutationFn: async ({ id, completed }: { id: string; completed: boolean }) =>
-      unwrap(await postgrest.from("todos").update({ completed }).eq("id", id)),
+    mutationFn: async ({
+      id,
+      completed
+    }: {
+      id: string
+      completed: boolean
+    }) => {
+      await postgrest
+        .from("todos")
+        .update({ completed })
+        .eq("id", id)
+        .throwOnError()
+    },
     onSuccess
   })
   const remove = useMutation({
-    mutationFn: async (id: string) =>
-      unwrap(await postgrest.from("todos").delete().eq("id", id)),
+    mutationFn: async (id: string) => {
+      await postgrest.from("todos").delete().eq("id", id).throwOnError()
+    },
     onSuccess
   })
 
