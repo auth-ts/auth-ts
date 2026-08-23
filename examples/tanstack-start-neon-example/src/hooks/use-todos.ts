@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { dataApi } from "../lib/data-api"
+import { postgrest } from "../db/postgrest"
 
 /** Unwraps a PostgREST result, throwing so the query library sees the failure. */
 function unwrap<T>({
@@ -35,7 +35,7 @@ export function useTodos(userId: string | undefined) {
     queryKey,
     queryFn: async () =>
       unwrap(
-        await dataApi
+        await postgrest
           .from("todos")
           .select()
           .order("createdAt", { ascending: false })
@@ -44,17 +44,17 @@ export function useTodos(userId: string | undefined) {
   })
   const add = useMutation({
     mutationFn: async (title: string) =>
-      unwrap(await dataApi.from("todos").insert({ title })),
+      unwrap(await postgrest.from("todos").insert({ title })),
     onSuccess
   })
   const toggle = useMutation({
     mutationFn: async ({ id, completed }: { id: string; completed: boolean }) =>
-      unwrap(await dataApi.from("todos").update({ completed }).eq("id", id)),
+      unwrap(await postgrest.from("todos").update({ completed }).eq("id", id)),
     onSuccess
   })
   const remove = useMutation({
     mutationFn: async (id: string) =>
-      unwrap(await dataApi.from("todos").delete().eq("id", id)),
+      unwrap(await postgrest.from("todos").delete().eq("id", id)),
     onSuccess
   })
 

@@ -1,12 +1,11 @@
 import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm"
 import type { PgTable } from "drizzle-orm/pg-core"
-
-import type * as schema from "../db/schema"
-import { authClient } from "./auth-client"
+import { authClient } from "../lib/auth-client"
+import type * as schema from "./schema"
 
 /** Types a postgrest-js `Database` from a drizzle schema: every table, keyed by its SQL name. */
-type DrizzleToPostgrestDatabase<Schema> = {
+type DrizzlePostgrest<Schema> = {
   public: {
     Tables: {
       [K in keyof Schema as Schema[K] extends PgTable
@@ -42,8 +41,8 @@ const withRetry: typeof fetch = async (input, init) => {
 }
 
 /** The data plane: PostgREST over Neon, authenticated by our access token. */
-export const dataApi = new NeonPostgrestClient<
-  DrizzleToPostgrestDatabase<typeof schema>
+export const postgrest = new NeonPostgrestClient<
+  DrizzlePostgrest<typeof schema>
 >({
   dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL as string,
   options: { global: { fetch: withRetry } }
