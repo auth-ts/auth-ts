@@ -51,11 +51,8 @@ describe("getToken as a function", () => {
     // Shares run() with POST /token, so it gets the same projection — no hash.
     expect(JSON.stringify(result)).not.toContain("tokenHash")
     expect(
-      (
-        await context.authServer.verifyToken(
-          required(result, "result").accessToken
-        )
-      )?.sub
+      (await context.authServer.verifyToken(required(result, "result").token))
+        ?.sub
     ).toBe(result?.user.id)
     expect(after).toBeGreaterThanOrEqual(before)
   })
@@ -163,19 +160,18 @@ describe("getSession", () => {
     const context = await createTestServer()
     const refreshToken = await signIn(context)
 
-    const result = await context.authServer.getSession({
-      headers: cookieHeaders(refreshToken)
-    })
+    const headers = cookieHeaders(refreshToken)
+    const { session } = await context.authServer.getSession({ headers })
+    const { user } = await context.authServer.getUser({ headers })
 
-    expect(result?.user.email).toBe("ada@example.com")
-    expect(result?.session.id).toBeTruthy()
-    // The server-side primitive deliberately returns the full row, hash included:
-    // this has no HTTP route, and server code addresses a session by its hash
-    // (a delete on `sessions`). Only POST /token and getToken() project it away.
-    expect(result?.session.tokenHash).toBeTruthy()
+    // Two calls, because they are two questions: one keeps the session alive
+    // without reading the user, the other reads the user.
+    expect(user.email).toBe("ada@example.com")
+    expect(session.id).toBeTruthy()
+    expect(session).not.toHaveProperty("tokenHash")
   })
 
-  it("resolves null for a revoked or expired session", async () => {
+  it("refuses a revoked or expired session", async () => {
     const context = await createTestServer()
     const refreshToken = await signIn(context)
     const session = required(context.db.sessions()[0], "session")
@@ -184,11 +180,13 @@ describe("getSession", () => {
       table: "sessions",
       where: { tokenHash: session.tokenHash }
     })
-    expect(
-      await context.authServer.getSession({
+    // The callable is the endpoint, so a dead session is refused rather than
+    // reported as null.
+    await expect(
+      context.authServer.getSession({
         headers: cookieHeaders(refreshToken)
       })
-    ).toBeNull()
+    ).rejects.toThrow()
   })
 
   it("throws the configuration error when no cookie can reach the route", async () => {
@@ -282,5 +280,31 @@ describe("callables and handlers agree", () => {
       code: "unauthenticated",
       status: 401
     })
+  })
+})
+
+describe("calling with a token instead of a request", () => {
+  it("authenticates from a token alone, with no headers at all", async () => {
+    const context = await createTestServer()
+    const refreshToken = await signIn(context)
+    const { token } = await context.authServer.getUser({
+      headers: cookieHeaders(refreshToken)
+    })
+
+    // No cookie, no request — the shape a custom API has after reading its own
+    // Authorization header, or a service handed a token some other way.
+    const { sessions } = await context.authServer.listSessions({
+      token: required(token, "token")
+    })
+
+    expect(sessions).toHaveLength(1)
+  })
+
+  it("refuses a token that does not verify", async () => {
+    const { authServer } = await createTestServer()
+
+    await expect(
+      authServer.listSessions({ token: "forged.not.real" })
+    ).rejects.toThrow()
   })
 })

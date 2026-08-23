@@ -117,8 +117,8 @@ describe("logging redaction", () => {
       readSetCookies(verifyResponse).get("auth-ts.refresh"),
       "refresh"
     ).value
-    const { accessToken } = (await verifyResponse.json()) as {
-      accessToken: string
+    const { token } = (await verifyResponse.json()) as {
+      token: string
     }
     const cookies = { "auth-ts.refresh": refreshToken }
 
@@ -140,7 +140,7 @@ describe("logging redaction", () => {
     expect(context.logCalls.length).toBeGreaterThan(0)
     expect(logged).not.toContain(refreshToken)
     expect(logged).not.toContain(sent.code)
-    expect(logged).not.toContain(accessToken)
+    expect(logged).not.toContain(token)
     if (codeHash) expect(logged).not.toContain(codeHash)
   })
 

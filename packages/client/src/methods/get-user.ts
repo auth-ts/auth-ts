@@ -1,6 +1,8 @@
 import type { AuthUser } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
+import { readLifetimeClaims } from "../lib/read-lifetime-claims"
+import type { UserResponse } from "./get-token"
 
 /**
  * Returns the signed-in user, or `null`.
@@ -8,8 +10,11 @@ import { AuthError } from "../lib/auth-error"
  * Always reads the server. The stored mirror is a render hint for the first
  * paint and for being offline, not an answer: a name or avatar changed in
  * another tab, on another device, or by something other than this client would
- * otherwise never arrive. The token is ensured first — refreshed if stale — and
- * carries only `sub`, so it is never decoded into a user.
+ * otherwise never arrive.
+ *
+ * The token already held is offered along with the request, and the response
+ * carries a new one only when that one is spent — so reading the user refreshes
+ * the token when it needs refreshing, and rotates nothing when it does not.
  *
  * Only the server answering `unauthenticated` is a verdict of `null`. Anything
  * else — the network failing, the server erroring, a proxy answering for it —
@@ -28,11 +33,15 @@ export function createGetUser(
     const restored = internals.userStore.restore()
 
     try {
-      await getToken()
-      const { user } = await internals.fetchJson<{ user: AuthUser }>({
+      // Deliberately not `getToken()` first: this request mints one, so asking
+      // for a token beforehand would refresh through the very endpoint about to
+      // be called. The live token, if there is one, rides along automatically —
+      // and the server answers with none when it sees that one is still good.
+      const { user, token } = await internals.fetchJson<UserResponse>({
         method: "GET",
         path: "/user"
       })
+      if (token) internals.tokenStore.set(token, readLifetimeClaims(token))
       internals.userStore.set(user)
 
       return user

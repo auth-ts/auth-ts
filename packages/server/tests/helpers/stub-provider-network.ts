@@ -9,7 +9,7 @@ export interface StubGitHubIdentity {
   avatarURL?: string
   emails?: Array<{ email: string; primary: boolean; verified: boolean }>
   /** Omit the token to simulate a rejected code exchange. */
-  accessToken?: string | null
+  token?: string | null
   /** HTTP statuses to answer with instead of 200, per endpoint. */
   status?: { token?: number; profile?: number; emails?: number }
   /** Extra response headers, per endpoint — GitHub signals rate limits this way. */
@@ -38,9 +38,9 @@ export function stubGitHub(identity: StubGitHubIdentity) {
 
     if (url.includes("login/oauth/access_token")) {
       return jsonResponse(
-        identity.accessToken === null
+        identity.token === null
           ? {}
-          : { access_token: identity.accessToken ?? "provider-token" },
+          : { access_token: identity.token ?? "provider-token" },
         identity.status?.token,
         identity.headers?.token
       )

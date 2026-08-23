@@ -2,6 +2,7 @@ import { waitUntil } from "cloudflare:workers"
 import type {
   AuthDirection,
   AuthOrderBy,
+  AuthRange,
   AuthTable,
   AuthWhere
 } from "@auth-ts/server"
@@ -12,11 +13,13 @@ import {
   desc,
   eq,
   getColumns,
+  gt,
   is,
   lt,
   notExists,
   sql
 } from "drizzle-orm"
+import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import { PgTable } from "drizzle-orm/pg-core"
 
 import { db } from "../db/db"
@@ -26,11 +29,23 @@ const authTables = Object.fromEntries(
   Object.entries(schema).filter(([, value]) => is(value, PgTable))
 ) as Pick<typeof schema, AuthTable>
 
-const buildWhere = (table: AuthTable, where: AuthWhere) => {
-  const columns = getColumns(authTables[table])
-  const entries = Object.entries(where) as [keyof typeof columns, never][]
+/** A range, per the contract: an object that is not a Date. */
+const isRange = (value: unknown): value is AuthRange<Date> =>
+  typeof value === "object" && value !== null && !(value instanceof Date)
 
-  return and(...entries.map(([name, value]) => eq(columns[name], value)))
+const buildWhere = (table: AuthTable, where: AuthWhere) => {
+  const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
+
+  return and(
+    ...Object.entries(where).flatMap(([name, value]) =>
+      isRange(value)
+        ? [
+            value.lt === undefined ? undefined : lt(columns[name], value.lt),
+            value.gt === undefined ? undefined : gt(columns[name], value.gt)
+          ]
+        : [eq(columns[name], value)]
+    )
+  )
 }
 
 const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
@@ -61,7 +76,11 @@ export const authDB = defineAuthDB({
       .returning()
       .then((rows) => rows[0]),
   update: ({ table, where, values }) =>
-    db.update(authTables[table]).set(values).where(buildWhere(table, where)),
+    db
+      .update(authTables[table])
+      .set(values)
+      .where(buildWhere(table, where))
+      .returning(),
   delete: ({ table, where }) =>
     db.delete(authTables[table]).where(buildWhere(table, where)).returning(),
   cleanup: () =>

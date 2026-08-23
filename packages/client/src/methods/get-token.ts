@@ -1,19 +1,21 @@
-import type { AuthUser } from "@auth-ts/server"
+import type { AuthUser, CurrentSession } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
 import { readLifetimeClaims } from "../lib/read-lifetime-claims"
 
-/** What the refresh endpoint returns. */
-interface TokenResponse {
-  accessToken: string
+/** What `GET /user` returns: the session it slid, the user, and a fresh token. */
+export interface UserResponse {
+  session: CurrentSession
   user: AuthUser
+  /** Absent when the request carried a token that is still live. */
+  token?: string
 }
 
 /**
  * Returns a usable access token, refreshing only when necessary.
  *
  * This is the data-plane workhorse: hand it to a PostgREST client as its
- * `accessToken` callback and it will return the cached token until shortly
+ * `token` callback and it will return the cached token until shortly
  * before expiry, then transparently exchange the refresh cookie for a new one.
  *
  * Only a token too close to expiry to be worth handing out makes a caller wait.
@@ -42,17 +44,21 @@ export function createGetToken(internals: AuthClientInternals) {
       internals.log.debug("refreshing access token")
 
       try {
-        const result = await internals.fetchJson<TokenResponse>({
-          method: "POST",
-          path: "/token"
+        // The user read is what mints a token, so refreshing and reading the
+        // user are one request rather than two.
+        const result = await internals.fetchJson<UserResponse>({
+          method: "GET",
+          path: "/user"
         })
-        internals.tokenStore.set(
-          result.accessToken,
-          readLifetimeClaims(result.accessToken)
-        )
+        // No bearer was sent — this path runs only when the held token is
+        // spent — so the server always answers with one.
+        if (!result.token) {
+          throw new Error("the user read returned no token to refresh with")
+        }
+        internals.tokenStore.set(result.token, readLifetimeClaims(result.token))
         internals.userStore.set(result.user)
 
-        return result.accessToken
+        return result.token
       } catch (error) {
         // Only the server saying "no session" is grounds to forget the user. A
         // 500, a 502 from the proxy, a 429 — every non-2xx becomes an AuthError,

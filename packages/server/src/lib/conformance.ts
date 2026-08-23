@@ -3,7 +3,8 @@ import type {
   AuthDB,
   AuthInsert,
   AuthRow,
-  AuthTable
+  AuthTable,
+  AuthWhere
 } from "../core/auth-db"
 
 /** One requirement of the contract, and a way to find out whether it holds. */
@@ -185,6 +186,92 @@ export const authDBChecks: AuthDBCheck[] = [
         expect(
           ordered(await page("asc", 10, 1), ascending.slice(1)),
           "offset did not skip from the start of the order"
+        )
+      } finally {
+        await db.delete({ table: "attempts", where: { key } })
+      }
+    }
+  },
+  {
+    name: "update returns the rows it changed",
+    async run(db) {
+      const email = `${unique()}@example.test`
+      const row = await create(db, "users", person({ email, name: "Ada" }))
+      try {
+        const changed = await db.update({
+          table: "users",
+          where: { id: row.id },
+          values: { name: "Ada Lovelace" }
+        })
+
+        expect(
+          changed.length === 1 && changed[0]?.name === "Ada Lovelace",
+          "update must return what it wrote, as delete does. Core finds and touches a session in one statement and learns from the result whether there was a live one — an empty return there is an authenticated request refused."
+        )
+        expect(
+          (
+            await db.update({
+              table: "users",
+              where: { id: crypto.randomUUID() },
+              values: { name: "nobody" }
+            })
+          ).length === 0,
+          "update matched nothing but did not report an empty result"
+        )
+      } finally {
+        await db.delete({ table: "users", where: { email } })
+      }
+    }
+  },
+  {
+    name: "a range matches on order, and only within its bounds",
+    async run(db) {
+      const key = unique()
+      const times = [1, 2, 3].map(
+        (minutes) => new Date(Date.now() + minutes * 60_000)
+      )
+      for (const expiresAt of times) {
+        await create(db, "attempts", {
+          key,
+          expiresAt,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+      }
+      const [first, second, third] = times as [Date, Date, Date]
+      try {
+        const count = async (
+          where: AuthWhere<AdditionalFieldsSchema, "attempts">
+        ) =>
+          (
+            await db.select({
+              table: "attempts",
+              where,
+              limit: 10,
+              offset: 0,
+              orderBy: { expiresAt: "asc" }
+            })
+          ).length
+
+        expect(
+          (await count({ key, expiresAt: { gt: second } })) === 1,
+          "gt must exclude its own bound and everything below it"
+        )
+        expect(
+          (await count({ key, expiresAt: { lt: second } })) === 1,
+          "lt must exclude its own bound and everything above it"
+        )
+        expect(
+          (await count({ key, expiresAt: { gt: first, lt: third } })) === 1,
+          "lt and gt together must bound both ends"
+        )
+        expect(
+          (await count({ key, expiresAt: { gt: third } })) === 0,
+          "a range past every row must match nothing"
+        )
+        expect(
+          (await count({ key, expiresAt: second })) === 1,
+          "a plain value must still compare for equality, not order"
         )
       } finally {
         await db.delete({ table: "attempts", where: { key } })

@@ -12,6 +12,7 @@ export type {
   AuthInsert,
   AuthInsertInput,
   AuthOrderBy,
+  AuthRange,
   AuthRow,
   AuthSelectInput,
   AuthSession,
@@ -57,6 +58,7 @@ export type { ConnectProviderInput } from "./endpoints/connect/$provider"
 export type { ConnectionInfo } from "./endpoints/connections"
 export type { DisconnectProviderInput } from "./endpoints/connections/$provider"
 export type { SendCodeInput } from "./endpoints/send-code"
+export type { CurrentSession } from "./endpoints/session"
 export type { SessionInfo } from "./endpoints/sessions"
 export type {
   RevokeSessionInput,

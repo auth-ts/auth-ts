@@ -47,8 +47,8 @@ describe("construction", () => {
 
 describe("getToken", () => {
   it("refreshes once and caches the token", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
 
@@ -57,13 +57,13 @@ describe("getToken", () => {
 
     expect(first).toBe(second)
     expect(
-      server.requests.filter((entry) => entry.path === "/api/auth/token")
+      server.requests.filter((entry) => entry.path === "/api/auth/user")
     ).toHaveLength(1)
   })
 
   it("sends credentials, which is what carries the refresh cookie", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
 
     await createAuthClient().getToken()
@@ -72,8 +72,8 @@ describe("getToken", () => {
   })
 
   it("makes exactly one request for ten concurrent callers", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
 
@@ -87,8 +87,8 @@ describe("getToken", () => {
 
   it("refreshes early, inside the 60 second window before expiry", async () => {
     vi.useFakeTimers()
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken({ lifetimeSeconds: 600 }), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken({ lifetimeSeconds: 600 }), user }
     })
     const client = createAuthClient()
 
@@ -107,8 +107,8 @@ describe("getToken", () => {
   })
 
   it("clears both caches and throws on 401", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
     await client.getToken()
@@ -116,7 +116,7 @@ describe("getToken", () => {
 
     server.restore()
     server = fakeAuthServer()
-    server.on("POST", "/api/auth/token", {
+    server.on("GET", "/api/auth/user", {
       status: 401,
       body: {
         error: { code: "unauthenticated", message: "You are not signed in." }
@@ -130,8 +130,8 @@ describe("getToken", () => {
   })
 
   it("throws on a server failure but keeps both caches, because a 500 is not a verdict", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
     await client.getToken()
@@ -152,7 +152,7 @@ describe("getToken", () => {
     ]) {
       server.restore()
       server = fakeAuthServer()
-      server.on("POST", "/api/auth/token", reply)
+      server.on("GET", "/api/auth/user", reply)
       client.clearToken()
 
       await expect(
@@ -167,7 +167,7 @@ describe("getToken", () => {
   })
 
   it("surfaces retryAfter from a throttled response", async () => {
-    server.on("POST", "/api/auth/token", {
+    server.on("GET", "/api/auth/user", {
       status: 429,
       body: {
         error: {
@@ -187,8 +187,8 @@ describe("getToken", () => {
 
 describe("getUser", () => {
   it("signs the user back in from a valid cookie when storage is empty", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
 
     expect(await createAuthClient().getUser()).toMatchObject({
@@ -197,8 +197,8 @@ describe("getUser", () => {
   })
 
   it("reads the server every time, because a name can change elsewhere", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     server.on("GET", "/api/auth/user", { body: { user } })
     const client = createAuthClient()
@@ -214,7 +214,7 @@ describe("getUser", () => {
   })
 
   it("resolves null when the session is gone", async () => {
-    server.on("POST", "/api/auth/token", {
+    server.on("GET", "/api/auth/user", {
       status: 401,
       body: {
         error: { code: "unauthenticated", message: "You are not signed in." }
@@ -225,15 +225,15 @@ describe("getUser", () => {
   })
 
   it("keeps the last known user when the network fails, because offline is not signed out", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
     await client.getUser()
 
     server.restore()
     server = fakeAuthServer()
-    server.on("POST", "/api/auth/token", { networkError: true })
+    server.on("GET", "/api/auth/user", { networkError: true })
     client.clearToken()
 
     expect(await client.getUser()).toMatchObject({ email: "ada@example.com" })
@@ -241,15 +241,15 @@ describe("getUser", () => {
   })
 
   it("keeps the last known user when the server fails, not only when the network does", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
     await client.getUser()
 
     server.restore()
     server = fakeAuthServer()
-    server.on("POST", "/api/auth/token", {
+    server.on("GET", "/api/auth/user", {
       status: 500,
       body: { error: { code: "internalError", message: "Something broke." } }
     })
@@ -266,11 +266,11 @@ describe("getUser", () => {
     try {
       const first = fakeAccessToken()
       const second = fakeAccessToken()
-      server.on("POST", "/api/auth/token", {
-        body: { accessToken: first, user }
+      server.on("GET", "/api/auth/user", {
+        body: { token: first, user }
       })
-      server.on("POST", "/api/auth/token", {
-        body: { accessToken: second, user }
+      server.on("GET", "/api/auth/user", {
+        body: { token: second, user }
       })
       const client = createAuthClient()
 
@@ -284,7 +284,7 @@ describe("getUser", () => {
       // It did not wait, but it did start the refresh.
       for (let tick = 0; tick < 10; tick++) await Promise.resolve()
       expect(
-        server.requests.filter((request) => request.path === "/api/auth/token")
+        server.requests.filter((request) => request.path === "/api/auth/user")
       ).toHaveLength(2)
       expect(await client.getToken()).toBe(second)
     } finally {
@@ -297,11 +297,11 @@ describe("getUser", () => {
     try {
       const spent = fakeAccessToken()
       const fresh = fakeAccessToken()
-      server.on("POST", "/api/auth/token", {
-        body: { accessToken: spent, user }
+      server.on("GET", "/api/auth/user", {
+        body: { token: spent, user }
       })
-      server.on("POST", "/api/auth/token", {
-        body: { accessToken: fresh, user }
+      server.on("GET", "/api/auth/user", {
+        body: { token: fresh, user }
       })
       const client = createAuthClient()
 
@@ -316,24 +316,25 @@ describe("getUser", () => {
   })
 
   it("shares one refresh between concurrent callers", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
-    server.on("GET", "/api/auth/user", { body: { user } })
     const client = createAuthClient()
 
-    await Promise.all(Array.from({ length: 5 }, () => client.getUser()))
+    // getToken deduplicates; getUser deliberately does not, because its whole
+    // job is to go and look.
+    await Promise.all(Array.from({ length: 5 }, () => client.getToken()))
 
     expect(
-      server.requests.filter((request) => request.path === "/api/auth/token")
+      server.requests.filter((request) => request.path === "/api/auth/user")
     ).toHaveLength(1)
   })
 })
 
 describe("subscribe", () => {
   it("fires once per change with the new user, and stops after unsubscribing", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
 
@@ -377,8 +378,8 @@ describe("subscribe", () => {
 
 describe("cross-tab sync", () => {
   it("drops this tab's access token when another tab signs out", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
 
@@ -392,7 +393,7 @@ describe("cross-tab sync", () => {
       new StorageEvent("storage", { key: "auth-ts.user", newValue: null })
     )
 
-    server.on("POST", "/api/auth/token", {
+    server.on("GET", "/api/auth/user", {
       status: 401,
       body: {
         error: { code: "unauthenticated", message: "You are not signed in." }
@@ -409,8 +410,8 @@ describe("cross-tab sync", () => {
     // Another tab — an older app version, another same-origin script — wrote
     // something that is not JSON. A throw inside the listener would leave this
     // tab's token alive while every other tab has moved on.
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
     await client.getToken()
@@ -425,7 +426,7 @@ describe("cross-tab sync", () => {
     )
 
     expect(seen).toEqual([null])
-    server.on("POST", "/api/auth/token", {
+    server.on("GET", "/api/auth/user", {
       status: 401,
       body: {
         error: { code: "unauthenticated", message: "You are not signed in." }
@@ -437,8 +438,8 @@ describe("cross-tab sync", () => {
   })
 
   it("ignores storage events for unrelated keys", async () => {
-    server.on("POST", "/api/auth/token", {
-      body: { accessToken: fakeAccessToken(), user }
+    server.on("GET", "/api/auth/user", {
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
     client.subscribe(() => {})

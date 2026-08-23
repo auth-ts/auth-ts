@@ -25,7 +25,9 @@ export type FetchJson = <Result>(options: FetchJsonOptions) => Promise<Result>
  */
 export function createFetchJson(
   config: AuthClientConfig,
-  getLocale: () => string | undefined
+  getLocale: () => string | undefined,
+  /** The access token to present, when one is worth presenting. */
+  getBearer: () => string | undefined
 ): FetchJson {
   const base = `${config.baseURL}${config.basePath}`
 
@@ -34,6 +36,11 @@ export function createFetchJson(
     const locale = getLocale()
     if (locale) headers.set("accept-language", locale)
     if (body !== undefined) headers.set("content-type", "application/json")
+    // Every request carries the token when there is a live one. Endpoints that
+    // only need to know who is calling read it and skip the session lookup
+    // entirely; `/user` reads it to decide whether to mint a replacement.
+    const bearer = getBearer()
+    if (bearer) headers.set("authorization", `Bearer ${bearer}`)
 
     let response: Response
     try {

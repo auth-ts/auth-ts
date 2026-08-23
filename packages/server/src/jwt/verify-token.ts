@@ -1,5 +1,5 @@
 import type { JWK, JWTVerifyGetKey } from "jose"
-import { createLocalJWKSet, jwtVerify } from "jose"
+import { createLocalJWKSet, errors, jwtVerify } from "jose"
 import type { UserType } from "../core/auth-db"
 import type { JwtAlgorithm } from "./import-signing-key"
 
@@ -88,6 +88,30 @@ export async function verifyToken(
   context: VerifyTokenContext,
   token: string
 ): Promise<TokenClaims | null> {
+  const verdict = await inspectToken(context, token)
+
+  return verdict.status === "valid" ? verdict.claims : null
+}
+
+/** Why a token was not accepted, for callers that treat the reasons differently. */
+export type TokenVerdict =
+  | { status: "valid"; claims: TokenClaims }
+  | { status: "expired" }
+  | { status: "invalid" }
+
+/**
+ * Verifies a token and says which way it failed.
+ *
+ * Expiry is the one failure that is ordinary — it happens to every token
+ * eventually, and the answer is to fall back to the cookie and mint another.
+ * Anything else means the token was not one this server issued, and is refused
+ * rather than quietly ignored: silently falling back would turn a forged token
+ * into a slower request instead of an error.
+ */
+export async function inspectToken(
+  context: VerifyTokenContext,
+  token: string
+): Promise<TokenVerdict> {
   try {
     const { payload } = await jwtVerify(token, context.keys, {
       algorithms: [context.algorithm],
@@ -97,8 +121,10 @@ export async function verifyToken(
       ...(context.audience ? { audience: context.audience } : {})
     })
 
-    return payload as TokenClaims
-  } catch {
-    return null
+    return { status: "valid", claims: payload as TokenClaims }
+  } catch (error) {
+    return {
+      status: error instanceof errors.JWTExpired ? "expired" : "invalid"
+    }
   }
 }

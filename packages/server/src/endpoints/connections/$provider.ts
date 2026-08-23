@@ -1,11 +1,11 @@
-import { AuthApiError, unauthenticated } from "../../http/auth-api-error"
+import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
-import { resolveSession } from "../../session/resolve-session"
+import type { CallerInput } from "../../session/authenticate"
+import { authenticate } from "../../session/authenticate"
 
 /** Input for unlinking a provider. */
-export interface DisconnectProviderInput {
+export interface DisconnectProviderInput extends CallerInput {
   provider: string
-  headers?: Headers
 }
 
 /**
@@ -25,17 +25,13 @@ export const disconnectProvider = defineEndpoint({
     headers: request.headers
   }),
   run: async (internals, input: DisconnectProviderInput) => {
-    const resolved = await resolveSession(
-      internals,
-      input.headers ?? new Headers()
-    )
-    if (!resolved) throw unauthenticated()
+    const caller = await authenticate(internals, input)
 
     // Ownership is part of the query, so another user's provider matches
     // nothing and the empty result is the 404.
     const deleted = await internals.db.delete({
       table: "connections",
-      where: { userId: resolved.user.id, provider: input.provider }
+      where: { userId: caller.userId, provider: input.provider }
     })
     if (deleted.length === 0) throw new AuthApiError("notFound", 404)
 

@@ -4,6 +4,7 @@ import type {
   AuthDB,
   AuthInsert,
   AuthOrderBy,
+  AuthRange,
   AuthRow,
   AuthUser,
   AuthWhere
@@ -90,10 +91,11 @@ describe("the table types the four functions take", () => {
 
   it("queries a declared field at its declared type", () => {
     expectTypeOf(usersWhere({ plan: 3 }).plan).toEqualTypeOf<
-      number | null | undefined
+      number | null | undefined | AuthRange<number | null | undefined>
     >()
-    // Core fields query the same way; there are no operators, only equality.
+    // Core fields query the same way, and take a range where order applies.
     usersWhere({ email: "ada@example.com", type: "guest" })
+    usersWhere({ createdAt: { gt: new Date() } })
 
     // @ts-expect-error plan is declared a number, so a string cannot match it
     usersWhere({ plan: "pro" })
@@ -151,15 +153,15 @@ describe("createAuthServer infers the schema and types everything it returns", (
       user: { additionalFields }
     })
 
-    const session = await server.getSession({ headers: new Headers() })
-    expectTypeOf(session?.user.plan).toEqualTypeOf<string | null | undefined>()
-    expectTypeOf(session?.user.seats).toEqualTypeOf<number | null | undefined>()
+    const { user } = await server.getUser({ headers: new Headers() })
+    expectTypeOf(user.plan).toEqualTypeOf<string | null | undefined>()
+    expectTypeOf(user.seats).toEqualTypeOf<number | null | undefined>()
 
     const token = await server.getToken({ headers: new Headers() })
     expectTypeOf(token.user.plan).toEqualTypeOf<string | null | undefined>()
     // Everything that is not a user passes through unchanged.
     expectTypeOf(token.session.createdAt).toEqualTypeOf<Date>()
-    expectTypeOf(token.accessToken).toEqualTypeOf<string>()
+    expectTypeOf(token.token).toEqualTypeOf<string>()
   })
 
   it("refuses an adapter typed against a different schema", () => {
@@ -180,8 +182,8 @@ describe("createAuthServer infers the schema and types everything it returns", (
 
   it("stays open when nothing is declared", async () => {
     const server = createAuthServer({ ...base, db: createMemoryDb() })
-    const session = await server.getSession({ headers: new Headers() })
-    expectTypeOf(session?.user.anything).toEqualTypeOf<unknown>()
+    const { user } = await server.getUser({ headers: new Headers() })
+    expectTypeOf(user.anything).toEqualTypeOf<unknown>()
   })
 })
 
@@ -192,7 +194,7 @@ describe("WithUserFields", () => {
       string | null | undefined
     >()
     expectTypeOf<Typed["session"]["createdAt"]>().toEqualTypeOf<Date>()
-    expectTypeOf<Typed["accessToken"]>().toEqualTypeOf<string>()
+    expectTypeOf<Typed["token"]>().toEqualTypeOf<string>()
 
     expectTypeOf<WithUserFields<AuthUser[], Declared>>().toEqualTypeOf<
       AuthUser<Declared>[]

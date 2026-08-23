@@ -15,18 +15,10 @@ export type UpdateUserInput = {
 /** Updates the signed-in user and refreshes the local mirror. */
 export function createUpdateUser(internals: AuthClientInternals) {
   return async function updateUser(input: UpdateUserInput): Promise<AuthUser> {
-    await internals.fetchJson<{ status: boolean }>({
+    const { user } = await internals.fetchJson<{ user: AuthUser }>({
       method: "POST",
       path: "/user",
       body: input
-    })
-
-    // The update answers with a status, so the row is read back rather than
-    // assembled from what was sent — that way the mirror carries what the
-    // server actually stored, `updatedAt` included.
-    const { user } = await internals.fetchJson<{ user: AuthUser }>({
-      method: "GET",
-      path: "/user"
     })
     internals.userStore.set(user)
 
@@ -62,14 +54,14 @@ export interface SignOutInput {
  */
 export function createSignOut(
   internals: AuthClientInternals,
-  primeSession: (result: { accessToken: string; user: AuthUser }) => void
+  primeSession: (result: { token: string; user: AuthUser }) => void
 ) {
   return async function signOut(
     input: SignOutInput = {}
   ): Promise<{ switchedTo: AuthUser } | null> {
     const scope = input.scope ?? "local"
     const result = await internals.fetchJson<
-      { switchedTo?: AuthUser; accessToken?: string } | undefined
+      { switchedTo?: AuthUser; token?: string } | undefined
     >({
       method: "POST",
       path: "/sign-out",
@@ -78,8 +70,8 @@ export function createSignOut(
 
     if (scope === "others") return null
 
-    if (result?.switchedTo && result.accessToken) {
-      primeSession({ accessToken: result.accessToken, user: result.switchedTo })
+    if (result?.switchedTo && result.token) {
+      primeSession({ token: result.token, user: result.switchedTo })
       return { switchedTo: result.switchedTo }
     }
 

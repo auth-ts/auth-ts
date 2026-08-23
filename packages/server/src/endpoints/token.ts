@@ -1,7 +1,7 @@
 import type { AuthUser } from "../core/auth-db"
 import { unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
-import { mintAccessToken, slideSession } from "../session/issue-session"
+import { mintAccessToken } from "../session/issue-session"
 import type { HeadersInput } from "../session/resolve-session"
 import { resolveSession } from "../session/resolve-session"
 
@@ -24,7 +24,7 @@ export interface TokenSession {
 
 /** What `POST /token` and `authServer.getToken` return. */
 export interface AuthTokenResult {
-  accessToken: string
+  token: string
   user: AuthUser
   session: TokenSession
 }
@@ -49,20 +49,14 @@ export const getToken = defineEndpoint({
     const resolved = await resolveSession(internals, input.headers)
     if (!resolved) throw unauthenticated()
 
-    // The expiry reported below is the one sliding just persisted, not the one
-    // the row had when it was read — otherwise every refresh would describe a
-    // session that is already out of date.
-    const expiresAt = await slideSession(
-      internals,
-      resolved.session,
-      input.headers
-    )
+    // Already slid: resolving a session is what records it as used.
+    const { expiresAt } = resolved.session
 
-    const accessToken = await mintAccessToken(internals, resolved.user)
+    const token = await mintAccessToken(internals, resolved.user)
 
     return {
       data: {
-        accessToken,
+        token,
         user: resolved.user,
         session: {
           id: resolved.session.id,

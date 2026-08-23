@@ -15,7 +15,7 @@ export type VerifyCodeInput = SendCodeInput & {
 
 /** What a completed sign-in returns. */
 export interface SignInResult {
-  accessToken: string
+  token: string
   user: AuthUser
 }
 

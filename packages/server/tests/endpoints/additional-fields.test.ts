@@ -252,7 +252,11 @@ describe("additionalFields on update", () => {
         ((await response.json()) as { error: { code: string } }).error.code
       ).toBe("invalidField")
     }
-    expect(update).not.toHaveBeenCalled()
+    // The session slides on every authenticated request, so the assertion is
+    // that the users table is never touched — not that nothing is written.
+    expect(
+      update.mock.calls.filter(([input]) => input.table === "users")
+    ).toHaveLength(0)
     expect(insert).not.toHaveBeenCalled()
   })
 

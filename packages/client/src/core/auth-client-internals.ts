@@ -49,7 +49,17 @@ export function createAuthClientInternals(
 
   // Reads `internals.locale` on each request, so setLocale takes effect
   // immediately rather than only for clients constructed afterwards.
-  internals.fetchJson = createFetchJson(config, () => internals.locale)
+  internals.fetchJson = createFetchJson(
+    config,
+    () => internals.locale,
+    // Only while it is worth presenting: a token near expiry is the signal for
+    // `/user` to mint a replacement, so sending it would suppress the refresh.
+    () => {
+      const held = tokenStore.get()
+
+      return held && !tokenStore.isExpiringSoon() ? held.token : undefined
+    }
+  )
 
   return internals
 }

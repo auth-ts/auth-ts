@@ -7,6 +7,7 @@ import { listConnections } from "../endpoints/connections"
 import { disconnectProvider } from "../endpoints/connections/$provider"
 import { getJwks } from "../endpoints/jwks"
 import { sendCode } from "../endpoints/send-code"
+import { getSession } from "../endpoints/session"
 import { listSessions } from "../endpoints/sessions"
 import { revokeSession } from "../endpoints/sessions/$id"
 import { signInProvider } from "../endpoints/sign-in/$provider"
@@ -32,6 +33,7 @@ export const endpointRegistry = {
   verifyCode,
   getToken,
   signOut,
+  getSession,
   getUser,
   updateUser,
   deleteUser,

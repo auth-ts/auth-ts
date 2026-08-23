@@ -61,7 +61,7 @@ disagree:
 
 ```ts
 // 1. Call it directly from your own backend. No HTTP round-trip to yourself.
-const { accessToken, user } = await authServer.getToken({ headers })
+const { token, user } = await authServer.getToken({ headers })
 
 // 2. One catch-all handler, mounted once.
 authServer.handler(request)

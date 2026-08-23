@@ -192,15 +192,13 @@ describe("multiAccount enabled", () => {
       })
     )
     const body = (await response.json()) as {
-      accessToken: string
+      token: string
       user: { email: string }
     }
 
     expect(response.status).toBe(200)
     expect(body.user.email).toBe("ada@example.com")
-    expect((await context.authServer.verifyToken(body.accessToken))?.sub).toBe(
-      adaId
-    )
+    expect((await context.authServer.verifyToken(body.token))?.sub).toBe(adaId)
 
     const switched = readSetCookies(response)
     const whoami = await context.authServer.handler(
@@ -267,8 +265,9 @@ describe("multiAccount enabled", () => {
     // rather than turning a single request into a thousand sequential queries.
     const context = await createTestServer(options)
     const { cookies } = await signIn(context, "ada@example.com")
-    // Every parked entry costs one read of `sessions`; the users the listing
-    // reads afterwards are not the cost being measured, so they are filtered out.
+    // Every parked entry costs one read of `sessions`. The active session is not
+    // among them — resolving it is an update, not a select — and the users the
+    // listing reads afterwards are not the cost being measured.
     const select = vi.spyOn(context.db, "select")
     const sessionReads = () =>
       select.mock.calls.filter(([input]) => input.table === "sessions").length
@@ -288,16 +287,15 @@ describe("multiAccount enabled", () => {
     expect(body.accounts.map((account) => account.user.email)).toEqual([
       "ada@example.com"
     ])
-    // One lookup for the active session, none for the forged entries.
-    expect(sessionReads()).toBe(1)
+    // Nothing at all: the forged entries are dropped whole.
+    expect(sessionReads()).toBe(0)
     expect(
       readSetCookies(response).get("auth-ts.refresh.accounts")?.value
     ).toBe("[]")
 
     // Within the cap, duplicates collapse: three copies of the active token are
-    // one parked entry, so the endpoint's two lookups (resolve, prune — the
-    // listing reuses what the prune read) rather than the four the un-deduped
-    // list would cost.
+    // one parked entry, so one read rather than the three an un-deduped list
+    // would cost.
     select.mockClear()
     const active = cookies["auth-ts.refresh"]
     await context.authServer.handler(
@@ -308,7 +306,7 @@ describe("multiAccount enabled", () => {
         }
       })
     )
-    expect(sessionReads()).toBe(2)
+    expect(sessionReads()).toBe(1)
 
     select.mockClear()
     await context.authServer.handler(
@@ -319,7 +317,9 @@ describe("multiAccount enabled", () => {
         }
       })
     )
-    expect(sessionReads()).toBe(1)
+    // An entry that is not a string makes the whole cookie untrustworthy, so it
+    // is dropped rather than filtered — no reads at all.
+    expect(sessionReads()).toBe(0)
   })
 
   it("signs out every account in the browser by default, revoking each parked session", async () => {
@@ -378,7 +378,7 @@ describe("multiAccount enabled", () => {
     )
     const body = (await response.json()) as {
       switchedTo: { email: string }
-      accessToken: string
+      token: string
     }
 
     expect(response.status).toBe(200)

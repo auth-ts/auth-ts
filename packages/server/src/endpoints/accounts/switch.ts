@@ -92,7 +92,7 @@ export const switchAccount = defineEndpoint({
 
     return {
       data: {
-        accessToken: await mintAccessToken(internals, targetUser),
+        token: await mintAccessToken(internals, targetUser),
         user: targetUser
       },
       headers: responseHeaders

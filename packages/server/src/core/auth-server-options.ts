@@ -114,7 +114,21 @@ export interface JwksOptions {
 export interface SessionOptions {
   /** @default "30d" */
   ttl?: Duration
-  /** Extend expiry on each refresh. @default true */
+  /**
+   * Push expiry out on every authenticated request, so `ttl` measures
+   * inactivity rather than age.
+   *
+   * Turn it off for a fixed re-authentication interval — NIST 800-63B asks for
+   * one at AAL2, twelve hours "regardless of user activity" — and pair it with
+   * a `ttl` short enough to mean something. With the default thirty days it
+   * only means people are signed out a month after signing in, whatever they
+   * were doing.
+   *
+   * `updatedAt` and the device stamp are written either way: when a session was
+   * last used is bookkeeping, not expiry policy.
+   *
+   * @default true
+   */
   sliding?: boolean
 }
 

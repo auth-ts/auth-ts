@@ -97,7 +97,7 @@ export const verifyCode = defineEndpoint({
 
     return {
       data: {
-        accessToken: issued.accessToken,
+        token: issued.token,
         user: issued.user,
         ...(issued.refreshToken ? { refreshToken: issued.refreshToken } : {})
       },

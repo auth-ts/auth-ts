@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
@@ -26,12 +26,12 @@ describe("verification code sign-in over HTTP", () => {
     expect(verifyResponse.status).toBe(200)
 
     const body = (await verifyResponse.json()) as {
-      accessToken: string
+      token: string
       user: { email: string; type: string }
     }
     expect(body.user.email).toBe("ada@example.com")
     expect(body.user.type).toBe("user")
-    expect(body.accessToken).toBeTruthy()
+    expect(body.token).toBeTruthy()
 
     const cookie = readSetCookies(verifyResponse).get("auth-ts.refresh")
     expect(cookie?.attributes).toContain("HttpOnly")
@@ -178,12 +178,12 @@ describe("token and user endpoints", () => {
 
     expect(response.status).toBe(200)
     const body = (await response.json()) as {
-      accessToken: string
+      token: string
       user: { email: string }
     }
     expect(body.user.email).toBe("ada@example.com")
 
-    const claims = await authServer.verifyToken(body.accessToken)
+    const claims = await authServer.verifyToken(body.token)
     expect(claims?.role).toBe("authenticated")
   })
 
@@ -397,11 +397,11 @@ describe("jwks and discovery", () => {
         }
       })
     )
-    const { accessToken } = (await verifyResponse.json()) as {
-      accessToken: string
+    const { token } = (await verifyResponse.json()) as {
+      token: string
     }
 
-    expect(authServer.decodeToken(accessToken)?.claims.iss).toBe(body.issuer)
+    expect(authServer.decodeToken(token)?.claims.iss).toBe(body.issuer)
   })
 
   it("404s discovery when no baseURL is configured", async () => {
@@ -411,5 +411,227 @@ describe("jwks and discovery", () => {
     )
 
     expect(response.status).toBe(404)
+  })
+})
+
+describe("GET /user", () => {
+  it("slides the session it read through", async () => {
+    const { authServer, sentCodes, db } = await createTestServer()
+
+    await authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const signIn = await authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        body: {
+          email: "ada@example.com",
+          code: required(sentCodes[0], "sent code").code
+        }
+      })
+    )
+    const cookies = {
+      "auth-ts.refresh": required(
+        readSetCookies(signIn).get("auth-ts.refresh"),
+        "refresh cookie"
+      ).value
+    }
+    const before = required(db.sessions()[0], "session")
+
+    // The columns carry whole milliseconds, so a read in the same tick would
+    // land on the same value and prove nothing.
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const read = await authServer.handler(
+      request("GET", "/api/auth/user", { cookies })
+    )
+    expect(read.status).toBe(200)
+
+    const after = required(db.sessions()[0], "session")
+    expect(after.expiresAt.getTime()).toBeGreaterThan(
+      before.expiresAt.getTime()
+    )
+    expect(after.updatedAt.getTime()).toBeGreaterThan(
+      before.updatedAt.getTime()
+    )
+    expect(after.createdAt.getTime()).toBe(before.createdAt.getTime())
+  })
+})
+
+describe("the token GET /user hands back", () => {
+  const signInFor = async () => {
+    const context = await createTestServer()
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const verified = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes[0], "sent code").code
+        }
+      })
+    )
+    const { token } = (await verified.json()) as { token: string }
+
+    return {
+      context,
+      token,
+      cookies: {
+        "auth-ts.refresh": required(
+          readSetCookies(verified).get("auth-ts.refresh"),
+          "refresh cookie"
+        ).value
+      }
+    }
+  }
+
+  it("mints one when the caller has none", async () => {
+    const { context, cookies } = await signInFor()
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/user", { cookies })
+    )
+    const body = (await response.json()) as { token?: string }
+
+    expect(body.token).toEqual(expect.any(String))
+  })
+
+  it("sends none back when the caller already holds a live one", async () => {
+    const { context, cookies, token } = await signInFor()
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/user", {
+        cookies,
+        headers: { authorization: `Bearer ${token}` }
+      })
+    )
+    const body = (await response.json()) as {
+      token?: string
+      user: { email: string }
+    }
+
+    // The point of the exercise: a sync socket holding this JWT is not handed a
+    // new one every time a tab regains focus.
+    expect(body.token).toBeUndefined()
+    expect(body.user.email).toBe("ada@example.com")
+  })
+
+  it("mints one when the type claim no longer matches the row", async () => {
+    const { context, cookies, token } = await signInFor()
+    const [stored] = context.db.users()
+    await context.db.update({
+      table: "users",
+      where: { id: required(stored, "user").id },
+      values: { type: "admin" }
+    })
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/user", {
+        cookies,
+        headers: { authorization: `Bearer ${token}` }
+      })
+    )
+    const body = (await response.json()) as { token?: string }
+
+    // Otherwise a promotion or demotion would wait out the token's lifetime,
+    // and `type` is the claim policies match on.
+    expect(body.token).toEqual(expect.any(String))
+  })
+
+  it("mints one when what was presented does not verify", async () => {
+    const { context, cookies } = await signInFor()
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/user", {
+        cookies,
+        headers: { authorization: "Bearer not.a.token" }
+      })
+    )
+
+    expect(((await response.json()) as { token?: string }).token).toEqual(
+      expect.any(String)
+    )
+  })
+})
+
+describe("authenticating from the access token", () => {
+  const signedIn = async () => {
+    const context = await createTestServer()
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const verified = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes[0], "sent code").code
+        }
+      })
+    )
+    const { token } = (await verified.json()) as { token: string }
+
+    return {
+      context,
+      token,
+      cookies: {
+        "auth-ts.refresh": required(
+          readSetCookies(verified).get("auth-ts.refresh"),
+          "refresh cookie"
+        ).value
+      }
+    }
+  }
+
+  it("reads the caller from the token, without looking the session up", async () => {
+    const { context, token, cookies } = await signedIn()
+    const update = vi.spyOn(context.db, "update")
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/sessions", {
+        cookies,
+        headers: { authorization: `Bearer ${token}` }
+      })
+    )
+    const body = (await response.json()) as {
+      sessions: Array<{ current: boolean }>
+    }
+
+    expect(response.status).toBe(200)
+    // `current` still resolves: the cookie is hashed, not looked up.
+    expect(body.sessions).toEqual([expect.objectContaining({ current: true })])
+    // And the session was never resolved, which is the whole point.
+    expect(
+      update.mock.calls.filter(([input]) => input.table === "sessions")
+    ).toHaveLength(0)
+  })
+
+  it("falls back to the cookie when no token rides along", async () => {
+    const { context, cookies } = await signedIn()
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/sessions", { cookies })
+    )
+
+    expect(response.status).toBe(200)
+  })
+
+  it("refuses a token that does not verify, rather than falling back", async () => {
+    const { context, cookies } = await signedIn()
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/sessions", {
+        cookies,
+        headers: { authorization: "Bearer forged.not.real" }
+      })
+    )
+
+    // The cookie is perfectly good. A forged token is still an error, because
+    // quietly ignoring it would make forgery indistinguishable from slowness.
+    expect(response.status).toBe(401)
   })
 })

@@ -10,7 +10,7 @@ import { signToken } from "../jwt/sign-token"
 import type { TokenClaims } from "../jwt/verify-token"
 import { verifyToken } from "../jwt/verify-token"
 import type { HeadersInput } from "../session/resolve-session"
-import { readRefreshToken, resolveSession } from "../session/resolve-session"
+import { readRefreshToken } from "../session/resolve-session"
 import type { AdditionalFieldsSchema, AuthSession, AuthUser } from "./auth-db"
 import type { AuthServerConfig } from "./auth-server-config"
 import { resolveAuthServerConfig } from "./auth-server-config"
@@ -87,8 +87,6 @@ export interface AuthServer<
   signToken: (claims?: SignTokenClaims) => Promise<string>
   /** Decodes without verifying. Never authorize with this. */
   decodeToken: typeof decodeToken
-  /** Resolves the refresh cookie to a session and user. One database round-trip. */
-  getSession: (input: HeadersInput) => Promise<AuthSessionResult<S> | null>
 }
 
 /**
@@ -188,20 +186,7 @@ export function createAuthServer<
         claims
       )
     },
-    decodeToken,
-    getSession: async (input) => {
-      assertCookieReachable(resolved, input.headers, internals)
-
-      const resolvedSession = await resolveSession(internals, input.headers)
-      if (!resolvedSession) return null
-
-      // Core reads users through the erased `AuthUser`; the schema is put back
-      // here, at the boundary, the same way the callables' return types are.
-      return {
-        session: resolvedSession.session,
-        user: resolvedSession.user as AuthUser<S>
-      }
-    }
+    decodeToken
   }
 }
 
@@ -236,7 +221,7 @@ function warnAboutInertIpLimits(internals: AuthServerInternals) {
  * unauthenticated request, but in a loader it almost always means `cookie.path`
  * has been narrowed to the auth mount.
  */
-const COOKIE_PLANE_CALLABLES = new Set(["getToken"])
+const COOKIE_PLANE_CALLABLES = new Set(["getToken", "getSession", "getUser"])
 
 /**
  * Turns a routing failure into an endpoint, so it flows through the usual

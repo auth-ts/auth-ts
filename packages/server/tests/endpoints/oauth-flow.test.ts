@@ -403,7 +403,7 @@ describe("oauth callback", () => {
   it("renders a page, not a JSON envelope, when the provider rejects the code", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie, state } = await startSignIn(authServer)
-    stubGitHub({ id: 4242, accessToken: null })
+    stubGitHub({ id: 4242, token: null })
 
     const response = await authServer.handler(
       request("GET", `/api/auth/callback/github?code=bad&state=${state}`, {

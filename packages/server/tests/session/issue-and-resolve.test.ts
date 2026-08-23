@@ -40,7 +40,7 @@ describe("issueSession", () => {
     })
 
     expect(issued.refreshToken).toBeUndefined()
-    expect(issued.accessToken).toBeTruthy()
+    expect(issued.token).toBeTruthy()
   })
 
   it("returns the refresh token and no cookie in token mode", async () => {
@@ -125,7 +125,7 @@ describe("issueSession", () => {
     const { verificationKeys } = await internals.keys()
     const claims = await verifyToken(
       { keys: verificationKeys, algorithm: "RS256" },
-      issued.accessToken
+      issued.token
     )
 
     expect(claims?.sub).toBe(user.id)
@@ -152,7 +152,7 @@ describe("issueSession", () => {
     const { verificationKeys } = await internals.keys()
     const claims = await verifyToken(
       { keys: verificationKeys, algorithm: "RS256" },
-      issued.accessToken
+      issued.token
     )
 
     expect(claims).not.toHaveProperty("primaryUserId")
@@ -294,10 +294,10 @@ describe("resolveSession", () => {
     expect(await resolveSession(internals, headers)).toBeNull()
   })
 
-  it("deletes the expired session it read, rather than only refusing it", async () => {
-    // The row is already in hand, so removing it costs nothing the sweep would
-    // not eventually pay — and a deployment that never sweeps still does not
-    // accumulate dead sessions on the traffic that touches them.
+  it("refuses an expired session without extending it", async () => {
+    // The row is found and touched by one statement, and an expiry already past
+    // matches nothing — so the write that records activity on a live session
+    // can never revive a dead one. Removing the row is the sweep's job.
     const { internals, db } = await createTestInternals({
       session: { ttl: "1s" }
     })
@@ -316,12 +316,16 @@ describe("resolveSession", () => {
       values: { expiresAt: new Date(Date.now() - 1000) }
     })
 
-    await resolveSession(
+    const resolved = await resolveSession(
       internals,
       new Headers({ cookie: `auth-ts.refresh=${issued.refreshToken}` })
     )
 
-    expect(await selectRows(db, "sessions")).toEqual([])
+    expect(resolved).toBeNull()
+    const [after] = await selectRows(db, "sessions")
+    expect(required(after, "session").expiresAt.getTime()).toBeLessThan(
+      Date.now()
+    )
   })
 
   it("refuses a session whose user no longer exists", async () => {

@@ -58,13 +58,13 @@ export interface SwitchAccountInput {
  */
 export function createSwitchAccount(
   internals: AuthClientInternals,
-  primeSession: (result: { accessToken: string; user: AuthUser }) => void
+  primeSession: (result: { token: string; user: AuthUser }) => void
 ) {
   return async function switchAccount(
     input: SwitchAccountInput
   ): Promise<AuthUser> {
     const result = await internals.fetchJson<{
-      accessToken: string
+      token: string
       user: AuthUser
     }>({
       method: "POST",

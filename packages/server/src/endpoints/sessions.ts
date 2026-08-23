@@ -1,8 +1,7 @@
-import { unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import type { CallerInput } from "../session/authenticate"
+import { authenticate } from "../session/authenticate"
 import { listUserSessions } from "../session/list-user-sessions"
-import type { HeadersInput } from "../session/resolve-session"
-import { resolveSession } from "../session/resolve-session"
 
 /**
  * One entry in the "your devices" list.
@@ -41,19 +40,18 @@ export interface SessionInfo {
 export const listSessions = defineEndpoint({
   method: "GET",
   path: "/sessions",
-  parse: ({ request }): HeadersInput => ({ headers: request.headers }),
-  run: async (internals, input: HeadersInput) => {
-    const resolved = await resolveSession(internals, input.headers)
-    if (!resolved) throw unauthenticated()
+  parse: ({ request }): CallerInput => ({ headers: request.headers }),
+  run: async (internals, input: CallerInput) => {
+    const caller = await authenticate(internals, input)
 
-    const sessions = await listUserSessions(internals, resolved.user.id)
+    const sessions = await listUserSessions(internals, caller.userId)
     const data: SessionInfo[] = sessions.map((session) => ({
       id: session.id,
       createdAt: session.createdAt,
       expiresAt: session.expiresAt,
       userAgent: session.userAgent ?? null,
       ipAddress: session.ipAddress ?? null,
-      current: session.tokenHash === resolved.tokenHash
+      current: session.tokenHash === caller.tokenHash
     }))
 
     return { data: { sessions: data } }

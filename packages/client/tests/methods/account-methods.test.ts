@@ -25,7 +25,7 @@ afterEach(() => {
 describe("verifyCode", () => {
   it("primes the token and user without a second round-trip", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
 
@@ -61,9 +61,8 @@ describe("sendCode", () => {
 })
 
 describe("updateUser", () => {
-  it("reads the row back, so the mirror carries what was stored", async () => {
-    server.on("POST", "/api/auth/user", { body: { status: true } })
-    server.on("GET", "/api/auth/user", {
+  it("refreshes the mirror from the row the update returned", async () => {
+    server.on("POST", "/api/auth/user", {
       body: { user: { ...user, name: "Ada" } }
     })
     const client = createAuthClient()
@@ -72,17 +71,15 @@ describe("updateUser", () => {
 
     expect(updated.name).toBe("Ada")
     expect(client.getCachedUser()?.name).toBe("Ada")
-    expect(server.requests.map((request) => request.method)).toEqual([
-      "POST",
-      "GET"
-    ])
+    // One request: the update answers with the row, so nothing is read back.
+    expect(server.requests).toHaveLength(1)
   })
 })
 
 describe("signOut", () => {
   it("clears local state for the local scope", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
@@ -96,7 +93,7 @@ describe("signOut", () => {
 
   it("keeps local state for the others scope, which is the point of it", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
@@ -124,10 +121,10 @@ describe("signOut", () => {
 
   it("adopts the promoted account when the server switches to one", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
     server.on("POST", "/api/auth/sign-out", {
-      body: { switchedTo: other, accessToken: fakeAccessToken() }
+      body: { switchedTo: other, token: fakeAccessToken() }
     })
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
@@ -155,7 +152,7 @@ describe("deleteUser", () => {
 
   it("clears everything once the account is gone", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
     server.on("DELETE", "/api/auth/user", { status: 204 })
     const client = createAuthClient()
@@ -203,7 +200,7 @@ describe("sessions and accounts", () => {
     })
     server.on("DELETE", "/api/auth/sessions/b", { body: { current: false } })
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
 
     const client = createAuthClient()
@@ -232,7 +229,7 @@ describe("sessions and accounts", () => {
   it("clears local state when the server reports the revoked session as current", async () => {
     server.on("DELETE", "/api/auth/sessions/a", { body: { current: true } })
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
 
     const client = createAuthClient()
@@ -244,10 +241,10 @@ describe("sessions and accounts", () => {
 
   it("switches accounts through the store, so subscribers see one change", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { accessToken: fakeAccessToken(), user }
+      body: { token: fakeAccessToken(), user }
     })
     server.on("POST", "/api/auth/accounts/switch", {
-      body: { accessToken: fakeAccessToken(), user: other }
+      body: { token: fakeAccessToken(), user: other }
     })
 
     const client = createAuthClient()

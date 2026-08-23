@@ -79,10 +79,7 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
 
   /** Writes a completed sign-in into both caches at once, so they cannot disagree. */
   const primeSession = (result: SignInResult) => {
-    internals.tokenStore.set(
-      result.accessToken,
-      readLifetimeClaims(result.accessToken)
-    )
+    internals.tokenStore.set(result.token, readLifetimeClaims(result.token))
     internals.userStore.set(result.user)
   }
 

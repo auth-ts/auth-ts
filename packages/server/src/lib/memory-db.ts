@@ -77,9 +77,25 @@ export function createMemoryDb(): MemoryDb {
     return rows
   }
 
+  /** A range, per the contract: an object that is not a Date. */
+  const isRange = (value: unknown): value is { lt?: unknown; gt?: unknown } =>
+    typeof value === "object" && value !== null && !(value instanceof Date)
+
+  const order = (stored: unknown, bound: unknown) =>
+    stored instanceof Date && bound instanceof Date
+      ? stored.getTime() - bound.getTime()
+      : Number(stored) - Number(bound)
+
   const matches = (row: StoredRow, where: Record<string, unknown>) =>
     Object.entries(where).every(([column, value]) => {
       const stored = row[column]
+
+      if (isRange(value)) {
+        if (value.lt !== undefined && order(stored, value.lt) >= 0) return false
+        if (value.gt !== undefined && order(stored, value.gt) <= 0) return false
+        return true
+      }
+
       if (stored instanceof Date && value instanceof Date) {
         return stored.getTime() === value.getTime()
       }
@@ -149,11 +165,13 @@ export function createMemoryDb(): MemoryDb {
         throw new Error(`update on ${table} was given no values to set`)
       }
 
-      for (const row of find(table, where)) {
+      return find(table, where).map((row) => {
         const updated = { ...row, ...Object.fromEntries(defined) }
         assertUnique(table, updated)
         tableOf(table).set(row.id, updated)
-      }
+
+        return { ...updated }
+      }) as never
     },
 
     async delete({ table, where }) {

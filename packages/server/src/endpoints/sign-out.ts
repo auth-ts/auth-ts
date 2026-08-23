@@ -1,5 +1,5 @@
 import type { AuthServerInternals } from "../core/auth-server-internals"
-import { AuthApiError, unauthenticated } from "../http/auth-api-error"
+import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import {
   clearCookie,
@@ -12,9 +12,10 @@ import {
   readAccountsCookie,
   serializeAccounts
 } from "../session/accounts-cookie"
+import type { CallerInput } from "../session/authenticate"
+import { authenticate } from "../session/authenticate"
 import { mintAccessToken } from "../session/issue-session"
 import { promoteNextAccount } from "../session/promote-account"
-import { resolveSession } from "../session/resolve-session"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
 
 /**
@@ -26,7 +27,7 @@ import { revokeOtherSessions } from "../session/revoke-other-sessions"
 export type SignOutScope = "local" | "others" | "global"
 
 /** Body accepted by `POST /sign-out`. */
-export interface SignOutInput {
+export interface SignOutInput extends CallerInput {
   scope?: SignOutScope
   /**
    * Which of this browser's accounts to sign out, under `multiAccount`.
@@ -41,7 +42,6 @@ export interface SignOutInput {
    * An id that is not signed in here is a 404 rather than a silent no-op.
    */
   userId?: string
-  headers?: Headers
   requestURL?: string
 }
 
@@ -69,8 +69,7 @@ export const signOut = defineEndpoint({
   },
   run: async (internals, input: SignOutInput) => {
     const headers = input.headers ?? new Headers()
-    const resolved = await resolveSession(internals, headers)
-    if (!resolved) throw unauthenticated()
+    const caller = await authenticate(internals, input)
 
     const { config } = internals
     const scope = input.scope ?? "local"
@@ -86,7 +85,7 @@ export const signOut = defineEndpoint({
     // Everything signed in here, the active account first. A parked entry for
     // the account already active is one of its sessions, not another account.
     const accounts = [
-      { userId: resolved.user.id, tokenHash: resolved.tokenHash, active: true },
+      { userId: caller.userId, tokenHash: caller.tokenHash, active: true },
       ...parked.map(({ session }) => ({
         userId: session.userId,
         tokenHash: session.tokenHash,
@@ -122,7 +121,11 @@ export const signOut = defineEndpoint({
         })
         continue
       }
-      await deleteSessionByToken(internals, target.tokenHash)
+      // Nothing to sign out of here when the caller authenticated by bearer
+      // alone: there is no session in this browser to end.
+      if (target.tokenHash) {
+        await deleteSessionByToken(internals, target.tokenHash)
+      }
     }
 
     const signedOut = new Set(targets.map(({ userId }) => userId))
@@ -131,7 +134,7 @@ export const signOut = defineEndpoint({
     )
 
     // The active account survived, so only the parked list changed.
-    if (!signedOut.has(resolved.user.id)) {
+    if (!signedOut.has(caller.userId)) {
       const responseHeaders = new Headers()
       responseHeaders.append(
         "set-cookie",
@@ -151,7 +154,7 @@ export const signOut = defineEndpoint({
       return {
         data: {
           switchedTo: promoted.user,
-          accessToken: await mintAccessToken(internals, promoted.user)
+          token: await mintAccessToken(internals, promoted.user)
         },
         headers: promoted.headers
       }

@@ -16,7 +16,11 @@ import { listUserSessions } from "./list-user-sessions"
 export async function revokeOtherSessions(
   internals: AuthServerInternals,
   userId: string,
-  currentTokenHash: string
+  /**
+   * The session to keep, or `null` to keep none — a caller authenticated by
+   * bearer alone has no session in this browser to spare.
+   */
+  currentTokenHash: string | null
 ) {
   let revoked = 0
 

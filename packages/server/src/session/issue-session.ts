@@ -4,7 +4,6 @@ import { signToken } from "../jwt/sign-token"
 import { randomBytesBase64url } from "../lib/generate-random"
 import { sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
-import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import {
   serializeCookie,
@@ -18,6 +17,7 @@ import {
   serializeAccounts
 } from "./accounts-cookie"
 import { readRefreshToken } from "./resolve-session"
+import { sessionStamp } from "./slide-session"
 
 /**
  * Where the refresh token goes.
@@ -29,20 +29,9 @@ import { readRefreshToken } from "./resolve-session"
  */
 export type IssueMode = "cookie" | "token"
 
-/** User-agent and validated client IP for a session row, from the request headers. */
-function sessionStamp(internals: AuthServerInternals, headers: Headers) {
-  const userAgent = headers.get("user-agent")
-  const ipAddress = getIpAddress(headers, internals.config.ipAddress)
-
-  return {
-    ...(userAgent ? { userAgent } : {}),
-    ...(ipAddress ? { ipAddress } : {})
-  }
-}
-
 /** What issuing a session produced. */
 export interface IssueResult {
-  accessToken: string
+  token: string
   user: AuthUser
   /** Present only in `"token"` mode. */
   refreshToken?: string
@@ -127,12 +116,12 @@ export async function issueSession(
   }
 
   const responseHeaders = new Headers()
-  const accessToken = await mintAccessToken(internals, user)
+  const token = await mintAccessToken(internals, user)
   internals.log.debug("session issued", { userType: user.type, mode })
 
   if (mode === "token") {
     return {
-      accessToken,
+      token,
       user,
       refreshToken: rawToken,
       headers: responseHeaders
@@ -180,17 +169,31 @@ export async function issueSession(
     )
   }
 
-  return { accessToken, user, headers: responseHeaders }
+  return { token, user, headers: responseHeaders }
 }
 
 /**
- * Signs an access token for a user.
+ * What a token for this user would claim about them.
  *
  * `type` rides along because row-level security reads it; `role` stays whatever
- * the configuration says, because it maps to a real Postgres role. `primaryUserId`
- * is deliberately never included — it describes a pending data migration, not who
- * is signed in.
+ * the configuration says, because it maps to a real Postgres role. Nothing that
+ * identifies the person does: the token is handed to the database, to sync
+ * services, and to whatever logs sit between them, and none of them need a name
+ * or an address to authorize a query.
+ *
+ * `primaryUserId` is deliberately never included either — it describes a
+ * pending data migration, not who is signed in.
+ *
+ * Split out from signing so a token already in hand can be checked against it
+ * without minting anything: whatever ends up here is what goes stale, so
+ * comparing against it covers a claim added later without anyone remembering to
+ * update the check.
  */
+export function accessTokenClaims(user: AuthUser) {
+  return { userId: user.id, type: user.type }
+}
+
+/** Signs an access token carrying {@link accessTokenClaims}. */
 export async function mintAccessToken(
   internals: AuthServerInternals,
   user: AuthUser
@@ -208,41 +211,6 @@ export async function mintAccessToken(
       ...(config.issuer ? { issuer: config.issuer } : {}),
       ...(config.jwt.audience ? { audience: config.jwt.audience } : {})
     },
-    { userId: user.id, type: user.type }
+    accessTokenClaims(user)
   )
-}
-
-/**
- * Extends a session's expiry on refresh, when sliding is enabled.
- *
- * `createdAt` is never named here, and that is the point: the update touches
- * expiry and the stamp only, so the timestamp recording when identity was
- * proven — the one account deletion checks — cannot be slid by accident.
- *
- * @returns The expiry now in effect — the one just persisted, or the existing
- * one when sliding is off — so a caller reports what the row actually says
- * rather than what it said before this ran.
- */
-export async function slideSession(
-  internals: AuthServerInternals,
-  session: { id: string; expiresAt: Date },
-  headers: Headers
-): Promise<Date> {
-  if (!internals.config.session.sliding) return session.expiresAt
-  internals.log.debug("sliding session expiry")
-
-  const expiresAt = new Date(
-    Date.now() + parseDuration(internals.config.session.ttl)
-  )
-  await internals.db.update({
-    table: "sessions",
-    where: { id: session.id },
-    values: {
-      expiresAt,
-      updatedAt: new Date(),
-      ...sessionStamp(internals, headers)
-    }
-  })
-
-  return expiresAt
 }

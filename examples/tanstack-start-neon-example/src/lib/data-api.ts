@@ -18,13 +18,13 @@ export async function dataApi<Result>(
   init: RequestInit & { body?: string } = {}
 ): Promise<Result> {
   const send = async () => {
-    const accessToken = await authClient.getToken()
+    const token = await authClient.getToken()
 
     return fetch(`${DATA_API_URL}${path}`, {
       ...init,
       headers: {
         ...init.headers,
-        authorization: `Bearer ${accessToken}`,
+        authorization: `Bearer ${token}`,
         "content-type": "application/json",
         prefer: "return=representation"
       }

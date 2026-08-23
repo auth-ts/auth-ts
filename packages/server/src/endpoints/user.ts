@@ -2,8 +2,10 @@ import { AuthApiError, unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import { resolveLocale } from "../http/resolve-locale"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
+import { presentedToken } from "../jwt/presented-token"
 import { parseDuration } from "../lib/parse-duration"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
+import { accessTokenClaims, mintAccessToken } from "../session/issue-session"
 import type { HeadersInput } from "../session/resolve-session"
 import { resolveSession } from "../session/resolve-session"
 // Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
@@ -15,8 +17,16 @@ import { sendVerificationCode } from "../verification-code/send-verification-cod
 /**
  * Reads the signed-in user.
  *
- * A cheap whoami for server-side rendering and app boot: it resolves the session
- * and returns the user without minting a token.
+ * `GET /session` plus the user and a freshly signed token: the same resolve and
+ * the same slide, then one more read.
+ *
+ * The token is why the user has to be read at all — its `type` claim is what
+ * row-level security policies match on, and `type` lives on the user row. That
+ * is also why `/session` does not mint one: it would cost this second query and
+ * stop being the cheap call.
+ *
+ * Send the token you already hold as a bearer and none comes back. `token` is
+ * therefore absent from the body whenever the one you have is still live.
  */
 export const getUser = defineEndpoint({
   method: "GET",
@@ -26,7 +36,32 @@ export const getUser = defineEndpoint({
     const resolved = await resolveSession(internals, input.headers)
     if (!resolved) throw unauthenticated()
 
-    return { data: { user: resolved.user } }
+    const { tokenHash, ...session } = resolved.session
+    // A token already in hand is left alone when it still describes this user.
+    // Verifying is the cheap half of RS256 and signing is the expensive half, so
+    // this trades down — and anything holding the JWT, a sync socket especially,
+    // is not handed a new one every time a tab regains focus.
+    //
+    // Every claim minting would make is compared, not just `sub`: `type` is what
+    // policies match on and can change under a live token, so a promotion or a
+    // guest becoming a user reaches the next request rather than waiting out the
+    // token's lifetime. Name and email are not compared because they are not in
+    // the token — it is a credential handed to other systems, not a profile.
+    const presented = await presentedToken(internals, input.headers)
+    const claims = accessTokenClaims(resolved.user)
+    const live =
+      presented !== null &&
+      Object.entries(claims).every(
+        ([claim, value]) =>
+          (claim === "userId" ? presented.sub : presented[claim]) === value
+      )
+    const token = live
+      ? undefined
+      : await mintAccessToken(internals, resolved.user)
+
+    return {
+      data: { session, user: resolved.user, ...(token ? { token } : {}) }
+    }
   }
 })
 

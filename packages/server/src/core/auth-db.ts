@@ -195,14 +195,36 @@ export type AuthRow<
 > = AuthTables<S>[T]
 
 /**
- * A query: column/value pairs, **all** of which must match, compared for
- * equality. There are no operators — one would be the thin end of a query
- * language, and equality is the thing every store expresses identically.
+ * `{ lt }`, `{ gt }`, or both — an open range on one column.
+ *
+ * The only comparison the contract has, and it exists because expiry is the one
+ * question core cannot ask with equality. Both bounds are exclusive.
+ */
+export interface AuthRange<V> {
+  lt?: V
+  gt?: V
+}
+
+/**
+ * A query: column/value pairs, **all** of which must match.
+ *
+ * A plain value compares for equality. An {@link AuthRange} compares for order,
+ * which is what lets core find a live session — `expiresAt` greater than now —
+ * in the same statement that updates it, rather than reading first to find out
+ * whether it may write.
+ *
+ * Telling them apart is one check, and the shape is chosen so it stays one: a
+ * range is a non-null object that is not a `Date`. Every value core compares
+ * for order is a `Date`, so an implementation reads
+ * `value instanceof Date || typeof value !== "object"` as "equality" and
+ * everything else as a range.
  */
 export type AuthWhere<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
-> = Partial<AuthRow<S, T>>
+> = {
+  [K in keyof AuthRow<S, T>]?: AuthRow<S, T>[K] | AuthRange<AuthRow<S, T>[K]>
+}
 
 /** Sort direction, per {@link AuthOrderBy}. */
 export type AuthDirection = "asc" | "desc"
@@ -371,15 +393,16 @@ export interface AuthDB<
    * implementation needs a guard against the empty `SET` that most query
    * builders reject.
    *
-   * Nothing is returned: core already holds the row it is updating, so the
-   * result is `{ ...existing, ...fields }` composed in memory rather than a
-   * second round trip on stores that do not return representations.
+   * Returns the rows it wrote, as {@link AuthDB.delete} does. That is what lets
+   * one statement both find and touch a row: core asks for a session whose
+   * `expiresAt` is still ahead, and learns from what comes back whether there
+   * was one — rather than reading to find out if it may write, then writing.
    */
   update<T extends AuthTable>(input: {
     table: T
     where: AuthWhere<S, T>
     values: Partial<AuthRow<S, T>>
-  }): Promise<unknown>
+  }): Promise<AuthRow<S, T>[]>
 
   /**
    * Deletes every row matching `where` and returns what it removed.

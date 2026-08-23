@@ -1,18 +1,18 @@
 import type { AuthUser } from "../../core/auth-db"
-import { AuthApiError, unauthenticated } from "../../http/auth-api-error"
+import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { clearCookie, shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import {
   pruneDeadAccounts,
   readAccountsCookie
 } from "../../session/accounts-cookie"
+import type { CallerInput } from "../../session/authenticate"
+import { authenticate } from "../../session/authenticate"
 import { promoteNextAccount } from "../../session/promote-account"
-import { resolveSession } from "../../session/resolve-session"
 
 /** Input for revoking one session. */
-export interface RevokeSessionInput {
+export interface RevokeSessionInput extends CallerInput {
   id: string
-  headers?: Headers
   requestURL?: string
 }
 
@@ -53,22 +53,21 @@ export const revokeSession = defineEndpoint({
   }),
   run: async (internals, input: RevokeSessionInput) => {
     const headers = input.headers ?? new Headers()
-    const resolved = await resolveSession(internals, headers)
-    if (!resolved) throw unauthenticated()
+    const caller = await authenticate(internals, input)
 
     // The delete filters on id AND userId and returns what it removed, so one
     // statement both enforces ownership and tells us whether anything was
     // there. No read-then-delete window for someone else's id to slip through.
     const [revoked] = await internals.db.delete({
       table: "sessions",
-      where: { id: input.id, userId: resolved.user.id }
+      where: { id: input.id, userId: caller.userId }
     })
     if (!revoked) throw new AuthApiError("notFound", 404)
 
     // Revoking the session you are using is a local sign-out, so the cookie has
     // to go too — otherwise the browser keeps presenting a token that no longer
     // resolves and every later request looks mysteriously unauthenticated.
-    const current = revoked.tokenHash === resolved.tokenHash
+    const current = revoked.tokenHash === caller.tokenHash
     if (!current) {
       const data: RevokeSessionResult = { current }
       return { data }
