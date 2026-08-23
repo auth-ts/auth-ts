@@ -6,22 +6,20 @@ import type * as schema from "../db/schema"
 import { authClient } from "./auth-client"
 
 /** The PostgREST view of a drizzle schema: every table, keyed by its SQL name. */
-type Tables<Schema> = {
-  [K in keyof Schema as Schema[K] extends PgTable
-    ? Schema[K]["_"]["name"]
-    : never]: Schema[K] extends PgTable
-    ? {
-        Row: InferSelectModel<Schema[K]>
-        Insert: InferInsertModel<Schema[K]>
-        Update: Partial<InferInsertModel<Schema[K]>>
-        Relationships: []
-      }
-    : never
-}
-
-type Database<Schema> = {
+type PostgrestSchema<Schema> = {
   public: {
-    Tables: Tables<Schema>
+    Tables: {
+      [K in keyof Schema as Schema[K] extends PgTable
+        ? Schema[K]["_"]["name"]
+        : never]: Schema[K] extends PgTable
+        ? {
+            Row: InferSelectModel<Schema[K]>
+            Insert: InferInsertModel<Schema[K]>
+            Update: Partial<InferInsertModel<Schema[K]>>
+            Relationships: []
+          }
+        : never
+    }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
     Enums: { [_ in never]: never }
@@ -44,7 +42,7 @@ const withRetry: typeof fetch = async (input, init) => {
 }
 
 /** The data plane: PostgREST over Neon, authenticated by our access token. */
-export const dataApi = new NeonPostgrestClient<Database<typeof schema>>({
+export const dataApi = new NeonPostgrestClient<PostgrestSchema<typeof schema>>({
   dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL as string,
   options: { global: { fetch: withRetry } }
 })
