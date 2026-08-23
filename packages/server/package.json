@@ -17,7 +17,7 @@
       "import": "./dist/index.js"
     },
     "./testing": {
-      "types": "./dist/lib/memory-db.d.ts",
+      "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js"
     }
   },

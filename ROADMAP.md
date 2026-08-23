@@ -188,40 +188,40 @@ has to do the things that are easy to skip:
 
 ### A conformance suite for the four functions
 
-"No adapter packages" is a promise that the contract is learnable. The contract
-is now much smaller — `select`, `insert`, `update`, `delete`, and an optional
-`cleanup`, all filtered by equality — and every semantic that used to be the
-consumer's to get right lives in core and is tested once. What is left to get
-wrong is real but narrow, and mostly structural: the unique constraints, and a
-`delete` that actually returns what it removed.
-
-The fix is the other half of `@auth-ts/server/testing`. `createMemoryDb` already
-encodes the exact semantics the library's own suite runs against; the missing
-piece is that same suite pointed at *your* implementation:
+**Shipped.** `authDBChecks` in `@auth-ts/server/testing` is the contract as a
+list of checks, each `{ name, run(db) }`, throwing on failure so it fits any
+runner without dragging a test framework into the package's dependencies:
 
 ```ts
-import { testAuthDB } from "@auth-ts/server/testing"
+import { authDBChecks } from "@auth-ts/server/testing"
 
-testAuthDB(() => authDB) // your four functions, your real database
+for (const check of authDBChecks) {
+  it(check.name, () => check.run(authDB)) // your four functions, your database
+}
 ```
 
-- [ ] Lift the memory-db cases into a parameterised suite: equality `where` on
-      one column and on several, `limit` and `offset`, `orderBy` in both
-      directions and over a date column, `insert` returning the stored row,
-      `update` applying only what it was given, `delete` returning every row it
-      removed, and `cleanup` sweeping the three tables that expire.
-- [ ] Add the duplicate-insert check for each unique set, which is the one thing
-      a consumer can get structurally wrong: `users.email`,
-      `users.phoneNumber`, `sessions.tokenHash`, and
-      `connections (provider, providerAccountId)` must throw rather than merge.
-      Note the limit honestly — a test can prove the constraint exists by
-      inserting twice in sequence, but the failure it prevents only shows under
-      a race.
-- [ ] Run it from the reference application against Neon in CI, so the example's
-      `auth-db.ts` — the file people will copy — is proven rather than believed.
+Every check tags its rows and cleans up after itself, so it runs against a real
+database — which is the point, since the two things most likely to be wrong are
+whether the unique constraints exist and whether `delete` returns what it
+removed, and neither is observable against a mock. It deviates from the earlier
+`testAuthDB(() => authDB)` sketch for that reason: a function that registers
+tests has to import a runner.
 
-This is what lets the "Not building" entry below mean "we give you the spec and
-the test" rather than "good luck".
+Verified against the reference application's Neon database, all eleven checks
+passing, and the library's own suite runs them against `createMemoryDb` plus a
+set of deliberately broken stores — a `delete` that returns nothing, a `where`
+that matches on any column rather than all of them, a `select` that ignores
+`limit`, a `cleanup` that sweeps nothing — so the checks are known to fail when
+the contract is broken, not merely to pass when it is not.
+
+- [ ] Run them from the reference application against Neon in CI, so the
+      example's `auth-db.ts` — the file people will copy — stays proven rather
+      than believed. Today it is proven by hand.
+
+One limit is stated in the docs and worth repeating: a duplicate-insert check
+proves a constraint exists by inserting twice in sequence. The failure it
+prevents only shows under a race, which no test stages reliably. The constraint
+is the fix; the check is evidence that you have one.
 
 ---
 
@@ -304,8 +304,8 @@ are the same code an adapter would generate, except you can read them and they
 are already written against your own tables.
 
 **The database contract is the product.** That is where the semver discipline
-goes — and where the conformance suite above goes, because a contract you are
-asked to implement yourself owes you a way to check your work.
+goes, and why `authDBChecks` ships beside it: a contract you are asked to
+implement yourself owes you a way to check your work.
 
 ### Rotating the refresh token on every use
 

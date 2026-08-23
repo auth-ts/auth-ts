@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest"
+import type { AuthDB } from "../../src/core/auth-db"
+import { createMemoryDb } from "../../src/lib/memory-db"
+import { authDBChecks } from "../../src/testing"
+
+/** Which checks a store fails, in the order they run. */
+async function failures(db: AuthDB) {
+  const failed: string[] = []
+  for (const check of authDBChecks) {
+    await check.run(db).catch(() => failed.push(check.name))
+  }
+  return failed
+}
+
+/** The reference implementation, with one part of the contract broken. */
+function broken(patch: Partial<AuthDB>): AuthDB {
+  return { ...createMemoryDb(), ...patch }
+}
+
+describe("authDBChecks", () => {
+  // The reference implementation has to pass the checks it ships beside, or
+  // they are measuring something other than the contract.
+  for (const check of authDBChecks) {
+    it(`passes: ${check.name}`, () => check.run(createMemoryDb()))
+  }
+
+  it("catches a delete that does not return what it removed", async () => {
+    const db = createMemoryDb()
+    const failed = await failures(
+      broken({
+        delete: async (input) => {
+          await db.delete(input)
+          return []
+        }
+      })
+    )
+
+    expect(failed).toContain(
+      "delete returns what it removed, and nothing when it matched nothing"
+    )
+  })
+
+  it("catches a where that matches on any column instead of all of them", async () => {
+    const db = createMemoryDb()
+    const failed = await failures(
+      broken({
+        select: (input) => {
+          const [first] = Object.entries(input.where)
+          const where = first ? { [first[0]]: first[1] } : {}
+          return db.select({ ...input, where } as typeof input)
+        }
+      })
+    )
+
+    expect(failed).toContain(
+      "select matches on every column given, and only on equality"
+    )
+  })
+
+  it("catches a select that ignores limit and offset", async () => {
+    const db = createMemoryDb()
+    const failed = await failures(
+      broken({
+        select: (input) => db.select({ ...input, limit: 100, offset: 0 })
+      })
+    )
+
+    expect(failed).toContain(
+      "select honours limit, offset, and both directions of orderBy"
+    )
+  })
+
+  it("catches a cleanup that sweeps nothing", async () => {
+    const failed = await failures(broken({ cleanup: () => undefined }))
+
+    expect(failed).toContain(
+      "cleanup deletes what has expired and keeps what has not"
+    )
+  })
+
+  it("skips the cleanup check for a store that does not implement it", async () => {
+    const { cleanup, ...withoutCleanup } = createMemoryDb()
+
+    expect(await failures(withoutCleanup)).toEqual([])
+  })
+})

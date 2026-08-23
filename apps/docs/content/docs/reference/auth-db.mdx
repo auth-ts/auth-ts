@@ -265,7 +265,48 @@ The core fields of a user. Your declared additional fields sit beside them on
 
 ## Testing your implementation
 
-The in-memory implementation the library's own test suite runs against is public:
+`@auth-ts/server/testing` exports the contract on this page as a list of checks
+you can run against your own four functions:
+
+```ts
+import { authDBChecks } from "@auth-ts/server/testing"
+import { authDB } from "./auth-db"
+
+describe("authDB", () => {
+  for (const check of authDBChecks) {
+    it(check.name, () => check.run(authDB))
+  }
+})
+```
+
+Each check is `{ name, run(db) }`, and `run` throws on failure and resolves on
+success — so it wires into any runner, and the package still depends on `jose`
+and nothing else.
+
+**Point it at a real database.** Every check cleans up after itself and tags its
+rows, so it is safe to run against the database you actually use, and that is
+where it earns its keep: the two things most likely to be wrong are whether your
+unique constraints are really there, and whether your `delete` really returns
+what it removed. Neither is observable against a mock, because a mock agrees
+with whatever you assumed.
+
+The checks cover `insert` returning the stored row with its id, equality `where`
+on one column and on several, `limit`, `offset`, `orderBy` in both directions,
+`update` applying only what it was given, `delete` returning what it removed and
+matching on every column, a duplicate insert being refused for each unique set
+above, and `cleanup` deleting what has expired while keeping what has not. The
+`cleanup` check is skipped when you have not implemented it, and waits for the
+sweep rather than assuming it has already landed, so deferring it — to
+`waitUntil`, say — still passes.
+
+One limit, stated plainly: a duplicate check proves the constraint exists by
+inserting twice in sequence. The failure it prevents only shows under a race,
+which no test can stage reliably — the constraint is the fix, and this is only
+evidence that you have one.
+
+### The in-memory implementation
+
+The store the library's own suite runs against is public too:
 
 ```ts
 import { createMemoryDb } from "@auth-ts/server/testing"
@@ -273,6 +314,6 @@ import { createMemoryDb } from "@auth-ts/server/testing"
 const db = createMemoryDb()
 ```
 
-Testing against it means testing against the same semantics the library verifies
-itself with, rather than a simplified mock that agrees with your assumptions —
-including the unique constraints above, which it enforces and throws on.
+It enforces the same unique constraints, so it is a fixture for testing code
+that sits *above* `AuthDB` rather than a substitute for running the checks
+against your database.

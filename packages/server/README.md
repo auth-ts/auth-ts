@@ -23,11 +23,18 @@ disagree: callable directly from your backend (`authServer.getToken({ headers })
 as one catch-all handler (`authServer.handler`), or as individual handlers
 (`authServer.handlers.sendCode`).
 
-Test your own four functions against the same in-memory implementation this
-library's test suite runs on:
+Check your own four functions against the contract — point it at the database
+you actually use, since each check cleans up after itself:
 
 ```ts
-import { createMemoryDb } from "@auth-ts/server/testing"
+import { authDBChecks } from "@auth-ts/server/testing"
+
+for (const check of authDBChecks) {
+  it(check.name, () => check.run(authDB))
+}
 ```
+
+`createMemoryDb` is exported from the same entry, for testing the code above
+`AuthDB` rather than `AuthDB` itself.
 
 Full documentation: [authts.dev](https://authts.dev)
