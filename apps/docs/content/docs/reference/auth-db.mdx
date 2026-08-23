@@ -32,7 +32,7 @@ cost of not having an adapter package.
 | `sessions` | `id`, `userId`, `tokenHash`, `createdAt`, `expiresAt`, `userAgent`, `ipAddress` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
 | `verificationCodes` | `id`, `identifier`, `codeHash`, `action`, `expiresAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt` | | `key`, `expiresAt` | `expiresAt` |
-| `connections` | `id`, `userId`, `provider`, `providerAccountId`, `email` | `(provider, providerAccountId)` | `userId` | |
+| `connections` | `id`, `userId`, `provider`, `providerAccountId`, `label` | `(provider, providerAccountId)` | `userId` | |
 
 **The unique constraints are a requirement, not hygiene.** The library reads
 before it writes — that is what a generic contract can express — so two first

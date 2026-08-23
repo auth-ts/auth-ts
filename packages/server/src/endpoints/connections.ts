@@ -7,8 +7,8 @@ import { resolveSession } from "../session/resolve-session"
 /** One linked provider, as shown on an account screen. */
 export interface ConnectionInfo {
   provider: string
-  /** The address the provider reported. Metadata only — never the match key. */
-  email?: string | null
+  /** What the provider calls this account. Display only. */
+  label?: string | null
 }
 
 /** Lists the signed-in user's linked providers. */
@@ -29,7 +29,7 @@ export const listConnections = defineEndpoint({
     })
     const data: ConnectionInfo[] = connections.map((connection) => ({
       provider: connection.provider,
-      email: connection.email ?? null
+      label: connection.label ?? null
     }))
 
     return { data: { connections: data } }

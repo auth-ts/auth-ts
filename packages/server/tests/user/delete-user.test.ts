@@ -29,7 +29,7 @@ async function seed() {
       userId: user.id,
       provider: "github",
       providerAccountId: "1",
-      email: "ada@example.com"
+      label: "ada@example.com"
     }
   })
   for (const identifier of ["ada@example.com", "+15550100"]) {

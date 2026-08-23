@@ -493,7 +493,7 @@ describe("oauth callback", () => {
         userId: owner.id,
         provider: "github",
         providerAccountId: "4242",
-        email: null
+        label: null
       }
     })
     // A different account holds the email GitHub now reports — the exact
@@ -612,7 +612,7 @@ describe("oauth callback", () => {
         userId: owner.id,
         provider: "github",
         providerAccountId: "4242",
-        email: null
+        label: null
       }
     })
     const guestResponse = await authServer.handler(
@@ -1055,7 +1055,7 @@ describe("connect and disconnect", () => {
         userId: firstUser.id,
         provider: "github",
         providerAccountId: "4242",
-        email: null
+        label: null
       }
     })
 
@@ -1096,7 +1096,7 @@ describe("connect and disconnect", () => {
         userId: user.id,
         provider: "github",
         providerAccountId: "4242",
-        email: null
+        label: null
       }
     })
 

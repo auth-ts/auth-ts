@@ -76,7 +76,7 @@ describe("insert", () => {
       userId: owner.id,
       provider: "github",
       providerAccountId: "1",
-      email: null
+      label: null
     }
     await db.insert({ table: "connections", values: link })
 
@@ -338,7 +338,7 @@ describe("cleanup", () => {
         userId: ada.id,
         provider: "github",
         providerAccountId: "1",
-        email: null
+        label: null
       }
     })
 

@@ -109,9 +109,6 @@ export const verificationCodes = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    // Indexed, not unique: a send deletes this identifier's codes and inserts a
-    // new one, and two sends racing may leave both rows for an instant. The
-    // newest by `expiresAt` is the live one.
     index("verificationCodesIdentifierIndex").on(table.identifier),
     index("verificationCodesExpiresAtIndex").on(table.expiresAt)
   ]
@@ -149,7 +146,7 @@ export const connections = pgTable.withRLS(
       .references(() => users.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
     providerAccountId: text("providerAccountId").notNull(),
-    email: text("email"),
+    label: text("label"),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -160,10 +157,6 @@ export const connections = pgTable.withRLS(
   },
   (table) => [
     index("connectionsUserIdIndex").on(table.userId),
-    // Unique, not merely indexed, and the contract says so: the library reads
-    // this pair before it inserts, so two concurrent sign-ins with one provider
-    // account both find nothing and both insert. This index is what refuses the loser
-    // instead of letting one identity link twice.
     uniqueIndex("connectionsProviderAccountIndex").on(
       table.provider,
       table.providerAccountId

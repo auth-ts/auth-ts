@@ -227,7 +227,7 @@ function AccountPage() {
                     {connection.provider}
                   </span>
                   <span className="list-col-grow text-sm text-base-content/60">
-                    {connection.email}
+                    {connection.label}
                   </span>
                   <button
                     type="button"

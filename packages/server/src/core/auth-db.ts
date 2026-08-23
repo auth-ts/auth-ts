@@ -147,8 +147,8 @@ export interface AuthConnection {
   provider: string
   /** The provider's stable id — GitHub's numeric id, Google's `sub`. */
   providerAccountId: string
-  /** Metadata only; never the match key. */
-  email?: string | null
+  /** Whatever the provider gives that a person recognises. Display only. */
+  label?: string | null
 }
 
 /** The tables core reads and writes. */

@@ -102,7 +102,7 @@ export async function resolveOAuthUser(
     userId: user.id,
     provider,
     providerAccountId: identity.providerAccountId,
-    email: identity.email
+    label: identity.email
   })
 
   return user

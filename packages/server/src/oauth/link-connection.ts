@@ -16,18 +16,18 @@ export interface LinkConnectionInput {
   userId: string
   provider: string
   providerAccountId: string
-  /** Metadata only. Recorded when present, left alone when the provider sent none. */
-  email?: string
+  /** Display only. Recorded when present, left alone when the provider sent none. */
+  label?: string
 }
 
 /**
  * Records a provider identity against a user, or refreshes the one on file.
  *
- * Keyed on the provider's stable account id rather than on email: people change
- * their email at the provider, and matching on email alone quietly creates a
+ * Keyed on the provider's stable account id rather than on the label: people
+ * change their email at the provider, and matching on it quietly creates a
  * second account for the same person.
  *
- * The email is written only when the provider actually sent one. A provider
+ * The label is written only when the provider actually sent one. A provider
  * with no verified email would otherwise produce an update with nothing to set
  * — an error in most query builders, and the one flow where it happens is a
  * routine sign-in.
@@ -39,7 +39,7 @@ export interface LinkConnectionInput {
  */
 export async function linkConnection(
   internals: AuthServerInternals,
-  { userId, provider, providerAccountId, email }: LinkConnectionInput
+  { userId, provider, providerAccountId, label }: LinkConnectionInput
 ) {
   const existing = await selectOne(internals, "connections", {
     provider,
@@ -47,11 +47,11 @@ export async function linkConnection(
   })
 
   if (existing) {
-    if (email !== undefined && email !== existing.email) {
+    if (label !== undefined && label !== existing.label) {
       await internals.db.update({
         table: "connections",
         where: { id: existing.id },
-        values: { email }
+        values: { label }
       })
     }
     return
@@ -61,6 +61,6 @@ export async function linkConnection(
     userId,
     provider,
     providerAccountId,
-    email: email ?? null
+    label: label ?? null
   })
 }
