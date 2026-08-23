@@ -4,6 +4,7 @@ import { authenticatedRole } from "drizzle-orm/neon"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import {
   boolean,
+  check,
   index,
   pgPolicy,
   pgTable,
@@ -50,7 +51,8 @@ export const users = pgTable.withRLS(
       to: authenticatedRole,
       using: authUuid(table.id),
       withCheck: authUuid(table.id)
-    })
+    }),
+    check("usersTypeCheck", sql`"type" in ('guest', 'user', 'admin')`)
   ]
 )
 
@@ -110,7 +112,11 @@ export const verificationCodes = pgTable.withRLS(
   },
   (table) => [
     index("verificationCodesIdentifierIndex").on(table.identifier),
-    index("verificationCodesExpiresAtIndex").on(table.expiresAt)
+    index("verificationCodesExpiresAtIndex").on(table.expiresAt),
+    check(
+      "verificationCodesActionCheck",
+      sql`"action" in ('signIn', 'deleteUser')`
+    )
   ]
 )
 
