@@ -19,6 +19,16 @@ export interface TokenState {
  */
 export const REFRESH_AHEAD_MS = 60_000
 
+/**
+ * How close to expiry a caller has to wait for the new token.
+ *
+ * Between this and {@link REFRESH_AHEAD_MS} the cached token is handed back and
+ * the refresh runs behind it, so a page that already holds a usable token never
+ * blocks on the network. Below it there may not be enough life left to survive
+ * the request being made, which is the failure the buffer exists to prevent.
+ */
+export const REFRESH_BLOCKING_MS = 10_000
+
 /** Holds the access token in memory and answers whether it still has life in it. */
 export interface TokenStore {
   get(): TokenState | null
@@ -26,6 +36,8 @@ export interface TokenStore {
   clear(): void
   /** True when there is no token, or it is inside the refresh-ahead window. */
   isExpiringSoon(): boolean
+  /** Too close to expiry to hand out while a refresh runs behind it. */
+  mustRefresh(): boolean
   /** Runs `refresh` once even if called concurrently, sharing the one result. */
   singleFlight<Result>(refresh: () => Promise<Result>): Promise<Result>
 }
@@ -67,6 +79,14 @@ export function createTokenStore(): TokenStore {
       const elapsed = Date.now() - state.receivedAt
 
       return elapsed >= lifetime - REFRESH_AHEAD_MS
+    },
+
+    mustRefresh() {
+      if (!state) return true
+
+      const lifetime = state.expiresAt - state.issuedAt
+
+      return Date.now() - state.receivedAt >= lifetime - REFRESH_BLOCKING_MS
     },
 
     async singleFlight<Result>(refresh: () => Promise<Result>) {

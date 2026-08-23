@@ -10,7 +10,7 @@ export type AdditionalFieldValues = Record<string, string | number | boolean>
  *
  * Runs at construction, so a colliding declaration is a startup failure rather
  * than a field that silently stops working. `name` and `imageURL` are included
- * because `PATCH /user` takes a flat body and two fields with one name cannot both
+ * because `POST /user` takes a flat body and two fields with one name cannot both
  * win.
  *
  * @throws {AuthConfigError} When a reserved name is declared.

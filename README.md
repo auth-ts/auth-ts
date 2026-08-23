@@ -55,7 +55,6 @@ export const Route = createFileRoute("/api/auth/$")({
     handlers: {
       GET: ({ request }) => authServer.handler(request),
       POST: ({ request }) => authServer.handler(request),
-      PATCH: ({ request }) => authServer.handler(request),
       DELETE: ({ request }) => authServer.handler(request)
     }
   }

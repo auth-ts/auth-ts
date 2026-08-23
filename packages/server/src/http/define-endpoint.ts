@@ -1,7 +1,7 @@
 import type { AuthServerInternals } from "../core/auth-server-internals"
 
 /** HTTP methods the endpoint table uses. */
-export type EndpointMethod = "GET" | "POST" | "PATCH" | "DELETE"
+export type EndpointMethod = "GET" | "POST" | "DELETE"
 
 /** What an endpoint's `run` returns when it needs more than a 200 with JSON. */
 export interface EndpointResult<Data> {

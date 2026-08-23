@@ -31,7 +31,7 @@ export const getUser = defineEndpoint({
 })
 
 /**
- * The flat body accepted by `PATCH /user`.
+ * The flat body accepted by `POST /user`.
  *
  * Flat because for this endpoint the whole payload *is* user fields — there are
  * no credentials mixed in, unlike sign-up, which is why sign-up keeps
@@ -50,11 +50,11 @@ export interface UpdateUserInput {
  * `email` and `phoneNumber` are rejected rather than updated. An identifier is
  * the anchor every sign-in resolves to, so changing one re-keys the account —
  * that is a ceremony with a code verified at the *new* address, not a field you
- * can PATCH. `type` is rejected for the obvious reason: it would be
+ * can post. `type` is rejected for the obvious reason: it would be
  * self-promotion to admin.
  */
 export const updateUser = defineEndpoint({
-  method: "PATCH",
+  method: "POST",
   path: "/user",
   parse: async ({ request }): Promise<UpdateUserInput> => {
     const body = (await request.json().catch(() => ({}))) as Record<
@@ -99,7 +99,7 @@ export const updateUser = defineEndpoint({
       rest
     )
 
-    // A PATCH that changes nothing is a client mistake, and saying so beats a
+    // An update that changes nothing is a client mistake, and saying so beats a
     // 200 that looks like success. Core would skip the write rather than send
     // an empty `SET`, so this is about answering the caller honestly rather
     // than about protecting the database.
@@ -113,13 +113,15 @@ export const updateUser = defineEndpoint({
       })
     }
 
-    const user = await updateUserFields(internals, resolved.user, {
+    await updateUserFields(internals, resolved.user, {
       name,
       imageURL,
       ...additionalFields
     })
 
-    return { data: { user } }
+    // No user in the body: the client holds a mirror and knows what it sent, so
+    // returning the row would only re-send what the caller already has.
+    return { data: { status: true } }
   }
 })
 

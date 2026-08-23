@@ -86,7 +86,7 @@ Plus the JWT-plane functions:
 ## Additional fields
 
 `user.additionalFields` declares the extra columns on your users table that
-sign-up may set and `PATCH /user` may edit — a name → type map, and the source
+sign-up may set and `POST /user` may edit — a name → type map, and the source
 of truth for types as well as validation. Declare a field and every user this
 server returns carries it, typed:
 

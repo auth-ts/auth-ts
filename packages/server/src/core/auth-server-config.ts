@@ -68,7 +68,7 @@ export interface AuthServerConfig {
 /**
  * Field names core owns, which therefore cannot be declared as additional fields.
  *
- * `name` and `imageURL` are included because `PATCH /user` takes a flat body: if
+ * `name` and `imageURL` are included because `POST /user` takes a flat body: if
  * an additional field shared one of those names, the two would collide silently.
  * `locale` is deliberately *not* reserved — core stores no locale, so declaring
  * one as an additional field is exactly how you persist a preference.

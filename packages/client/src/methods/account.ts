@@ -15,10 +15,18 @@ export type UpdateUserInput = {
 /** Updates the signed-in user and refreshes the local mirror. */
 export function createUpdateUser(internals: AuthClientInternals) {
   return async function updateUser(input: UpdateUserInput): Promise<AuthUser> {
-    const { user } = await internals.fetchJson<{ user: AuthUser }>({
-      method: "PATCH",
+    await internals.fetchJson<{ status: boolean }>({
+      method: "POST",
       path: "/user",
       body: input
+    })
+
+    // The update answers with a status, so the row is read back rather than
+    // assembled from what was sent — that way the mirror carries what the
+    // server actually stored, `updatedAt` included.
+    const { user } = await internals.fetchJson<{ user: AuthUser }>({
+      method: "GET",
+      path: "/user"
     })
     internals.userStore.set(user)
 

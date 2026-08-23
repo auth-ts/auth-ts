@@ -4,7 +4,7 @@ import { AuthError, AuthNetworkError } from "./auth-error"
 
 /** Per-request options. */
 export interface FetchJsonOptions {
-  method: "GET" | "POST" | "PATCH" | "DELETE"
+  method: "GET" | "POST" | "DELETE"
   path: string
   body?: unknown
 }

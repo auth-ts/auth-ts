@@ -196,17 +196,21 @@ describe("getUser", () => {
     })
   })
 
-  it("costs nothing while the token is still valid", async () => {
+  it("reads the server every time, because a name can change elsewhere", async () => {
     server.on("POST", "/api/auth/token", {
       body: { accessToken: fakeAccessToken(), user }
     })
+    server.on("GET", "/api/auth/user", { body: { user } })
     const client = createAuthClient()
 
     await client.getUser()
     await client.getUser()
     await client.getUser()
 
-    expect(server.requests).toHaveLength(1)
+    // One refresh, then a read per call. Caching is the caller's to decide.
+    expect(
+      server.requests.filter((request) => request.method === "GET")
+    ).toHaveLength(3)
   })
 
   it("resolves null when the session is gone", async () => {
@@ -255,15 +259,74 @@ describe("getUser", () => {
     expect(await client.getUser()).toMatchObject({ email: "ada@example.com" })
   })
 
+  it("returns a token nearing expiry at once, refreshing behind the caller", async () => {
+    // The store measures a token's life from when it arrived, not from `iat`,
+    // so the clock has to move rather than the token being backdated.
+    vi.useFakeTimers()
+    try {
+      const first = fakeAccessToken()
+      const second = fakeAccessToken()
+      server.on("POST", "/api/auth/token", {
+        body: { accessToken: first, user }
+      })
+      server.on("POST", "/api/auth/token", {
+        body: { accessToken: second, user }
+      })
+      const client = createAuthClient()
+
+      expect(await client.getToken()).toBe(first)
+
+      // 55 seconds left: inside the refresh-ahead window, outside the one that
+      // makes a caller wait.
+      vi.setSystemTime(Date.now() + 545_000)
+      expect(await client.getToken()).toBe(first)
+
+      // It did not wait, but it did start the refresh.
+      for (let tick = 0; tick < 10; tick++) await Promise.resolve()
+      expect(
+        server.requests.filter((request) => request.path === "/api/auth/token")
+      ).toHaveLength(2)
+      expect(await client.getToken()).toBe(second)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("waits for the new token when the cached one is nearly spent", async () => {
+    vi.useFakeTimers()
+    try {
+      const spent = fakeAccessToken()
+      const fresh = fakeAccessToken()
+      server.on("POST", "/api/auth/token", {
+        body: { accessToken: spent, user }
+      })
+      server.on("POST", "/api/auth/token", {
+        body: { accessToken: fresh, user }
+      })
+      const client = createAuthClient()
+
+      expect(await client.getToken()).toBe(spent)
+
+      // Five seconds left — not enough to outlive the request it would be used for.
+      vi.setSystemTime(Date.now() + 595_000)
+      expect(await client.getToken()).toBe(fresh)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("shares one refresh between concurrent callers", async () => {
     server.on("POST", "/api/auth/token", {
       body: { accessToken: fakeAccessToken(), user }
     })
+    server.on("GET", "/api/auth/user", { body: { user } })
     const client = createAuthClient()
 
     await Promise.all(Array.from({ length: 5 }, () => client.getUser()))
 
-    expect(server.requests).toHaveLength(1)
+    expect(
+      server.requests.filter((request) => request.path === "/api/auth/token")
+    ).toHaveLength(1)
   })
 })
 

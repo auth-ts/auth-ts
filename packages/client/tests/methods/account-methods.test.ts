@@ -31,7 +31,8 @@ describe("verifyCode", () => {
 
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    expect(await client.getUser()).toMatchObject({ email: "ada@example.com" })
+    // The mirror, not getUser: reading the user is always a request now.
+    expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
     expect(server.requests).toHaveLength(1)
   })
 })
@@ -60,8 +61,9 @@ describe("sendCode", () => {
 })
 
 describe("updateUser", () => {
-  it("refreshes the cached user from the response", async () => {
-    server.on("PATCH", "/api/auth/user", {
+  it("reads the row back, so the mirror carries what was stored", async () => {
+    server.on("POST", "/api/auth/user", { body: { status: true } })
+    server.on("GET", "/api/auth/user", {
       body: { user: { ...user, name: "Ada" } }
     })
     const client = createAuthClient()
@@ -70,6 +72,10 @@ describe("updateUser", () => {
 
     expect(updated.name).toBe("Ada")
     expect(client.getCachedUser()?.name).toBe("Ada")
+    expect(server.requests.map((request) => request.method)).toEqual([
+      "POST",
+      "GET"
+    ])
   })
 })
 

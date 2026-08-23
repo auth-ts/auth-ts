@@ -1,6 +1,6 @@
 import type { CorsOptions } from "../core/auth-server-options"
 
-const ALLOWED_METHODS = "GET, POST, PATCH, DELETE, OPTIONS"
+const ALLOWED_METHODS = "GET, POST, DELETE, OPTIONS"
 const ALLOWED_HEADERS = "content-type, authorization, accept-language"
 
 /**
@@ -33,7 +33,7 @@ export function applyCorsHeaders(
 /**
  * Answers a preflight request.
  *
- * Needed because the client sends JSON bodies and `PATCH`/`DELETE`, none of
+ * Needed because the client sends JSON bodies and `DELETE`, none of
  * which are "simple" requests — without this they fail before the real request
  * is ever made.
  */

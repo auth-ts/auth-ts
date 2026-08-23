@@ -243,15 +243,18 @@ describe("token and user endpoints", () => {
     const cookies = { "auth-ts.refresh": refreshToken }
 
     await authServer.handler(
-      request("PATCH", "/api/auth/user", {
+      request("POST", "/api/auth/user", {
         cookies,
         body: { name: "Ada", imageURL: "https://img.example/a.png" }
       })
     )
-    const patched = await authServer.handler(
-      request("PATCH", "/api/auth/user", { cookies, body: { name: "Ada L" } })
+    await authServer.handler(
+      request("POST", "/api/auth/user", { cookies, body: { name: "Ada L" } })
     )
-    const body = (await patched.json()) as {
+    const read = await authServer.handler(
+      request("GET", "/api/auth/user", { cookies })
+    )
+    const body = (await read.json()) as {
       user: { name: string; imageURL: string }
     }
 
@@ -264,7 +267,7 @@ describe("token and user endpoints", () => {
       { unknownField: 1 }
     ]) {
       const response = await authServer.handler(
-        request("PATCH", "/api/auth/user", { cookies, body: rejected })
+        request("POST", "/api/auth/user", { cookies, body: rejected })
       )
       expect(response.status).toBe(400)
       expect(

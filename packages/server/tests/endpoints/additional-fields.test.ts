@@ -197,7 +197,7 @@ describe("additionalFields on sign-up", () => {
   })
 })
 
-describe("additionalFields on PATCH", () => {
+describe("additionalFields on update", () => {
   it("accepts declared fields flat, beside name and imageURL", async () => {
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
@@ -209,12 +209,18 @@ describe("additionalFields on PATCH", () => {
     }
 
     const response = await context.authServer.handler(
-      request("PATCH", "/api/auth/user", {
+      request("POST", "/api/auth/user", {
         cookies,
         body: { name: "Ada", referralCode: "UPDATED", seats: 9 }
       })
     )
-    const body = (await response.json()) as { user: Record<string, unknown> }
+    expect(await response.json()).toEqual({ status: true })
+
+    // The update answers with a status, so the row is read back to see it.
+    const read = await context.authServer.handler(
+      request("GET", "/api/auth/user", { cookies })
+    )
+    const body = (await read.json()) as { user: Record<string, unknown> }
 
     expect(body.user.name).toBe("Ada")
     expect(body.user.referralCode).toBe("UPDATED")
@@ -224,7 +230,7 @@ describe("additionalFields on PATCH", () => {
   it("answers 400 for a body that changes nothing, without touching the database", async () => {
     // An UPDATE with no SET columns is an error in most query builders — the
     // in-memory store throws "no values to set", as a real one would — so an
-    // empty PATCH used to surface as a 500. It is the client's mistake, and it
+    // an empty update used to surface as a 500. It is the client's mistake, and it
     // never reaches the store now.
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
@@ -239,7 +245,7 @@ describe("additionalFields on PATCH", () => {
 
     for (const body of [{}, { name: undefined }, { seats: undefined }]) {
       const response = await context.authServer.handler(
-        request("PATCH", "/api/auth/user", { cookies, body })
+        request("POST", "/api/auth/user", { cookies, body })
       )
       expect(response.status).toBe(400)
       expect(
@@ -266,7 +272,7 @@ describe("additionalFields on PATCH", () => {
       { somethingElse: 1 }
     ]) {
       const response = await context.authServer.handler(
-        request("PATCH", "/api/auth/user", { cookies, body })
+        request("POST", "/api/auth/user", { cookies, body })
       )
       expect(response.status).toBe(400)
     }

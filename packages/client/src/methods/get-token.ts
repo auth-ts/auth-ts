@@ -16,6 +16,10 @@ interface TokenResponse {
  * `accessToken` callback and it will return the cached token until shortly
  * before expiry, then transparently exchange the refresh cookie for a new one.
  *
+ * Only a token too close to expiry to be worth handing out makes a caller wait.
+ * Approaching that point the cached token is returned immediately and the
+ * refresh runs behind it, so the common case costs no round trip.
+ *
  * Concurrent callers share a single request, so a page that mounts ten
  * components makes one round-trip and they all see the same token.
  *
@@ -27,11 +31,8 @@ interface TokenResponse {
  * interface because a deploy was mid-flight is the bug, not the fix.
  */
 export function createGetToken(internals: AuthClientInternals) {
-  return async function getToken(): Promise<string> {
-    const cached = internals.tokenStore.get()
-    if (cached && !internals.tokenStore.isExpiringSoon()) return cached.token
-
-    return internals.tokenStore.singleFlight(async () => {
+  const refresh = (): Promise<string> =>
+    internals.tokenStore.singleFlight(async () => {
       // Re-check inside the lock: a queued caller may be waiting on a refresh
       // that has already completed.
       const current = internals.tokenStore.get()
@@ -65,5 +66,19 @@ export function createGetToken(internals: AuthClientInternals) {
         throw error
       }
     })
+
+  return async function getToken(): Promise<string> {
+    const cached = internals.tokenStore.get()
+    if (!cached || internals.tokenStore.mustRefresh()) return refresh()
+
+    if (internals.tokenStore.isExpiringSoon()) {
+      // Behind the caller, and deliberately not awaited. A failure here is not
+      // this call's to report: the token being returned is still good, and the
+      // next call finds the state this one left — cleared, if the session is
+      // gone.
+      void refresh().catch(() => {})
+    }
+
+    return cached.token
   }
 }

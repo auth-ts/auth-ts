@@ -16,7 +16,7 @@ describe("matchRoute", () => {
       ["POST", "/api/auth/token"],
       ["POST", "/api/auth/sign-out"],
       ["GET", "/api/auth/user"],
-      ["PATCH", "/api/auth/user"],
+      ["POST", "/api/auth/user"],
       ["DELETE", "/api/auth/user"],
       ["GET", "/api/auth/sessions"],
       ["DELETE", "/api/auth/sessions/abc"],
@@ -70,7 +70,7 @@ describe("matchRoute", () => {
     // Regression guard for the handler's method check: the fallback endpoint
     // behind the catch-all must not turn a routing 404 into a 405.
     const { authServer } = await createTestServer()
-    for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
+    for (const method of ["GET", "POST", "DELETE"]) {
       const response = await authServer.handler(
         request(method, "/api/auth/nope")
       )
@@ -412,7 +412,7 @@ describe("cors", () => {
       "true"
     )
     expect(preflight.headers.get("access-control-allow-methods")).toContain(
-      "PATCH"
+      "POST"
     )
     expect(preflight.headers.get("access-control-allow-methods")).toContain(
       "DELETE"

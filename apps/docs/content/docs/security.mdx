@@ -151,7 +151,7 @@ untouched.
 
 `type` is written by core only as `guest` or `user`, and only on insert — so
 signing in cannot demote an administrator, and no endpoint can produce `admin`.
-`PATCH /user` rejects `email`, `phoneNumber`, and `type`.
+`POST /user` rejects `email`, `phoneNumber`, and `type`.
 
 Additional fields are an allowlist applied on insert only. On an existing user
 they are ignored, because otherwise any sign-in request could rewrite profile

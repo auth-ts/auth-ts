@@ -151,7 +151,7 @@ export interface UserOptions<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > {
   /**
-   * Extra columns your users table has that sign-up may set and `PATCH /user`
+   * Extra columns your users table has that sign-up may set and `POST /user`
    * may edit, as a name → type map: `{ plan: "string", seats: "number" }`.
    *
    * An allowlist as much as a schema: undeclared keys in a request are
