@@ -104,7 +104,7 @@ describe("getToken", () => {
     expect(server.requests).toHaveLength(2)
   })
 
-  it("clears the token and throws on 401", async () => {
+  it("clears the token and resolves null on 401, because signed out is an answer", async () => {
     server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
@@ -122,7 +122,25 @@ describe("getToken", () => {
     })
     client.clearToken()
 
-    await expect(client.getToken()).rejects.toBeInstanceOf(AuthError)
+    expect(await client.getToken()).toBeNull()
+    // The refused token is forgotten with it, so nothing presents it again.
+    expect(await client.getToken()).toBeNull()
+  })
+
+  it("still throws from the methods that need a credential", async () => {
+    server.on("GET", "/api/auth/token", {
+      status: 401,
+      body: {
+        error: { code: "unauthenticated", message: "You are not signed in." }
+      }
+    })
+    const client = createAuthClient()
+
+    // Asking who is here and asking to act as them are different questions.
+    expect(await client.getToken()).toBeNull()
+    await expect(client.listSessions()).rejects.toMatchObject({
+      code: "unauthenticated"
+    })
   })
 
   it("throws on a server failure and keeps the token, because a 500 is not a verdict", async () => {

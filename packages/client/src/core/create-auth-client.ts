@@ -35,8 +35,14 @@ import type { AuthClientOptions } from "./auth-client-options"
  * the client keeps it.
  */
 export interface AuthClient {
-  /** A valid access token, refreshed when needed. Hand this to your data client. */
-  getToken: () => Promise<string>
+  /**
+   * A valid access token, refreshed when needed, or `null` when signed out.
+   *
+   * Hand it to your data client: Neon's `fetchWithToken` and its equivalents
+   * take exactly this shape and raise their own error on `null`, so a
+   * signed-out data query fails as a data-plane error rather than an auth one.
+   */
+  getToken: () => Promise<string | null>
   /** The user, the session, and a token — or `null`. Always reads the server. */
   getUser: ReturnType<typeof createGetUser>
   /** The session this browser is on, confirming it is live and keeping it that way. */
@@ -74,10 +80,10 @@ export interface AuthClient {
 export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   const internals = createAuthClientInternals(options)
 
-  const { getToken, refresh } = createGetToken(internals)
+  const { getToken, requireToken, refresh } = createGetToken(internals)
   // Late-bound: the refresh issues a request, so it needs `fetchJson`, which in
   // turn needs to be able to refresh.
-  internals.getToken = getToken
+  internals.requireToken = requireToken
 
   return {
     getToken,

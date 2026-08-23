@@ -23,13 +23,13 @@ export interface AuthClientInternals {
   tokenStore: TokenStore
   fetchJson: FetchJson
   /**
-   * Returns a live access token, refreshing through `/token` when needed.
+   * A live access token, or the server's `unauthenticated` error.
    *
    * Assigned by `createAuthClient`, which is where the refresh is built. It has
    * to be late-bound because the refresh issues a request and so needs
    * `fetchJson`, which needs this — one of the two has to be filled in after.
    */
-  getToken: () => Promise<string>
+  requireToken: () => Promise<string>
   /** The client's own cookie jar, where `cookieStorage` stands in for a browser's. */
   cookieJar: CookieJar | undefined
   log: LeveledLogger
@@ -49,7 +49,7 @@ export function createAuthClientInternals(
     config,
     tokenStore,
     fetchJson: undefined as unknown as FetchJson,
-    getToken: undefined as unknown as () => Promise<string>,
+    requireToken: undefined as unknown as () => Promise<string>,
     cookieJar: config.cookieStorage
       ? createCookieJar(config.cookieStorage)
       : undefined,
@@ -67,7 +67,7 @@ export function createAuthClientInternals(
     // session this browser thinks it is on — which is what lets a verification
     // code upgrade the right guest — and nothing here depends on withholding it.
     () => tokenStore.get()?.token,
-    () => internals.getToken(),
+    () => internals.requireToken(),
     () => tokenStore.clear()
   )
 
