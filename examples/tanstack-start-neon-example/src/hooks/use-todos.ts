@@ -21,14 +21,13 @@ export function useTodos(userId: string | undefined) {
 
   const todos = useQuery({
     queryKey,
-    queryFn: async () => {
-      const { data } = await postgrest
+    queryFn: () =>
+      postgrest
         .from("todos")
         .select()
         .order("createdAt", { ascending: false })
         .throwOnError()
-      return data
-    },
+        .then(({ data }) => data),
     enabled: Boolean(userId)
   })
   const add = useMutation({
