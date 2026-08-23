@@ -2,8 +2,11 @@ import { AuthApiError } from "../../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import { sha256Hex } from "../../lib/hash"
 import { insertRow } from "../../lib/insert-row"
+import { selectOne } from "../../lib/select-one"
 import { issueSession } from "../../session/issue-session"
+import { readRefreshToken } from "../../session/resolve-session"
 
 /** Body accepted by `POST /sign-in/guest`. */
 export interface SignInGuestInput {
@@ -44,6 +47,18 @@ export const signInGuest = defineEndpoint({
       const ipKey = ipRateLimitKey(internals, headers, "guest")
       if (ipKey)
         await checkRateLimit(internals, ipKey, config.rateLimit.guestPerIP)
+    }
+
+    // A browser that is signed in never becomes a guest on top of it: the
+    // guest would displace or park a real account, and a guest parked behind
+    // one is a row nothing will ever convert. A dead cookie does not count.
+    const presented = readRefreshToken(internals, headers)
+    if (presented) {
+      const live = await selectOne(internals, "sessions", {
+        tokenHash: await sha256Hex(presented),
+        expiresAt: { gt: new Date() }
+      })
+      if (live) throw new AuthApiError("alreadySignedIn", 409)
     }
 
     const additionalFields = validateAdditionalFields(

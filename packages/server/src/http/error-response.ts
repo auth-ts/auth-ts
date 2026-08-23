@@ -34,6 +34,8 @@ export type AuthErrorCode =
   | "unsupportedMediaType"
   /** A guest has no email or phone number, so no code can be sent to them. */
   | "guestCannotReceiveCode"
+  /** A guest sign-in was attempted from a browser that is already signed in. */
+  | "alreadySignedIn"
   /** The OAuth provider timed out or failed while the code was being exchanged. */
   | "providerUnavailable"
   /** Something threw that this library did not anticipate. */

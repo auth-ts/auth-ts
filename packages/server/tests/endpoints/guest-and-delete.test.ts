@@ -82,6 +82,165 @@ describe("guest sign-in", () => {
   })
 })
 
+describe("guests and multiAccount never mix", () => {
+  it("refuses a guest sign-in while the browser is signed in", async () => {
+    const context = await createTestServer(guestOptions)
+    const { refreshToken } = await signInAsGuest(context)
+
+    const refused = await context.authServer.handler(
+      request("POST", "/api/auth/sign-in/guest", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+
+    expect(refused.status).toBe(409)
+    expect(
+      ((await refused.json()) as { error: { code: string } }).error.code
+    ).toBe("alreadySignedIn")
+    expect(context.db.users()).toHaveLength(1)
+  })
+
+  it("allows a guest sign-in over a dead cookie", async () => {
+    const context = await createTestServer(guestOptions)
+    const { refreshToken, user } = await signInAsGuest(context)
+    await context.db.delete({
+      table: "sessions",
+      where: { userId: user.id }
+    })
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/sign-in/guest", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+
+    expect(response.status).toBe(200)
+  })
+
+  it("leaves a guest nothing to switch to — a 404, not a special case", async () => {
+    // No refusal code exists for this on purpose: sign-in/guest refusing a
+    // signed-in browser means a guest can never hold parked accounts, so the
+    // switch's own target lookup already answers.
+    const context = await createTestServer({ guest: true, multiAccount: true })
+    const { token, refreshToken } = await signInAsGuest(context)
+
+    const refused = await context.authServer.handler(
+      request("POST", "/api/auth/accounts/switch", {
+        body: { userId: "anyone" },
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
+      })
+    )
+
+    expect(refused.status).toBe(404)
+  })
+})
+
+describe("guest reaping", () => {
+  it("signing out deletes the guest, not just the session", async () => {
+    const context = await createTestServer(guestOptions)
+    const { refreshToken, token } = await signInAsGuest(context)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", {
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
+      })
+    )
+
+    expect(response.status).toBe(204)
+    expect(context.db.sessions()).toHaveLength(0)
+    expect(context.db.users()).toHaveLength(0)
+  })
+
+  it("signing out keeps a real user's row", async () => {
+    const context = await createTestServer(guestOptions)
+    const { refreshToken } = await signInAsGuest(context)
+    const cookies = { "auth-ts.refresh": refreshToken }
+
+    // Convert, so the very same session now belongs to a real user.
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" },
+        cookies
+      })
+    )
+    const verified = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes.at(-1), "code").code
+        },
+        cookies
+      })
+    )
+    const { token } = (await verified.json()) as { token: string }
+    const converted = required(
+      readSetCookies(verified).get("auth-ts.refresh"),
+      "refresh"
+    ).value
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", {
+        cookies: { "auth-ts.refresh": converted },
+        token
+      })
+    )
+
+    expect(context.db.sessions()).toHaveLength(0)
+    expect(context.db.users()).toHaveLength(1)
+  })
+
+  it("revoking the guest's only session reaps the guest", async () => {
+    const context = await createTestServer(guestOptions)
+    const { refreshToken, token } = await signInAsGuest(context)
+    const sessionId = required(context.db.sessions()[0], "session").id
+
+    const response = await context.authServer.handler(
+      request("DELETE", `/api/auth/sessions/${sessionId}`, {
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(context.db.users()).toHaveLength(0)
+  })
+
+  it("the sweep reaps a guest whose session expired, and spares a merged one", async () => {
+    const context = await createTestServer(guestOptions)
+    const expired = {
+      expiresAt: new Date(Date.now() - 1000),
+      userAgent: null,
+      ipAddress: null,
+      createdAt: new Date(Date.now() - 2000),
+      updatedAt: new Date(Date.now() - 2000)
+    }
+    const orphan = await insertUser(context.db, { type: "guest" })
+    await context.db.insert({
+      table: "sessions",
+      values: { userId: orphan.id, tokenHash: "orphan-hash", ...expired }
+    })
+    const target = await insertUser(context.db, { email: "ada@example.com" })
+    const merged = await insertUser(context.db, {
+      type: "guest",
+      primaryUserId: target.id
+    })
+    await context.db.insert({
+      table: "sessions",
+      values: { userId: merged.id, tokenHash: "merged-hash", ...expired }
+    })
+
+    // Any sign-in sweeps sessions; the reap follows from what it removed.
+    await signInAsGuest(context)
+
+    const remaining = new Set(context.db.users().map((user) => user.id))
+    expect(remaining.has(orphan.id)).toBe(false)
+    expect(remaining.has(merged.id)).toBe(true)
+    expect(remaining.has(target.id)).toBe(true)
+  })
+})
+
 describe("guest conversion", () => {
   it("upgrades the guest in place when the identifier is new, keeping every row they own", async () => {
     const context = await createTestServer(guestOptions)

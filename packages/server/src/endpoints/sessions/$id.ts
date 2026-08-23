@@ -1,6 +1,7 @@
 import type { AuthUser } from "../../core/auth-db"
 import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
+import { reapGuests } from "../../lib/sweep-expired"
 import {
   pruneDeadAccounts,
   readAccountsCookie
@@ -66,6 +67,7 @@ export const revokeSession = defineEndpoint({
       where: { id: input.id, userId: caller.userId }
     })
     if (!revoked) throw new AuthApiError("notFound", 404)
+    await reapGuests(internals, [revoked])
 
     // Revoking the session you are using is a local sign-out, so the cookie has
     // to go too — otherwise the browser keeps presenting a token that no longer

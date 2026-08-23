@@ -141,6 +141,41 @@ export const authDBChecks: AuthDBCheck[] = [
     }
   },
   {
+    name: "a null in a where matches stored null, and nothing else",
+    async run(db) {
+      const plainEmail = `${unique()}@example.test`
+      const pointedEmail = `${unique()}@example.test`
+      const plain = await create(db, "users", person({ email: plainEmail }))
+      await create(
+        db,
+        "users",
+        person({ email: pointedEmail, primaryUserId: plain.id })
+      )
+      try {
+        const matching = (email: string) =>
+          db.select({
+            table: "users",
+            where: { email, primaryUserId: null },
+            limit: 10,
+            offset: 0,
+            orderBy: { id: "asc" }
+          })
+
+        expect(
+          (await matching(plainEmail)).length === 1,
+          "a where with a null value did not match the row storing null. In SQL, `= NULL` matches nothing — this needs `IS NULL`. Guest cleanup filters on `primaryUserId: null`, so without it a merged guest's pending migration would not be what spares them."
+        )
+        expect(
+          (await matching(pointedEmail)).length === 0,
+          "a where with a null value matched a row storing a real value"
+        )
+      } finally {
+        await db.delete({ table: "users", where: { email: pointedEmail } })
+        await db.delete({ table: "users", where: { email: plainEmail } })
+      }
+    }
+  },
+  {
     name: "select honours limit, offset, and both directions of orderBy",
     async run(db) {
       const key = unique()

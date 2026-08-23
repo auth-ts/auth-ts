@@ -28,6 +28,7 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   unsupportedMediaType: "Request bodies must be sent as JSON.",
   guestCannotReceiveCode:
     "Add an email address or phone number before continuing.",
+  alreadySignedIn: "You are already signed in.",
   providerUnavailable:
     "The sign-in provider did not respond. Please try again.",
   internalError: "Something went wrong."

@@ -5,6 +5,7 @@ import {
   serializeCookie,
   shouldUseSecureCookies
 } from "../lib/serialize-cookie"
+import { reapGuests } from "../lib/sweep-expired"
 import {
   parkedTokens,
   pruneDeadAccounts,
@@ -113,15 +114,19 @@ export const signOut = defineEndpoint({
       return { data: undefined, status: 204 }
     }
 
+    const ended = []
     for (const target of targets) {
-      await internals.db.delete({
-        table: "sessions",
-        where:
-          scope === "global"
-            ? { userId: target.userId }
-            : { id: target.sessionId }
-      })
+      ended.push(
+        ...(await internals.db.delete({
+          table: "sessions",
+          where:
+            scope === "global"
+              ? { userId: target.userId }
+              : { id: target.sessionId }
+        }))
+      )
     }
+    await reapGuests(internals, ended)
 
     const signedOut = new Set(targets.map(({ userId }) => userId))
     const remaining = parked.filter(

@@ -54,7 +54,9 @@ that create new ones: a sign-in sweeps `sessions`, a code send sweeps
 `verificationCodes`, and the first attempt of each rate-limit window sweeps
 `attempts`. Garbage accrues only through inserts, so sweeping at insert time
 keys the sweep rate to the growth rate — including the rows left by people who
-never come back.
+never come back. Orphaned guests follow the same rule: any deletion of sessions
+— sign-out, revocation, the sweep — removes the guests it left with none, since
+a guest without a session is unreachable forever.
 
 ```ts
 import { waitUntil } from "cloudflare:workers"
