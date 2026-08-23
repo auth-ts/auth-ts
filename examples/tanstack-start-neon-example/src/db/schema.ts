@@ -40,7 +40,7 @@ export const users = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    pgPolicy("readOwnUser", {
+    pgPolicy("selectOwnUser", {
       for: "select",
       to: authenticatedRole,
       using: authUuid(table.id)
@@ -75,7 +75,17 @@ export const sessions = pgTable.withRLS(
   },
   (table) => [
     index("sessionsUserIdIndex").on(table.userId),
-    index("sessionsExpiresAtIndex").on(table.expiresAt)
+    index("sessionsExpiresAtIndex").on(table.expiresAt),
+    pgPolicy("selectOwnSessions", {
+      for: "select",
+      to: authenticatedRole,
+      using: authUuid(table.userId)
+    }),
+    pgPolicy("deleteOwnSessions", {
+      for: "delete",
+      to: authenticatedRole,
+      using: authUuid(table.userId)
+    })
   ]
 )
 
@@ -157,7 +167,17 @@ export const connections = pgTable.withRLS(
     uniqueIndex("connectionsProviderAccountIndex").on(
       table.provider,
       table.providerAccountId
-    )
+    ),
+    pgPolicy("selectOwnConnections", {
+      for: "select",
+      to: authenticatedRole,
+      using: authUuid(table.userId)
+    }),
+    pgPolicy("deleteOwnConnections", {
+      for: "delete",
+      to: authenticatedRole,
+      using: authUuid(table.userId)
+    })
   ]
 )
 
