@@ -20,10 +20,6 @@ export const users = pgTable.withRLS("users", {
   name: text("name"),
   imageURL: text("imageURL"),
   type: text("type").$type<UserType>().notNull().default("user"),
-  // Set on a guest row when its sign-in resolved to an existing account. It
-  // cascades because that guest's rows are that account's data: deleting the
-  // account has to take them too, or "delete my account" leaves a row nobody
-  // can reach still holding it.
   primaryUserId: uuid("primaryUserId").references((): AnyPgColumn => users.id, {
     onDelete: "cascade"
   }),
