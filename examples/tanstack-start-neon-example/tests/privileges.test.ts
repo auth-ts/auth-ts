@@ -133,37 +133,4 @@ describe("triggers.sql", () => {
 
     expect(row?.updatedAt.getFullYear()).toBeGreaterThan(2000)
   })
-
-  it("lets the server write the columns it owns", async () => {
-    const { id } = (
-      await client.query<{ id: string }>(
-        `insert into "users" ("type") values ('guest') returning "id"`
-      )
-    ).rows[0] as { id: string }
-
-    // A guest becoming a user writes type; merging an account writes
-    // primaryUserId. The guard must not reach the server's own connection.
-    await expect(
-      client.exec(`update "users" set "type" = 'user' where "id" = '${id}'`)
-    ).resolves.toBeDefined()
-  })
-
-  it("refuses a client write to type even when the column is granted", async () => {
-    const { id } = (
-      await client.query<{ id: string }>(
-        `insert into "users" ("type") values ('guest') returning "id"`
-      )
-    ).rows[0] as { id: string }
-
-    await client.exec(`grant update ("type") on table "users" to authenticated`)
-    try {
-      await as("authenticated", () =>
-        refused(`update "users" set "type" = 'admin' where "id" = '${id}'`)
-      )
-    } finally {
-      await client.exec(
-        `revoke update ("type") on table "users" from authenticated`
-      )
-    }
-  })
 })

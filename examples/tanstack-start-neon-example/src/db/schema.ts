@@ -97,7 +97,11 @@ export const attempts = pgTable.withRLS(
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
       .defaultNow()
+      .$onUpdate(() => new Date())
   },
   (table) => [
     // A log, not a counter: one row per counted request, read back by key. Both
