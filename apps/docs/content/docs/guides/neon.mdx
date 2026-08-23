@@ -100,8 +100,11 @@ belongs to and nothing else.
 ## Using it
 
 ```ts
+const token = await authClient.getToken()
+if (!token) return // Signed out — `null` rather than a token to send.
+
 const response = await fetch(`${DATA_API_URL}/todos`, {
-  headers: { authorization: `Bearer ${await authClient.getToken()}` }
+  headers: { authorization: `Bearer ${token}` }
 })
 ```
 

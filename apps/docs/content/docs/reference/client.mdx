@@ -74,6 +74,28 @@ if they need it.
 token and refreshes behind you; only a token too close to expiry to outlive the
 request it would be used for makes you wait.
 
+### Catching the user a refresh minted
+
+Minting reads the user row — that is where the token's `type` claim comes from —
+so `/token` returns it, and `onRefresh` is how you get it without asking again:
+
+```ts
+const token = await authClient.getToken({
+  onRefresh: ({ user }) => queryClient.setQueryData(["user"], user)
+})
+```
+
+<auto-type-table path="../../../../../packages/client/src/methods/get-token.ts" name="GetTokenOptions" />
+
+It fires only when that call actually minted. A token served from memory read
+nothing, and the user it could report would be as old as the token — so a warm
+call costs no request and reports nothing, which is what makes this safe to put
+on the call every authenticated method already makes.
+
+It is a per-call option rather than a client-wide one because the cache to seed
+belongs to whoever is asking. A framework that builds one query client per
+request has nothing a module-level client could hold.
+
 A 401 is retried once with a fresh token before it is believed. Refresh-ahead
 covers the ordinary case, but a key rotated between mint and use, or a device
 clock far enough off that the window never fired, both look like a refusal on a
@@ -122,6 +144,47 @@ export function useUser() {
 
 `data` is the user, or `null`. `getSession()`'s `id` is how a device list tells
 which entry is this device — the list does not carry a flag saying so.
+
+### Reading the user from your own database
+
+Row-level security already answers "which user", so the row can come from your
+data plane like everything else and the auth server can be asked one question
+per load. Seed it from the refresh, or the two reads are serial — anything keyed
+by the user waits on its id:
+
+```tsx
+export function useToken() {
+  const queryClient = useQueryClient()
+
+  return useQuery({
+    queryKey: ["token"],
+    queryFn: () =>
+      authClient.getToken({
+        onRefresh: ({ user }) => queryClient.setQueryData(["user"], user)
+      })
+  })
+}
+
+export function useUser() {
+  const { data: token, isPending } = useToken()
+
+  return useQuery({
+    queryKey: ["user"],
+    queryFn: isPending
+      ? skipToken
+      : async () => {
+          if (!token) return null
+
+          const { data } = await postgrest.from("users").select().single()
+          return data
+        }
+  })
+}
+```
+
+Signed out has to resolve to `null` rather than skip. A query disabled while
+there is no session stays pending forever, and a page branching on `isPending`
+would spin instead of offering a way in.
 
 Anything that changes who is signed in has to invalidate that key, because
 nothing else will:
