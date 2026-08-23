@@ -82,7 +82,7 @@ export async function handleRequest(
       : undefined
     const result = await endpoint.run(internals, input as never)
 
-    const headers = applyCorsHeaders(new Headers(result.headers), config.cors)
+    const headers = responseHeaders(internals, result.headers)
     const status = result.status ?? 200
 
     if (result.body !== undefined) {
@@ -102,6 +102,20 @@ export async function handleRequest(
   }
 }
 
+/**
+ * The headers every response starts from.
+ *
+ * `no-store` because responses here carry tokens and per-user bodies on a
+ * cookie-authenticated GET, which is exactly what a shared cache would serve to
+ * the next person. An endpoint that sets its own policy — `jwks` — keeps it.
+ */
+function responseHeaders(internals: AuthServerInternals, init?: Headers) {
+  const headers = applyCorsHeaders(new Headers(init), internals.config.cors)
+  if (!headers.has("cache-control")) headers.set("cache-control", "no-store")
+
+  return headers
+}
+
 /** Serializes a failure into the standard envelope. */
 function toErrorResponse(
   internals: AuthServerInternals,
@@ -109,7 +123,7 @@ function toErrorResponse(
   locale: string
 ) {
   const { config } = internals
-  const headers = applyCorsHeaders(new Headers(), config.cors)
+  const headers = responseHeaders(internals)
 
   if (isAuthApiError(error)) {
     const message = getErrorMessage(error.code, locale, config.localization, {

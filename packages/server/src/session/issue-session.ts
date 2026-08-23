@@ -19,22 +19,10 @@ import {
 import { readRefreshToken } from "./resolve-session"
 import { sessionStamp } from "./slide-session"
 
-/**
- * Where the refresh token goes.
- *
- * `"cookie"` is the default and the only mode browsers should use. `"token"`
- * returns the refresh token in the body for native and CLI clients that have no
- * cookie jar — with the consequence, documented loudly, that the client is then
- * responsible for storing a long-lived credential safely.
- */
-export type IssueMode = "cookie" | "token"
-
 /** What issuing a session produced. */
 export interface IssueResult {
   token: string
   user: AuthUser
-  /** Present only in `"token"` mode. */
-  refreshToken?: string
   /** `Set-Cookie` headers the caller must send. */
   headers: Headers
 }
@@ -50,7 +38,6 @@ export interface IssueSessionInput {
    * called in-process, where {@link shouldUseSecureCookies} assumes they should.
    */
   requestURL?: string
-  mode?: IssueMode
   /**
    * Token hash of a session this one supersedes.
    *
@@ -82,14 +69,14 @@ export interface IssueSessionInput {
  */
 export async function issueSession(
   internals: AuthServerInternals,
-  { user, headers, requestURL, mode = "cookie", replaces }: IssueSessionInput
+  { user, headers, requestURL, replaces }: IssueSessionInput
 ): Promise<IssueResult> {
   const { config } = internals
   const rawToken = randomBytesBase64url(32)
   const tokenHash = await sha256Hex(rawToken)
   const now = new Date()
 
-  await insertRow(internals, "sessions", {
+  const session = await insertRow(internals, "sessions", {
     userId: user.id,
     tokenHash,
     expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
@@ -116,17 +103,8 @@ export async function issueSession(
   }
 
   const responseHeaders = new Headers()
-  const token = await mintAccessToken(internals, user)
-  internals.log.debug("session issued", { userType: user.type, mode })
-
-  if (mode === "token") {
-    return {
-      token,
-      user,
-      refreshToken: rawToken,
-      headers: responseHeaders
-    }
-  }
+  const token = await mintAccessToken(internals, user, session.id)
+  internals.log.debug("session issued", { userType: user.type })
 
   const secure = shouldUseSecureCookies(requestURL)
   responseHeaders.append(
@@ -176,27 +154,25 @@ export async function issueSession(
  * What a token for this user would claim about them.
  *
  * `type` rides along because row-level security reads it; `role` stays whatever
- * the configuration says, because it maps to a real Postgres role. Nothing that
+ * the configuration says, because it maps to a real Postgres role. `sid` names
+ * the session the token was minted from, so an endpoint authenticated by the
+ * token alone still knows which session it is acting for. Nothing that
  * identifies the person does: the token is handed to the database, to sync
  * services, and to whatever logs sit between them, and none of them need a name
  * or an address to authorize a query.
  *
  * `primaryUserId` is deliberately never included either — it describes a
  * pending data migration, not who is signed in.
- *
- * Split out from signing so a token already in hand can be checked against it
- * without minting anything: whatever ends up here is what goes stale, so
- * comparing against it covers a claim added later without anyone remembering to
- * update the check.
  */
-export function accessTokenClaims(user: AuthUser) {
-  return { userId: user.id, type: user.type }
+export function accessTokenClaims(user: AuthUser, sessionId: string) {
+  return { userId: user.id, type: user.type, sid: sessionId }
 }
 
 /** Signs an access token carrying {@link accessTokenClaims}. */
 export async function mintAccessToken(
   internals: AuthServerInternals,
-  user: AuthUser
+  user: AuthUser,
+  sessionId: string
 ) {
   const { config } = internals
   const { signingKey, kid } = await internals.keys()
@@ -211,6 +187,6 @@ export async function mintAccessToken(
       ...(config.issuer ? { issuer: config.issuer } : {}),
       ...(config.jwt.audience ? { audience: config.jwt.audience } : {})
     },
-    accessTokenClaims(user)
+    accessTokenClaims(user, sessionId)
   )
 }

@@ -9,11 +9,12 @@ import { authenticate } from "../session/authenticate"
 export type CurrentSession = Omit<AuthSession, "tokenHash">
 
 /**
- * The session this browser is on.
+ * The session the caller is acting from.
  *
- * Authenticated from the access token like everything else, so it is one read
- * of `sessions` and no session write — the write happens on the token refresh,
- * which is the request that had to look at the cookie anyway.
+ * Authenticated from the access token like everything else, whose `sid` says
+ * which row to read — one read of `sessions` and no session write. The write
+ * happens on the token refresh, which is the request that had to look at the
+ * cookie anyway.
  *
  * Its `id` is how a device list tells which entry is this device.
  */
@@ -28,11 +29,7 @@ export const getSession = defineEndpoint({
     // second look at a row just written.
     const found =
       caller.session ??
-      (caller.tokenHash
-        ? await selectOne(internals, "sessions", {
-            tokenHash: caller.tokenHash
-          })
-        : null)
+      (await selectOne(internals, "sessions", { id: caller.sessionId }))
     if (!found) throw unauthenticated()
 
     const { tokenHash, ...session } = found

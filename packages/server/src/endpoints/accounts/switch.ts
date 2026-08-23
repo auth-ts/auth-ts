@@ -1,4 +1,4 @@
-import { notFound, unauthenticated } from "../../http/auth-api-error"
+import { notFound } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { selectOne } from "../../lib/select-one"
 import {
@@ -13,14 +13,14 @@ import {
   readAccountsCookie,
   serializeAccounts
 } from "../../session/accounts-cookie"
-import { TOKEN_HEADER } from "../../session/authenticate"
+import type { CallerInput } from "../../session/authenticate"
+import { authenticate, TOKEN_HEADER } from "../../session/authenticate"
 import { mintAccessToken } from "../../session/issue-session"
-import { readRefreshToken, resolveSession } from "../../session/resolve-session"
+import { readRefreshToken } from "../../session/resolve-session"
 
 /** Body accepted by `POST /accounts/switch`. */
-export interface SwitchAccountInput {
+export interface SwitchAccountInput extends CallerInput {
   userId: string
-  headers?: Headers
   requestURL?: string
 }
 
@@ -49,8 +49,7 @@ export const switchAccount = defineEndpoint({
     if (!config.multiAccount) throw notFound()
 
     const headers = input.headers ?? new Headers()
-    const active = await resolveSession(internals, headers)
-    if (!active) throw unauthenticated()
+    await authenticate(internals, input)
 
     const parked = await pruneDeadAccounts(
       internals,
@@ -72,7 +71,7 @@ export const switchAccount = defineEndpoint({
     const responseHeaders = new Headers()
     responseHeaders.set(
       TOKEN_HEADER,
-      await mintAccessToken(internals, targetUser)
+      await mintAccessToken(internals, targetUser, target.session.id)
     )
     responseHeaders.append(
       "set-cookie",

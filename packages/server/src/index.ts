@@ -97,5 +97,4 @@ export type {
 } from "./oauth/providers/oauth-provider"
 export type { OAuthStatePayload, StateCookie } from "./oauth/state-cookie"
 export type { GuestConversion, GuestIdentity } from "./session/convert-guest"
-export type { IssueMode } from "./session/issue-session"
 export type { HeadersInput } from "./session/resolve-session"

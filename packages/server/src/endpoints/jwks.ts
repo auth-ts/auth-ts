@@ -20,6 +20,10 @@ export const getJwks = defineEndpoint({
     const json = internals.config.jwks?.json
     if (json === undefined) throw new AuthApiError("notFound", 404)
 
-    return { data: json }
+    // Public and stable, so it is the one response here a cache may keep.
+    return {
+      data: json,
+      headers: new Headers({ "cache-control": "public, max-age=3600" })
+    }
   }
 })

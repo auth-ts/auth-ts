@@ -9,6 +9,10 @@ import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
 const REQUEST_URL = "https://app.example.com/api/auth/verify-code"
 
+const refreshTokenOf = (issued: { headers: Headers }) =>
+  required(readSetCookies(issued).get("auth-ts.refresh"), "refresh cookie")
+    .value
+
 describe("issueSession", () => {
   it("sets a cookie with every security attribute and no Domain", async () => {
     const { internals, db } = await createTestInternals()
@@ -29,7 +33,7 @@ describe("issueSession", () => {
     expect(cookie?.attributes.toLowerCase()).not.toContain("domain")
   })
 
-  it("never puts the refresh token in the body in cookie mode", async () => {
+  it("stores only the hash of the token, never the token", async () => {
     const { internals, db } = await createTestInternals()
     const user = await insertUser(db, { email: "ada@example.com" })
 
@@ -38,43 +42,12 @@ describe("issueSession", () => {
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
-
-    expect(issued.refreshToken).toBeUndefined()
-    expect(issued.token).toBeTruthy()
-  })
-
-  it("returns the refresh token and no cookie in token mode", async () => {
-    const { internals, db } = await createTestInternals()
-    const user = await insertUser(db, { email: "ada@example.com" })
-
-    const issued = await issueSession(internals, {
-      user,
-      headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
-    })
-
-    expect(issued.refreshToken).toBeTruthy()
-    expect(issued.headers.getSetCookie()).toHaveLength(0)
-  })
-
-  it("stores only the hash of the token, never the token", async () => {
-    const { internals, db } = await createTestInternals()
-    const user = await insertUser(db, { email: "ada@example.com" })
-
-    const issued = await issueSession(internals, {
-      user,
-      headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
-    })
+    const refreshToken = refreshTokenOf(issued)
     const [stored] = db.sessions()
 
     expect(stored?.tokenHash).toMatch(/^[0-9a-f]{64}$/)
-    expect(stored?.tokenHash).not.toBe(issued.refreshToken)
-    expect(JSON.stringify(db.sessions())).not.toContain(
-      issued.refreshToken as string
-    )
+    expect(stored?.tokenHash).not.toBe(refreshToken)
+    expect(JSON.stringify(db.sessions())).not.toContain(refreshToken)
   })
 
   it("stamps user agent and the client ip from proxy headers", async () => {
@@ -179,68 +152,32 @@ describe("resolveSession", () => {
     const issued = await issueSession(internals, {
       user,
       headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
+      requestURL: REQUEST_URL
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${issued.refreshToken}`
+      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
     })
     const resolved = await resolveSession(internals, headers)
 
     expect(resolved?.user.id).toBe(user.id)
   })
 
-  it("accepts a bearer token, but the cookie wins when both are present", async () => {
-    const { internals, db } = await createTestInternals()
-    const first = await insertUser(db, { email: "ada@example.com" })
-    const second = await insertUser(db, { email: "grace@example.com" })
-
-    const cookieSession = await issueSession(internals, {
-      user: first,
-      headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
-    })
-    const bearerSession = await issueSession(internals, {
-      user: second,
-      headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
-    })
-
-    const bearerOnly = await resolveSession(
-      internals,
-      new Headers({ authorization: `Bearer ${bearerSession.refreshToken}` })
-    )
-    expect(bearerOnly?.user.id).toBe(second.id)
-
-    const both = await resolveSession(
-      internals,
-      new Headers({
-        cookie: `auth-ts.refresh=${cookieSession.refreshToken}`,
-        authorization: `Bearer ${bearerSession.refreshToken}`
-      })
-    )
-    expect(both?.user.id).toBe(first.id)
-  })
-
-  it("matches the Bearer scheme case-insensitively", async () => {
+  it("ignores a refresh token presented as a bearer: the cookie is its only carrier", async () => {
     const { internals, db } = await createTestInternals()
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
       headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
+      requestURL: REQUEST_URL
     })
 
     const resolved = await resolveSession(
       internals,
-      new Headers({ authorization: `bearer ${issued.refreshToken}` })
+      new Headers({ authorization: `Bearer ${refreshTokenOf(issued)}` })
     )
 
-    expect(resolved?.user.id).toBe(user.id)
+    expect(resolved).toBeNull()
   })
 
   it("returns null with no credential at all", async () => {
@@ -254,8 +191,7 @@ describe("resolveSession", () => {
     const issued = await issueSession(internals, {
       user,
       headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
+      requestURL: REQUEST_URL
     })
     const [stored] = db.sessions()
     await db.delete({
@@ -264,7 +200,7 @@ describe("resolveSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${issued.refreshToken}`
+      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
     })
     expect(await resolveSession(internals, headers)).toBeNull()
   })
@@ -277,8 +213,7 @@ describe("resolveSession", () => {
     const issued = await issueSession(internals, {
       user,
       headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
+      requestURL: REQUEST_URL
     })
 
     const [stored] = db.sessions()
@@ -289,7 +224,7 @@ describe("resolveSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${issued.refreshToken}`
+      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
     })
     expect(await resolveSession(internals, headers)).toBeNull()
   })
@@ -305,8 +240,7 @@ describe("resolveSession", () => {
     const issued = await issueSession(internals, {
       user,
       headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
+      requestURL: REQUEST_URL
     })
 
     const [stored] = db.sessions()
@@ -318,7 +252,7 @@ describe("resolveSession", () => {
 
     const resolved = await resolveSession(
       internals,
-      new Headers({ cookie: `auth-ts.refresh=${issued.refreshToken}` })
+      new Headers({ cookie: `auth-ts.refresh=${refreshTokenOf(issued)}` })
     )
 
     expect(resolved).toBeNull()
@@ -334,8 +268,7 @@ describe("resolveSession", () => {
     const issued = await issueSession(internals, {
       user,
       headers: new Headers(),
-      requestURL: REQUEST_URL,
-      mode: "token"
+      requestURL: REQUEST_URL
     })
 
     const [stored] = db.sessions()
@@ -346,7 +279,7 @@ describe("resolveSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${issued.refreshToken}`
+      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
     })
     expect(await resolveSession(internals, headers)).toBeNull()
   })

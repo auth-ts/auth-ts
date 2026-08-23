@@ -26,22 +26,12 @@ export interface ResolvedSession {
   tokenHash: string
 }
 
-/**
- * Extracts the raw refresh token from a request.
- *
- * The cookie wins over the `Authorization` header: a browser that has both is a
- * browser whose cookie is authoritative, and preferring a header there would let
- * a caller downgrade to a token they supplied.
- */
+/** Reads the refresh token from the cookie — the only place it ever travels. */
 export function readRefreshToken(
   internals: AuthServerInternals,
   headers: Headers
 ) {
-  const fromCookie = readCookie(headers, internals.config.cookie.name)
-  if (fromCookie) return fromCookie
-
-  // The /i matters: the Bearer scheme is case-insensitive per RFC 6750.
-  return headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]
+  return readCookie(headers, internals.config.cookie.name)
 }
 
 /**

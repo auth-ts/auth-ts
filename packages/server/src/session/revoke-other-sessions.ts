@@ -16,19 +16,14 @@ import { listUserSessions } from "./list-user-sessions"
 export async function revokeOtherSessions(
   internals: AuthServerInternals,
   userId: string,
-  /**
-   * The session to keep, or `null` to keep none — a caller authenticated by
-   * bearer alone has no session in this browser to spare.
-   */
-  currentTokenHash: string | null
+  /** The session to keep. */
+  currentSessionId: string
 ) {
   let revoked = 0
 
   for (;;) {
     const page = await listUserSessions(internals, userId)
-    const others = page.filter(
-      (session) => session.tokenHash !== currentTokenHash
-    )
+    const others = page.filter((session) => session.id !== currentSessionId)
     if (others.length === 0) return revoked
 
     let removed = 0

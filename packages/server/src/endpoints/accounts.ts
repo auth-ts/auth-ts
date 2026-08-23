@@ -12,7 +12,8 @@ import {
   readAccountsCookie,
   serializeAccounts
 } from "../session/accounts-cookie"
-import { resolveSession } from "../session/resolve-session"
+import type { CallerInput } from "../session/authenticate"
+import { authenticate } from "../session/authenticate"
 
 /**
  * One signed-in user in this browser.
@@ -23,8 +24,7 @@ import { resolveSession } from "../session/resolve-session"
 export type AccountInfo = AuthUser
 
 /** Input for listing accounts. */
-export interface ListAccountsInput {
-  headers?: Headers
+export interface ListAccountsInput extends CallerInput {
   requestURL?: string
 }
 
@@ -51,7 +51,8 @@ export const listAccounts = defineEndpoint({
     if (!config.multiAccount) throw notFound()
 
     const headers = input.headers ?? new Headers()
-    const active = await resolveSession(internals, headers)
+    const caller = await authenticate(internals, input)
+    const active = await selectOne(internals, "users", { id: caller.userId })
     if (!active) throw unauthenticated()
 
     const parked = await pruneDeadAccounts(
@@ -65,12 +66,12 @@ export const listAccounts = defineEndpoint({
         selectOne(internals, "users", { id: session.userId })
       )
     )
-    const accounts: AccountInfo[] = [active.user]
+    const accounts: AccountInfo[] = [active]
     for (const user of parkedUsers) {
       if (user) accounts.push(user)
     }
 
-    const responseHeaders = new Headers()
+    const responseHeaders = new Headers(caller.headers)
     responseHeaders.append(
       "set-cookie",
       serializeCookie({

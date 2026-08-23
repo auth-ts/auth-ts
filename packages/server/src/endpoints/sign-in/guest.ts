@@ -1,17 +1,14 @@
-import type { AuthUser } from "../../core/auth-db"
 import { AuthApiError } from "../../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { insertRow } from "../../lib/insert-row"
 import { TOKEN_HEADER } from "../../session/authenticate"
-import type { IssueMode } from "../../session/issue-session"
 import { issueSession } from "../../session/issue-session"
 
 /** Body accepted by `POST /sign-in/guest`. */
 export interface SignInGuestInput {
   additionalFields?: Record<string, unknown>
-  mode?: IssueMode
   headers?: Headers
   requestURL?: string
 }
@@ -70,18 +67,12 @@ export const signInGuest = defineEndpoint({
     const issued = await issueSession(internals, {
       user,
       headers,
-      requestURL: input.requestURL,
-      ...(input.mode ? { mode: input.mode } : {})
+      requestURL: input.requestURL
     })
 
     const responseHeaders = new Headers(issued.headers)
     responseHeaders.set(TOKEN_HEADER, issued.token)
 
-    const data: { user: AuthUser; refreshToken?: string } = {
-      user: issued.user
-    }
-    if (issued.refreshToken) data.refreshToken = issued.refreshToken
-
-    return { data, headers: responseHeaders }
+    return { data: { user: issued.user }, headers: responseHeaders }
   }
 })

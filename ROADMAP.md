@@ -297,8 +297,10 @@ already have.
 
 ### Native application OAuth
 
-Deep-link flows for iOS and Android. `mode: "token"` already exists for clients
-with no cookie jar, so this is the redirect handling rather than the token model.
+Deep-link flows for iOS and Android, and with them a decision on how a client
+with no cookie jar holds the refresh token — today it travels only in the
+`HttpOnly` cookie, on purpose, so this is the token model as much as the
+redirect handling.
 
 ---
 

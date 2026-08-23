@@ -7,7 +7,6 @@ import { selectOne } from "../lib/select-one"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
-import { resolveSession } from "../session/resolve-session"
 // Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
 import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
@@ -45,10 +44,9 @@ export const getUser = defineEndpoint({
  * no credentials mixed in, unlike sign-up, which is why sign-up keeps
  * `additionalFields` nested and this does not.
  */
-export interface UpdateUserInput {
+export interface UpdateUserInput extends CallerInput {
   name?: string
   imageURL?: string
-  headers?: Headers
   [field: string]: unknown
 }
 
@@ -73,11 +71,9 @@ export const updateUser = defineEndpoint({
     return { ...body, headers: request.headers }
   },
   run: async (internals, input: UpdateUserInput) => {
-    const headers = input.headers ?? new Headers()
-    const resolved = await resolveSession(internals, headers)
-    if (!resolved) throw unauthenticated()
+    const caller = await authenticate(internals, input)
 
-    const { headers: _headers, name, imageURL, ...rest } = input
+    const { headers: _headers, token: _token, name, imageURL, ...rest } = input
     for (const [field, value] of [
       ["name", name],
       ["imageURL", imageURL]
@@ -121,21 +117,23 @@ export const updateUser = defineEndpoint({
       })
     }
 
-    const user = await updateUserFields(internals, resolved.user, {
+    const current = await selectOne(internals, "users", { id: caller.userId })
+    if (!current) throw unauthenticated()
+
+    const user = await updateUserFields(internals, current, {
       name,
       imageURL,
       ...additionalFields
     })
 
-    return { data: user }
+    return { data: user, headers: caller.headers }
   }
 })
 
 /** Body accepted by `DELETE /user`. */
-export interface DeleteUserInput {
+export interface DeleteUserInput extends CallerInput {
   /** The confirmation code, when a challenge was issued. */
   code?: string
-  headers?: Headers
   requestURL?: string
 }
 
@@ -164,11 +162,35 @@ export const deleteUser = defineEndpoint({
   },
   run: async (internals, input: DeleteUserInput) => {
     const headers = input.headers ?? new Headers()
-    const resolved = await resolveSession(internals, headers)
-    if (!resolved) throw unauthenticated()
+    const caller = await authenticate(internals, input)
 
     const { config } = internals
-    const { user, session } = resolved
+    const user = await selectOne(internals, "users", { id: caller.userId })
+    // The fresh window is measured from the session, and a session already
+    // revoked refuses the delete rather than honouring a token that outlived it.
+    const session =
+      caller.session ??
+      (await selectOne(internals, "sessions", { id: caller.sessionId }))
+    if (!user || !session) throw unauthenticated()
+
+    const finishDeletion = async () => {
+      await deleteUserAndRows(internals, user)
+
+      const responseHeaders = new Headers()
+      const secure = shouldUseSecureCookies(input.requestURL)
+      responseHeaders.append(
+        "set-cookie",
+        clearCookie(config.cookie.name, config.cookie.path, secure)
+      )
+      if (config.multiAccount) {
+        responseHeaders.append(
+          "set-cookie",
+          clearCookie(config.cookie.accountsName, config.cookie.path, secure)
+        )
+      }
+
+      return { data: undefined, status: 204, headers: responseHeaders }
+    }
 
     if (input.code) {
       const identifier = user.email ?? user.phoneNumber
@@ -210,24 +232,5 @@ export const deleteUser = defineEndpoint({
     })
 
     throw new AuthApiError("codeSent", 403)
-
-    async function finishDeletion() {
-      await deleteUserAndRows(internals, user)
-
-      const responseHeaders = new Headers()
-      const secure = shouldUseSecureCookies(input.requestURL)
-      responseHeaders.append(
-        "set-cookie",
-        clearCookie(config.cookie.name, config.cookie.path, secure)
-      )
-      if (config.multiAccount) {
-        responseHeaders.append(
-          "set-cookie",
-          clearCookie(config.cookie.accountsName, config.cookie.path, secure)
-        )
-      }
-
-      return { data: undefined, status: 204, headers: responseHeaders }
-    }
   }
 })

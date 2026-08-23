@@ -78,8 +78,8 @@ Plus the JWT-plane functions:
   private key with a function signature; never expose it through a route.
 - `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
   Never authorize with it.
-- `getSession({ headers })` — confirms the session is live and keeps it that
-  way. One statement, no user read, no token.
+- `getSession({ headers })` — the session the caller is acting from. One
+  read, no user lookup; with a token, the one its `sid` names.
 
 ### Headers, a token, or both
 

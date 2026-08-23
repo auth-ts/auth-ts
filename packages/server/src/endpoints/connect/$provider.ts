@@ -1,15 +1,18 @@
-import { AuthApiError, notFound } from "../../http/auth-api-error"
+import { notFound } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import { validateRedirect } from "../../lib/validate-redirect"
 import { getCallbackURL } from "../../oauth/callback-url"
 import { getProvider } from "../../oauth/providers/get-provider"
 import { createStateCookie } from "../../oauth/state-cookie"
-import { resolveSession } from "../../session/resolve-session"
+import type { CallerInput } from "../../session/authenticate"
+import { authenticate } from "../../session/authenticate"
 import type { SignInProviderInput } from "../sign-in/$provider"
 
 /** Input for starting a provider link. */
-export interface ConnectProviderInput extends SignInProviderInput {}
+export interface ConnectProviderInput
+  extends SignInProviderInput,
+    CallerInput {}
 
 /**
  * Starts linking a provider to the **current** user.
@@ -39,8 +42,7 @@ export const connectProvider = defineEndpoint({
     const { config } = internals
     const headers = input.headers ?? new Headers()
 
-    const resolved = await resolveSession(internals, headers)
-    if (!resolved) throw new AuthApiError("unauthenticated", 401)
+    const caller = await authenticate(internals, input)
 
     const configured = getProvider(config.providers, input.provider)
     if (!configured) throw notFound()
@@ -59,21 +61,23 @@ export const connectProvider = defineEndpoint({
       {
         intent: "connect",
         redirect: validateRedirect(input.redirect),
-        userId: resolved.user.id,
+        userId: caller.userId,
         ...(input.locale ? { locale: input.locale } : {})
       },
       secure
     )
 
-    const responseHeaders = new Headers({
-      location: configured.provider.authorizeURL({
+    const responseHeaders = new Headers(caller.headers)
+    responseHeaders.set(
+      "location",
+      configured.provider.authorizeURL({
         credentials: configured.credentials,
         redirectURI,
         state,
         codeChallenge,
         nonce
       })
-    })
+    )
     responseHeaders.append("set-cookie", setCookie)
 
     return { data: undefined, status: 302, headers: responseHeaders }

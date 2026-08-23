@@ -79,9 +79,8 @@ function allowedOrigins(config: AuthServerConfig, request: Request) {
  * stripped it), and one that is not this server's own — as the runtime sees it
  * or as a proxy forwarded it — nor its `baseURL`, nor its configured
  * `cors.origin`, is refused. A request with neither header passes:
- * its absence means a non-browser client — a native app or CLI using
- * `mode: "token"` — which holds no cookie and so cannot be made to act on
- * someone's behalf. That is the one way this check fails open.
+ * its absence means a non-browser client, which holds no cookie and so cannot
+ * be made to act on someone's behalf. That is the one way this check fails open.
  *
  * **A body must be JSON.** A page cannot send `application/json` cross-origin
  * without a preflight, and the preflight approves only `cors.origin` — so this

@@ -16,8 +16,6 @@ export type VerifyCodeInput = SendCodeInput & {
 /** What a completed sign-in returns. The token arrived in the response header. */
 export interface SignInResult {
   user: AuthUser
-  /** Only in token mode, for clients that cannot hold a cookie. */
-  refreshToken?: string
 }
 
 /**

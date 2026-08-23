@@ -9,7 +9,7 @@ import type { SignTokenClaims } from "../jwt/sign-token"
 import { signToken } from "../jwt/sign-token"
 import type { TokenClaims } from "../jwt/verify-token"
 import { verifyToken } from "../jwt/verify-token"
-import type { HeadersInput } from "../session/resolve-session"
+import type { CallerInput } from "../session/authenticate"
 import { readRefreshToken } from "../session/resolve-session"
 import type { AdditionalFieldsSchema, AuthSession, AuthUser } from "./auth-db"
 import type { AuthServerConfig } from "./auth-server-config"
@@ -121,12 +121,9 @@ export function createAuthServer<
       // Called in-process rather than over HTTP, so this is where the "server-side
       // rendering never sees the cookie" trap is explained instead of silently
       // resolving to null.
-      if (COOKIE_PLANE_CALLABLES.has(name)) {
-        assertCookieReachable(
-          resolved,
-          (input as HeadersInput | undefined)?.headers,
-          internals
-        )
+      const callerInput = input as CallerInput | undefined
+      if (COOKIE_PLANE_CALLABLES.has(name) && !callerInput?.token) {
+        assertCookieReachable(resolved, callerInput?.headers, internals)
       }
 
       const result = await endpoint.run(internals, input as never)

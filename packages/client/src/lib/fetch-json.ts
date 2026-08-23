@@ -59,8 +59,6 @@ export function createFetchJson(
       throw new AuthNetworkError(cause)
     }
 
-    // Read before anything else, including on failures: an endpoint that
-    // refused the request may still have refreshed the token on the way.
     const minted = response.headers.get(TOKEN_HEADER)
     if (minted) onToken(minted)
 

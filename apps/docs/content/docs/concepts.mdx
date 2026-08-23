@@ -21,12 +21,13 @@ revoked or expires, and hashing does nothing to change that.
 PostgREST verifies. It lives in a JavaScript variable for at most ten minutes and
 is never persisted anywhere.
 
-Once a session exists, every client method is authenticated by the cookie —
-`getToken` included, since it is the call that exchanges the cookie for a JWT
-rather than one that presents a JWT. The sign-in methods are the exception only
-in the obvious sense: they run before a cookie exists, because they are what
-create it. An application that never touches the access token still gets
-working sign-in, profile updates, deletion, and a correct user object.
+Once a session exists, every client method presents the access token it holds
+and is authenticated from it with no session lookup; when it holds none — first
+load, or the one it had has expired — the cookie authenticates instead and a new
+token comes back in the response. The sign-in methods are the exception only in
+the obvious sense: they run before a cookie exists, because they are what create
+it. An application that never touches the access token still gets working
+sign-in, profile updates, deletion, and a correct user object.
 
 ## Why the token is only in memory
 
@@ -62,6 +63,7 @@ tighter bound; you are trading refresh traffic for revocation speed.
 ```json
 {
   "sub": "the user id",
+  "sid": "the session id",
   "role": "authenticated",
   "type": "user",
   "iat": 1771200000,
@@ -69,8 +71,10 @@ tighter bound; you are trading refresh traffic for revocation speed.
 }
 ```
 
-`role` is the Postgres role PostgREST assumes, and stays `authenticated` for
-everyone. `type` is what your policies read — `auth.session()->>'type' = 'admin'`,
+`sid` is the session the token was minted from, so an endpoint given only the
+token still knows which device it is acting for — `getSession`, a local
+sign-out, and "is this the current session" all read it. `role` is the Postgres
+role PostgREST assumes, and stays `authenticated` for everyone. `type` is what your policies read — `auth.session()->>'type' = 'admin'`,
 or denying guests writes. Core writes only `guest` and `user`, and only on
 insert; promoting someone to `admin` is your own SQL, so no endpoint can do it.
 

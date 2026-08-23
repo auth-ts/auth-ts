@@ -1,4 +1,3 @@
-import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import {
@@ -85,11 +84,10 @@ export const signOut = defineEndpoint({
     // Everything signed in here, the active account first. A parked entry for
     // the account already active is one of its sessions, not another account.
     const accounts = [
-      { userId: caller.userId, tokenHash: caller.tokenHash, active: true },
+      { userId: caller.userId, sessionId: caller.sessionId },
       ...parked.map(({ session }) => ({
         userId: session.userId,
-        tokenHash: session.tokenHash,
-        active: false
+        sessionId: session.id
       }))
     ]
 
@@ -108,24 +106,19 @@ export const signOut = defineEndpoint({
     // whoever is signed in here stays signed in.
     if (scope === "others") {
       for (const target of targets) {
-        await revokeOtherSessions(internals, target.userId, target.tokenHash)
+        await revokeOtherSessions(internals, target.userId, target.sessionId)
       }
       return { data: undefined, status: 204 }
     }
 
     for (const target of targets) {
-      if (scope === "global") {
-        await internals.db.delete({
-          table: "sessions",
-          where: { userId: target.userId }
-        })
-        continue
-      }
-      // Nothing to sign out of here when the caller authenticated by bearer
-      // alone: there is no session in this browser to end.
-      if (target.tokenHash) {
-        await deleteSessionByToken(internals, target.tokenHash)
-      }
+      await internals.db.delete({
+        table: "sessions",
+        where:
+          scope === "global"
+            ? { userId: target.userId }
+            : { id: target.sessionId }
+      })
     }
 
     const signedOut = new Set(targets.map(({ userId }) => userId))
@@ -155,7 +148,10 @@ export const signOut = defineEndpoint({
       // token. Signing out without a promotion sends none: handing over a fresh
       // credential on the way out would be perverse.
       const headers = new Headers(promoted.headers)
-      headers.set(TOKEN_HEADER, await mintAccessToken(internals, promoted.user))
+      headers.set(
+        TOKEN_HEADER,
+        await mintAccessToken(internals, promoted.user, promoted.session.id)
+      )
 
       return { data: { switchedTo: promoted.user }, headers }
     }
@@ -175,11 +171,3 @@ export const signOut = defineEndpoint({
     return { data: undefined, status: 204, headers: responseHeaders }
   }
 })
-
-/** Deletes one session by its token hash — the shape most sign-outs need. */
-function deleteSessionByToken(
-  internals: AuthServerInternals,
-  tokenHash: string
-) {
-  return internals.db.delete({ table: "sessions", where: { tokenHash } })
-}

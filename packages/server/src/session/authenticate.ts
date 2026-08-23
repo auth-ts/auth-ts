@@ -2,9 +2,8 @@ import type { AuthSession } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { unauthenticated } from "../http/auth-api-error"
 import { inspectToken } from "../jwt/verify-token"
-import { sha256Hex } from "../lib/hash"
 import { mintAccessToken } from "./issue-session"
-import { readRefreshToken, resolveSession } from "./resolve-session"
+import { resolveSession } from "./resolve-session"
 
 /**
  * How a caller identifies itself: a request's headers, an access token, or both.
@@ -21,11 +20,11 @@ export interface CallerInput {
 /** The response header a freshly minted access token is delivered in. */
 export const TOKEN_HEADER = "x-auth-token"
 
-/** Who is calling, the cookie hash if one rode along, and anything to send back. */
+/** Who is calling, which session they are acting from, and anything to send back. */
 export interface Caller {
   userId: string
-  /** Present whenever a refresh cookie rode along — it is a hash, not a lookup. */
-  tokenHash: string | null
+  /** The session the credential came from: the token's `sid`, or the cookie's row. */
+  sessionId: string
   /**
    * Headers the response must carry: a new access token, when this request had
    * to fall back to the cookie to authenticate.
@@ -35,10 +34,11 @@ export interface Caller {
    */
   headers: Headers
   /**
-   * The session, when the cookie was what authenticated this request.
+   * The session row, when the cookie was what authenticated this request.
    *
    * Carried rather than dropped: the fallback has just read and touched the row,
-   * so an endpoint that needs it should not go and read it again.
+   * so an endpoint that needs it should not go and read it again. Absent when
+   * the token did the work — read it by `sessionId` if it is needed.
    */
   session?: AuthSession
 }
@@ -53,11 +53,11 @@ export interface Caller {
  * but no access token to go with it.
  *
  * A token passed directly wins over one in a header, which wins over the
- * cookie. An expired token falls through to the cookie, because expiry is
- * ordinary. A
- * token that fails any other check is refused outright rather than ignored:
- * falling back there would turn a forged token into a slower request instead of
- * an error.
+ * cookie. A token that does not verify — expired, forged, minted under a key
+ * since rotated, or simply unreadable — is treated as absent: the cookie is
+ * consulted and, if it holds a live session, a replacement is minted. A client
+ * holding a spoiled token self-heals rather than being handed an error it
+ * cannot act on, and a forged one buys nothing but the cookie path.
  *
  * The cost of trusting the token is revocation latency — a session revoked
  * elsewhere keeps working here until the token expires. That is the same bound
@@ -68,8 +68,7 @@ export async function authenticate(
   input: CallerInput
 ): Promise<Caller> {
   const { headers } = input
-  const cookieToken = headers ? readRefreshToken(internals, headers) : undefined
-  const tokenHash = cookieToken ? await sha256Hex(cookieToken) : null
+  // The /i matters: the Bearer scheme is case-insensitive per RFC 6750.
   const bearer =
     input.token ?? headers?.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]
 
@@ -88,9 +87,17 @@ export async function authenticate(
       bearer
     )
 
-    if (verdict.status === "valid" && verdict.claims.sub) {
+    if (
+      verdict.status === "valid" &&
+      verdict.claims.sub &&
+      typeof verdict.claims.sid === "string"
+    ) {
       // Nothing to send back: the token they hold is the token they need.
-      return { userId: verdict.claims.sub, tokenHash, headers: new Headers() }
+      return {
+        userId: verdict.claims.sub,
+        sessionId: verdict.claims.sid,
+        headers: new Headers()
+      }
     }
     reason = verdict.status === "expired" ? "expired" : "invalid"
   }
@@ -111,11 +118,14 @@ export async function authenticate(
   if (!resolved) throw unauthenticated()
 
   const minted = new Headers()
-  minted.set(TOKEN_HEADER, await mintAccessToken(internals, resolved.user))
+  minted.set(
+    TOKEN_HEADER,
+    await mintAccessToken(internals, resolved.user, resolved.session.id)
+  )
 
   return {
     userId: resolved.user.id,
-    tokenHash: resolved.tokenHash,
+    sessionId: resolved.session.id,
     headers: minted,
     session: resolved.session
   }

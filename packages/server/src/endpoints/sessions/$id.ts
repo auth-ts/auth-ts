@@ -67,7 +67,7 @@ export const revokeSession = defineEndpoint({
     // Revoking the session you are using is a local sign-out, so the cookie has
     // to go too — otherwise the browser keeps presenting a token that no longer
     // resolves and every later request looks mysteriously unauthenticated.
-    const current = revoked.tokenHash === caller.tokenHash
+    const current = revoked.id === caller.sessionId
     if (!current) {
       const data: RevokeSessionResult = { current }
       return { data, headers: caller.headers }

@@ -270,4 +270,67 @@ describe("calling with a token instead of a request", () => {
       authServer.listSessions({ token: "forged.not.real" })
     ).rejects.toThrow()
   })
+
+  it("serves every authenticated callable from the token alone", async () => {
+    const context = await createTestServer({
+      user: { deleteFreshWindow: "1h" }
+    })
+    const refreshToken = await signIn(context)
+    const minted = await context.authServer.handler(
+      request("GET", "/api/auth/user", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+    const token = required(minted.headers.get("x-auth-token"), "token header")
+    const { authServer } = context
+
+    const session = await authServer.getSession({ token })
+    expect(session.id).toBe(required(context.db.sessions()[0], "row").id)
+
+    const user = await authServer.getUser({ token })
+    expect(user.email).toBe("ada@example.com")
+
+    const updated = await authServer.updateUser({ token, name: "Ada" })
+    expect(updated.name).toBe("Ada")
+
+    expect(await authServer.listConnections({ token })).toEqual([])
+
+    await authServer.deleteUser({ token })
+    expect(context.db.sessions()).toHaveLength(0)
+  })
+
+  it("names the session in the token, so bearer-only sign-out ends that session", async () => {
+    const context = await createTestServer()
+    const refreshToken = await signIn(context)
+    const minted = await context.authServer.handler(
+      request("GET", "/api/auth/user", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+    const token = required(minted.headers.get("x-auth-token"), "token header")
+    const [row] = context.db.sessions()
+
+    expect(context.authServer.decodeToken(token)?.claims.sid).toBe(
+      required(row, "row").id
+    )
+
+    await context.authServer.signOut({ token })
+
+    expect(context.db.sessions()).toHaveLength(0)
+  })
+
+  it("does not demand a cookie of a token caller when cookie.path is narrowed", async () => {
+    const context = await createTestServer({ cookie: { path: "/api/auth" } })
+    const refreshToken = await signIn(context)
+    const minted = await context.authServer.handler(
+      request("GET", "/api/auth/user", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+    const token = required(minted.headers.get("x-auth-token"), "token header")
+
+    const user = await context.authServer.getUser({ token })
+
+    expect(user.email).toBe("ada@example.com")
+  })
 })

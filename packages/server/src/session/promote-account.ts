@@ -1,4 +1,4 @@
-import type { AuthUser } from "../core/auth-db"
+import type { AuthSession, AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { selectOne } from "../lib/select-one"
 import { serializeCookie } from "../lib/serialize-cookie"
@@ -8,6 +8,7 @@ import { parkedTokens, serializeAccounts } from "./accounts-cookie"
 /** The account a browser moved to, and the cookies that move it. */
 export interface PromotedAccount {
   user: AuthUser
+  session: AuthSession
   headers: Headers
 }
 
@@ -59,7 +60,7 @@ export async function promoteNextAccount(
       })
     )
 
-    return { user, headers }
+    return { user, session: next.session, headers }
   }
 
   return null

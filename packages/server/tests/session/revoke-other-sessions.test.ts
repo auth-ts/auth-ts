@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest"
 import { revokeOtherSessions } from "../../src/session/revoke-other-sessions"
 import { createTestInternals } from "../helpers/create-test-internals"
+import { required } from "../helpers/required"
 import { insertUser, selectRows } from "../helpers/rows"
 
-/** Seeds `count` sessions for one user and returns their token hashes. */
+/** Seeds `count` sessions for one user and returns their ids. */
 async function seedSessions(
   db: Awaited<ReturnType<typeof createTestInternals>>["db"],
   userId: string,
   count: number
 ) {
-  const hashes: string[] = []
+  const ids: string[] = []
   for (let index = 0; index < count; index++) {
-    const tokenHash = `hash-${index}`
-    await db.insert({
+    const row = await db.insert({
       table: "sessions",
       values: {
         userId,
-        tokenHash,
+        tokenHash: `hash-${index}`,
         createdAt: new Date(Date.now() + index),
         expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,
@@ -24,10 +24,10 @@ async function seedSessions(
         updatedAt: new Date()
       }
     })
-    hashes.push(tokenHash)
+    ids.push(required(row, "inserted session").id)
   }
 
-  return hashes
+  return ids
 }
 
 describe("revokeOtherSessions", () => {
@@ -44,7 +44,7 @@ describe("revokeOtherSessions", () => {
 
     expect(revoked).toBe(3)
     const remaining = await selectRows(db, "sessions")
-    expect(remaining.map((row) => row.tokenHash)).toEqual([current])
+    expect(remaining.map((row) => row.id)).toEqual([current])
   })
 
   it("pages past the read ceiling, so a long device list is fully revoked", async () => {
@@ -88,7 +88,7 @@ describe("revokeOtherSessions", () => {
     const remaining = await selectRows(db, "sessions")
     expect(remaining.map((row) => row.tokenHash).sort()).toEqual([
       "grace",
-      current
+      "hash-0"
     ])
   })
 

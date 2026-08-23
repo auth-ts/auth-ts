@@ -459,3 +459,17 @@ describe("cors", () => {
     ).toBe("accept-encoding, origin")
   })
 })
+
+describe("caching", () => {
+  it("marks every response no-store, except the public key set", async () => {
+    const { authServer } = await createTestServer({
+      jwks: { json: { keys: [] } }
+    })
+
+    const refused = await authServer.handler(request("GET", "/api/auth/user"))
+    expect(refused.headers.get("cache-control")).toBe("no-store")
+
+    const served = await authServer.handler(request("GET", "/api/auth/jwks"))
+    expect(served.headers.get("cache-control")).toBe("public, max-age=3600")
+  })
+})

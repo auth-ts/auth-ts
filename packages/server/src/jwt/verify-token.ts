@@ -13,6 +13,8 @@ import type { JwtAlgorithm } from "./import-signing-key"
 export interface UnverifiedClaims {
   /** The user id, absent on service tokens minted without one. */
   sub?: string
+  /** The session the token was minted from, absent on tokens minted by hand. */
+  sid?: string
   type?: UserType
   role?: string
   iss?: string
@@ -102,11 +104,9 @@ export type TokenVerdict =
 /**
  * Verifies a token and says which way it failed.
  *
- * Expiry is the one failure that is ordinary — it happens to every token
- * eventually, and the answer is to fall back to the cookie and mint another.
- * Anything else means the token was not one this server issued, and is refused
- * rather than quietly ignored: silently falling back would turn a forged token
- * into a slower request instead of an error.
+ * Expiry is the ordinary failure — it happens to every token eventually — and
+ * is told apart from the rest so a caller can log it as routine rather than as
+ * a token this server never issued.
  */
 export async function inspectToken(
   context: VerifyTokenContext,
