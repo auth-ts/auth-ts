@@ -293,6 +293,37 @@ describe("oauth callback", () => {
     expect(user?.type).toBe("user")
   })
 
+  it("records the handle as the label, and refreshes it when it changes", async () => {
+    const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
+
+    const signInAs = async (login: string) => {
+      const { stateCookie, state } = await startSignIn(authServer)
+      stubGitHub({
+        id: 4242,
+        login,
+        name: "Ada",
+        emails: verifiedEmails("ada@example.com")
+      })
+
+      return authServer.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          cookies: { "auth-ts.state": stateCookie }
+        })
+      )
+    }
+
+    await signInAs("ada")
+    expect(db.rows("connections")[0]?.label).toBe("ada")
+
+    // The link is keyed on GitHub's numeric id, so a rename is the same row
+    // with a new name on it — not a second account.
+    await signInAs("ada-lovelace")
+
+    expect(db.rows("connections")).toHaveLength(1)
+    expect(db.rows("connections")[0]?.label).toBe("ada-lovelace")
+    expect(db.users()).toHaveLength(1)
+  })
+
   it("sends the PKCE verifier from the state cookie to the token endpoint", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie, state } = await startSignIn(authServer)

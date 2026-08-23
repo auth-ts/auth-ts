@@ -129,6 +129,7 @@ export const google: OAuthProvider = {
 
     return {
       providerAccountId: claims.sub,
+      ...(email ? { label: email.toLowerCase() } : {}),
       ...(email ? { email: email.toLowerCase() } : {}),
       ...(claims.name ? { name: claims.name } : {}),
       ...(claims.picture ? { imageURL: claims.picture } : {})

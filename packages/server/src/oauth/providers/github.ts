@@ -115,6 +115,9 @@ export const github: OAuthProvider = {
 
     return {
       providerAccountId: String(profile.id),
+      // The handle, not the address: `login` is always present, while a primary
+      // verified email frequently is not.
+      label: profile.login,
       ...(verified ? { email: verified.email.toLowerCase() } : {}),
       ...(profile.name ? { name: profile.name } : { name: profile.login }),
       ...(profile.avatar_url ? { imageURL: profile.avatar_url } : {})

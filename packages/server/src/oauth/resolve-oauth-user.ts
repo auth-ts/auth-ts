@@ -56,12 +56,14 @@ export async function resolveOAuthUser(
       id: connection.userId
     })
     if (linked) {
-      // Refresh the recorded email, but never re-key on it.
+      // Refresh the recorded label, but never re-key on it: the account is
+      // found by the provider's stable id, so a renamed handle is the same
+      // link with a new name on it.
       await linkConnection(internals, {
         userId: linked.id,
         provider,
         providerAccountId: identity.providerAccountId,
-        ...(identity.email ? { email: identity.email } : {})
+        ...(identity.label ? { label: identity.label } : {})
       })
 
       if (guest && guest.id !== linked.id) {
@@ -102,7 +104,7 @@ export async function resolveOAuthUser(
     userId: user.id,
     provider,
     providerAccountId: identity.providerAccountId,
-    label: identity.email
+    ...(identity.label ? { label: identity.label } : {})
   })
 
   return user

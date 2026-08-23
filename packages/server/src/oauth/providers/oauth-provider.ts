@@ -10,6 +10,14 @@ export interface ProviderIdentity {
    */
   providerAccountId: string
   /**
+   * What this provider calls the account, for a person reading a list of links.
+   *
+   * Whatever that provider actually gives that someone recognises: a GitHub
+   * handle, a Google address. Not an identifier — nothing matches on it — so a
+   * provider that offers nothing recognisable may leave it out.
+   */
+  label?: string
+  /**
    * A **verified** email address, or `undefined` if the provider has none.
    *
    * Providers return unverified addresses too. Accepting one is a full account

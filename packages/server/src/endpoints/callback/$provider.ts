@@ -219,7 +219,7 @@ async function connectIdentity(
     userId: resolved.user.id,
     provider: input.provider,
     providerAccountId: identity.providerAccountId,
-    ...(identity.email ? { email: identity.email } : {})
+    ...(identity.label ? { label: identity.label } : {})
   })
 
   const headers = new Headers({ location: redirect })
