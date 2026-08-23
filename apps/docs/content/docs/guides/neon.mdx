@@ -54,7 +54,7 @@ query on your owner connection silently sees everything.
 ## 4. Protect the auth tables — this one bites
 
 **Neon grants the `authenticated` role full access to everything in `public` when
-the Data API is enabled.** Your `users`, `sessions`, and `otps` tables are
+the Data API is enabled.** Your `users`, `sessions`, and `verifications` tables are
 not private by default, which means any signed-in user could read every account
 and every session hash straight from the REST endpoint.
 
@@ -64,7 +64,7 @@ except the owner, so your server keeps working and the Data API sees nothing:
 ```sql
 alter table "users" enable row level security;
 alter table "sessions" enable row level security;
-alter table "otps" enable row level security;
+alter table "verifications" enable row level security;
 alter table "attempts" enable row level security;
 alter table "identities" enable row level security;
 ```

@@ -75,7 +75,10 @@ describe("storing a provider grant", () => {
     const context = await createTestServer(OAUTH_OPTIONS)
     const { identity } = await signInWithGitHub(context, GRANT)
 
-    for (const column of [identity.accessToken, identity.refreshToken]) {
+    for (const column of [
+      identity.accessTokenEncrypted,
+      identity.refreshTokenEncrypted
+    ]) {
       expect(column).toMatch(/^v1\./)
     }
     expect(JSON.stringify(identity)).not.toContain("provider-access-token")
@@ -84,13 +87,13 @@ describe("storing a provider grant", () => {
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(identity.accessToken, "access token")
+        required(identity.accessTokenEncrypted, "access token")
       )
     ).toBe("provider-access-token")
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(identity.refreshToken, "refresh token")
+        required(identity.refreshTokenEncrypted, "refresh token")
       )
     ).toBe("provider-refresh-token")
   })
@@ -116,11 +119,13 @@ describe("storing a provider grant", () => {
     })
 
     expect(second.identity.id).toBe(first.identity.id)
-    expect(second.identity.accessToken).not.toBe(first.identity.accessToken)
+    expect(second.identity.accessTokenEncrypted).not.toBe(
+      first.identity.accessTokenEncrypted
+    )
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(second.identity.accessToken, "access token")
+        required(second.identity.accessTokenEncrypted, "access token")
       )
     ).toBe("second-access-token")
   })
@@ -137,8 +142,8 @@ describe("storing a provider grant", () => {
     const [listed] = (await response.json()) as Array<Record<string, unknown>>
 
     expect(listed).toBeDefined()
-    expect(listed).not.toHaveProperty("accessToken")
-    expect(listed).not.toHaveProperty("refreshToken")
+    expect(listed).not.toHaveProperty("accessTokenEncrypted")
+    expect(listed).not.toHaveProperty("refreshTokenEncrypted")
     // Not a secret, but not an answer either: the listing holds no token, so
     // its expiry is churn. `getProviderToken` reports the one it hands over.
     expect(listed).not.toHaveProperty("accessTokenExpiresAt")
@@ -200,7 +205,7 @@ describe("GET /identities/:id/token", () => {
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(stored.accessToken, "access token")
+        required(stored.accessTokenEncrypted, "access token")
       )
     ).toBe("refreshed-access-token")
   })
@@ -229,7 +234,7 @@ describe("GET /identities/:id/token", () => {
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(stored.refreshToken, "refresh token")
+        required(stored.refreshTokenEncrypted, "refresh token")
       )
     ).toBe("rotated-refresh-token")
   })
@@ -255,8 +260,8 @@ describe("GET /identities/:id/token", () => {
     )
     // The row stays — the account is still linked — but it stops claiming a
     // grant it does not have.
-    expect(stored.accessToken).toBeNull()
-    expect(stored.refreshToken).toBeNull()
+    expect(stored.accessTokenEncrypted).toBeNull()
+    expect(stored.refreshTokenEncrypted).toBeNull()
     expect(stored.scope).toBeNull()
   })
 
@@ -272,7 +277,7 @@ describe("GET /identities/:id/token", () => {
     await context.db.update({
       table: "identities",
       where: { id: identity.id },
-      values: { accessToken: null }
+      values: { accessTokenEncrypted: null }
     })
 
     const response = await tokenRequest(context, refreshToken, identity.id)
@@ -287,7 +292,10 @@ describe("GET /identities/:id/token", () => {
       table: "identities",
       where: { id: identity.id },
       values: {
-        accessToken: await encryptSecret("some-other-secret", "unreadable")
+        accessTokenEncrypted: await encryptSecret(
+          "some-other-secret",
+          "unreadable"
+        )
       }
     })
     stubGitHub({ ...GRANT, refreshed: { access_token: "refreshed-token" } })

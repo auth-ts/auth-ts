@@ -114,8 +114,8 @@ export interface AuthSession {
   updatedAt: Date
 }
 
-/** What a live verification code authorizes. Checked on every verify, so a code cannot cross actions. */
-export type OTPAction = "signIn" | "deleteUser"
+/** What a live verification code authorizes. Checked on every verify, so a code cannot cross purposes. */
+export type VerificationPurpose = "signIn" | "deleteUser"
 
 /**
  * A verification code, stored as an HMAC of the six digits.
@@ -124,13 +124,13 @@ export type OTPAction = "signIn" | "deleteUser"
  * codes and inserts a new one, and a verify reads the newest by `expiresAt`.
  * Latest wins, so a resend still invalidates the code before it.
  */
-export interface AuthOTP {
+export interface AuthVerification {
   id: string
   /** Normalized email or E.164 phone number. */
   identifier: string
   codeHash: string
   expiresAt: Date
-  action: OTPAction
+  purpose: VerificationPurpose
   /** Written by core on insert. */
   createdAt: Date
   /** Written by core on insert and on every update it makes. */
@@ -169,16 +169,16 @@ export interface AuthIdentity {
    * granted the column. Short-lived — read it through `getProviderToken`,
    * which refreshes it rather than handing back a spent one.
    */
-  accessToken?: string | null
-  /** When {@link accessToken} expires, as the provider reported it. */
+  accessTokenEncrypted?: string | null
+  /** When {@link accessTokenEncrypted} expires, as the provider reported it. */
   accessTokenExpiresAt?: Date | null
   /**
    * The provider's refresh token, **encrypted**. The durable half of the grant:
    * this is what keeps calling a provider's API working for months without the
    * user signing in again, and the one column whose leak matters most.
    */
-  refreshToken?: string | null
-  /** When {@link refreshToken} expires. Null where the provider reports none. */
+  refreshTokenEncrypted?: string | null
+  /** When {@link refreshTokenEncrypted} expires. Null where the provider reports none. */
   refreshTokenExpiresAt?: Date | null
   /** The scopes actually granted, space-delimited as the provider returned them. */
   scope?: string | null
@@ -192,7 +192,7 @@ export interface AuthIdentity {
 export type AuthTable =
   | "users"
   | "sessions"
-  | "otps"
+  | "verifications"
   | "attempts"
   | "identities"
 
@@ -202,7 +202,7 @@ export interface AuthTables<
 > {
   users: AuthUser<S>
   sessions: AuthSession
-  otps: AuthOTP
+  verifications: AuthVerification
   attempts: AuthAttempt
   identities: AuthIdentity
 }
@@ -341,7 +341,7 @@ export type AuthDeleteInput<
  * | --- | --- | --- | --- |
  * | `users` | `email`, `phoneNumber` | | |
  * | `sessions` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
- * | `otps` | | `identifier`, `expiresAt` | `expiresAt` |
+ * | `verifications` | | `identifier`, `expiresAt` | `expiresAt` |
  * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
  * | `identities` | `(provider, providerUserId)` | `userId` | |
  *

@@ -12,12 +12,12 @@ const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 
 /** Every code stored for the identifier. A send replaces them, so normally one. */
 const storedCodes = (db: MemoryDb) =>
-  selectRows(db, "otps", { identifier: emailIdentifier.value })
+  selectRows(db, "verifications", { identifier: emailIdentifier.value })
 
 /** The row a verify would read: the newest by expiry, exactly as core reads it. */
 const liveCode = async (db: MemoryDb) => {
   const [row] = await db.select({
-    table: "otps",
+    table: "verifications",
     where: { identifier: emailIdentifier.value },
     limit: 1,
     offset: 0,
@@ -129,7 +129,7 @@ describe("sendVerificationCode", () => {
     const send = () =>
       sendVerificationCode(internals, {
         identifier: emailIdentifier,
-        action: "signIn",
+        purpose: "signIn",
         locale: "en",
         headers: new Headers()
       })
@@ -160,7 +160,7 @@ describe("sendVerificationCode", () => {
     let deliveries = 0
     const { internals, db, sentCodes } = await createTestInternals({
       email: {
-        sendCode: ({ email, code, locale, action, headers }) => {
+        sendCode: ({ email, code, locale, purpose, headers }) => {
           deliveries += 1
           if (deliveries === 2) throw new Error("SMTP blip")
           sentCodes.push({
@@ -168,7 +168,7 @@ describe("sendVerificationCode", () => {
             destination: email,
             code,
             locale,
-            action,
+            purpose,
             headers
           })
         }
@@ -177,7 +177,7 @@ describe("sendVerificationCode", () => {
     const send = () =>
       sendVerificationCode(internals, {
         identifier: emailIdentifier,
-        action: "signIn",
+        purpose: "signIn",
         locale: "en",
         headers: new Headers()
       })
@@ -200,7 +200,7 @@ describe("sendVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code: required(sentCodes[0], "delivered code").code,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     expect(await storedCodes(db)).toHaveLength(0)
@@ -215,7 +215,7 @@ describe("sendVerificationCode", () => {
 
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
@@ -227,7 +227,7 @@ describe("sendVerificationCode", () => {
     const stored = required(await liveCode(db), "stored code")
     expect(stored.codeHash).toMatch(/^[0-9a-f]{64}$/)
     expect(stored.codeHash).not.toContain(sent.code)
-    expect(stored.action).toBe("signIn")
+    expect(stored.purpose).toBe("signIn")
     // The guess budget is a set of attempt rows keyed on the hash rather than a
     // column on this row, so a fresh code simply has none against it.
     expect(
@@ -235,7 +235,7 @@ describe("sendVerificationCode", () => {
     ).toBe(0)
   })
 
-  it("passes the resolved locale, action, and request headers to the sender", async () => {
+  it("passes the resolved locale, purpose, and request headers to the sender", async () => {
     const { internals, sentCodes } = await createTestInternals()
     const headers = new Headers({
       host: "tenant.example.com",
@@ -244,14 +244,14 @@ describe("sendVerificationCode", () => {
 
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "deleteUser",
+      purpose: "deleteUser",
       locale: "de",
       headers
     })
 
     const sent = required(sentCodes[0], "sent code")
     expect(sent.locale).toBe("de")
-    expect(sent.action).toBe("deleteUser")
+    expect(sent.purpose).toBe("deleteUser")
     expect(sent.headers.get("host")).toBe("tenant.example.com")
   })
 
@@ -262,7 +262,7 @@ describe("sendVerificationCode", () => {
 
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
@@ -270,7 +270,7 @@ describe("sendVerificationCode", () => {
 
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
@@ -287,7 +287,7 @@ describe("sendVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code: required(sentCodes[0], "first sent").code,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -297,14 +297,14 @@ describe("sendVerificationCode", () => {
 
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
     await expect(
       sendVerificationCode(internals, {
         identifier: emailIdentifier,
-        action: "signIn",
+        purpose: "signIn",
         locale: "en",
         headers: new Headers()
       })
@@ -325,7 +325,7 @@ describe("sendVerificationCode", () => {
       const { internals, sentCodes } = await createTestInternals()
       await sendVerificationCode(internals, {
         identifier: emailIdentifier,
-        action: "signIn",
+        purpose: "signIn",
         locale: "en",
         headers: new Headers()
       })
@@ -333,7 +333,7 @@ describe("sendVerificationCode", () => {
       vi.advanceTimersByTime(61_000)
       await sendVerificationCode(internals, {
         identifier: emailIdentifier,
-        action: "signIn",
+        purpose: "signIn",
         locale: "en",
         headers: new Headers()
       })
@@ -353,7 +353,7 @@ describe("sendVerificationCode", () => {
       for (let attempt = 0; attempt < 3; attempt++) {
         await sendVerificationCode(internals, {
           identifier: emailIdentifier,
-          action: "signIn",
+          purpose: "signIn",
           locale: "en",
           headers: new Headers()
         })
@@ -363,7 +363,7 @@ describe("sendVerificationCode", () => {
       await expect(
         sendVerificationCode(internals, {
           identifier: emailIdentifier,
-          action: "signIn",
+          purpose: "signIn",
           locale: "en",
           headers: new Headers()
         })
@@ -387,7 +387,7 @@ describe("sendVerificationCode", () => {
       for (let attempt = 0; attempt < 3; attempt++) {
         await sendVerificationCode(internals, {
           identifier: emailIdentifier,
-          action: "signIn",
+          purpose: "signIn",
           locale: "en",
           headers: new Headers()
         })
@@ -397,7 +397,7 @@ describe("sendVerificationCode", () => {
       vi.advanceTimersByTime(10 * 60_000)
       await sendVerificationCode(internals, {
         identifier: emailIdentifier,
-        action: "signIn",
+        purpose: "signIn",
         locale: "en",
         headers: new Headers()
       })
@@ -424,13 +424,13 @@ describe("sendVerificationCode", () => {
 
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
@@ -449,7 +449,7 @@ describe("sendVerificationCode", () => {
 
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers
     })
@@ -465,7 +465,7 @@ describe("consumeVerificationCode", () => {
     const context = await createTestInternals()
     await sendVerificationCode(context.internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
@@ -481,7 +481,7 @@ describe("consumeVerificationCode", () => {
     await consumeVerificationCode(internals, {
       identifier: "ada@example.com",
       code,
-      action: "signIn"
+      purpose: "signIn"
     })
 
     expect(await storedCodes(db)).toHaveLength(0)
@@ -489,7 +489,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -501,7 +501,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        action: "deleteUser"
+        purpose: "deleteUser"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -515,7 +515,7 @@ describe("consumeVerificationCode", () => {
         consumeVerificationCode(internals, {
           identifier: "ada@example.com",
           code: wrongCode,
-          action: "signIn"
+          purpose: "signIn"
         })
       ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     }
@@ -530,7 +530,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code: wrongCode,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
 
@@ -541,7 +541,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -553,7 +553,7 @@ describe("consumeVerificationCode", () => {
     const { internals, db, code } = await sendAndRead()
     const originalDelete = db.delete.bind(db)
     db.delete = async (input) => {
-      if (input.table === "otps") {
+      if (input.table === "verifications") {
         await new Promise((resolve) => setTimeout(resolve, 5))
       }
       return originalDelete(input)
@@ -563,12 +563,12 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        action: "signIn"
+        purpose: "signIn"
       }),
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        action: "signIn"
+        purpose: "signIn"
       })
     ])
 
@@ -589,14 +589,14 @@ describe("consumeVerificationCode", () => {
     })
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
     const oldCode = required(sentCodes[0], "first code").code
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
@@ -607,7 +607,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code: oldCode,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     expect(await liveCode(db)).not.toBeNull()
@@ -615,7 +615,7 @@ describe("consumeVerificationCode", () => {
     await consumeVerificationCode(internals, {
       identifier: "ada@example.com",
       code: newCode,
-      action: "signIn"
+      purpose: "signIn"
     })
   })
 
@@ -632,7 +632,7 @@ describe("consumeVerificationCode", () => {
     const send = () =>
       sendVerificationCode(internals, {
         identifier: emailIdentifier,
-        action: "signIn",
+        purpose: "signIn",
         locale: "en",
         headers: new Headers()
       })
@@ -644,7 +644,7 @@ describe("consumeVerificationCode", () => {
         consumeVerificationCode(internals, {
           identifier: "ada@example.com",
           code: wrongCode,
-          action: "signIn"
+          purpose: "signIn"
         })
       ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
 
@@ -654,7 +654,7 @@ describe("consumeVerificationCode", () => {
     let resendOnRead = true
     db.select = async (input) => {
       const rows = await realSelect(input)
-      if (resendOnRead && input.table === "otps") {
+      if (resendOnRead && input.table === "verifications") {
         resendOnRead = false
         await send()
       }
@@ -679,7 +679,7 @@ describe("consumeVerificationCode", () => {
     await consumeVerificationCode(internals, {
       identifier: "ada@example.com",
       code: codeB,
-      action: "signIn"
+      purpose: "signIn"
     })
   })
 
@@ -695,7 +695,7 @@ describe("consumeVerificationCode", () => {
     const { internals, db, sentCodes } = await createTestInternals()
     await sendVerificationCode(internals, {
       identifier: emailIdentifier,
-      action: "signIn",
+      purpose: "signIn",
       locale: "en",
       headers: new Headers()
     })
@@ -709,7 +709,7 @@ describe("consumeVerificationCode", () => {
     const realSelect = db.select.bind(db)
     db.select = async (input) => {
       const rows = await realSelect(input)
-      if (input.table === "otps") {
+      if (input.table === "verifications") {
         reads += 1
         if (reads === guesses) releaseReads()
         await allRead
@@ -722,7 +722,7 @@ describe("consumeVerificationCode", () => {
         consumeVerificationCode(internals, {
           identifier: "ada@example.com",
           code: wrongCode,
-          action: "signIn"
+          purpose: "signIn"
         })
       )
     )
@@ -739,7 +739,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -748,7 +748,7 @@ describe("consumeVerificationCode", () => {
     const { internals, db, code } = await sendAndRead()
     const stored = required(await liveCode(db), "stored")
     await db.update({
-      table: "otps",
+      table: "verifications",
       where: { id: stored.id },
       values: { expiresAt: new Date(Date.now() - 1000) }
     })
@@ -757,7 +757,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     // The row was already in hand, so it is deleted rather than left for the
@@ -772,7 +772,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "nobody@example.com",
         code: "123456",
-        action: "signIn"
+        purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })

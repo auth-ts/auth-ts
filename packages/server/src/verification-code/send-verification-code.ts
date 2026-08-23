@@ -1,4 +1,4 @@
-import type { OTPAction } from "../core/auth-db"
+import type { VerificationPurpose } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
@@ -23,7 +23,7 @@ export const VERIFICATION_CODE_TTL = "10m"
 /** What sending a code needs to know. */
 export interface SendVerificationCodeInput {
   identifier: CodeIdentifier
-  action: OTPAction
+  purpose: VerificationPurpose
   locale: string
   headers: Headers
 }
@@ -45,12 +45,12 @@ export async function sendVerificationCode(
   input: SendVerificationCodeInput
 ) {
   const { config } = internals
-  const { identifier, action, locale, headers } = input
+  const { identifier, purpose, locale, headers } = input
 
   if (config.rateLimit !== false) {
     const live = await selectOne(
       internals,
-      "otps",
+      "verifications",
       { identifier: identifier.value },
       { expiresAt: "desc" }
     )
@@ -64,10 +64,10 @@ export async function sendVerificationCode(
     }
 
     const perIdentifier =
-      action === "deleteUser"
+      purpose === "deleteUser"
         ? config.rateLimit.deleteUserPerIdentifier
         : config.rateLimit.sendCodePerIdentifier
-    const scope = action === "deleteUser" ? "deleteUser" : "sendCode"
+    const scope = purpose === "deleteUser" ? "deleteUser" : "sendCode"
     await checkRateLimit(
       internals,
       `${scope}:id:${identifier.value}`,
@@ -84,16 +84,16 @@ export async function sendVerificationCode(
   // Delete then insert: latest wins. Two sends racing can leave both rows for
   // an instant, and that is harmless — verification reads the newest, so the
   // earlier code is dead either way and the sweep collects it.
-  const swept = sweepExpired(internals, "otps")
+  const swept = sweepExpired(internals, "verifications")
   await internals.db.delete({
-    table: "otps",
+    table: "verifications",
     where: { identifier: identifier.value }
   })
-  await insertRow(internals, "otps", {
+  await insertRow(internals, "verifications", {
     identifier: identifier.value,
     codeHash,
     expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
-    action
+    purpose
   })
   await swept
 
@@ -109,23 +109,23 @@ export async function sendVerificationCode(
   // still in flight to the inbox. Serializing that would take a lock primitive
   // the database contract deliberately does not have.
   try {
-    await deliver(internals, identifier, code, locale, action, headers)
+    await deliver(internals, identifier, code, locale, purpose, headers)
   } catch (error) {
     await internals.db.delete({
-      table: "otps",
+      table: "verifications",
       where: { identifier: identifier.value, codeHash }
     })
     internals.log.error("verification code delivery failed", {
       channel: identifier.kind,
-      action
+      purpose
     })
     throw error
   }
-  // Channel and action only: the address is personal data and the code is a
+  // Channel and purpose only: the address is personal data and the code is a
   // credential, so neither is ever handed to a log sink.
   internals.log.info("verification code sent", {
     channel: identifier.kind,
-    action
+    purpose
   })
 }
 
@@ -135,7 +135,7 @@ async function deliver(
   identifier: CodeIdentifier,
   code: string,
   locale: string,
-  action: OTPAction,
+  purpose: VerificationPurpose,
   headers: Headers
 ) {
   const { config } = internals
@@ -146,7 +146,7 @@ async function deliver(
       email: identifier.value,
       code,
       locale,
-      action,
+      purpose,
       headers
     })
     return
@@ -157,7 +157,7 @@ async function deliver(
     phoneNumber: identifier.value,
     code,
     locale,
-    action,
+    purpose,
     headers
   })
 }

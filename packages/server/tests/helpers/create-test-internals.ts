@@ -13,7 +13,7 @@ export interface CapturedCode {
   destination: string
   code: string
   locale: string
-  action: "signIn" | "deleteUser"
+  purpose: "signIn" | "deleteUser"
   headers: Headers
 }
 
@@ -58,13 +58,13 @@ export async function createTestInternals(
   const config = resolveAuthServerConfig({
     db,
     email: {
-      sendCode: ({ email, code, locale, action, headers }) => {
+      sendCode: ({ email, code, locale, purpose, headers }) => {
         sentCodes.push({
           channel: "email",
           destination: email,
           code,
           locale,
-          action,
+          purpose,
           headers
         })
       }
@@ -79,13 +79,13 @@ export async function createTestInternals(
     ...(overrides.sms
       ? {
           sms: {
-            sendCode: ({ phoneNumber, code, locale, action, headers }) => {
+            sendCode: ({ phoneNumber, code, locale, purpose, headers }) => {
               sentCodes.push({
                 channel: "sms",
                 destination: phoneNumber,
                 code,
                 locale,
-                action,
+                purpose,
                 headers
               })
             }

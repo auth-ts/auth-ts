@@ -504,7 +504,7 @@ describe("account deletion", () => {
       })
     )
     expect(
-      await selectRows(context.db, "otps", {
+      await selectRows(context.db, "verifications", {
         identifier: "ada@example.com"
       })
     ).not.toEqual([])
@@ -515,7 +515,7 @@ describe("account deletion", () => {
 
     expect(response.status).toBe(204)
     expect(
-      await selectRows(context.db, "otps", {
+      await selectRows(context.db, "verifications", {
         identifier: "ada@example.com"
       })
     ).toEqual([])
@@ -579,7 +579,9 @@ describe("account deletion", () => {
     expect(response.status).toBe(403)
     expect(((await response.json()) as { code: string }).code).toBe("codeSent")
     expect(context.db.users()).toHaveLength(1)
-    expect(required(context.sentCodes.at(-1), "code").action).toBe("deleteUser")
+    expect(required(context.sentCodes.at(-1), "code").purpose).toBe(
+      "deleteUser"
+    )
   })
 
   it("treats a zero-length freshness window as always requiring a code", async () => {
@@ -693,7 +695,7 @@ describe("account deletion", () => {
       })
     )
     const signInCode = required(context.sentCodes.at(-1), "sign-in code")
-    expect(signInCode.action).toBe("signIn")
+    expect(signInCode.purpose).toBe("signIn")
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {

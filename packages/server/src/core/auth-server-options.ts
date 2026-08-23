@@ -29,7 +29,7 @@ export interface SendCodeContext {
    */
   headers: Headers
   /** Why the code was sent, so deletion mail can differ from sign-in mail. */
-  action: "signIn" | "deleteUser"
+  purpose: "signIn" | "deleteUser"
 }
 
 /** Email delivery. Supplying this enables email as a sign-in method. */

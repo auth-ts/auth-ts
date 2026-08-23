@@ -24,7 +24,7 @@ import { authenticate } from "../session/authenticate"
  */
 export type IdentityInfo = Omit<
   AuthIdentity,
-  "accessToken" | "refreshToken" | "accessTokenExpiresAt"
+  "accessTokenEncrypted" | "refreshTokenEncrypted" | "accessTokenExpiresAt"
 >
 
 /** Lists the signed-in user's linked providers. */
@@ -43,8 +43,12 @@ export const listIdentities = defineEndpoint({
       orderBy: { provider: "asc" }
     })
     const data: IdentityInfo[] = identities.map(
-      ({ accessToken, refreshToken, accessTokenExpiresAt, ...identity }) =>
-        identity
+      ({
+        accessTokenEncrypted,
+        refreshTokenEncrypted,
+        accessTokenExpiresAt,
+        ...identity
+      }) => identity
     )
 
     return { data }

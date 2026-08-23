@@ -201,8 +201,8 @@ export function createAuthServer<
         id: identityId
       })
 
-      return identity?.refreshToken
-        ? decryptSecret(resolved.secret, identity.refreshToken)
+      return identity?.refreshTokenEncrypted
+        ? decryptSecret(resolved.secret, identity.refreshTokenEncrypted)
         : null
     }
   }

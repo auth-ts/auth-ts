@@ -1,4 +1,4 @@
-import type { AuthOTP } from "../core/auth-db"
+import type { AuthVerification } from "../core/auth-db"
 import type { Duration } from "../lib/parse-duration"
 import { parseDuration } from "../lib/parse-duration"
 
@@ -17,7 +17,7 @@ import { parseDuration } from "../lib/parse-duration"
  * @returns Remaining seconds, or 0 when a send is allowed now.
  */
 export function getCooldownRemaining(
-  otp: AuthOTP | null,
+  otp: AuthVerification | null,
   codeTtl: Duration,
   cooldown: Duration
 ): number {

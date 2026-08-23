@@ -51,7 +51,7 @@ row's `id`.
 There is no cleanup schedule to own. The library sweeps expired rows itself,
 through your own [`AuthDB.delete`](/docs/reference/auth-db), on the requests
 that create new ones: a sign-in sweeps `sessions`, a code send sweeps
-`otps`, and the first attempt of each rate-limit window sweeps
+`verifications`, and the first attempt of each rate-limit window sweeps
 `attempts`. Garbage accrues only through inserts, so sweeping at insert time
 keys the sweep rate to the growth rate — including the rows left by people who
 never come back. Orphaned guests follow the same rule: any deletion of sessions

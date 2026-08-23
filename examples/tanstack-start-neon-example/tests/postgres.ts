@@ -4,7 +4,13 @@ import {
   generateMigration
 } from "drizzle-kit/api-postgres"
 import { drizzle } from "drizzle-orm/pglite"
-import { attempts, identities, otps, sessions, users } from "../src/db/schema"
+import {
+  attempts,
+  identities,
+  sessions,
+  users,
+  verifications
+} from "../src/db/schema"
 
 const client = new PGlite()
 await client.exec(`
@@ -20,7 +26,7 @@ const statements = await generateMigration(
   await generateDrizzleJson({
     users,
     sessions,
-    otps,
+    verifications,
     attempts,
     identities
   })

@@ -41,10 +41,17 @@ export async function encryptTokens(
 ): Promise<Partial<AuthIdentity>> {
   return {
     ...(tokens.accessToken
-      ? { accessToken: await encryptSecret(secret, tokens.accessToken) }
+      ? {
+          accessTokenEncrypted: await encryptSecret(secret, tokens.accessToken)
+        }
       : {}),
     ...(tokens.refreshToken
-      ? { refreshToken: await encryptSecret(secret, tokens.refreshToken) }
+      ? {
+          refreshTokenEncrypted: await encryptSecret(
+            secret,
+            tokens.refreshToken
+          )
+        }
       : {}),
     ...(tokens.accessTokenExpiresAt
       ? { accessTokenExpiresAt: tokens.accessTokenExpiresAt }

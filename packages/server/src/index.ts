@@ -12,7 +12,6 @@ export type {
   AuthInsert,
   AuthInsertInput,
   AuthOrderBy,
-  AuthOTP,
   AuthRange,
   AuthRow,
   AuthSelectInput,
@@ -21,10 +20,11 @@ export type {
   AuthTables,
   AuthUpdateInput,
   AuthUser,
+  AuthVerification,
   AuthWhere,
   CoreUserFields,
-  OTPAction,
-  UserType
+  UserType,
+  VerificationPurpose
 } from "./core/auth-db"
 export { defineAuthDB } from "./core/auth-db"
 export type { AuthServerConfig } from "./core/auth-server-config"

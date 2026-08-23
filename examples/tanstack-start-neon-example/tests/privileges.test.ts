@@ -13,12 +13,12 @@ const client = new PGlite()
 /** Columns the browser must never read, whatever a policy allows. */
 const SECRETS = [
   ["sessions", "tokenHash"],
-  ["identities", "accessToken"],
-  ["identities", "refreshToken"]
+  ["identities", "accessTokenEncrypted"],
+  ["identities", "refreshTokenEncrypted"]
 ]
 
 /** Tables with RLS on and no policy — the Data API role sees and writes nothing. */
-const SERVER_ONLY = ["otps", "attempts"]
+const SERVER_ONLY = ["verifications", "attempts"]
 
 /**
  * Every column withheld from the Data API role, per table with a column grant.
@@ -36,7 +36,7 @@ const SERVER_ONLY = ["otps", "attempts"]
  */
 const WITHHELD: Record<string, string[]> = {
   sessions: ["tokenHash"],
-  identities: ["accessToken", "refreshToken"]
+  identities: ["accessTokenEncrypted", "refreshTokenEncrypted"]
 }
 
 beforeAll(async () => {
@@ -138,7 +138,7 @@ describe("privileges.sql", () => {
         `insert into "${table}" ${
           table === "attempts"
             ? `("key", "expiresAt") values ('k', now() + interval '10 minutes')`
-            : `("identifier", "codeHash", "action", "expiresAt")
+            : `("identifier", "codeHash", "purpose", "expiresAt")
                values ('a@example.test', 'x', 'signIn', now() + interval '10 minutes')`
         }`
       )

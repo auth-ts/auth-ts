@@ -44,13 +44,13 @@ export async function createTestServer(
   const authServer = createAuthServer({
     db,
     email: {
-      sendCode: ({ email, code, locale, action, headers }) => {
+      sendCode: ({ email, code, locale, purpose, headers }) => {
         sentCodes.push({
           channel: "email",
           destination: email,
           code,
           locale,
-          action,
+          purpose,
           headers
         })
       }

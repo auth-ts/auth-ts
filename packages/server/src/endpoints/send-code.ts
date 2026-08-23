@@ -39,7 +39,7 @@ export const sendCode = defineEndpoint({
 
     await sendVerificationCode(internals, {
       identifier,
-      action: "signIn",
+      purpose: "signIn",
       locale:
         input.locale ?? internals.config.localization?.defaultLocale ?? "en",
       headers: input.headers ?? new Headers()

@@ -497,18 +497,18 @@ export const authDBChecks: AuthDBCheck[] = [
     async run(db) {
       const identifier = `${unique()}@example.test`
       for (const expiresAt of [past(), future()]) {
-        await create(db, "otps", {
+        await create(db, "verifications", {
           identifier,
           codeHash: `${unique()}`,
           expiresAt,
-          action: "signIn",
+          purpose: "signIn",
           createdAt: new Date(),
           updatedAt: new Date()
         })
       }
       try {
         const removed = await db.delete({
-          table: "otps",
+          table: "verifications",
           where: { identifier, expiresAt: { lt: new Date() } }
         })
 
@@ -520,7 +520,7 @@ export const authDBChecks: AuthDBCheck[] = [
         )
 
         const left = await db.select({
-          table: "otps",
+          table: "verifications",
           where: { identifier },
           limit: 10,
           offset: 0,
@@ -533,7 +533,7 @@ export const authDBChecks: AuthDBCheck[] = [
           "the delete removed the row that had not expired yet, signing people out early"
         )
       } finally {
-        await db.delete({ table: "otps", where: { identifier } })
+        await db.delete({ table: "verifications", where: { identifier } })
       }
     }
   }

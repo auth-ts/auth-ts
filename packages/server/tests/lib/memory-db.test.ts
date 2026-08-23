@@ -34,7 +34,7 @@ const attempt = (key: string, expiresAt = new Date(Date.now() + 60_000)) =>
     values: { key, expiresAt, createdAt: new Date(), updatedAt: new Date() }
   })
 
-const read = <T extends "users" | "sessions" | "otps" | "attempts">(
+const read = <T extends "users" | "sessions" | "verifications" | "attempts">(
   table: T,
   where: Record<string, unknown> = {},
   limit = 100
@@ -164,30 +164,30 @@ describe("select", () => {
     const older = new Date("2026-01-01T00:00:00Z")
     const newer = new Date("2026-06-01T00:00:00Z")
     await db.insert({
-      table: "otps",
+      table: "verifications",
       values: {
         identifier,
         codeHash: "old",
         expiresAt: older,
-        action: "signIn",
+        purpose: "signIn",
         createdAt: new Date(),
         updatedAt: new Date()
       }
     })
     await db.insert({
-      table: "otps",
+      table: "verifications",
       values: {
         identifier,
         codeHash: "new",
         expiresAt: newer,
-        action: "signIn",
+        purpose: "signIn",
         createdAt: new Date(),
         updatedAt: new Date()
       }
     })
 
     const [newest] = await db.select({
-      table: "otps",
+      table: "verifications",
       where: { identifier },
       limit: 1,
       offset: 0,

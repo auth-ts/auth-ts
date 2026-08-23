@@ -1,4 +1,4 @@
-import type { OTPAction, UserType } from "@auth-ts/server"
+import type { UserType, VerificationPurpose } from "@auth-ts/server"
 import { sql } from "drizzle-orm"
 import { authenticatedRole } from "drizzle-orm/neon"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
@@ -91,14 +91,17 @@ export const sessions = pgTable.withRLS(
   ]
 )
 
-export const otps = pgTable.withRLS(
-  "otps",
+export const verifications = pgTable.withRLS(
+  "verifications",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     identifier: text("identifier").notNull(),
     codeHash: text("codeHash").notNull(),
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
-    action: text("action").$type<OTPAction>().notNull().default("signIn"),
+    purpose: text("purpose")
+      .$type<VerificationPurpose>()
+      .notNull()
+      .default("signIn"),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -108,9 +111,12 @@ export const otps = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    index("otpsIdentifierIndex").on(table.identifier),
-    index("otpsExpiresAtIndex").on(table.expiresAt),
-    check("otpsActionCheck", sql`"action" in ('signIn', 'deleteUser')`)
+    index("verificationsIdentifierIndex").on(table.identifier),
+    index("verificationsExpiresAtIndex").on(table.expiresAt),
+    check(
+      "verificationsPurposeCheck",
+      sql`"purpose" in ('signIn', 'deleteUser')`
+    )
   ]
 )
 
@@ -147,11 +153,11 @@ export const identities = pgTable.withRLS(
     // Encrypted by the library before they ever arrive here, and revoked from
     // the Data API role in privileges.sql — a connected account's credentials
     // have no business in a browser, ciphertext or not.
-    accessToken: text("accessToken"),
+    accessTokenEncrypted: text("accessTokenEncrypted"),
     accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
       withTimezone: true
     }),
-    refreshToken: text("refreshToken"),
+    refreshTokenEncrypted: text("refreshTokenEncrypted"),
     refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
       withTimezone: true
     }),

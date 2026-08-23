@@ -6,9 +6,9 @@ export const authServer = createAuthServer({
   db: authDB,
   waitUntil,
   email: {
-    sendCode: ({ email, code, action }) => {
+    sendCode: ({ email, code, purpose }) => {
       if (process.env.NODE_ENV === "development") {
-        console.log(`${action} code for ${email}: ${code}`)
+        console.log(`${purpose} code for ${email}: ${code}`)
       }
     }
   },

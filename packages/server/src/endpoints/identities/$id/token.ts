@@ -94,12 +94,12 @@ function liveAccessToken(
   internals: AuthServerInternals,
   identity: AuthIdentity
 ) {
-  if (!identity.accessToken) return null
+  if (!identity.accessTokenEncrypted) return null
 
   const expiry = identity.accessTokenExpiresAt
   if (expiry && expiry.getTime() <= Date.now() + EXPIRY_SKEW_MS) return null
 
-  return decryptSecret(internals.config.secret, identity.accessToken)
+  return decryptSecret(internals.config.secret, identity.accessTokenEncrypted)
 }
 
 /** Trades the stored refresh token for a fresh grant, and records what comes back. */
@@ -108,8 +108,11 @@ async function refreshProviderToken(
   identity: AuthIdentity
 ): Promise<ProviderTokenResult> {
   const configured = getProvider(internals.config.providers, identity.provider)
-  const refreshToken = identity.refreshToken
-    ? await decryptSecret(internals.config.secret, identity.refreshToken)
+  const refreshToken = identity.refreshTokenEncrypted
+    ? await decryptSecret(
+        internals.config.secret,
+        identity.refreshTokenEncrypted
+      )
     : null
 
   // Nothing to refresh with, nothing that knows how, or a refresh token whose
@@ -143,9 +146,9 @@ async function refreshProviderToken(
         table: "identities",
         where: { id: identity.id },
         values: {
-          accessToken: null,
+          accessTokenEncrypted: null,
           accessTokenExpiresAt: null,
-          refreshToken: null,
+          refreshTokenEncrypted: null,
           refreshTokenExpiresAt: null,
           scope: null,
           updatedAt: new Date()

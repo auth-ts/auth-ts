@@ -62,12 +62,12 @@ describe("sweeping", () => {
   it("sending a code sweeps expired verification rows", async () => {
     const context = await createTestServer()
     await context.db.insert({
-      table: "otps",
+      table: "verifications",
       values: {
         identifier: "grace@example.com",
         codeHash: "stale-code",
         expiresAt: new Date(Date.now() - 1000),
-        action: "signIn",
+        purpose: "signIn",
         createdAt: new Date(Date.now() - 2000),
         updatedAt: new Date(Date.now() - 2000)
       }
@@ -75,7 +75,7 @@ describe("sweeping", () => {
 
     await context.authServer.handler(sendCode())
 
-    const remaining = context.db.rows("otps")
+    const remaining = context.db.rows("verifications")
     expect(remaining).toHaveLength(1)
     expect(required(remaining[0], "code").identifier).toBe("ada@example.com")
   })
