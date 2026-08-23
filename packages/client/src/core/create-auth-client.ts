@@ -1,3 +1,4 @@
+import { decodeToken } from "../lib/decode-token"
 import {
   createDeleteUser,
   createListSessions,
@@ -70,6 +71,12 @@ export interface AuthClient {
   setLocale: (locale: string | undefined) => void
   /** Drops the in-memory token only — the 401-retry helper. Leaves the session alone. */
   clearToken: () => void
+  /**
+   * Reads a token's claims **without verifying it** — `sid` for which session
+   * row is this device, `sub`, `exp`. The server's `decodeToken`, same rule:
+   * never authorize with it.
+   */
+  decodeToken: typeof decodeToken
 }
 
 /**
@@ -111,6 +118,7 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     setLocale: (locale) => {
       internals.locale = locale
     },
-    clearToken: () => internals.tokenStore.clear()
+    clearToken: () => internals.tokenStore.clear(),
+    decodeToken
   }
 }

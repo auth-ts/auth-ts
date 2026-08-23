@@ -47,8 +47,10 @@ cold read costs one request rather than two.
 with it. Every other failure throws — a 502 from a proxy is not a statement about
 whether anyone is signed in.
 
-`getSession()` returns the session this browser is on. Its `id` is how a device
-list tells which entry is this device.
+`getSession()` returns the session this browser is on, confirmed live, with the
+`createdAt` a freshness check reads. To merely know *which* session this is,
+there is no need to ask: the token names it, and `decodeToken(token)?.claims.sid`
+costs no request.
 
 The client keeps no user state at all. No mirror, no `localStorage`, no cross-tab
 listener. Caching, persistence, retry, and refetch-on-focus are what a query
@@ -142,8 +144,13 @@ export function useUser() {
 }
 ```
 
-`data` is the user, or `null`. `getSession()`'s `id` is how a device list tells
-which entry is this device — the list does not carry a flag saying so.
+`data` is the user, or `null`. A device list tells which entry is this device
+by comparing each row's `id` to the token's `sid` — the list does not carry a
+flag saying so, and the token is already in hand:
+
+```ts
+const currentSessionId = authClient.decodeToken(token)?.claims.sid
+```
 
 ### Reading the user from your own database
 

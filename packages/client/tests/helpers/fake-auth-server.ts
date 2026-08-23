@@ -60,6 +60,7 @@ export function fakeAccessToken({
 
   const payload = {
     sub: "user-1",
+    sid: "session-1",
     iat: Math.floor(issuedAt / 1000),
     exp: Math.floor(issuedAt / 1000) + lifetimeSeconds
   }

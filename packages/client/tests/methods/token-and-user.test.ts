@@ -43,6 +43,26 @@ describe("construction", () => {
   })
 })
 
+describe("decodeToken", () => {
+  it("reads the claims the browser has a use for, and says when they have expired", () => {
+    const client = createAuthClient()
+
+    const live = client.decodeToken(fakeAccessToken())
+    expect(live?.claims).toMatchObject({ sub: "user-1", sid: "session-1" })
+    expect(live?.expired).toBe(false)
+
+    const spent = client.decodeToken(
+      fakeAccessToken({
+        issuedAt: Date.now() - 3_600_000,
+        lifetimeSeconds: 600
+      })
+    )
+    expect(spent?.expired).toBe(true)
+
+    expect(client.decodeToken("not a token")).toBeNull()
+  })
+})
+
 describe("getToken", () => {
   it("reports the user it minted from, and only when it minted", async () => {
     server.on("GET", "/api/auth/token", {

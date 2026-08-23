@@ -1,4 +1,4 @@
-import { readLifetimeClaims } from "../lib/read-lifetime-claims"
+import { decodeToken } from "../lib/decode-token"
 
 /** The in-memory access token and what is known about its lifetime. */
 export interface TokenState {
@@ -61,7 +61,7 @@ export function createTokenStore(): TokenStore {
     get: () => state,
 
     set(token) {
-      const claims = readLifetimeClaims(token)
+      const claims = decodeToken(token)?.claims ?? {}
       const now = Date.now()
       const issuedAt = typeof claims.iat === "number" ? claims.iat * 1000 : now
       const expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : now
