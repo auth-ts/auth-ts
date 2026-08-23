@@ -1,3 +1,9 @@
+# Package manager
+
+**bun.** Never `npm`, `yarn`, or `pnpm` — the Nx guidance below uses `pnpm nx`
+only as an example of prefixing with the workspace's package manager. Here that
+is `bun nx`.
+
 # Comments
 
 Write fewer. Most code here has none, and that is the intended state.
