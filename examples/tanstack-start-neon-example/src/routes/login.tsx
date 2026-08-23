@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/icons"
 import { useCountdown } from "../hooks/use-countdown"
-import { useUser } from "../hooks/use-user"
+import { useToken } from "../hooks/use-token"
 import { authClient } from "../lib/auth-client"
 
 export const Route = createFileRoute("/login")({ component: LoginPage })
@@ -16,7 +16,8 @@ interface Notice {
 /** Every way in that this demo has configured. */
 function LoginPage() {
   const navigate = useNavigate()
-  const { refetch: refetchUser } = useUser()
+  // The token gates the user query, so refetching it pulls the rest through.
+  const { refetch: refetchToken } = useToken()
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [stage, setStage] = useState<"email" | "code">("email")
@@ -56,8 +57,8 @@ function LoginPage() {
     setNotice(null)
     try {
       await authClient.verifyCode({ email, code })
-      // Nothing pushes the new user into the cache, so ask for it.
-      await refetchUser()
+      // Nothing pushes the new session into the cache, so ask for it.
+      await refetchToken()
       await navigate({ to: "/todos" })
     } catch (error) {
       report(error)
@@ -168,7 +169,7 @@ function LoginPage() {
               type="button"
               onClick={async () => {
                 await authClient.signInAsGuest()
-                await refetchUser()
+                await refetchToken()
                 await navigate({ to: "/todos" })
               }}
               className="btn btn-ghost w-full"

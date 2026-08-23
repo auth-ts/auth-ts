@@ -1,19 +1,31 @@
-import { useQuery } from "@tanstack/react-query"
-import { authClient } from "../lib/auth-client"
+import { skipToken, useQuery } from "@tanstack/react-query"
 
-/** The query key the session lives under, shared so other hooks can scope to it. */
-export const sessionQueryKey = ["session"] as const
+import { postgrest } from "../db/postgrest"
+import { useToken } from "./use-token"
 
-/**
- * The signed-in user, the session, and a token — or `null` when signed out.
- *
- * `getUser` always reads the server, so caching, refetching, and persistence
- * are decided here rather than inside the auth client. Anything that changes
- * who is signed in invalidates this key.
- */
+export const userQueryKey = ["user"] as const
+
 export function useUser() {
+  const { data: token, isPending: isTokenPending } = useToken()
+
   return useQuery({
-    queryKey: sessionQueryKey,
-    queryFn: authClient.getUser
+    queryKey: userQueryKey,
+    queryFn: isTokenPending
+      ? skipToken
+      : async () => {
+          if (!token) return null
+
+          const { data } = await postgrest
+            .from("users")
+            .select()
+            .single()
+            .throwOnError()
+
+          return {
+            ...data,
+            createdAt: new Date(data.createdAt),
+            updatedAt: new Date(data.updatedAt)
+          }
+        }
   })
 }

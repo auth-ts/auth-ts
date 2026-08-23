@@ -4,7 +4,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/icons"
 import { useCountdown } from "../hooks/use-countdown"
-import { useUser } from "../hooks/use-user"
+import { userQueryKey, useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 
 export const Route = createFileRoute("/account")({ component: AccountPage })
@@ -63,9 +63,10 @@ function AccountPage() {
 
   const rename = useMutation({
     mutationFn: (name: string) => authClient.updateUser({ name }),
-    onSuccess: () => {
+    onSuccess: async () => {
       setDraftName(null)
       setNotice({ text: "Saved.", tone: "success" })
+      await queryClient.invalidateQueries({ queryKey: userQueryKey })
     }
   })
 
