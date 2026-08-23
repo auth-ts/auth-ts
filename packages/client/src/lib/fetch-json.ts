@@ -9,6 +9,9 @@ export interface FetchJsonOptions {
   body?: unknown
 }
 
+/** The response header a freshly minted access token arrives in. */
+export const TOKEN_HEADER = "x-auth-token"
+
 /** Issues authenticated requests to the auth server and unwraps its responses. */
 export type FetchJson = <Result>(options: FetchJsonOptions) => Promise<Result>
 
@@ -27,7 +30,9 @@ export function createFetchJson(
   config: AuthClientConfig,
   getLocale: () => string | undefined,
   /** The access token to present, when one is worth presenting. */
-  getBearer: () => string | undefined
+  getBearer: () => string | undefined,
+  /** Called with any token the server sent back, on every response. */
+  onToken: (token: string) => void
 ): FetchJson {
   const base = `${config.baseURL}${config.basePath}`
 
@@ -53,6 +58,11 @@ export function createFetchJson(
     } catch (cause) {
       throw new AuthNetworkError(cause)
     }
+
+    // Read before anything else, including on failures: an endpoint that
+    // refused the request may still have refreshed the token on the way.
+    const minted = response.headers.get(TOKEN_HEADER)
+    if (minted) onToken(minted)
 
     if (!response.ok) {
       const parsed = (await response

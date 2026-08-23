@@ -1,8 +1,10 @@
+import type { AuthUser } from "../../core/auth-db"
 import { AuthApiError } from "../../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { insertRow } from "../../lib/insert-row"
+import { TOKEN_HEADER } from "../../session/authenticate"
 import type { IssueMode } from "../../session/issue-session"
 import { issueSession } from "../../session/issue-session"
 
@@ -72,13 +74,14 @@ export const signInGuest = defineEndpoint({
       ...(input.mode ? { mode: input.mode } : {})
     })
 
-    return {
-      data: {
-        token: issued.token,
-        user: issued.user,
-        ...(issued.refreshToken ? { refreshToken: issued.refreshToken } : {})
-      },
-      headers: issued.headers
+    const responseHeaders = new Headers(issued.headers)
+    responseHeaders.set(TOKEN_HEADER, issued.token)
+
+    const data: { user: AuthUser; refreshToken?: string } = {
+      user: issued.user
     }
+    if (issued.refreshToken) data.refreshToken = issued.refreshToken
+
+    return { data, headers: responseHeaders }
   }
 })

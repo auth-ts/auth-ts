@@ -35,6 +35,6 @@ export const disconnectProvider = defineEndpoint({
     })
     if (deleted.length === 0) throw new AuthApiError("notFound", 404)
 
-    return { data: undefined, status: 204 }
+    return { data: undefined, status: 204, headers: caller.headers }
   }
 })

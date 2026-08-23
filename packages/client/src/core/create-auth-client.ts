@@ -1,4 +1,3 @@
-import { readLifetimeClaims } from "../lib/read-lifetime-claims"
 import {
   createDeleteUser,
   createListSessions,
@@ -16,7 +15,6 @@ import { createGetSession } from "../methods/get-session"
 import { createGetToken } from "../methods/get-token"
 import { createGetUser } from "../methods/get-user"
 import { createConnect, createSignIn } from "../methods/oauth"
-import type { SignInResult } from "../methods/sign-in-with-code"
 import {
   createSendCode,
   createSignInAsGuest,
@@ -74,11 +72,6 @@ export interface AuthClient {
 export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   const internals = createAuthClientInternals(options)
 
-  /** Keeps the token a sign-in already produced, so the next call needs no refresh. */
-  const primeSession = (result: SignInResult) => {
-    internals.tokenStore.set(result.token, readLifetimeClaims(result.token))
-  }
-
   const getToken = createGetToken(internals)
 
   return {
@@ -86,8 +79,8 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     getUser: createGetUser(internals),
     getSession: createGetSession(internals),
     sendCode: createSendCode(internals),
-    verifyCode: createVerifyCode(internals, primeSession),
-    signInAsGuest: createSignInAsGuest(internals, primeSession),
+    verifyCode: createVerifyCode(internals),
+    signInAsGuest: createSignInAsGuest(internals),
     signIn: createSignIn(internals),
     connect: createConnect(internals),
     listConnections: createListConnections(internals),
@@ -95,10 +88,10 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     listSessions: createListSessions(internals),
     revokeSession: createRevokeSession(internals),
     listAccounts: createListAccounts(internals),
-    switchAccount: createSwitchAccount(internals, primeSession),
+    switchAccount: createSwitchAccount(internals),
     updateUser: createUpdateUser(internals),
     deleteUser: createDeleteUser(internals),
-    signOut: createSignOut(internals, primeSession),
+    signOut: createSignOut(internals),
     setLocale: (locale) => {
       internals.locale = locale
     },

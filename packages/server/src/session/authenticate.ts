@@ -1,7 +1,9 @@
+import type { AuthSession } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { unauthenticated } from "../http/auth-api-error"
 import { inspectToken } from "../jwt/verify-token"
 import { sha256Hex } from "../lib/hash"
+import { mintAccessToken } from "./issue-session"
 import { readRefreshToken, resolveSession } from "./resolve-session"
 
 /**
@@ -16,11 +18,29 @@ export interface CallerInput {
   token?: string
 }
 
-/** Who is calling, and the hash of the session cookie they sent, if they sent one. */
+/** The response header a freshly minted access token is delivered in. */
+export const TOKEN_HEADER = "x-auth-token"
+
+/** Who is calling, the cookie hash if one rode along, and anything to send back. */
 export interface Caller {
   userId: string
   /** Present whenever a refresh cookie rode along — it is a hash, not a lookup. */
   tokenHash: string | null
+  /**
+   * Headers the response must carry: a new access token, when this request had
+   * to fall back to the cookie to authenticate.
+   *
+   * Every endpoint returns these, so any request can refresh the token. There
+   * is no endpoint whose job that is.
+   */
+  headers: Headers
+  /**
+   * The session, when the cookie was what authenticated this request.
+   *
+   * Carried rather than dropped: the fallback has just read and touched the row,
+   * so an endpoint that needs it should not go and read it again.
+   */
+  session?: AuthSession
 }
 
 /**
@@ -53,6 +73,8 @@ export async function authenticate(
   const bearer =
     input.token ?? headers?.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]
 
+  let reason: "missing" | "expired" | "invalid" = "missing"
+
   if (bearer) {
     const { config } = internals
     const { verificationKeys } = await internals.keys()
@@ -67,19 +89,34 @@ export async function authenticate(
     )
 
     if (verdict.status === "valid" && verdict.claims.sub) {
-      return { userId: verdict.claims.sub, tokenHash }
+      // Nothing to send back: the token they hold is the token they need.
+      return { userId: verdict.claims.sub, tokenHash, headers: new Headers() }
     }
-    if (verdict.status === "invalid") {
-      internals.log.debug("bearer token did not verify")
-      throw unauthenticated()
-    }
-    internals.log.debug("bearer token expired, falling back to the cookie")
+    reason = verdict.status === "expired" ? "expired" : "invalid"
   }
+
+  // Logged on every fallback, including the one nobody thinks about — a caller
+  // that sends no token at all. Counting these is how a client that has stopped
+  // reading the token header shows up as a graph rather than as an unexplained
+  // load on the database: a healthy deployment falls back about once per token
+  // lifetime per client, and no more.
+  internals.log.debug("authenticating from the cookie", { reason })
 
   if (!headers) throw unauthenticated()
 
+  // The cookie path is also the refresh path, and the only place a session is
+  // touched. A token lives ten minutes, so this runs about that often rather
+  // than on every request.
   const resolved = await resolveSession(internals, headers)
   if (!resolved) throw unauthenticated()
 
-  return { userId: resolved.user.id, tokenHash: resolved.tokenHash }
+  const minted = new Headers()
+  minted.set(TOKEN_HEADER, await mintAccessToken(internals, resolved.user))
+
+  return {
+    userId: resolved.user.id,
+    tokenHash: resolved.tokenHash,
+    headers: minted,
+    session: resolved.session
+  }
 }

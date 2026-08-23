@@ -3,8 +3,7 @@ import { useUser } from "../hooks/use-user"
 import { Logo } from "./logo"
 
 export function Header() {
-  const { data } = useUser()
-  const user = data?.user
+  const { data: user } = useUser()
   const label = user?.name ?? user?.email ?? user?.phoneNumber ?? "Guest"
 
   return (

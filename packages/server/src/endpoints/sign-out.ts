@@ -13,7 +13,7 @@ import {
   serializeAccounts
 } from "../session/accounts-cookie"
 import type { CallerInput } from "../session/authenticate"
-import { authenticate } from "../session/authenticate"
+import { authenticate, TOKEN_HEADER } from "../session/authenticate"
 import { mintAccessToken } from "../session/issue-session"
 import { promoteNextAccount } from "../session/promote-account"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
@@ -151,13 +151,13 @@ export const signOut = defineEndpoint({
 
     const promoted = await promoteNextAccount(internals, remaining, secure)
     if (promoted) {
-      return {
-        data: {
-          switchedTo: promoted.user,
-          token: await mintAccessToken(internals, promoted.user)
-        },
-        headers: promoted.headers
-      }
+      // The browser is now acting as someone else, so it gets that account's
+      // token. Signing out without a promotion sends none: handing over a fresh
+      // credential on the way out would be perverse.
+      const headers = new Headers(promoted.headers)
+      headers.set(TOKEN_HEADER, await mintAccessToken(internals, promoted.user))
+
+      return { data: { switchedTo: promoted.user }, headers }
     }
 
     const responseHeaders = new Headers()

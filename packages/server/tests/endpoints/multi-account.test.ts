@@ -56,9 +56,9 @@ describe("multiAccount disabled", () => {
     const whoami = await context.authServer.handler(
       request("GET", "/api/auth/user", { cookies: second.cookies })
     )
-    expect(
-      ((await whoami.json()) as { user: { email: string } }).user.email
-    ).toBe("grace@example.com")
+    expect(((await whoami.json()) as { email: string }).email).toBe(
+      "grace@example.com"
+    )
     expect(second.cookies["auth-ts.refresh.accounts"]).toBeUndefined()
 
     // Replaced means replaced: the browser overwrote its cookie, so the row the
@@ -182,14 +182,17 @@ describe("multiAccount enabled", () => {
         body: { userId: adaId }
       })
     )
-    const body = (await response.json()) as {
-      token: string
-      user: { email: string }
-    }
+    const body = (await response.json()) as { email: string }
 
     expect(response.status).toBe(200)
-    expect(body.user.email).toBe("ada@example.com")
-    expect((await context.authServer.verifyToken(body.token))?.sub).toBe(adaId)
+    expect(body.email).toBe("ada@example.com")
+    expect(
+      (
+        await context.authServer.verifyToken(
+          required(response.headers.get("x-auth-token"), "token header")
+        )
+      )?.sub
+    ).toBe(adaId)
 
     const switched = readSetCookies(response)
     const whoami = await context.authServer.handler(
@@ -202,9 +205,9 @@ describe("multiAccount enabled", () => {
         }
       })
     )
-    expect(
-      ((await whoami.json()) as { user: { email: string } }).user.email
-    ).toBe("ada@example.com")
+    expect(((await whoami.json()) as { email: string }).email).toBe(
+      "ada@example.com"
+    )
   })
 
   it("404s a switch to an account this browser is not holding", async () => {
@@ -382,9 +385,9 @@ describe("multiAccount enabled", () => {
         }
       })
     )
-    expect(
-      ((await whoami.json()) as { user: { email: string } }).user.email
-    ).toBe("ada@example.com")
+    expect(((await whoami.json()) as { email: string }).email).toBe(
+      "ada@example.com"
+    )
   })
 
   it("reaches every parked account's other devices under scope: global", async () => {

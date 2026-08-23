@@ -1,15 +1,5 @@
-import type { AuthUser, CurrentSession } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
-import { readLifetimeClaims } from "../lib/read-lifetime-claims"
-
-/** What `GET /user` returns: the session it slid, the user, and a fresh token. */
-export interface UserResponse {
-  session: CurrentSession
-  user: AuthUser
-  /** Absent when the request carried a token that is still live. */
-  token?: string
-}
 
 /**
  * Returns a usable access token, refreshing only when necessary.
@@ -44,20 +34,19 @@ export function createGetToken(internals: AuthClientInternals) {
       internals.log.debug("refreshing access token")
 
       try {
-        // The user read is what mints a token, so refreshing and reading the
-        // user are one request rather than two.
-        const result = await internals.fetchJson<UserResponse>({
-          method: "GET",
-          path: "/user"
-        })
+        // Through the user read, not the session read: minting needs the user
+        // row for its `type` claim, so this is the one endpoint where that cost
+        // is not wasted. The token arrives in the response header and the fetch
+        // layer has already stored it.
+        await internals.fetchJson<unknown>({ method: "GET", path: "/user" })
+        const refreshed = internals.tokenStore.get()
         // No bearer was sent — this path runs only when the held token is
         // spent — so the server always answers with one.
-        if (!result.token) {
+        if (!refreshed) {
           throw new Error("the user read returned no token to refresh with")
         }
-        internals.tokenStore.set(result.token, readLifetimeClaims(result.token))
 
-        return result.token
+        return refreshed.token
       } catch (error) {
         // Only the server saying "no session" is grounds to forget the user. A
         // 500, a 502 from the proxy, a 429 — every non-2xx becomes an AuthError,

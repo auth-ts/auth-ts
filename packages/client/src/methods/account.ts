@@ -50,16 +50,13 @@ export interface SignOutInput {
  * active one and another is parked, the server promotes it and the caches are
  * primed with that user instead of emptied.
  */
-export function createSignOut(
-  internals: AuthClientInternals,
-  primeSession: (result: { token: string; user: AuthUser }) => void
-) {
+export function createSignOut(internals: AuthClientInternals) {
   return async function signOut(
     input: SignOutInput = {}
   ): Promise<{ switchedTo: AuthUser } | null> {
     const scope = input.scope ?? "local"
     const result = await internals.fetchJson<
-      { switchedTo?: AuthUser; token?: string } | undefined
+      { switchedTo?: AuthUser } | undefined
     >({
       method: "POST",
       path: "/sign-out",
@@ -68,10 +65,9 @@ export function createSignOut(
 
     if (scope === "others") return null
 
-    if (result?.switchedTo && result.token) {
-      primeSession({ token: result.token, user: result.switchedTo })
-      return { switchedTo: result.switchedTo }
-    }
+    // The promoted account's token came back in the header and is already
+    // stored; only a sign-out with nothing to promote clears it.
+    if (result?.switchedTo) return { switchedTo: result.switchedTo }
 
     internals.tokenStore.clear()
 

@@ -43,9 +43,7 @@ describe("guest sign-in", () => {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
-    expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
-      user.id
-    )
+    expect(((await whoami.json()) as { id: string }).id).toBe(user.id)
   })
 
   it("creates a separate user per guest sign-in", async () => {

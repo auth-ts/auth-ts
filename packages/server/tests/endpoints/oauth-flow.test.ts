@@ -548,9 +548,7 @@ describe("oauth callback", () => {
         }
       })
     )
-    expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
-      owner.id
-    )
+    expect(((await whoami.json()) as { id: string }).id).toBe(owner.id)
     // The guest session was replaced by the callback, not left live beside it.
     expect(
       (

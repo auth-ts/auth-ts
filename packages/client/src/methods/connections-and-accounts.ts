@@ -48,10 +48,7 @@ export interface SwitchAccountInput {
  * the whole interface flips at the same moment rather than briefly showing one
  * account's name above another's data.
  */
-export function createSwitchAccount(
-  internals: AuthClientInternals,
-  primeSession: (result: { token: string; user: AuthUser }) => void
-) {
+export function createSwitchAccount(internals: AuthClientInternals) {
   return async function switchAccount(
     input: SwitchAccountInput
   ): Promise<AuthUser> {
@@ -63,7 +60,6 @@ export function createSwitchAccount(
       path: "/accounts/switch",
       body: input
     })
-    primeSession(result)
 
     return result.user
   }

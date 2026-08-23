@@ -2,6 +2,7 @@ import type { FetchJson } from "../lib/fetch-json"
 import { createFetchJson } from "../lib/fetch-json"
 import type { LeveledLogger } from "../lib/logger"
 import { createLogger } from "../lib/logger"
+import { readLifetimeClaims } from "../lib/read-lifetime-claims"
 import type { AuthClientConfig } from "./auth-client-config"
 import { resolveAuthClientConfig } from "./auth-client-config"
 import type { AuthClientOptions } from "./auth-client-options"
@@ -52,7 +53,10 @@ export function createAuthClientInternals(
       const held = tokenStore.get()
 
       return held && !tokenStore.isExpiringSoon() ? held.token : undefined
-    }
+    },
+    // Any response may carry a new token, so this is the only place one is
+    // ever stored.
+    (token) => tokenStore.set(token, readLifetimeClaims(token))
   )
 
   return internals

@@ -24,7 +24,8 @@ afterEach(() => {
 describe("verifyCode", () => {
   it("primes the token and user without a second round-trip", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     const client = createAuthClient()
 
@@ -80,7 +81,8 @@ describe("updateUser", () => {
 describe("signOut", () => {
   it("clears local state for the local scope", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
@@ -94,7 +96,8 @@ describe("signOut", () => {
 
   it("keeps local state for the others scope, which is the point of it", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
@@ -120,7 +123,8 @@ describe("signOut", () => {
 
   it("adopts the promoted account when the server switches to one", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     server.on("POST", "/api/auth/sign-out", {
       body: { switchedTo: other, token: fakeAccessToken() }
@@ -150,7 +154,8 @@ describe("deleteUser", () => {
 
   it("clears everything once the account is gone", async () => {
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     server.on("DELETE", "/api/auth/user", { status: 204 })
     const client = createAuthClient()
@@ -193,7 +198,8 @@ describe("sessions and accounts", () => {
     })
     server.on("DELETE", "/api/auth/sessions/b", { body: { current: false } })
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
 
     const client = createAuthClient()
@@ -220,7 +226,8 @@ describe("sessions and accounts", () => {
   it("clears local state when the server reports the revoked session as current", async () => {
     server.on("DELETE", "/api/auth/sessions/a", { body: { current: true } })
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
 
     const client = createAuthClient()
@@ -231,10 +238,12 @@ describe("sessions and accounts", () => {
   it("returns the account it switched to, and keeps that account's token", async () => {
     const switched = fakeAccessToken()
     server.on("POST", "/api/auth/verify-code", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     server.on("POST", "/api/auth/accounts/switch", {
-      body: { token: switched, user: other }
+      body: { user: other },
+      token: switched
     })
 
     const client = createAuthClient()

@@ -28,18 +28,16 @@ async function signIn(context: TestContext) {
 const cookieHeaders = (refreshToken: string) =>
   new Headers({ cookie: `auth-ts.refresh=${refreshToken}` })
 
-describe("getToken as a function", () => {
-  it("matches POST /token exactly, including sliding the session", async () => {
-    const context = await createTestServer({
-      session: { ttl: "30d" }
-    })
+describe("getUser as a function", () => {
+  it("returns the user and slides the session it fell back to", async () => {
+    const context = await createTestServer({ session: { ttl: "30d" } })
     const refreshToken = await signIn(context)
-
     const before = required(
       context.db.sessions()[0],
       "session"
     ).expiresAt.getTime()
-    const result = await context.authServer.getUser({
+
+    const user = await context.authServer.getUser({
       headers: cookieHeaders(refreshToken)
     })
     const after = required(
@@ -47,46 +45,11 @@ describe("getToken as a function", () => {
       "session"
     ).expiresAt.getTime()
 
-    expect(result?.user.email).toBe("ada@example.com")
-    // The session is projected on the way out — never the hash.
-    expect(JSON.stringify(result)).not.toContain("tokenHash")
-    expect(
-      (
-        await context.authServer.verifyToken(
-          required(required(result, "result").token, "token")
-        )
-      )?.sub
-    ).toBe(result?.user.id)
+    expect(user.email).toBe("ada@example.com")
     expect(after).toBeGreaterThanOrEqual(before)
   })
 
-  it("reports the expiry sliding just persisted, not the one it read", async () => {
-    vi.useFakeTimers()
-    try {
-      const context = await createTestServer({
-        session: { ttl: "30d" }
-      })
-      const refreshToken = await signIn(context)
-      const before = required(context.db.sessions()[0], "session").expiresAt
-
-      vi.advanceTimersByTime(60 * 60_000)
-      const result = required(
-        await context.authServer.getUser({
-          headers: cookieHeaders(refreshToken)
-        }),
-        "result"
-      )
-      const stored = required(context.db.sessions()[0], "session").expiresAt
-
-      // Regression: this returned `before` — the row as it was before the slide.
-      expect(stored.getTime()).toBeGreaterThan(before.getTime())
-      expect(result.session.expiresAt.getTime()).toBe(stored.getTime())
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("reports the unchanged expiry when sliding is off", async () => {
+  it("does not slide when sliding is off", async () => {
     vi.useFakeTimers()
     try {
       const context = await createTestServer({
@@ -96,14 +59,8 @@ describe("getToken as a function", () => {
       const before = required(context.db.sessions()[0], "session").expiresAt
 
       vi.advanceTimersByTime(60 * 60_000)
-      const result = required(
-        await context.authServer.getUser({
-          headers: cookieHeaders(refreshToken)
-        }),
-        "result"
-      )
+      await context.authServer.getUser({ headers: cookieHeaders(refreshToken) })
 
-      expect(result.session.expiresAt.getTime()).toBe(before.getTime())
       expect(
         required(context.db.sessions()[0], "session").expiresAt.getTime()
       ).toBe(before.getTime())
@@ -116,13 +73,13 @@ describe("getToken as a function", () => {
     const context = await createTestServer()
     const refreshToken = await signIn(context)
 
-    const result = await context.authServer.getUser(
+    const user = await context.authServer.getUser(
       request("GET", "/dashboard", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
 
-    expect(result?.user.email).toBe("ada@example.com")
+    expect(user.email).toBe("ada@example.com")
   })
 
   it("throws unauthenticated for a revoked session, matching the endpoint", async () => {
@@ -165,7 +122,7 @@ describe("getSession", () => {
 
     const headers = cookieHeaders(refreshToken)
     const session = await context.authServer.getSession({ headers })
-    const { user } = await context.authServer.getUser({ headers })
+    const user = await context.authServer.getUser({ headers })
 
     // Two calls, because they are two questions: one keeps the session alive
     // without reading the user, the other reads the user.
@@ -290,20 +247,23 @@ describe("calling with a token instead of a request", () => {
   it("authenticates from a token alone, with no headers at all", async () => {
     const context = await createTestServer()
     const refreshToken = await signIn(context)
-    const { token } = await context.authServer.getUser({
-      headers: cookieHeaders(refreshToken)
-    })
+    // Tokens arrive in the response header, so this is how a caller with only
+    // the cookie gets one to pass along.
+    const minted = await context.authServer.handler(
+      request("GET", "/api/auth/session", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+    const token = required(minted.headers.get("x-auth-token"), "token header")
 
     // No cookie, no request — the shape a custom API has after reading its own
     // Authorization header, or a service handed a token some other way.
-    const sessions = await context.authServer.listSessions({
-      token: required(token, "token")
-    })
+    const sessions = await context.authServer.listSessions({ token })
 
     expect(sessions).toHaveLength(1)
   })
 
-  it("refuses a token that does not verify", async () => {
+  it("refuses an unreadable token when there is no cookie to fall back to", async () => {
     const { authServer } = await createTestServer()
 
     await expect(

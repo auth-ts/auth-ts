@@ -70,7 +70,7 @@ export const revokeSession = defineEndpoint({
     const current = revoked.tokenHash === caller.tokenHash
     if (!current) {
       const data: RevokeSessionResult = { current }
-      return { data }
+      return { data, headers: caller.headers }
     }
 
     const secure = shouldUseSecureCookies(input.requestURL)
@@ -89,7 +89,7 @@ export const revokeSession = defineEndpoint({
       return { data, headers: promoted.headers }
     }
 
-    const responseHeaders = new Headers()
+    const responseHeaders = new Headers(caller.headers)
     responseHeaders.append(
       "set-cookie",
       clearCookie(

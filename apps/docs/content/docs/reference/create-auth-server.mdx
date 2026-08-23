@@ -95,22 +95,34 @@ await authServer.listSessions({ headers })
 await authServer.listSessions({ token })
 ```
 
-The token path does no database work to establish who is calling, which is the
-point of issuing tokens at all. The cookie path is what keeps server-side
-rendering to a single call rather than making every page fetch a token first.
+A valid token names the caller with no database work at all, which is the point
+of issuing tokens. Missing, expired, and unreadable all mean the same thing: fall
+back to the cookie, touch the session, mint a replacement, and send it back in
+the `x-auth-token` response header. A client that has lost its token gets another
+rather than an error it cannot act on.
 
-An **expired** token falls through to the cookie, because expiry is ordinary.
-A token that fails any other check is refused rather than ignored: falling back
-there would make a forged token indistinguishable from a slow request.
+That is the only place a token is ever produced, sign-ins included. Nothing
+returns one in a body.
 
-Two endpoints are cookie-only by nature. `GET /session` and `GET /user` are what
-resolve and slide the session in the first place, and `/user` is what mints
-tokens — so neither can be authenticated by the token it exists to produce.
+**Cross-origin clients need the header exposed**, and the server does that
+automatically alongside the other CORS headers. Without it a browser silently
+cannot read the token, and only same-origin deployments would ever refresh.
+
+Sessions are touched on that fallback and nowhere else, so a session is written
+about once per token lifetime per client rather than once per request. Signing
+out is the one endpoint that mints nothing — handing over a fresh credential on
+the way out would be perverse — unless it promotes another account, which gets
+that account's token.
 
 The cost of trusting a token is revocation latency: a session revoked elsewhere
-keeps working here until that token expires, `jwt.ttl` at the outside. That is
-the same bound your database already lives with, since it authorizes on the token
+keeps working until that token expires, `jwt.ttl` at the outside. That is the
+same bound your database already lives with, since it authorizes on the token
 too.
+
+Every fallback is logged at `debug` with a `reason` of `missing`, `expired`, or
+`invalid`. Counting them is worth doing: a healthy client falls back about once
+per token lifetime, so a rate above that is a client that has stopped reading the
+header, showing up as a graph rather than as unexplained database load.
 
 <auto-type-table path="../../../../../packages/server/src/jwt/sign-token.ts" name="SignTokenClaims" />
 

@@ -24,26 +24,61 @@ callers share a single refresh, so a page mounting ten components makes one
 round-trip and they all see the same token. Hand it to your PostgREST client as
 its access token.
 
-`getUser()` returns `{ user, session, token }`, or `null`, and **always reads the
+`getUser()` returns the signed-in user, or `null`, and **always reads the
 server**. There is no cache behind it on purpose: a name or avatar changed in
 another tab, on another device, or by anything other than this client has to
 arrive somehow, and deciding when to ask again is yours to make.
 
 `null` means the server said the session is gone, and the stored token is dropped
 with it. Every other failure throws — a 502 from a proxy is not a statement about
-whether anyone is signed in, and swallowing it would make it look like one.
+whether anyone is signed in.
+
+`getSession()` returns the session this browser is on. Its `id` is how a device
+list tells which entry is this device.
 
 The client keeps no user state at all. No mirror, no `localStorage`, no cross-tab
 listener. Caching, persistence, retry, and refetch-on-focus are what a query
 library already does well, and doing them here would only give you two sources of
 truth to keep in step.
 
-The two reads are one request underneath. `GET /user` answers with the user, the
-session, and a freshly signed token, so reading the user refreshes the token
-`getToken()` hands out. The client sends the token it already holds along with
-every request, and the server answers with a new one only when that one is spent
-— so a token nothing has invalidated is not rotated on every tab focus, which
-matters for anything else holding it.
+## Where tokens come from
+
+Never a response body. Every endpoint answers with `x-auth-token` when it had to
+authenticate from the cookie, and the client stores whatever arrives — so any
+request refreshes the token, and there is no endpoint whose job that is.
+
+Send the token you hold and none comes back. That matters for anything else
+holding the JWT, a sync socket especially: a token nothing has invalidated is not
+rotated on every tab focus.
+
+`getToken()` serves from that cache. Approaching expiry it hands back the cached
+token and refreshes behind you; only a token too close to expiry to outlive the
+request it would be used for makes you wait. Concurrent callers share one
+refresh.
+
+It refreshes through `GET /user`, deliberately. Minting a token needs the user
+row for its `type` claim, so that is the one endpoint where the read is not
+wasted.
+
+**Your data plane cannot do this.** PostgREST talks to Neon directly and never
+passes through your server, so it can neither harvest a header nor mint
+anything — an expired token there is a hard 401 with nothing to rescue it. That
+is what `getToken()`'s proactive refresh is for, and why a 401 from your data
+client should refresh once and retry:
+
+```ts
+const token = await authClient.getToken()
+let response = await fetch(url, { headers: { authorization: `Bearer ${token}` } })
+
+if (response.status === 401) {
+  authClient.clearToken()
+  const fresh = await authClient.getToken()
+  response = await fetch(url, { headers: { authorization: `Bearer ${fresh}` } })
+}
+```
+
+Once, never in a loop: if the second attempt is also refused, the session is
+genuinely gone.
 
 ## React
 

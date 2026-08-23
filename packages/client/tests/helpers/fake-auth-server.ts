@@ -13,6 +13,8 @@ export interface RecordedRequest {
 export interface StubbedReply {
   status?: number
   body?: unknown
+  /** A token to send back the way the server does — in the response header. */
+  token?: string
   /** Throw a network failure instead of replying. */
   networkError?: boolean
 }
@@ -104,11 +106,18 @@ export function fakeAuthServer(): FakeAuthServer {
       if (reply.networkError) throw new TypeError("Failed to fetch")
 
       const status = reply.status ?? 200
-      if (status === 204) return new Response(null, { status })
+      const responseHeaders = new Headers(
+        reply.token ? { "x-auth-token": reply.token } : {}
+      )
+      if (status === 204) {
+        return new Response(null, { status, headers: responseHeaders })
+      }
+
+      responseHeaders.set("content-type", "application/json")
 
       return new Response(JSON.stringify(reply.body ?? {}), {
         status,
-        headers: { "content-type": "application/json" }
+        headers: responseHeaders
       })
     })
 

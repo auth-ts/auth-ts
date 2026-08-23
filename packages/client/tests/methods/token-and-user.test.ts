@@ -42,7 +42,8 @@ describe("construction", () => {
 describe("getToken", () => {
   it("refreshes once and caches the token", async () => {
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     const client = createAuthClient()
 
@@ -57,7 +58,8 @@ describe("getToken", () => {
 
   it("sends credentials, which is what carries the refresh cookie", async () => {
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
 
     await createAuthClient().getToken()
@@ -67,7 +69,8 @@ describe("getToken", () => {
 
   it("makes exactly one request for ten concurrent callers", async () => {
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     const client = createAuthClient()
 
@@ -82,7 +85,8 @@ describe("getToken", () => {
   it("refreshes early, inside the 60 second window before expiry", async () => {
     vi.useFakeTimers()
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken({ lifetimeSeconds: 600 }), user }
+      body: { user },
+      token: fakeAccessToken({ lifetimeSeconds: 600 })
     })
     const client = createAuthClient()
 
@@ -102,7 +106,8 @@ describe("getToken", () => {
 
   it("clears the token and throws on 401", async () => {
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     const client = createAuthClient()
     await client.getToken()
@@ -122,7 +127,8 @@ describe("getToken", () => {
 
   it("throws on a server failure and keeps the token, because a 500 is not a verdict", async () => {
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     const client = createAuthClient()
     await client.getToken()
@@ -175,7 +181,8 @@ describe("getToken", () => {
 describe("getUser", () => {
   it("reads the server every time, because a name can change elsewhere", async () => {
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     server.on("GET", "/api/auth/user", { body: { user } })
     const client = createAuthClient()
@@ -209,10 +216,12 @@ describe("getUser", () => {
       const first = fakeAccessToken()
       const second = fakeAccessToken()
       server.on("GET", "/api/auth/user", {
-        body: { token: first, user }
+        body: { user },
+        token: first
       })
       server.on("GET", "/api/auth/user", {
-        body: { token: second, user }
+        body: { user },
+        token: second
       })
       const client = createAuthClient()
 
@@ -240,10 +249,12 @@ describe("getUser", () => {
       const spent = fakeAccessToken()
       const fresh = fakeAccessToken()
       server.on("GET", "/api/auth/user", {
-        body: { token: spent, user }
+        body: { user },
+        token: spent
       })
       server.on("GET", "/api/auth/user", {
-        body: { token: fresh, user }
+        body: { user },
+        token: fresh
       })
       const client = createAuthClient()
 
@@ -259,7 +270,8 @@ describe("getUser", () => {
 
   it("shares one refresh between concurrent callers", async () => {
     server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
+      body: { user },
+      token: fakeAccessToken()
     })
     const client = createAuthClient()
 

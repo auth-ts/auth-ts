@@ -13,10 +13,11 @@ export type VerifyCodeInput = SendCodeInput & {
   additionalFields?: Record<string, string | number | boolean>
 }
 
-/** What a completed sign-in returns. */
+/** What a completed sign-in returns. The token arrived in the response header. */
 export interface SignInResult {
-  token: string
   user: AuthUser
+  /** Only in token mode, for clients that cannot hold a cookie. */
+  refreshToken?: string
 }
 
 /**
@@ -42,13 +43,10 @@ export function createSendCode(internals: AuthClientInternals) {
 /**
  * Verifies a code and starts a session.
  *
- * Primes the token and user caches from the response, so the sign-in and the
- * first render cost one round-trip between them rather than two.
+ * The token rides back in the response header and is stored on the way through,
+ * so the sign-in and the first render cost one round trip between them.
  */
-export function createVerifyCode(
-  internals: AuthClientInternals,
-  primeSession: (result: SignInResult) => void
-) {
+export function createVerifyCode(internals: AuthClientInternals) {
   return async function verifyCode(
     input: VerifyCodeInput
   ): Promise<SignInResult> {
@@ -57,8 +55,6 @@ export function createVerifyCode(
       path: "/verify-code",
       body: input
     })
-    primeSession(result)
-
     return result
   }
 }
@@ -75,10 +71,7 @@ export interface SignInAsGuestInput {
  * in every way that matters — they own rows, they have a session — which is what
  * lets them keep everything when they later add an email or connect a provider.
  */
-export function createSignInAsGuest(
-  internals: AuthClientInternals,
-  primeSession: (result: SignInResult) => void
-) {
+export function createSignInAsGuest(internals: AuthClientInternals) {
   return async function signInAsGuest(
     input: SignInAsGuestInput = {}
   ): Promise<SignInResult> {
@@ -87,8 +80,6 @@ export function createSignInAsGuest(
       path: "/sign-in/guest",
       body: input
     })
-    primeSession(result)
-
     return result
   }
 }

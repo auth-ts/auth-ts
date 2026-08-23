@@ -21,8 +21,7 @@ export const Route = createFileRoute("/todos")({ component: TodosPage })
  * evaluated against the `sub` claim of the token this library signed.
  */
 function TodosPage() {
-  const { data, isPending } = useUser()
-  const user = data?.user
+  const { data: user, isPending } = useUser()
   const queryClient = useQueryClient()
   const [title, setTitle] = useState("")
 

@@ -3,6 +3,7 @@ import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
 import { defineEndpoint } from "../http/define-endpoint"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
+import { TOKEN_HEADER } from "../session/authenticate"
 import { convertGuest } from "../session/convert-guest"
 import type { IssueMode } from "../session/issue-session"
 import { issueSession } from "../session/issue-session"
@@ -96,12 +97,17 @@ export const verifyCode = defineEndpoint({
       ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
     })
 
-    const data: { token: string; user: AuthUser; refreshToken?: string } = {
-      token: issued.token,
+    // The access token goes in the header, as it does from every endpoint.
+    // `refreshToken` is a different credential — the session itself, for
+    // clients that cannot hold a cookie — so it stays in the body.
+    const responseHeaders = new Headers(issued.headers)
+    responseHeaders.set(TOKEN_HEADER, issued.token)
+
+    const data: { user: AuthUser; refreshToken?: string } = {
       user: issued.user
     }
     if (issued.refreshToken) data.refreshToken = issued.refreshToken
 
-    return { data, headers: issued.headers }
+    return { data, headers: responseHeaders }
   }
 })

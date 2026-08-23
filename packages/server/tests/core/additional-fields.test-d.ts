@@ -153,15 +153,13 @@ describe("createAuthServer infers the schema and types everything it returns", (
       user: { additionalFields }
     })
 
-    const { user } = await server.getUser({ headers: new Headers() })
+    const user = await server.getUser({ headers: new Headers() })
     expectTypeOf(user.plan).toEqualTypeOf<string | null | undefined>()
     expectTypeOf(user.seats).toEqualTypeOf<number | null | undefined>()
 
-    const read = await server.getUser({ headers: new Headers() })
-    expectTypeOf(read.user.plan).toEqualTypeOf<string | null | undefined>()
+    const session = await server.getSession({ headers: new Headers() })
     // Everything that is not a user passes through unchanged.
-    expectTypeOf(read.session.createdAt).toEqualTypeOf<Date>()
-    expectTypeOf(read.token).toEqualTypeOf<string | undefined>()
+    expectTypeOf(session.createdAt).toEqualTypeOf<Date>()
   })
 
   it("refuses an adapter typed against a different schema", () => {
@@ -182,7 +180,7 @@ describe("createAuthServer infers the schema and types everything it returns", (
 
   it("stays open when nothing is declared", async () => {
     const server = createAuthServer({ ...base, db: createMemoryDb() })
-    const { user } = await server.getUser({ headers: new Headers() })
+    const user = await server.getUser({ headers: new Headers() })
     expectTypeOf(user.anything).toEqualTypeOf<unknown>()
   })
 })
@@ -190,14 +188,13 @@ describe("createAuthServer infers the schema and types everything it returns", (
 describe("WithUserFields", () => {
   it("replaces users wherever they appear and leaves everything else alone", () => {
     type Typed = WithUserFields<
-      { user: AuthUser; session: CurrentSession; token?: string },
+      { user: AuthUser; session: CurrentSession },
       Declared
     >
     expectTypeOf<Typed["user"]["plan"]>().toEqualTypeOf<
       string | null | undefined
     >()
     expectTypeOf<Typed["session"]["createdAt"]>().toEqualTypeOf<Date>()
-    expectTypeOf<Typed["token"]>().toEqualTypeOf<string | undefined>()
 
     expectTypeOf<WithUserFields<AuthUser[], Declared>>().toEqualTypeOf<
       AuthUser<Declared>[]

@@ -1,7 +1,11 @@
 import type { CorsOptions } from "../core/auth-server-options"
+import { TOKEN_HEADER } from "../session/authenticate"
 
 const ALLOWED_METHODS = "GET, POST, DELETE, OPTIONS"
 const ALLOWED_HEADERS = "content-type, authorization, accept-language"
+// Without this a cross-origin browser silently cannot read the token, and
+// only same-origin deployments would ever refresh.
+const EXPOSED_HEADERS = TOKEN_HEADER
 
 /**
  * Adds CORS headers when a cross-origin client is configured.
@@ -18,6 +22,7 @@ export function applyCorsHeaders(
 
   headers.set("access-control-allow-origin", cors.origin)
   headers.set("access-control-allow-credentials", "true")
+  headers.set("access-control-expose-headers", EXPOSED_HEADERS)
   // Appended, not set: `Vary` is a list, and an endpoint that already varies
   // on something else must not have that clobbered on the way out.
   const vary = headers.get("vary")
