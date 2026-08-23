@@ -13,7 +13,6 @@ import {
   uuid
 } from "drizzle-orm/pg-core"
 
-/** Drizzle's `authUid`, cast: `auth.user_id()` returns text. */
 const authUuid = (userIdColumn: AnyPgColumn) =>
   sql`(select (auth.user_id())::uuid = ${userIdColumn})`
 
@@ -41,7 +40,6 @@ export const users = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    // No insert or delete policy: RLS denies what none permits.
     pgPolicy("read_own_user", {
       for: "select",
       to: authenticatedRole,
