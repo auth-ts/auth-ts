@@ -313,14 +313,14 @@ describe("oauth callback", () => {
     }
 
     await signInAs("ada")
-    expect(db.rows("connections")[0]?.label).toBe("ada")
+    expect(db.rows("identities")[0]?.label).toBe("ada")
 
     // The link is keyed on GitHub's numeric id, so a rename is the same row
     // with a new name on it — not a second account.
     await signInAs("ada-lovelace")
 
-    expect(db.rows("connections")).toHaveLength(1)
-    expect(db.rows("connections")[0]?.label).toBe("ada-lovelace")
+    expect(db.rows("identities")).toHaveLength(1)
+    expect(db.rows("identities")[0]?.label).toBe("ada-lovelace")
     expect(db.users()).toHaveLength(1)
   })
 
@@ -519,7 +519,7 @@ describe("oauth callback", () => {
     const { authServer, db } = context
     const owner = await insertUser(db, { email: "owner@example.com" })
     await db.insert({
-      table: "connections",
+      table: "identities",
       values: {
         userId: owner.id,
         provider: "github",
@@ -556,7 +556,7 @@ describe("oauth callback", () => {
     expect(response.status).toBe(302)
     expect(
       (
-        await selectRow(db, "connections", {
+        await selectRow(db, "identities", {
           provider: "github",
           providerAccountId: "4242"
         })
@@ -565,9 +565,7 @@ describe("oauth callback", () => {
     expect(
       (await selectRow(db, "users", { id: guest.id }))?.primaryUserId
     ).toBe(owner.id)
-    expect(await selectRows(db, "connections", { userId: other.id })).toEqual(
-      []
-    )
+    expect(await selectRows(db, "identities", { userId: other.id })).toEqual([])
 
     const whoami = await authServer.handler(
       request("GET", "/api/auth/user", {
@@ -636,7 +634,7 @@ describe("oauth callback", () => {
     const { authServer, db } = context
     const owner = await insertUser(db, { email: "owner@example.com" })
     await db.insert({
-      table: "connections",
+      table: "identities",
       values: {
         userId: owner.id,
         provider: "github",
@@ -684,7 +682,7 @@ describe("oauth callback", () => {
     ).toBe(owner.id)
     expect(
       (
-        await selectRow(db, "connections", {
+        await selectRow(db, "identities", {
           provider: "github",
           providerAccountId: "4242"
         })
@@ -727,7 +725,7 @@ describe("oauth callback", () => {
     expect(upgraded?.primaryUserId).toBeNull()
     expect(
       (
-        await selectRow(db, "connections", {
+        await selectRow(db, "identities", {
           provider: "github",
           providerAccountId: "5555"
         })
@@ -1034,12 +1032,12 @@ describe("connect and disconnect", () => {
     expect(context.db.users()).toHaveLength(1)
 
     const listed = await context.authServer.handler(
-      request("GET", "/api/auth/connections", {
+      request("GET", "/api/auth/identities", {
         token: await mintToken(context.authServer, refreshToken)
       })
     )
     const body = (await listed.json()) as Array<{ provider: string }>
-    expect(body.map((connection) => connection.provider)).toEqual(["github"])
+    expect(body.map((identity) => identity.provider)).toEqual(["github"])
   })
 
   it("starts a connect from either credential, since it is a navigation", async () => {
@@ -1094,7 +1092,7 @@ describe("connect and disconnect", () => {
 
     expect(callbackResponse.status).toBe(401)
     expect(
-      await selectRows(context.db, "connections", {
+      await selectRows(context.db, "identities", {
         userId: required(context.db.users()[0], "user").id
       })
     ).toEqual([])
@@ -1106,7 +1104,7 @@ describe("connect and disconnect", () => {
       email: "first@example.com"
     })
     await context.db.insert({
-      table: "connections",
+      table: "identities",
       values: {
         userId: firstUser.id,
         provider: "github",
@@ -1136,11 +1134,11 @@ describe("connect and disconnect", () => {
     )
 
     expect(callbackResponse.status).toBe(409)
-    const connection = await selectRow(context.db, "connections", {
+    const identity = await selectRow(context.db, "identities", {
       provider: "github",
       providerAccountId: "4242"
     })
-    expect(connection?.userId).toBe(firstUser.id)
+    expect(identity?.userId).toBe(firstUser.id)
   })
 
   it("unlinks a provider", async () => {
@@ -1148,7 +1146,7 @@ describe("connect and disconnect", () => {
     const refreshToken = await signInWithCode(context)
     const user = required(context.db.users()[0], "user")
     await context.db.insert({
-      table: "connections",
+      table: "identities",
       values: {
         userId: user.id,
         provider: "github",
@@ -1160,14 +1158,14 @@ describe("connect and disconnect", () => {
     })
 
     const response = await context.authServer.handler(
-      request("DELETE", "/api/auth/connections/github", {
+      request("DELETE", "/api/auth/identities/github", {
         token: await mintToken(context.authServer, refreshToken)
       })
     )
 
     expect(response.status).toBe(204)
     expect(
-      await selectRows(context.db, "connections", { userId: user.id })
+      await selectRows(context.db, "identities", { userId: user.id })
     ).toEqual([])
   })
 })

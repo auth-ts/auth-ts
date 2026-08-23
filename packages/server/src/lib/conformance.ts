@@ -429,7 +429,7 @@ export const authDBChecks: AuthDBCheck[] = [
     }
   },
   {
-    name: "connections are unique on (provider, providerAccountId)",
+    name: "identities are unique on (provider, providerAccountId)",
     async run(db) {
       const owner = await create(
         db,
@@ -437,7 +437,7 @@ export const authDBChecks: AuthDBCheck[] = [
         person({ email: `${unique()}@example.test` })
       )
       const providerAccountId = unique()
-      const connection = () => ({
+      const identity = () => ({
         userId: owner.id,
         provider: "github",
         providerAccountId,
@@ -446,13 +446,13 @@ export const authDBChecks: AuthDBCheck[] = [
         updatedAt: new Date()
       })
       try {
-        await create(db, "connections", connection())
+        await create(db, "identities", identity())
         await refuses(
-          () => db.insert({ table: "connections", values: connection() }),
+          () => db.insert({ table: "identities", values: identity() }),
           "one provider account was linked twice. Core looks the pair up before it inserts, so two concurrent sign-ins both find nothing — this index is what refuses the loser."
         )
       } finally {
-        await db.delete({ table: "connections", where: { providerAccountId } })
+        await db.delete({ table: "identities", where: { providerAccountId } })
         await db.delete({ table: "users", where: { id: owner.id } })
       }
     }

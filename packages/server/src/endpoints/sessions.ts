@@ -34,7 +34,7 @@ export type SessionInfo = Omit<AuthSession, "tokenHash">
  * sessions than that has a device list nobody scrolls and a problem this screen
  * is not going to solve.
  */
-export const getSessions = defineEndpoint({
+export const listSessions = defineEndpoint({
   method: "GET",
   path: "/sessions",
   parse: ({ request }): CallerInput => ({ headers: request.headers }),

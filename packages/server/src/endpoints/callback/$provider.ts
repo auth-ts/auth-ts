@@ -8,7 +8,7 @@ import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { selectOne } from "../../lib/select-one"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import { getCallbackURL } from "../../oauth/callback-url"
-import { linkConnection } from "../../oauth/link-connection"
+import { linkIdentity } from "../../oauth/link-identity"
 import { getProvider } from "../../oauth/providers/get-provider"
 import type { ProviderIdentity } from "../../oauth/providers/oauth-provider"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user"
@@ -160,7 +160,7 @@ export const callbackProvider = defineEndpoint({
 
     // A signed-in guest converts rather than creating a new user. The lookup
     // lives inside resolveOAuthUser so the guest path runs the same
-    // connection-first cascade as everyone else — a provider account already
+    // identity-first cascade as everyone else — a provider account already
     // linked to an account is never silently re-pointed at the guest.
     const user = await resolveOAuthUser(internals, input.provider, identity, {
       additionalFields,
@@ -205,7 +205,7 @@ async function connectIdentity(
     return errorPage(internals, "unauthenticated", locale, clearState)
   }
 
-  const existing = await selectOne(internals, "connections", {
+  const existing = await selectOne(internals, "identities", {
     provider: input.provider,
     providerAccountId: identity.providerAccountId
   })
@@ -216,7 +216,7 @@ async function connectIdentity(
     return errorPage(internals, "providerConflict", locale, clearState, 409)
   }
 
-  await linkConnection(internals, {
+  await linkIdentity(internals, {
     userId: resolved.user.id,
     provider: input.provider,
     providerAccountId: identity.providerAccountId,

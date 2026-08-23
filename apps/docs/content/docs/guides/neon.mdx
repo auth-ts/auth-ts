@@ -66,7 +66,7 @@ alter table "users" enable row level security;
 alter table "sessions" enable row level security;
 alter table "verificationCodes" enable row level security;
 alter table "attempts" enable row level security;
-alter table "connections" enable row level security;
+alter table "identities" enable row level security;
 ```
 
 Do not force it here — the server connects as the owner and must still read them.

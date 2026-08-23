@@ -12,14 +12,14 @@ export interface DisconnectProviderInput extends CallerInput {
  * Unlinks a provider from the signed-in user.
  *
  * There is no "last sign-in method" guard, on purpose. Every user core creates
- * with a connection also has an email — OAuth sign-up requires a verified one —
+ * with an identity also has an email — OAuth sign-up requires a verified one —
  * or a phone number, so unlinking the last provider never strands anyone: a
  * code signs them back in, and signing in with the provider again matches on
  * that email and re-records the link on the same account.
  */
 export const disconnectProvider = defineEndpoint({
   method: "DELETE",
-  path: "/connections/$provider",
+  path: "/identities/$provider",
   parse: ({ request, params }): DisconnectProviderInput => ({
     provider: params.provider ?? "",
     headers: request.headers
@@ -30,7 +30,7 @@ export const disconnectProvider = defineEndpoint({
     // Ownership is part of the query, so another user's provider matches
     // nothing and the empty result is the 404.
     const deleted = await internals.db.delete({
-      table: "connections",
+      table: "identities",
       where: { userId: caller.userId, provider: input.provider }
     })
     if (deleted.length === 0) throw new AuthApiError("notFound", 404)

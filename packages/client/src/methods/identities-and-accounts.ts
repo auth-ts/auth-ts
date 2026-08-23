@@ -1,12 +1,12 @@
-import type { AccountInfo, AuthUser, ConnectionInfo } from "@auth-ts/server"
+import type { AccountInfo, AuthUser, IdentityInfo } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Lists the providers linked to this user. */
-export function createGetConnections(internals: AuthClientInternals) {
-  return async function getConnections(): Promise<ConnectionInfo[]> {
-    return internals.fetchJson<ConnectionInfo[]>({
+export function createListIdentities(internals: AuthClientInternals) {
+  return async function listIdentities(): Promise<IdentityInfo[]> {
+    return internals.fetchJson<IdentityInfo[]>({
       method: "GET",
-      path: "/connections",
+      path: "/identities",
       authenticated: true
     })
   }
@@ -22,15 +22,15 @@ export function createDisconnect(internals: AuthClientInternals) {
   return async function disconnect(input: DisconnectInput): Promise<void> {
     await internals.fetchJson({
       method: "DELETE",
-      path: `/connections/${encodeURIComponent(input.provider)}`,
+      path: `/identities/${encodeURIComponent(input.provider)}`,
       authenticated: true
     })
   }
 }
 
 /** Lists every account signed in to this browser. Requires `multiAccount` server-side. */
-export function createGetAccounts(internals: AuthClientInternals) {
-  return async function getAccounts(): Promise<AccountInfo[]> {
+export function createListAccounts(internals: AuthClientInternals) {
+  return async function listAccounts(): Promise<AccountInfo[]> {
     return internals.fetchJson<AccountInfo[]>({
       method: "GET",
       path: "/accounts",

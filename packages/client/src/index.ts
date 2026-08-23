@@ -16,11 +16,11 @@ export type {
   SignOutScope,
   UpdateUserInput
 } from "./methods/account"
+export type { GetTokenOptions } from "./methods/get-token"
 export type {
   DisconnectInput,
   SwitchAccountInput
-} from "./methods/connections-and-accounts"
-export type { GetTokenOptions } from "./methods/get-token"
+} from "./methods/identities-and-accounts"
 export type { OAuthNavigationInput } from "./methods/oauth"
 export type {
   SendCodeInput,

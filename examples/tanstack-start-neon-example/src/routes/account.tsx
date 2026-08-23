@@ -4,8 +4,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/icons"
 import { postgrest } from "../db/postgrest"
-import { connectionsQueryKey, useConnections } from "../hooks/use-connections"
 import { useCountdown } from "../hooks/use-countdown"
+import { identitiesQueryKey, useIdentities } from "../hooks/use-identities"
 import { sessionsQueryKey, useSessions } from "../hooks/use-sessions"
 import { useToken } from "../hooks/use-token"
 import { userQueryKey, useUser } from "../hooks/use-user"
@@ -46,10 +46,10 @@ function AccountPage() {
   const currentSessionId = token
     ? authClient.decodeToken(token)?.claims.sid
     : undefined
-  const connections = useConnections(user?.id)
+  const identities = useIdentities(user?.id)
   const accounts = useQuery({
     queryKey: ["accounts"],
-    queryFn: authClient.getAccounts,
+    queryFn: authClient.listAccounts,
     enabled: Boolean(user),
     // 404 means multiAccount is off on the server; that is a configuration
     // answer, not a failure worth retrying.
@@ -78,19 +78,19 @@ function AccountPage() {
       queryClient.invalidateQueries({ queryKey: sessionsQueryKey(user?.id) })
   })
 
-  // No userId filter: deleteOwnConnections narrows the delete to this user's
+  // No userId filter: deleteOwnIdentities narrows the delete to this user's
   // rows, and a provider is linked at most once per user.
   const disconnect = useMutation({
     mutationFn: async (provider: string) => {
       await postgrest
-        .from("connections")
+        .from("identities")
         .delete()
         .eq("provider", provider)
         .throwOnError()
     },
     onSuccess: () =>
       queryClient.invalidateQueries({
-        queryKey: connectionsQueryKey(user?.id)
+        queryKey: identitiesQueryKey(user?.id)
       }),
     onError: () => setNotice({ text: "Could not disconnect.", tone: "error" })
   })
@@ -232,21 +232,21 @@ function AccountPage() {
               Link GitHub
             </button>
           </div>
-          {connections.data?.length === 0 ? (
+          {identities.data?.length === 0 ? (
             <p className="text-sm text-base-content/60">None linked.</p>
           ) : (
             <ul className="list rounded-box bg-base-200">
-              {(connections.data ?? []).map((connection) => (
-                <li key={connection.provider} className="list-row items-center">
+              {(identities.data ?? []).map((identity) => (
+                <li key={identity.provider} className="list-row items-center">
                   <span className="badge badge-neutral capitalize">
-                    {connection.provider}
+                    {identity.provider}
                   </span>
                   <span className="list-col-grow text-sm text-base-content/60">
-                    {connection.label}
+                    {identity.label}
                   </span>
                   <button
                     type="button"
-                    onClick={() => disconnect.mutate(connection.provider)}
+                    onClick={() => disconnect.mutate(identity.provider)}
                     className="btn btn-ghost btn-sm"
                   >
                     Disconnect

@@ -135,8 +135,8 @@ session converted in place with email, name, and avatar.
 
 Still unproven against a live provider: Google entirely, and for GitHub the
 connect, disconnect, and repeat-sign-in paths. The first live run also surfaced
-a database the schema had drifted from (a plain index where linking a
-connection needs a unique one) — the kind of thing only a real round trip catches.
+a database the schema had drifted from (a plain index where linking an
+identity needs a unique one) — the kind of thing only a real round trip catches.
 
 To close it: register a Google client, point the callback at
 `<origin>/api/auth/callback/google`, and run both providers through connect and

@@ -85,10 +85,10 @@ describe("insert", () => {
       createdAt: new Date(),
       updatedAt: new Date()
     }
-    await db.insert({ table: "connections", values: link })
+    await db.insert({ table: "identities", values: link })
 
     await expect(
-      db.insert({ table: "connections", values: link })
+      db.insert({ table: "identities", values: link })
     ).rejects.toThrow(/unique constraint/)
   })
 
@@ -345,10 +345,10 @@ describe("cleanup", () => {
     expect(db.users()).toHaveLength(1)
   })
 
-  it("leaves connections alone, since nothing about a link expires", async () => {
+  it("leaves identities alone, since nothing about a link expires", async () => {
     const ada = await user({ email: "ada@example.com" })
     await db.insert({
-      table: "connections",
+      table: "identities",
       values: {
         userId: ada.id,
         provider: "github",
@@ -361,7 +361,7 @@ describe("cleanup", () => {
 
     await db.cleanup?.()
 
-    expect(await db.rows("connections")).toHaveLength(1)
+    expect(await db.rows("identities")).toHaveLength(1)
   })
 })
 

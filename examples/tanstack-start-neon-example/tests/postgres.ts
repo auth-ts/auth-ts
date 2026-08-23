@@ -6,7 +6,7 @@ import {
 import { drizzle } from "drizzle-orm/pglite"
 import {
   attempts,
-  connections,
+  identities,
   sessions,
   users,
   verificationCodes
@@ -28,7 +28,7 @@ const statements = await generateMigration(
     sessions,
     verificationCodes,
     attempts,
-    connections
+    identities
   })
 )
 for (const statement of statements) await client.exec(statement)

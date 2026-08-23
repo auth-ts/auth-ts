@@ -33,7 +33,7 @@ cost of not having an adapter package.
 | `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
 | `verificationCodes` | `id`, `identifier`, `codeHash`, `action`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
-| `connections` | `id`, `userId`, `provider`, `providerAccountId`, `label`, `createdAt`, `updatedAt` | `(provider, providerAccountId)` | `userId` | |
+| `identities` | `id`, `userId`, `provider`, `providerAccountId`, `label`, `createdAt`, `updatedAt` | `(provider, providerAccountId)` | `userId` | |
 
 **`createdAt` and `updatedAt` are written by core**, on every insert and on
 every update it makes. Your columns need no default and no trigger: the values
@@ -288,7 +288,7 @@ The core fields of a user. Your declared additional fields sit beside them on
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthAttempt" />
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthConnection" />
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthIdentity" />
 
 ## Testing your implementation
 

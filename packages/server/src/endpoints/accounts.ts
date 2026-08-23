@@ -24,7 +24,7 @@ import { authenticate } from "../session/authenticate"
 export type AccountInfo = AuthUser
 
 /** Input for listing accounts. */
-export interface GetAccountsInput extends CallerInput {
+export interface ListAccountsInput extends CallerInput {
   requestURL?: string
 }
 
@@ -36,17 +36,17 @@ export interface GetAccountsInput extends CallerInput {
  * immediately rather than lingering until someone clicks it.
  *
  * Note the terminology, which is easy to blur: `/sessions` is one user's devices,
- * `/accounts` is one browser's users, and `/connections` is one user's linked
+ * `/accounts` is one browser's users, and `/identities` is one user's linked
  * providers.
  */
-export const getAccounts = defineEndpoint({
+export const listAccounts = defineEndpoint({
   method: "GET",
   path: "/accounts",
-  parse: ({ request }): GetAccountsInput => ({
+  parse: ({ request }): ListAccountsInput => ({
     headers: request.headers,
     requestURL: request.url
   }),
-  run: async (internals, input: GetAccountsInput) => {
+  run: async (internals, input: ListAccountsInput) => {
     const { config } = internals
     if (!config.multiAccount) throw notFound()
 

@@ -155,7 +155,7 @@ export interface AuthAttempt {
 }
 
 /** A provider identity linked to a user. */
-export interface AuthConnection {
+export interface AuthIdentity {
   id: string
   userId: string
   provider: string
@@ -175,7 +175,7 @@ export type AuthTable =
   | "sessions"
   | "verificationCodes"
   | "attempts"
-  | "connections"
+  | "identities"
 
 /** Table name → the row it holds. Your declared fields ride flat on `users`. */
 export interface AuthTables<
@@ -185,7 +185,7 @@ export interface AuthTables<
   sessions: AuthSession
   verificationCodes: AuthVerificationCode
   attempts: AuthAttempt
-  connections: AuthConnection
+  identities: AuthIdentity
 }
 
 /** A row of `T`, with your declared fields where they apply. */
@@ -324,7 +324,7 @@ export type AuthDeleteInput<
  * | `sessions` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
  * | `verificationCodes` | | `identifier`, `expiresAt` | `expiresAt` |
  * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
- * | `connections` | `(provider, providerAccountId)` | `userId` | |
+ * | `identities` | `(provider, providerAccountId)` | `userId` | |
  *
  * **The uniqueness column is not hygiene, it is the design.** Core composes a
  * read and a write where it used to hand your store an upsert, so two first

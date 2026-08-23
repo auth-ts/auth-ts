@@ -1,21 +1,21 @@
 import { decodeToken } from "../lib/decode-token"
 import {
   createDeleteUser,
-  createGetSessions,
+  createListSessions,
   createRevokeSession,
   createSignOut,
   createUpdateUser
 } from "../methods/account"
-import {
-  createDisconnect,
-  createGetAccounts,
-  createGetConnections,
-  createSwitchAccount
-} from "../methods/connections-and-accounts"
 import { createGetSession } from "../methods/get-session"
 import type { GetTokenOptions } from "../methods/get-token"
 import { createGetToken } from "../methods/get-token"
 import { createGetUser } from "../methods/get-user"
+import {
+  createDisconnect,
+  createListAccounts,
+  createListIdentities,
+  createSwitchAccount
+} from "../methods/identities-and-accounts"
 import { createConnect, createSignIn } from "../methods/oauth"
 import {
   createSendCode,
@@ -58,11 +58,11 @@ export interface AuthClient {
   signInAsGuest: ReturnType<typeof createSignInAsGuest>
   signIn: ReturnType<typeof createSignIn>
   connect: ReturnType<typeof createConnect>
-  getConnections: ReturnType<typeof createGetConnections>
+  listIdentities: ReturnType<typeof createListIdentities>
   disconnect: ReturnType<typeof createDisconnect>
-  getSessions: ReturnType<typeof createGetSessions>
+  listSessions: ReturnType<typeof createListSessions>
   revokeSession: ReturnType<typeof createRevokeSession>
-  getAccounts: ReturnType<typeof createGetAccounts>
+  listAccounts: ReturnType<typeof createListAccounts>
   switchAccount: ReturnType<typeof createSwitchAccount>
   updateUser: ReturnType<typeof createUpdateUser>
   deleteUser: ReturnType<typeof createDeleteUser>
@@ -106,11 +106,11 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     signInAsGuest: createSignInAsGuest(internals),
     signIn: createSignIn(internals),
     connect: createConnect(internals),
-    getConnections: createGetConnections(internals),
+    listIdentities: createListIdentities(internals),
     disconnect: createDisconnect(internals),
-    getSessions: createGetSessions(internals),
+    listSessions: createListSessions(internals),
     revokeSession: createRevokeSession(internals),
-    getAccounts: createGetAccounts(internals),
+    listAccounts: createListAccounts(internals),
     switchAccount: createSwitchAccount(internals),
     updateUser: createUpdateUser(internals),
     deleteUser: createDeleteUser(internals),

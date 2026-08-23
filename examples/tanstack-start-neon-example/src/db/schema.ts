@@ -140,8 +140,8 @@ export const attempts = pgTable.withRLS(
   ]
 )
 
-export const connections = pgTable.withRLS(
-  "connections",
+export const identities = pgTable.withRLS(
+  "identities",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     userId: uuid("userId")
@@ -159,17 +159,17 @@ export const connections = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    index("connectionsUserIdIndex").on(table.userId),
-    uniqueIndex("connectionsProviderAccountIndex").on(
+    index("identitiesUserIdIndex").on(table.userId),
+    uniqueIndex("identitiesProviderAccountIndex").on(
       table.provider,
       table.providerAccountId
     ),
-    pgPolicy("selectOwnConnections", {
+    pgPolicy("selectOwnIdentities", {
       for: "select",
       to: authenticatedRole,
       using: authUuid(table.userId)
     }),
-    pgPolicy("deleteOwnConnections", {
+    pgPolicy("deleteOwnIdentities", {
       for: "delete",
       to: authenticatedRole,
       using: authUuid(table.userId)

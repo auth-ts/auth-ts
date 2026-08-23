@@ -88,7 +88,7 @@ export async function convertGuest(
 /**
  * Points a guest at the account that turned out to be theirs.
  *
- * Shared with OAuth, where the account is found by provider connection rather
+ * Shared with OAuth, where the account is found by provider identity rather
  * than by identifier, so that every way a guest can resolve to an existing user
  * leaves the same `primaryUserId` breadcrumb for the application to act on.
  */

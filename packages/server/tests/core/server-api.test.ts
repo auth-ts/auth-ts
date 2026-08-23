@@ -138,7 +138,7 @@ describe("getToken as a function", () => {
     for (const call of [
       () => context.authServer.getUser({ headers }),
       () => context.authServer.getSession({ headers }),
-      () => context.authServer.getSessions({ headers })
+      () => context.authServer.listSessions({ headers })
     ]) {
       await expect(call()).rejects.toMatchObject({
         code: "unauthenticated",
@@ -163,7 +163,7 @@ describe("getToken as a function", () => {
     const [session, user, sessions] = await Promise.all([
       context.authServer.getSession({ token }),
       context.authServer.getUser({ token }),
-      context.authServer.getSessions({ token })
+      context.authServer.listSessions({ token })
     ])
 
     expect(update).not.toHaveBeenCalled()
@@ -310,7 +310,7 @@ describe("calling with a token instead of a request", () => {
 
     // No cookie, no request — the shape a custom API has after reading its own
     // Authorization header, or a service handed a token some other way.
-    const sessions = await context.authServer.getSessions({ token })
+    const sessions = await context.authServer.listSessions({ token })
 
     expect(sessions).toHaveLength(1)
   })
@@ -319,7 +319,7 @@ describe("calling with a token instead of a request", () => {
     const { authServer } = await createTestServer()
 
     await expect(
-      authServer.getSessions({ token: "forged.not.real" })
+      authServer.listSessions({ token: "forged.not.real" })
     ).rejects.toThrow()
   })
 
@@ -339,7 +339,7 @@ describe("calling with a token instead of a request", () => {
     const updated = await authServer.updateUser({ token, name: "Ada" })
     expect(updated.name).toBe("Ada")
 
-    expect(await authServer.getConnections({ token })).toEqual([])
+    expect(await authServer.listIdentities({ token })).toEqual([])
 
     await authServer.deleteUser({ token })
     expect(context.db.sessions()).toHaveLength(0)

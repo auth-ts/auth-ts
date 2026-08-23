@@ -22,7 +22,7 @@ describe("matchRoute", () => {
       ["GET", "/api/auth/sessions"],
       ["DELETE", "/api/auth/sessions/abc"],
       ["POST", "/api/auth/sign-in/guest"],
-      ["GET", "/api/auth/connections"],
+      ["GET", "/api/auth/identities"],
       ["GET", "/api/auth/jwks"]
     ]
 

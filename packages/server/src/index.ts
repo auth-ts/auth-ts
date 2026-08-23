@@ -5,10 +5,10 @@ export type {
   AdditionalFieldType,
   AdditionalFieldValue,
   AuthAttempt,
-  AuthConnection,
   AuthDB,
   AuthDeleteInput,
   AuthDirection,
+  AuthIdentity,
   AuthInsert,
   AuthInsertInput,
   AuthOrderBy,
@@ -50,12 +50,12 @@ export type {
   AuthServer
 } from "./core/create-auth-server"
 export { createAuthServer } from "./core/create-auth-server"
-export type { AccountInfo, GetAccountsInput } from "./endpoints/accounts"
+export type { AccountInfo, ListAccountsInput } from "./endpoints/accounts"
 export type { SwitchAccountInput } from "./endpoints/accounts/switch"
 export type { CallbackProviderInput } from "./endpoints/callback/$provider"
 export type { ConnectProviderInput } from "./endpoints/connect/$provider"
-export type { ConnectionInfo } from "./endpoints/connections"
-export type { DisconnectProviderInput } from "./endpoints/connections/$provider"
+export type { IdentityInfo } from "./endpoints/identities"
+export type { DisconnectProviderInput } from "./endpoints/identities/$provider"
 export type { SendCodeInput } from "./endpoints/send-code"
 export type { CurrentSession } from "./endpoints/session"
 export type { SessionInfo } from "./endpoints/sessions"

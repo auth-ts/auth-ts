@@ -3,24 +3,24 @@ import { skipToken, useQuery } from "@tanstack/react-query"
 import { postgrest } from "../db/postgrest"
 
 /** The query key a user's linked providers live under, shared so disconnecting can invalidate it. */
-export const connectionsQueryKey = (userId?: string) => ["connections", userId]
+export const identitiesQueryKey = (userId?: string) => ["identities", userId]
 
 /** Every provider linked to this account, alphabetical. */
-export function useConnections(userId?: string) {
+export function useIdentities(userId?: string) {
   return useQuery({
-    queryKey: connectionsQueryKey(userId),
+    queryKey: identitiesQueryKey(userId),
     queryFn: userId
       ? async () => {
           const { data } = await postgrest
-            .from("connections")
+            .from("identities")
             .select()
             .order("provider", { ascending: true })
             .throwOnError()
 
-          return data.map((connection) => ({
-            ...connection,
-            createdAt: new Date(connection.createdAt),
-            updatedAt: new Date(connection.updatedAt)
+          return data.map((identity) => ({
+            ...identity,
+            createdAt: new Date(identity.createdAt),
+            updatedAt: new Date(identity.updatedAt)
           }))
         }
       : skipToken

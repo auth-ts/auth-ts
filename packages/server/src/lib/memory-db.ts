@@ -35,7 +35,7 @@ type StoredRow = Record<string, unknown> & { id: string }
 const UNIQUE_COLUMNS: { [T in AuthTable]?: string[][] } = {
   users: [["email"], ["phoneNumber"]],
   sessions: [["tokenHash"]],
-  connections: [["provider", "providerAccountId"]]
+  identities: [["provider", "providerAccountId"]]
 }
 
 /** The tables core sweeps, all keyed on `expiresAt`. */

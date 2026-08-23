@@ -25,7 +25,7 @@ async function seed() {
     }
   })
   await db.insert({
-    table: "connections",
+    table: "identities",
     values: {
       userId: user.id,
       provider: "github",
@@ -60,7 +60,7 @@ describe("deleteUser", () => {
 
     expect(db.users()).toEqual([])
     expect(await selectRows(db, "sessions")).toEqual([])
-    expect(await selectRows(db, "connections")).toEqual([])
+    expect(await selectRows(db, "identities")).toEqual([])
     expect(await selectRows(db, "verificationCodes")).toEqual([])
   })
 
@@ -79,7 +79,7 @@ describe("deleteUser", () => {
     // live token rather than a live token with no account.
     expect(tables[0]).toBe("sessions")
     expect(tables.at(-1)).toBe("users")
-    expect(tables).toContain("connections")
+    expect(tables).toContain("identities")
     expect(tables).toContain("verificationCodes")
   })
 

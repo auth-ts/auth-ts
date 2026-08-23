@@ -7,12 +7,12 @@ import { selectOne } from "../lib/select-one"
  *
  * The ceiling every read the contract accepts must have. Nobody links more
  * providers than this; a `userId` that somehow matched more has a problem the
- * connections screen is not going to solve.
+ * identities screen is not going to solve.
  */
-export const CONNECTION_PAGE_SIZE = 100
+export const IDENTITY_PAGE_SIZE = 100
 
 /** A provider identity to record against a user. */
-export interface LinkConnectionInput {
+export interface LinkIdentityInput {
   userId: string
   provider: string
   providerAccountId: string
@@ -37,11 +37,11 @@ export interface LinkConnectionInput {
  * provider account both find nothing, both insert, and the constraint refuses
  * the loser rather than letting one identity link twice.
  */
-export async function linkConnection(
+export async function linkIdentity(
   internals: AuthServerInternals,
-  { userId, provider, providerAccountId, label }: LinkConnectionInput
+  { userId, provider, providerAccountId, label }: LinkIdentityInput
 ) {
-  const existing = await selectOne(internals, "connections", {
+  const existing = await selectOne(internals, "identities", {
     provider,
     providerAccountId
   })
@@ -49,7 +49,7 @@ export async function linkConnection(
   if (existing) {
     if (label !== undefined && label !== existing.label) {
       await internals.db.update({
-        table: "connections",
+        table: "identities",
         where: { id: existing.id },
         values: { label, updatedAt: new Date() }
       })
@@ -57,7 +57,7 @@ export async function linkConnection(
     return
   }
 
-  await insertRow(internals, "connections", {
+  await insertRow(internals, "identities", {
     userId,
     provider,
     providerAccountId,

@@ -4,7 +4,7 @@ import { AuthApiError } from "../http/auth-api-error"
 import { selectOne } from "../lib/select-one"
 import { convertGuest, mergeGuestInto } from "../session/convert-guest"
 import { findOrCreateUser } from "../user/find-or-create-user"
-import { linkConnection } from "./link-connection"
+import { linkIdentity } from "./link-identity"
 import type { ProviderIdentity } from "./providers/oauth-provider"
 
 /** What shapes how a provider identity resolves to a user. */
@@ -24,21 +24,21 @@ export interface ResolveOAuthUserOptions {
  *
  * The cascade, in order:
  *
- * 1. **An existing connection for this provider account id.** The stable id
+ * 1. **An existing identity for this provider account id.** The stable id
  *    match comes first so that someone who changed their email at the provider
  *    still lands in their own account instead of a new one. A guest merges into
- *    that account; the connection itself is never re-pointed.
+ *    that account; the identity itself is never re-pointed.
  * 2. **A verified email that already belongs to a user.** They are the same
- *    person, so the accounts are joined and the connection recorded. A guest
+ *    person, so the accounts are joined and the identity recorded. A guest
  *    merges into that account, or — if the email is new — is upgraded in place.
  * 3. **Neither.** Create the user (or upgrade the guest), then record the
- *    connection.
+ *    identity.
  *
  * A phone number is never consulted: providers do not supply one, and linking by
  * phone is the `connect` flow, which the signed-in user initiates deliberately.
  *
  * @throws {AuthApiError} `unauthenticated` when the provider gave no verified email
- * and there is no existing connection to fall back on.
+ * and there is no existing identity to fall back on.
  */
 export async function resolveOAuthUser(
   internals: AuthServerInternals,
@@ -46,20 +46,20 @@ export async function resolveOAuthUser(
   identity: ProviderIdentity,
   { additionalFields = {}, guest }: ResolveOAuthUserOptions = {}
 ): Promise<AuthUser> {
-  const connection = await selectOne(internals, "connections", {
+  const existing = await selectOne(internals, "identities", {
     provider,
     providerAccountId: identity.providerAccountId
   })
 
-  if (connection) {
+  if (existing) {
     const linked = await selectOne(internals, "users", {
-      id: connection.userId
+      id: existing.userId
     })
     if (linked) {
       // Refresh the recorded label, but never re-key on it: the account is
       // found by the provider's stable id, so a renamed handle is the same
       // link with a new name on it.
-      await linkConnection(internals, {
+      await linkIdentity(internals, {
         userId: linked.id,
         provider,
         providerAccountId: identity.providerAccountId,
@@ -76,7 +76,7 @@ export async function resolveOAuthUser(
 
   if (!identity.email) {
     internals.log.warn(
-      "oauth identity had no verified email and no existing connection",
+      "oauth identity had no verified email and no existing identity",
       { provider }
     )
     throw new AuthApiError("unauthenticated", 403)
@@ -100,7 +100,7 @@ export async function resolveOAuthUser(
         additionalFields
       })
 
-  await linkConnection(internals, {
+  await linkIdentity(internals, {
     userId: user.id,
     provider,
     providerAccountId: identity.providerAccountId,
