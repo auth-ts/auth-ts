@@ -17,6 +17,7 @@ import {
   serializeAccounts
 } from "./accounts-cookie"
 import { readRefreshToken } from "./resolve-session"
+import { refreshCookies } from "./session-cookies"
 import { sessionStamp } from "./slide-session"
 
 /** What issuing a session produced. */
@@ -107,16 +108,13 @@ export async function issueSession(
   internals.log.debug("session issued", { userType: user.type })
 
   const secure = shouldUseSecureCookies(requestURL)
-  responseHeaders.append(
-    "set-cookie",
-    serializeCookie({
-      name: config.cookie.name,
-      value: rawToken,
-      path: config.cookie.path,
-      maxAge: config.session.ttl,
-      secure
-    })
-  )
+  for (const cookie of refreshCookies(internals, {
+    rawToken,
+    requestURL,
+    headers
+  })) {
+    responseHeaders.append("set-cookie", cookie)
+  }
 
   if (config.multiAccount) {
     // Sign-ins append rather than replace: the previous active session moves to

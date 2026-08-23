@@ -17,6 +17,7 @@ import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
 import { mintAccessToken } from "../../session/issue-session"
 import { readRefreshToken } from "../../session/resolve-session"
+import { refreshCookies } from "../../session/session-cookies"
 
 /** Body accepted by `POST /accounts/switch`. */
 export interface SwitchAccountInput extends CallerInput {
@@ -74,16 +75,13 @@ export const switchAccount = defineEndpoint({
       target.session.id
     )
     const responseHeaders = new Headers()
-    responseHeaders.append(
-      "set-cookie",
-      serializeCookie({
-        name: config.cookie.name,
-        value: target.token,
-        path: config.cookie.path,
-        maxAge: config.session.ttl,
-        secure
-      })
-    )
+    for (const cookie of refreshCookies(internals, {
+      rawToken: target.token,
+      requestURL: input.requestURL,
+      headers
+    })) {
+      responseHeaders.append("set-cookie", cookie)
+    }
     responseHeaders.append(
       "set-cookie",
       serializeCookie({

@@ -1,11 +1,12 @@
 import type { AuthUser } from "../core/auth-db"
-import { unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { mintAccessToken } from "../session/issue-session"
 import type { HeadersInput } from "../session/resolve-session"
 import { resolveSession } from "../session/resolve-session"
+import { clearedRefreshCookies } from "../session/session-cookies"
 
-/** What `GET /token` and `authServer.getToken` return. */
+/** What `GET /token` and `authServer.getToken` return when somebody is signed in. */
 export interface TokenResult {
   token: string
   /**
@@ -18,13 +19,26 @@ export interface TokenResult {
   user: AuthUser
 }
 
+/** The request, plus its URL — read to scope the cookies this endpoint retires. */
+export interface TokenInput extends HeadersInput {
+  requestURL?: string
+}
+
 /**
- * Exchanges the refresh cookie for an access token.
+ * Exchanges the refresh cookie for an access token, or answers `null`.
  *
  * The only endpoint that authenticates from the cookie, and therefore the only
  * one that touches a session: every other endpoint reads the token this
  * produces and does no session work at all. A page that calls four of them
  * costs one session write, not four.
+ *
+ * No session answers `null` with a 200 rather than a 401. This is the one
+ * question in the library whose honest answer can be "nobody", and the callers
+ * asking it — a client deciding what to render, a loader deciding whether to
+ * greet someone — are not in a failure state. It also lets the answer carry
+ * `Set-Cookie`, which a thrown error cannot: whatever dead credential the
+ * browser presented is expired on the way out, so the next page load asks
+ * nothing at all.
  *
  * An `Authorization` header is ignored rather than honoured. A caller holding a
  * live token has no reason to be here, and one holding a spent token is here
@@ -34,16 +48,35 @@ export interface TokenResult {
  * and never crosses an origin, so rotation would buy very little; what it would
  * reliably buy is a race between concurrent tabs, where the second presents a
  * token the first has already spent.
- *
- * @throws {AuthApiError} `unauthenticated` when there is no live session.
  */
 export const getToken = defineEndpoint({
   method: "GET",
   path: "/token",
-  parse: ({ request }): HeadersInput => ({ headers: request.headers }),
-  run: async (internals, input: HeadersInput) => {
+  parse: ({ request }): TokenInput => ({
+    headers: request.headers,
+    requestURL: request.url
+  }),
+  run: async (internals, input: TokenInput) => {
+    const { config } = internals
     const resolved = await resolveSession(internals, input.headers)
-    if (!resolved) throw unauthenticated()
+    if (!resolved) {
+      const headers = new Headers()
+      for (const cookie of clearedRefreshCookies(internals, input)) {
+        headers.append("set-cookie", cookie)
+      }
+      if (config.multiAccount) {
+        headers.append(
+          "set-cookie",
+          clearCookie(
+            config.cookie.accountsName,
+            config.cookie.path,
+            shouldUseSecureCookies(input.requestURL)
+          )
+        )
+      }
+
+      return { data: null, headers }
+    }
 
     const token = await mintAccessToken(
       internals,

@@ -225,10 +225,11 @@ function notFoundEndpoint(error: AuthApiError, request: Request): AnyEndpoint {
  * Explains the "server-side rendering is always signed out" trap before it happens.
  *
  * A `cookie.path` narrowed to the auth mount means the refresh cookie is never
- * sent to a page request, so a server-side read would quietly return null
- * forever. That presents as a bug in the application rather than the cost of a
- * configuration choice, so it throws with the fix in the message instead. The
- * default path is `"/"`, so this is only ever reached by opting into scoping.
+ * sent to a page request, so a server-side read answers `null` — the same
+ * answer a real visitor gets, and therefore indistinguishable from one. That
+ * presents as a bug in the application rather than the cost of a configuration
+ * choice, so it throws with the fix in the message instead. The default path is
+ * `"/"`, so this is only ever reached by opting into scoping.
  */
 function assertCookieReachable(
   resolved: AuthServerConfig,

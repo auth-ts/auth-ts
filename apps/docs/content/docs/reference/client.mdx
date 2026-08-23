@@ -28,6 +28,14 @@ takes exactly this shape and raises its own error on `null`, so a query made
 while signed out fails as a data-plane error rather than an auth one. It also
 means "is anyone signed in" is a question you can ask without a `try`.
 
+A browser that has never signed in, or has signed out, answers `null` without a
+request. The server writes a readable `auth-ts.hint` cookie beside the refresh
+cookie and retires the two together, so the client can tell "no session" from
+"unknown" locally — a signed-out page costs no round trip on load and none on
+every tab focus. A `baseURL` on another origin is the exception: the hint only
+reaches a sibling host when the browser accepts the domain they share, so there
+the client asks and reads the answer.
+
 `getUser()` returns the signed-in user, or `null`, and **always reads the
 server**. There is no cache behind it on purpose: a name or avatar changed in
 another tab, on another device, or by anything other than this client has to
@@ -49,7 +57,8 @@ truth to keep in step.
 
 ## Where tokens come from
 
-Two places, both a body. `GET /token` exchanges the refresh cookie for one, and
+Two places, both a body. `GET /token` exchanges the refresh cookie for one — or
+answers `null` with a 200, because nobody signed in is an answer — and
 a sign-in returns one with the user it signed in — verification code, guest,
 account switch, and the sign-out that promotes a parked account. Nothing arrives
 in a response header, so there is nothing for a framework's response plumbing to

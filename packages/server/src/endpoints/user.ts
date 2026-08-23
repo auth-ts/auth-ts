@@ -7,6 +7,7 @@ import { selectOne } from "../lib/select-one"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
+import { clearedRefreshCookies } from "../session/session-cookies"
 // Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
 import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
@@ -178,10 +179,12 @@ export const deleteUser = defineEndpoint({
 
       const responseHeaders = new Headers()
       const secure = shouldUseSecureCookies(input.requestURL)
-      responseHeaders.append(
-        "set-cookie",
-        clearCookie(config.cookie.name, config.cookie.path, secure)
-      )
+      for (const cookie of clearedRefreshCookies(internals, {
+        requestURL: input.requestURL,
+        headers
+      })) {
+        responseHeaders.append("set-cookie", cookie)
+      }
       if (config.multiAccount) {
         responseHeaders.append(
           "set-cookie",

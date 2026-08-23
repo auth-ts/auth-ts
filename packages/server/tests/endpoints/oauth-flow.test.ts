@@ -580,15 +580,14 @@ describe("oauth callback", () => {
     )
     expect(((await whoami.json()) as { id: string }).id).toBe(owner.id)
     // The guest session was replaced by the callback, not left live beside it.
-    expect(
-      (
-        await authServer.handler(
-          request("GET", "/api/auth/token", {
-            cookies: { "auth-ts.refresh": guestRefresh }
-          })
-        )
-      ).status
-    ).toBe(401)
+    const refused = await authServer.handler(
+      request("GET", "/api/auth/token", {
+        cookies: { "auth-ts.refresh": guestRefresh }
+      })
+    )
+
+    expect(refused.status).toBe(200)
+    expect(await refused.json()).toBeNull()
   })
 
   it("applies sign-up additionalFields when a guest is upgraded in place", async () => {

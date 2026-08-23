@@ -1,9 +1,14 @@
 import type { AuthSession, AuthUser } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { selectOne } from "../lib/select-one"
-import { serializeCookie } from "../lib/serialize-cookie"
+import {
+  serializeCookie,
+  shouldUseSecureCookies
+} from "../lib/serialize-cookie"
 import type { ParkedAccount } from "./accounts-cookie"
 import { parkedTokens, serializeAccounts } from "./accounts-cookie"
+import type { SessionCookieContext } from "./session-cookies"
+import { refreshCookies } from "./session-cookies"
 
 /** The account a browser moved to, and the cookies that move it. */
 export interface PromotedAccount {
@@ -27,7 +32,7 @@ export interface PromotedAccount {
 export async function promoteNextAccount(
   internals: AuthServerInternals,
   parked: ParkedAccount[],
-  secure: boolean
+  context: SessionCookieContext
 ): Promise<PromotedAccount | null> {
   const { config } = internals
 
@@ -39,16 +44,12 @@ export async function promoteNextAccount(
 
     const remaining = parkedTokens(parked.filter((_, at) => at !== index))
     const headers = new Headers()
-    headers.append(
-      "set-cookie",
-      serializeCookie({
-        name: config.cookie.name,
-        value: next.token,
-        path: config.cookie.path,
-        maxAge: config.session.ttl,
-        secure
-      })
-    )
+    for (const cookie of refreshCookies(internals, {
+      ...context,
+      rawToken: next.token
+    })) {
+      headers.append("set-cookie", cookie)
+    }
     headers.append(
       "set-cookie",
       serializeCookie({
@@ -56,7 +57,7 @@ export async function promoteNextAccount(
         value: serializeAccounts(remaining),
         path: config.cookie.path,
         maxAge: config.session.ttl,
-        secure
+        secure: shouldUseSecureCookies(context.requestURL)
       })
     )
 

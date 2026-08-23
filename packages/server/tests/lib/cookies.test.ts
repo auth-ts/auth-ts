@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest"
 import { parseCookies, readCookie } from "../../src/lib/parse-cookies"
 import {
   clearCookie,
+  clearHintCookie,
   serializeCookie,
+  serializeHintCookie,
   shouldUseSecureCookies
 } from "../../src/lib/serialize-cookie"
 
@@ -107,6 +109,49 @@ describe("serializeCookie", () => {
     })
     expect(setCookie).not.toContain("Secure")
     expect(setCookie).toContain("HttpOnly")
+  })
+})
+
+describe("serializeHintCookie", () => {
+  it("is readable by script and rooted at the site, unlike every other cookie here", () => {
+    const setCookie = serializeHintCookie({ value: "in", maxAge: "30d" })
+
+    expect(setCookie).toContain("auth-ts.hint=in")
+    expect(setCookie).not.toContain("HttpOnly")
+    // Not cookie.path: document.cookie only exposes cookies covering the page.
+    expect(setCookie).toContain("Path=/")
+    expect(setCookie).toContain("SameSite=Lax")
+    expect(setCookie).toContain("Secure")
+    expect(setCookie).toContain("Max-Age=2592000")
+  })
+
+  it("carries a Domain only when one is given", () => {
+    expect(
+      serializeHintCookie({ value: "out", maxAge: "30d" }).toLowerCase()
+    ).not.toContain("domain")
+    expect(
+      serializeHintCookie({
+        value: "out",
+        maxAge: "30d",
+        domain: "example.com"
+      })
+    ).toContain("Domain=example.com")
+  })
+
+  it("drops Secure alongside the cookie it shadows", () => {
+    expect(
+      serializeHintCookie({ value: "in", maxAge: "30d", secure: false })
+    ).not.toContain("Secure")
+  })
+})
+
+describe("clearHintCookie", () => {
+  it("expires on the same scope it was set with", () => {
+    const setCookie = clearHintCookie({ domain: "example.com" })
+
+    expect(setCookie).toContain("Max-Age=0")
+    expect(setCookie).toContain("Path=/")
+    expect(setCookie).toContain("Domain=example.com")
   })
 })
 

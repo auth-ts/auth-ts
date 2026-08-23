@@ -43,16 +43,19 @@ describe("getToken as a function", () => {
       "session"
     ).expiresAt.getTime()
 
-    const { token, user } = await context.authServer.getToken({
-      headers: cookieHeaders(refreshToken)
-    })
+    const result = required(
+      await context.authServer.getToken({
+        headers: cookieHeaders(refreshToken)
+      }),
+      "token"
+    )
     const after = required(
       context.db.sessions()[0],
       "session"
     ).expiresAt.getTime()
 
-    expect(user.email).toBe("ada@example.com")
-    expect(await context.authServer.verifyToken(token)).toBeTruthy()
+    expect(result.user.email).toBe("ada@example.com")
+    expect(await context.authServer.verifyToken(result.token)).toBeTruthy()
     expect(after).toBeGreaterThanOrEqual(before)
   })
 
@@ -82,18 +85,18 @@ describe("getToken as a function", () => {
     const context = await createTestServer()
     const { refreshToken } = await signIn(context)
 
-    const { user } = await context.authServer.getToken(
+    const result = await context.authServer.getToken(
       request("GET", "/dashboard", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
 
-    expect(user.email).toBe("ada@example.com")
+    expect(result?.user.email).toBe("ada@example.com")
   })
 
-  it("throws unauthenticated for a revoked session, matching the endpoint", async () => {
-    // Callables throw AuthApiError so a caller can switch on `code` rather than
-    // pattern-matching a message.
+  it("answers null for a revoked session, matching the endpoint", async () => {
+    // A loader asking who is here gets an answer, not an exception: "nobody" is
+    // the ordinary case on a public page.
     const context = await createTestServer()
     const { refreshToken } = await signIn(context)
     await context.db.delete({
@@ -103,10 +106,15 @@ describe("getToken as a function", () => {
 
     await expect(
       context.authServer.getToken({ headers: cookieHeaders(refreshToken) })
-    ).rejects.toMatchObject({
-      code: "unauthenticated",
-      status: 401
-    })
+    ).resolves.toBeNull()
+  })
+
+  it("answers null when no cookie was sent at all", async () => {
+    const context = await createTestServer()
+
+    await expect(
+      context.authServer.getToken({ headers: new Headers() })
+    ).resolves.toBeNull()
   })
 
   it("explains a narrowed cookie.path instead of silently returning null", async () => {
@@ -144,9 +152,12 @@ describe("getToken as a function", () => {
     // spend it. Anything else would slide the session on every call.
     const context = await createTestServer()
     const { refreshToken } = await signIn(context)
-    const { token } = await context.authServer.getToken({
-      headers: cookieHeaders(refreshToken)
-    })
+    const { token } = required(
+      await context.authServer.getToken({
+        headers: cookieHeaders(refreshToken)
+      }),
+      "token"
+    )
 
     const update = vi.spyOn(context.db, "update")
     const [session, user, sessions] = await Promise.all([
@@ -177,7 +188,7 @@ describe("getSession", () => {
 
   it("refuses a revoked or expired session", async () => {
     const context = await createTestServer()
-    const { refreshToken } = await signIn(context)
+    const { token } = await signIn(context)
     const session = required(context.db.sessions()[0], "session")
 
     await context.db.delete({
@@ -185,11 +196,10 @@ describe("getSession", () => {
       where: { tokenHash: session.tokenHash }
     })
 
+    // The token still verifies — it is the row its `sid` names that is gone.
     await expect(
-      context.authServer.getToken({
-        headers: cookieHeaders(refreshToken)
-      })
-    ).rejects.toThrow()
+      context.authServer.getSession({ token })
+    ).rejects.toMatchObject({ code: "unauthenticated", status: 401 })
   })
 
   it("throws the configuration error when no cookie can reach the route", async () => {

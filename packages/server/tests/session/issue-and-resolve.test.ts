@@ -36,6 +36,66 @@ describe("issueSession", () => {
     expect(cookie?.attributes.toLowerCase()).not.toContain("domain")
   })
 
+  it("writes the readable hint beside the cookie, expiring together", async () => {
+    const { internals, db } = await createTestInternals()
+    const user = await insertUser(db, { email: "ada@example.com" })
+
+    const issued = await issueSession(internals, {
+      user,
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+    const cookies = readSetCookies(issued)
+    const hint = required(cookies.get("auth-ts.hint"), "hint cookie")
+
+    expect(hint.value).toBe("in")
+    // The one cookie script may read, because it is the one that is not a
+    // credential — and useless if a page cannot see it.
+    expect(hint.attributes).not.toContain("HttpOnly")
+    expect(hint.attributes).toContain("Path=/")
+    expect(hint.attributes.toLowerCase()).not.toContain("domain")
+    expect(hint.attributes).toContain(
+      required(
+        cookies.get("auth-ts.refresh"),
+        "refresh cookie"
+      ).attributes.match(/Max-Age=\d+/)?.[0]
+    )
+  })
+
+  it("scopes the hint to the shared domain only when a cross-origin app is configured", async () => {
+    const cross = await createTestInternals({
+      cors: { origin: "https://app.example.com" }
+    })
+    const issuedCross = await issueSession(cross.internals, {
+      user: await insertUser(cross.db, { email: "ada@example.com" }),
+      headers: new Headers(),
+      requestURL: "https://api.example.com/api/auth/verify-code"
+    })
+
+    expect(
+      required(readSetCookies(issuedCross).get("auth-ts.hint"), "hint")
+        .attributes
+    ).toContain("Domain=example.com")
+
+    // A public suffix would be refused by the browser anyway; a single shared
+    // label is never a domain a cookie may claim.
+    const tld = await createTestInternals({
+      cors: { origin: "https://app.example" }
+    })
+    const issuedTld = await issueSession(tld.internals, {
+      user: await insertUser(tld.db, { email: "ada@example.com" }),
+      headers: new Headers(),
+      requestURL: "https://api.other.example/api/auth/verify-code"
+    })
+
+    expect(
+      required(
+        readSetCookies(issuedTld).get("auth-ts.hint"),
+        "hint"
+      ).attributes.toLowerCase()
+    ).not.toContain("domain")
+  })
+
   it("stores only the hash of the token, never the token", async () => {
     const { internals, db } = await createTestInternals()
     const user = await insertUser(db, { email: "ada@example.com" })

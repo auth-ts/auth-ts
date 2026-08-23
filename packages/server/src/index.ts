@@ -69,7 +69,7 @@ export type {
   SignOutInput,
   SignOutScope
 } from "./endpoints/sign-out"
-export type { TokenResult } from "./endpoints/token"
+export type { TokenInput, TokenResult } from "./endpoints/token"
 export type { DeleteUserInput, UpdateUserInput } from "./endpoints/user"
 export type { VerifyCodeInput } from "./endpoints/verify-code"
 export { AuthApiError } from "./http/auth-api-error"
@@ -91,6 +91,7 @@ export type {
 export { isIpAddress } from "./lib/ip-address"
 export type { LeveledLogger, Logger, LogLevel } from "./lib/logger"
 export type { Duration } from "./lib/parse-duration"
+export { HINT_COOKIE_NAME } from "./lib/serialize-cookie"
 export type {
   OAuthProvider,
   ProviderIdentity

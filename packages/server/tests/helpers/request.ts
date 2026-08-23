@@ -65,8 +65,8 @@ export async function mintToken(
       cookies: { "auth-ts.refresh": refreshToken }
     })
   )
-  const body = (await response.json()) as { token?: string }
-  if (!body.token) throw new Error("no token for that refresh cookie")
+  const body = (await response.json()) as { token?: string } | null
+  if (!body?.token) throw new Error("no token for that refresh cookie")
 
   return body.token
 }

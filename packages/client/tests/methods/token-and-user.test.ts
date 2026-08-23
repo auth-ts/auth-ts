@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createAuthClient } from "../../src/core/create-auth-client"
 import { AuthError } from "../../src/lib/auth-error"
 import type { FakeAuthServer } from "../helpers/fake-auth-server"
-import { fakeAccessToken, fakeAuthServer } from "../helpers/fake-auth-server"
+import {
+  fakeAccessToken,
+  fakeAuthServer,
+  setSessionHint
+} from "../helpers/fake-auth-server"
 
 const user = { id: "user-1", email: "ada@example.com", type: "user" as const }
 
@@ -127,6 +131,24 @@ describe("getToken", () => {
     expect(await client.getToken()).toBeNull()
   })
 
+  it("resolves null and clears the token when the server says nobody is here", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    const client = createAuthClient()
+    await client.getToken()
+
+    server.restore()
+    server = fakeAuthServer()
+    // 200 with a null body: the answer to "who is here", not a failure.
+    server.on("GET", "/api/auth/token", { body: null })
+    client.clearToken()
+
+    expect(await client.getToken()).toBeNull()
+    await expect(client.getUser()).resolves.toBeNull()
+  })
+
   it("still throws from the methods that need a credential", async () => {
     server.on("GET", "/api/auth/token", {
       status: 401,
@@ -193,6 +215,81 @@ describe("getToken", () => {
       code: "rateLimited",
       retryAfter: 42
     })
+  })
+})
+
+describe("the session hint", () => {
+  it("costs a signed-out browser no request at all", async () => {
+    setSessionHint(undefined)
+    const client = createAuthClient()
+
+    expect(await client.getToken()).toBeNull()
+    await expect(client.getUser()).resolves.toBeNull()
+    // The point of the whole mechanism: no 401 on load, none on tab focus.
+    expect(server.requests).toHaveLength(0)
+  })
+
+  it("still throws from requireToken, which has nothing to do with null", async () => {
+    setSessionHint(undefined)
+    const client = createAuthClient()
+
+    await expect(client.listSessions()).rejects.toMatchObject({
+      code: "unauthenticated",
+      status: 401
+    })
+    expect(server.requests).toHaveLength(0)
+  })
+
+  it("believes an explicit out the same way", async () => {
+    setSessionHint("out")
+    const client = createAuthClient()
+
+    expect(await client.getToken()).toBeNull()
+    expect(server.requests).toHaveLength(0)
+  })
+
+  it("forgets a token it is still holding when the hint has gone", async () => {
+    // Another tab signed out; this one must not keep serving from its cache.
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    const client = createAuthClient()
+    await client.getToken()
+
+    setSessionHint("out")
+    client.clearToken()
+
+    expect(await client.getToken()).toBeNull()
+    expect(server.requests).toHaveLength(1)
+  })
+
+  it("asks anyway when the auth server is on another origin", async () => {
+    // There the hint may simply never have been delivered, and a wrong "signed
+    // out" is worse than a wasted request.
+    setSessionHint(undefined)
+    const client = createAuthClient({ baseURL: "https://api.example.test" })
+    server.on("GET", "/api/auth/token", { body: null })
+
+    expect(await client.getToken()).toBeNull()
+    expect(server.requests).toHaveLength(1)
+  })
+
+  it("is ignored by a client holding its own cookie jar", async () => {
+    // A native app has the refresh cookie itself; nothing to hint about.
+    setSessionHint(undefined)
+    const storage = new Map<string, string>()
+    const client = createAuthClient({
+      cookieStorage: {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => void storage.set(key, value),
+        removeItem: (key) => void storage.delete(key)
+      }
+    })
+    server.on("GET", "/api/auth/token", { body: null })
+
+    expect(await client.getToken()).toBeNull()
+    expect(server.requests).toHaveLength(1)
   })
 })
 

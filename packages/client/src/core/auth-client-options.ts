@@ -16,6 +16,11 @@ export interface AuthClientOptions {
    * `SameSite=Lax`, so a genuinely foreign domain never receives it no matter
    * what CORS says. For a separate domain, reverse-proxy the auth mount under
    * this origin instead.
+   *
+   * Setting this also costs a signed-out visitor one request per page load: the
+   * cookie that would have told this client not to bother is written by the
+   * auth server, and only reaches a sibling host when the browser accepts the
+   * domain the two share. Same-origin needs no such luck.
    */
   baseURL?: string
   /**

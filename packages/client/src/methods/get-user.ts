@@ -27,7 +27,7 @@ export function createGetUser(
     try {
       const cached = internals.tokenStore.get()
       if (!cached || internals.tokenStore.mustRefresh()) {
-        return (await refresh()).user
+        return (await refresh())?.user ?? null
       }
 
       return await internals.fetchJson<AuthUser>({

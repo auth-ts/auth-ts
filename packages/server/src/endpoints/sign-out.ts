@@ -16,6 +16,7 @@ import { authenticate } from "../session/authenticate"
 import { mintAccessToken } from "../session/issue-session"
 import { promoteNextAccount } from "../session/promote-account"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
+import { clearedRefreshCookies } from "../session/session-cookies"
 
 /**
  * How far a sign-out reaches, for each account it applies to.
@@ -73,6 +74,7 @@ export const signOut = defineEndpoint({
     const { config } = internals
     const scope = input.scope ?? "local"
     const secure = shouldUseSecureCookies(input.requestURL)
+    const context = { requestURL: input.requestURL, headers }
 
     const parked = config.multiAccount
       ? await pruneDeadAccounts(
@@ -142,7 +144,7 @@ export const signOut = defineEndpoint({
       return { data: undefined, status: 204, headers: responseHeaders }
     }
 
-    const promoted = await promoteNextAccount(internals, remaining, secure)
+    const promoted = await promoteNextAccount(internals, remaining, context)
     if (promoted) {
       // The browser is now acting as someone else, so it gets that account's
       // token. Signing out without a promotion returns none: handing over a
@@ -160,10 +162,9 @@ export const signOut = defineEndpoint({
     }
 
     const responseHeaders = new Headers()
-    responseHeaders.append(
-      "set-cookie",
-      clearCookie(config.cookie.name, config.cookie.path, secure)
-    )
+    for (const cookie of clearedRefreshCookies(internals, context)) {
+      responseHeaders.append("set-cookie", cookie)
+    }
     if (config.multiAccount) {
       responseHeaders.append(
         "set-cookie",

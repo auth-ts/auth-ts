@@ -91,7 +91,10 @@ The refresh token is the session: 32 random bytes, delivered only as an
 access token is a short-lived JWT held in a JavaScript variable and never
 persisted, because a stored bearer token turns any XSS into an exfiltratable
 credential. `GET /token` is the only endpoint that reads the cookie, and the only
-one that touches a session; everything else authenticates from the JWT alone. Revocation latency is therefore the access-token lifetime — ten
+one that touches a session; everything else authenticates from the JWT alone. A
+signed-out visitor never makes that exchange: a readable `auth-ts.hint` cookie,
+written and retired with the refresh cookie, holds `in` or `out` and nothing
+else, so the client can answer "nobody" without a request. Revocation latency is therefore the access-token lifetime — ten
 minutes by default — which is stated plainly rather than glossed over.
 
 ## Repository

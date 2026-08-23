@@ -5,10 +5,13 @@ import { parseDurationSeconds } from "./parse-duration"
  * The cookie attributes this library controls.
  *
  * Only `name`, `value`, `path`, and lifetime are caller-supplied. `HttpOnly`,
- * `Secure`, and `SameSite=Lax` are not configurable: every cookie here carries a
- * session credential, and making those optional would turn a typo into an XSS or
- * CSRF exposure. There is no `Domain` option either — cookies stay host-only so
- * the token is never broadcast to sibling subdomains.
+ * `Secure`, and `SameSite=Lax` are not configurable: every cookie built here
+ * carries a session credential, and making those optional would turn a typo
+ * into an XSS or CSRF exposure. There is no `Domain` option either — these
+ * cookies stay host-only so the token is never broadcast to sibling subdomains.
+ *
+ * The one cookie that is none of those things has its own builder,
+ * {@link serializeHintCookie}, and says why it may be read by script.
  */
 export interface CookieAttributes {
   /** Cookie name, e.g. `"auth-ts.refresh"`. */
@@ -51,6 +54,69 @@ export function serializeCookie(cookie: CookieAttributes) {
   )
 
   return `${cookie.name}=${encodedValue}; ${attributes}`
+}
+
+/** The cookie that tells a browser client whether asking for a token is worth a request. */
+export const HINT_COOKIE_NAME = "auth-ts.hint"
+
+/**
+ * What the hint says: a session exists here, or one demonstrably does not.
+ *
+ * `"out"` is only written where the hint may be delivered cross-origin, since
+ * that is the only deployment where a missing hint is ambiguous.
+ */
+export type HintValue = "in" | "out"
+
+/** Where a hint cookie applies, which is all that setting and clearing it share. */
+export interface HintCookieScope {
+  /** Same rule as every other cookie here — see {@link shouldUseSecureCookies}. */
+  secure?: boolean
+  /** Set only for a cross-origin deployment, where the app is on a sibling host. */
+  domain?: string
+}
+
+/** Attributes of the hint cookie that vary per response. */
+export interface HintCookieAttributes extends HintCookieScope {
+  value: HintValue
+  /** Lifetime as a duration, matching the refresh cookie it shadows. */
+  maxAge: Duration
+}
+
+/**
+ * Builds the hint cookie.
+ *
+ * The one cookie in this library that script may read and that may carry a
+ * `Domain`, because it is the one cookie that is not a credential: its entire
+ * contents are `in` or `out`. It exists so a signed-out visitor costs no
+ * request, which means a browser has to be able to read it, and a cross-origin
+ * app has to be able to receive it. The refresh token stays `HttpOnly` and
+ * host-only, and learning that a browser once signed in is not a capability —
+ * whoever can read this can already see the interface it produces.
+ *
+ * `Path` is always `/`, never `cookie.path`: `document.cookie` only exposes
+ * cookies whose path covers the current page, and a hint scoped to the auth
+ * mount would be invisible on every page that needs it.
+ */
+export function serializeHintCookie(cookie: HintCookieAttributes) {
+  return hintCookie(cookie.value, cookie, parseDurationSeconds(cookie.maxAge))
+}
+
+/** Builds a `Set-Cookie` value that deletes the hint cookie. */
+export function clearHintCookie(options: HintCookieScope = {}) {
+  return hintCookie("", options, 0)
+}
+
+function hintCookie(
+  value: string,
+  { secure, domain }: HintCookieScope,
+  maxAgeSeconds: number
+) {
+  const attributes = ["Path=/", "SameSite=Lax"]
+  if (secure ?? true) attributes.push("Secure")
+  if (domain) attributes.push(`Domain=${domain}`)
+  attributes.push(`Max-Age=${maxAgeSeconds}`)
+
+  return `${HINT_COOKIE_NAME}=${value}; ${attributes.join("; ")}`
 }
 
 /**

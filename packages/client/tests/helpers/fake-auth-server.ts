@@ -1,3 +1,4 @@
+import { HINT_COOKIE_NAME } from "@auth-ts/server"
 import { vi } from "vitest"
 
 /** One recorded request the client made. */
@@ -34,6 +35,18 @@ export interface FakeAuthServer {
   restore(): void
 }
 
+/**
+ * Writes, rewrites, or removes the hint cookie the client reads before it asks
+ * for a token.
+ */
+export function setSessionHint(value: "in" | "out" | undefined) {
+  // biome-ignore lint/suspicious/noDocumentCookie: stands in for the browser that received the server's Set-Cookie
+  globalThis.document.cookie =
+    value === undefined
+      ? `${HINT_COOKIE_NAME}=; path=/; max-age=0`
+      : `${HINT_COOKIE_NAME}=${value}; path=/`
+}
+
 /** Builds an unsigned JWT with the given lifetime, which is all the client reads. */
 export function fakeAccessToken({
   issuedAt = Date.now(),
@@ -62,6 +75,11 @@ export function fakeAccessToken({
  * failure — which needs a server that can be made to fail on demand.
  */
 export function fakeAuthServer(): FakeAuthServer {
+  // The client skips the refresh entirely without this, so the default fixture
+  // is a browser that has signed in: a test that wants the signed-out shortcut
+  // clears it with `signOutHint`.
+  setSessionHint("in")
+
   const requests: RecordedRequest[] = []
   const replies = new Map<string, Array<StubbedReply | (() => StubbedReply)>>()
   const served = new Map<string, number>()
@@ -126,9 +144,13 @@ export function fakeAuthServer(): FakeAuthServer {
 
       responseHeaders.set("content-type", "application/json")
 
+      // `"body" in reply` rather than `?? {}`: `null` is a real body — it is
+      // how `/token` says nobody is signed in.
       const body =
         reply.token === undefined
-          ? (reply.body ?? {})
+          ? "body" in reply
+            ? reply.body
+            : {}
           : { ...(reply.body as object | undefined), token: reply.token }
 
       return withHeaders(new Response(JSON.stringify(body), { status }))
@@ -140,6 +162,9 @@ export function fakeAuthServer(): FakeAuthServer {
       const existing = replies.get(key(method, path)) ?? []
       replies.set(key(method, path), [...existing, reply])
     },
-    restore: () => spy.mockRestore()
+    restore: () => {
+      setSessionHint(undefined)
+      spy.mockRestore()
+    }
   }
 }

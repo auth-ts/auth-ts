@@ -118,13 +118,12 @@ describe("guest conversion", () => {
     // and stays good until it expires — that is the revocation latency every
     // token buys, not a session surviving.
     expect(context.db.sessions()).toHaveLength(1)
-    expect(
-      (
-        await context.authServer.handler(
-          request("GET", "/api/auth/token", { cookies })
-        )
-      ).status
-    ).toBe(401)
+    const refused = await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies })
+    )
+
+    expect(refused.status).toBe(200)
+    expect(await refused.json()).toBeNull()
   })
 
   it("finds the guest from the token when no cookie reaches the route", async () => {
@@ -227,13 +226,12 @@ describe("guest conversion", () => {
     // dead, so nothing can keep acting as the guest from this browser.
     expect(context.db.sessions()).toHaveLength(1)
     expect(context.db.sessions()[0]?.userId).toBe(existing.id)
-    expect(
-      (
-        await context.authServer.handler(
-          request("GET", "/api/auth/token", { cookies })
-        )
-      ).status
-    ).toBe(401)
+    const refused = await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies })
+    )
+
+    expect(refused.status).toBe(200)
+    expect(await refused.json()).toBeNull()
   })
 
   it("never converts a real user — signing in again just replaces the session", async () => {

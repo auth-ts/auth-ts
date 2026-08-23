@@ -322,11 +322,14 @@ describe("token and user endpoints", () => {
     )
 
     expect(response.status).toBe(204)
+    const cleared = readSetCookies(response)
     expect(
-      required(
-        readSetCookies(response).get("auth-ts.refresh"),
-        "cleared cookie"
-      ).attributes
+      required(cleared.get("auth-ts.refresh"), "cleared cookie").attributes
+    ).toContain("Max-Age=0")
+    // The hint goes with it, or the next page load asks a question it already
+    // knows the answer to.
+    expect(
+      required(cleared.get("auth-ts.hint"), "cleared hint").attributes
     ).toContain("Max-Age=0")
 
     const afterSignOut = await authServer.handler(
@@ -334,7 +337,8 @@ describe("token and user endpoints", () => {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
-    expect(afterSignOut.status).toBe(401)
+    expect(afterSignOut.status).toBe(200)
+    expect(await afterSignOut.json()).toBeNull()
   })
 })
 
@@ -433,6 +437,49 @@ describe("jwks and discovery", () => {
 })
 
 describe("GET /token", () => {
+  it("answers null and retires the cookies a stranger presented", async () => {
+    const { authServer } = await createTestServer({ multiAccount: true })
+
+    const response = await authServer.handler(
+      request("GET", "/api/auth/token", {
+        cookies: { "auth-ts.refresh": "a token no session was ever issued for" }
+      })
+    )
+    const cookies = readSetCookies(response)
+
+    // 200, not 401: nobody signed in is the answer to this question, and only
+    // an answer may carry the cookies that stop it being asked again.
+    expect(response.status).toBe(200)
+    expect(await response.json()).toBeNull()
+    for (const name of ["auth-ts.refresh", "auth-ts.refresh.accounts"]) {
+      expect(required(cookies.get(name), name).attributes).toContain(
+        "Max-Age=0"
+      )
+    }
+    expect(required(cookies.get("auth-ts.hint"), "hint").attributes).toContain(
+      "Max-Age=0"
+    )
+  })
+
+  it("says out rather than nothing when the app is on another origin", async () => {
+    // Cross-origin, a hint that never arrived is indistinguishable from one
+    // that says no — so the refusal has to be stated, not implied by absence.
+    const { authServer } = await createTestServer({
+      cors: { origin: "https://app.example.com" }
+    })
+
+    const response = await authServer.handler(
+      request("GET", "/api/auth/token", {
+        origin: "https://api.example.com"
+      })
+    )
+    const hint = required(readSetCookies(response).get("auth-ts.hint"), "hint")
+
+    expect(hint.value).toBe("out")
+    expect(hint.attributes).toContain("Domain=example.com")
+    expect(hint.attributes).not.toContain("Max-Age=0")
+  })
+
   it("slides the session it read through", async () => {
     const { authServer, sentCodes, db } = await createTestServer()
 

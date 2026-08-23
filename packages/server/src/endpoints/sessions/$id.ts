@@ -1,7 +1,6 @@
 import type { AuthUser } from "../../core/auth-db"
 import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
-import { clearCookie, shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import {
   pruneDeadAccounts,
   readAccountsCookie
@@ -10,6 +9,7 @@ import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
 import { mintAccessToken } from "../../session/issue-session"
 import { promoteNextAccount } from "../../session/promote-account"
+import { clearedRefreshCookies } from "../../session/session-cookies"
 
 /** Input for revoking one session. */
 export interface RevokeSessionInput extends CallerInput {
@@ -76,14 +76,14 @@ export const revokeSession = defineEndpoint({
       return { data }
     }
 
-    const secure = shouldUseSecureCookies(input.requestURL)
+    const context = { requestURL: input.requestURL, headers }
     const parked = internals.config.multiAccount
       ? await pruneDeadAccounts(
           internals,
           readAccountsCookie(internals, headers)
         )
       : []
-    const promoted = await promoteNextAccount(internals, parked, secure)
+    const promoted = await promoteNextAccount(internals, parked, context)
     if (promoted) {
       const data: RevokeSessionResult = {
         current,
@@ -98,14 +98,9 @@ export const revokeSession = defineEndpoint({
     }
 
     const responseHeaders = new Headers()
-    responseHeaders.append(
-      "set-cookie",
-      clearCookie(
-        internals.config.cookie.name,
-        internals.config.cookie.path,
-        secure
-      )
-    )
+    for (const cookie of clearedRefreshCookies(internals, context)) {
+      responseHeaders.append("set-cookie", cookie)
+    }
 
     const data: RevokeSessionResult = { current }
     return { data, headers: responseHeaders }

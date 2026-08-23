@@ -61,7 +61,7 @@ disagree:
 
 ```ts
 // 1. Call it directly from your own backend. No HTTP round-trip to yourself.
-const { token, user } = await authServer.getToken({ headers })
+const session = await authServer.getToken({ headers }) // null when nobody is
 
 // 2. One catch-all handler, mounted once.
 authServer.handler(request)
@@ -79,7 +79,8 @@ Plus the JWT-plane functions:
 - `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
   Never authorize with it.
 - `getToken({ headers })` — exchanges the refresh cookie for an access token,
-  and returns the user with it. The one function that reads the cookie.
+  and returns the user with it, or `null` when nobody is signed in. The one
+  function that reads the cookie.
 - `getSession({ headers })` — the session the caller is acting from. One
   read, no user lookup: the one the token's `sid` names.
 
@@ -93,10 +94,16 @@ header, then a 401. There is no cookie fallback.
 slides the session, signs a token, and answers with `{ token, user }`. Nothing
 else touches a session at all.
 
+It answers `null` rather than throwing when there is no session — a visitor
+nobody is signed in as is the ordinary case on a public page, not a failure —
+so a loader branches instead of catching:
+
 ```ts
 // Server-side rendering: buy a token once, then spend it.
-const { token, user } = await authServer.getToken({ headers })
-const sessions = await authServer.listSessions({ token })
+const session = await authServer.getToken({ headers })
+if (!session) return { user: null }
+
+const sessions = await authServer.listSessions({ token: session.token })
 ```
 
 That shape is the point. A loader that called four endpoints with `{ headers }`

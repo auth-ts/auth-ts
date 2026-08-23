@@ -30,6 +30,16 @@ run before a cookie exists, because they are what create it, and they hand back 
 token with the user. An application that never touches the access token still
 gets working sign-in, profile updates, deletion, and a correct user object.
 
+A visitor who is not signed in makes no request at all. Beside the refresh
+cookie the server writes `auth-ts.hint`, a cookie holding `in` or `out` that
+script *can* read, and the client checks it before it asks. The two are written
+and retired together, so a browser holding one holds both — and a public page
+costs nothing on load, nothing on every tab focus, and shows no refused request
+in the console for what is not a failure. It carries no credential; the refresh
+token stays `HttpOnly`. Cross-origin the hint reaches the app only when the
+browser accepts the domain the two hosts share, so a client with a `baseURL`
+elsewhere falls back to asking.
+
 ## Why the token is only in memory
 
 A bearer token in `localStorage` turns any cross-site scripting flaw into a

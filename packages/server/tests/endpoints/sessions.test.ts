@@ -107,13 +107,12 @@ describe("DELETE /sessions/:id", () => {
     ).toContain("Max-Age=0")
     // Asked of the cookie: the revoked session's token stays readable until it
     // expires, which is the revocation latency every token carries.
-    expect(
-      (
-        await context.authServer.handler(
-          request("GET", "/api/auth/token", { cookies })
-        )
-      ).status
-    ).toBe(401)
+    const refused = await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies })
+    )
+
+    expect(refused.status).toBe(200)
+    expect(await refused.json()).toBeNull()
   })
 
   it("404s another user's session id, because ownership is in the query", async () => {

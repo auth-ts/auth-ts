@@ -1,11 +1,12 @@
 import type { TokenResult } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
+import { mayHaveSession } from "../lib/session-hint"
 
 /** A token refresh, and the two ways of asking for its result. */
 export interface RefreshToken {
-  /** Exchanges the refresh cookie for a token, deduplicating concurrent calls. */
-  refresh: () => Promise<TokenResult>
+  /** Exchanges the refresh cookie for a token, or `null` when there is no session. */
+  refresh: () => Promise<TokenResult | null>
   /** A usable token, or `null` when nobody is signed in. */
   getToken: () => Promise<string | null>
   /** A usable token, or the server's own `unauthenticated` error. */
@@ -38,17 +39,47 @@ export interface RefreshToken {
  * network dropping — throws from both, and clears nothing: none of those is a
  * verdict on the session, and blanking the interface because a deploy was
  * mid-flight is the bug, not the fix.
+ *
+ * A signed-out browser answers `null` without a request at all — see
+ * {@link mayHaveSession} — so a page nobody is signed in to costs nothing on
+ * load and nothing again on every tab focus.
  */
 export function createGetToken(internals: AuthClientInternals): RefreshToken {
-  const refresh = (): Promise<TokenResult> =>
+  // Built here rather than caught from the server, because a client that never
+  // sent the request still owes `requireToken` the same error it would have.
+  const noSession = () =>
+    new AuthError("unauthenticated", 401, "You are not signed in.")
+
+  const forget = async () => {
+    internals.tokenStore.clear()
+    // The refresh cookie is what was just refused, so a jar holding it is
+    // holding a dead credential. A browser's own jar is the browser's.
+    await internals.cookieJar?.clear()
+  }
+
+  const refresh = (): Promise<TokenResult | null> =>
     internals.tokenStore.singleFlight(async () => {
+      if (!mayHaveSession(internals.config)) {
+        internals.log.debug("no session hint, skipping the refresh")
+        // Another tab may have signed out since this one last looked.
+        internals.tokenStore.clear()
+
+        return null
+      }
+
       internals.log.debug("refreshing access token")
 
       try {
-        const result = await internals.fetchJson<TokenResult>({
+        const result = await internals.fetchJson<TokenResult | null>({
           method: "GET",
           path: "/token"
         })
+        if (!result) {
+          internals.log.debug("no session, clearing local state")
+          await forget()
+
+          return null
+        }
         internals.tokenStore.set(result.token)
 
         return result
@@ -58,10 +89,7 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
         // and most of them say nothing about whether the cookie is still good.
         if (error instanceof AuthError && error.code === "unauthenticated") {
           internals.log.debug("refresh refused, clearing local state")
-          internals.tokenStore.clear()
-          // The refresh cookie is what was just refused, so a jar holding it is
-          // holding a dead credential. A browser's own jar is the browser's.
-          await internals.cookieJar?.clear()
+          await forget()
         }
 
         throw error
@@ -71,7 +99,10 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
   const requireToken = async () => {
     const cached = internals.tokenStore.get()
     if (!cached || internals.tokenStore.mustRefresh()) {
-      return (await refresh()).token
+      const result = await refresh()
+      if (!result) throw noSession()
+
+      return result.token
     }
 
     if (internals.tokenStore.isExpiringSoon()) {

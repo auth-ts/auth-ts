@@ -41,6 +41,10 @@ export interface AuthClient {
    * Hand it to your data client: Neon's `fetchWithToken` and its equivalents
    * take exactly this shape and raise their own error on `null`, so a
    * signed-out data query fails as a data-plane error rather than an auth one.
+   *
+   * A browser that has never signed in, or has signed out, answers `null`
+   * without a request — so calling this on every render costs nothing until
+   * there is something to refresh.
    */
   getToken: () => Promise<string | null>
   /** The user, the session, and a token — or `null`. Always reads the server. */

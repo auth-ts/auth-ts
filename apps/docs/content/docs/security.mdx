@@ -126,6 +126,15 @@ Revoking a session filters on both the session id and the user id **in the
 query**, so revoking someone else's session is structurally impossible rather
 than a check somebody remembered to write.
 
+**One cookie beside it is readable by script**, on purpose. `auth-ts.hint` holds
+`in` or `out` and nothing else, and is written and retired with the refresh
+cookie it shadows. It exists so a signed-out visitor costs no request: the
+client reads it before asking `/token`, and a browser that has never signed in
+skips the exchange entirely. It carries no credential and grants nothing —
+whoever can read it can already see the signed-out page it produces. It is the
+only cookie here that may carry a `Domain`, and only when `cors` is configured,
+because a cross-origin app cannot otherwise see it.
+
 **State-changing requests are checked against their `Origin`.** CORS headers
 decide who may *read* a response, not who may *send* a request: a `POST` with a
 simple content type goes out without a preflight, cookie attached. `SameSite=Lax`
@@ -154,6 +163,11 @@ origin the browser will not let it *read* the reply, which is where the token is
 Every other authenticated route takes the bearer and nothing else, so a request
 carrying only a cookie cannot act for anyone — the whole class of cross-site
 request forgery ends at that one route.
+
+With no session it answers **200 with `null`**, not 401, and expires whatever
+dead cookies the request presented on the way out. Nobody signed in is the
+answer to the question, not a failure to answer it; and only an answer can carry
+`Set-Cookie`, which is what stops the next page load asking again.
 
 ## Accounts
 
