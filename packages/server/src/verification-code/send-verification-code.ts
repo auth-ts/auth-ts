@@ -1,4 +1,4 @@
-import type { VerificationCodeAction } from "../core/auth-db"
+import type { OTPAction } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
@@ -23,7 +23,7 @@ export const VERIFICATION_CODE_TTL = "10m"
 /** What sending a code needs to know. */
 export interface SendVerificationCodeInput {
   identifier: CodeIdentifier
-  action: VerificationCodeAction
+  action: OTPAction
   locale: string
   headers: Headers
 }
@@ -50,7 +50,7 @@ export async function sendVerificationCode(
   if (config.rateLimit !== false) {
     const live = await selectOne(
       internals,
-      "verificationCodes",
+      "otps",
       { identifier: identifier.value },
       { expiresAt: "desc" }
     )
@@ -84,12 +84,12 @@ export async function sendVerificationCode(
   // Delete then insert: latest wins. Two sends racing can leave both rows for
   // an instant, and that is harmless — verification reads the newest, so the
   // earlier code is dead either way and the sweep collects it.
-  const swept = sweepExpired(internals, "verificationCodes")
+  const swept = sweepExpired(internals, "otps")
   await internals.db.delete({
-    table: "verificationCodes",
+    table: "otps",
     where: { identifier: identifier.value }
   })
-  await insertRow(internals, "verificationCodes", {
+  await insertRow(internals, "otps", {
     identifier: identifier.value,
     codeHash,
     expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
@@ -112,7 +112,7 @@ export async function sendVerificationCode(
     await deliver(internals, identifier, code, locale, action, headers)
   } catch (error) {
     await internals.db.delete({
-      table: "verificationCodes",
+      table: "otps",
       where: { identifier: identifier.value, codeHash }
     })
     internals.log.error("verification code delivery failed", {
@@ -135,7 +135,7 @@ async function deliver(
   identifier: CodeIdentifier,
   code: string,
   locale: string,
-  action: VerificationCodeAction,
+  action: OTPAction,
   headers: Headers
 ) {
   const { config } = internals

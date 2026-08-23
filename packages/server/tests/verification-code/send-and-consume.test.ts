@@ -12,12 +12,12 @@ const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 
 /** Every code stored for the identifier. A send replaces them, so normally one. */
 const storedCodes = (db: MemoryDb) =>
-  selectRows(db, "verificationCodes", { identifier: emailIdentifier.value })
+  selectRows(db, "otps", { identifier: emailIdentifier.value })
 
 /** The row a verify would read: the newest by expiry, exactly as core reads it. */
 const liveCode = async (db: MemoryDb) => {
   const [row] = await db.select({
-    table: "verificationCodes",
+    table: "otps",
     where: { identifier: emailIdentifier.value },
     limit: 1,
     offset: 0,
@@ -553,7 +553,7 @@ describe("consumeVerificationCode", () => {
     const { internals, db, code } = await sendAndRead()
     const originalDelete = db.delete.bind(db)
     db.delete = async (input) => {
-      if (input.table === "verificationCodes") {
+      if (input.table === "otps") {
         await new Promise((resolve) => setTimeout(resolve, 5))
       }
       return originalDelete(input)
@@ -654,7 +654,7 @@ describe("consumeVerificationCode", () => {
     let resendOnRead = true
     db.select = async (input) => {
       const rows = await realSelect(input)
-      if (resendOnRead && input.table === "verificationCodes") {
+      if (resendOnRead && input.table === "otps") {
         resendOnRead = false
         await send()
       }
@@ -709,7 +709,7 @@ describe("consumeVerificationCode", () => {
     const realSelect = db.select.bind(db)
     db.select = async (input) => {
       const rows = await realSelect(input)
-      if (input.table === "verificationCodes") {
+      if (input.table === "otps") {
         reads += 1
         if (reads === guesses) releaseReads()
         await allRead
@@ -748,7 +748,7 @@ describe("consumeVerificationCode", () => {
     const { internals, db, code } = await sendAndRead()
     const stored = required(await liveCode(db), "stored")
     await db.update({
-      table: "verificationCodes",
+      table: "otps",
       where: { id: stored.id },
       values: { expiresAt: new Date(Date.now() - 1000) }
     })

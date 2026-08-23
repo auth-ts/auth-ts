@@ -1,7 +1,4 @@
-import type {
-  AuthVerificationCode,
-  VerificationCodeAction
-} from "../core/auth-db"
+import type { AuthOTP, OTPAction } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { countAttempt } from "../http/check-rate-limit"
@@ -21,7 +18,7 @@ export const MAX_CODE_ATTEMPTS = 5
 export interface ConsumeVerificationCodeInput {
   identifier: string
   code: string
-  action: VerificationCodeAction
+  action: OTPAction
 }
 
 /**
@@ -44,7 +41,7 @@ export interface ConsumeVerificationCodeInput {
 async function countWrongGuess(
   internals: AuthServerInternals,
   identifier: string,
-  stored: AuthVerificationCode
+  stored: AuthOTP
 ) {
   const counted = await countAttempt(
     internals,
@@ -57,7 +54,7 @@ async function countWrongGuess(
   // Match on the hash here too: a resend that landed after the row was read
   // is a fresh code with its own budget, and this delete then matches nothing.
   const [burned] = await internals.db.delete({
-    table: "verificationCodes",
+    table: "otps",
     where: { identifier, codeHash: stored.codeHash }
   })
   if (burned)
@@ -85,7 +82,7 @@ export async function consumeVerificationCode(
   // gone, and the code the person is holding is the one sent last.
   const stored = await selectOne(
     internals,
-    "verificationCodes",
+    "otps",
     { identifier: input.identifier },
     { expiresAt: "desc" }
   )
@@ -97,7 +94,7 @@ export async function consumeVerificationCode(
   if (stored.expiresAt.getTime() <= Date.now()) {
     // Already in hand, so delete it rather than leave it for the sweep.
     await internals.db.delete({
-      table: "verificationCodes",
+      table: "otps",
       where: { id: stored.id }
     })
     throw new AuthApiError("invalidCode", 401)
@@ -115,7 +112,7 @@ export async function consumeVerificationCode(
   // other gets nothing back and is rejected. Matching on the hash also means a
   // code issued before a resend can never consume the row the resend created.
   const [consumed] = await internals.db.delete({
-    table: "verificationCodes",
+    table: "otps",
     where: { identifier: input.identifier, codeHash: stored.codeHash }
   })
   if (!consumed) throw new AuthApiError("invalidCode", 401)

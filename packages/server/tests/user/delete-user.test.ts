@@ -37,7 +37,7 @@ async function seed() {
   })
   for (const identifier of ["ada@example.com", "+15550100"]) {
     await db.insert({
-      table: "verificationCodes",
+      table: "otps",
       values: {
         identifier,
         codeHash: `code-${identifier}`,
@@ -61,7 +61,7 @@ describe("deleteUser", () => {
     expect(db.users()).toEqual([])
     expect(await selectRows(db, "sessions")).toEqual([])
     expect(await selectRows(db, "identities")).toEqual([])
-    expect(await selectRows(db, "verificationCodes")).toEqual([])
+    expect(await selectRows(db, "otps")).toEqual([])
   })
 
   it("deletes the children itself, so no cascade is required of the store", async () => {
@@ -80,7 +80,7 @@ describe("deleteUser", () => {
     expect(tables[0]).toBe("sessions")
     expect(tables.at(-1)).toBe("users")
     expect(tables).toContain("identities")
-    expect(tables).toContain("verificationCodes")
+    expect(tables).toContain("otps")
   })
 
   it("takes an outstanding code with it, for each identifier the user had", async () => {
@@ -90,7 +90,7 @@ describe("deleteUser", () => {
 
     // A code left behind for a freed address would sign its next owner into an
     // account that no longer exists.
-    expect(await selectRows(db, "verificationCodes")).toEqual([])
+    expect(await selectRows(db, "otps")).toEqual([])
   })
 
   it("leaves other people's rows alone", async () => {
@@ -122,8 +122,8 @@ describe("deleteUser", () => {
 
     await deleteUser(internals, guest)
 
-    expect(
-      remove.mock.calls.some(([input]) => input.table === "verificationCodes")
-    ).toBe(false)
+    expect(remove.mock.calls.some(([input]) => input.table === "otps")).toBe(
+      false
+    )
   })
 })

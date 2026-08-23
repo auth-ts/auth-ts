@@ -62,7 +62,7 @@ describe("sweeping", () => {
   it("sending a code sweeps expired verification rows", async () => {
     const context = await createTestServer()
     await context.db.insert({
-      table: "verificationCodes",
+      table: "otps",
       values: {
         identifier: "grace@example.com",
         codeHash: "stale-code",
@@ -75,7 +75,7 @@ describe("sweeping", () => {
 
     await context.authServer.handler(sendCode())
 
-    const remaining = context.db.rows("verificationCodes")
+    const remaining = context.db.rows("otps")
     expect(remaining).toHaveLength(1)
     expect(required(remaining[0], "code").identifier).toBe("ada@example.com")
   })

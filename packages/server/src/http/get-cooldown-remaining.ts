@@ -1,4 +1,4 @@
-import type { AuthVerificationCode } from "../core/auth-db"
+import type { AuthOTP } from "../core/auth-db"
 import type { Duration } from "../lib/parse-duration"
 import { parseDuration } from "../lib/parse-duration"
 
@@ -17,13 +17,13 @@ import { parseDuration } from "../lib/parse-duration"
  * @returns Remaining seconds, or 0 when a send is allowed now.
  */
 export function getCooldownRemaining(
-  verificationCode: AuthVerificationCode | null,
+  otp: AuthOTP | null,
   codeTtl: Duration,
   cooldown: Duration
 ): number {
-  if (!verificationCode) return 0
+  if (!otp) return 0
 
-  const sentAt = verificationCode.expiresAt.getTime() - parseDuration(codeTtl)
+  const sentAt = otp.expiresAt.getTime() - parseDuration(codeTtl)
   const nextAllowedAt = sentAt + parseDuration(cooldown)
   const remaining = nextAllowedAt - Date.now()
 

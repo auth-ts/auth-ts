@@ -44,7 +44,7 @@ describe("generateId", () => {
       })
     )
 
-    const [code] = await selectRows(context.db, "verificationCodes")
-    expect(code?.id).toBe("verificationCodes_async")
+    const [code] = await selectRows(context.db, "otps")
+    expect(code?.id).toBe("otps_async")
   })
 })

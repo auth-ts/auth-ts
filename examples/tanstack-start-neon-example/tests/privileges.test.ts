@@ -18,7 +18,7 @@ const SECRETS = [
 ]
 
 /** Tables with RLS on and no policy — the Data API role sees and writes nothing. */
-const SERVER_ONLY = ["verificationCodes", "attempts"]
+const SERVER_ONLY = ["otps", "attempts"]
 
 /**
  * Every column withheld from the Data API role, per table with a column grant.

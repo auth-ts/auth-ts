@@ -36,7 +36,7 @@ function hygiene(
  */
 export function sweepExpired(
   internals: AuthServerInternals,
-  table: "sessions" | "verificationCodes" | "attempts"
+  table: "sessions" | "otps" | "attempts"
 ) {
   const where = { expiresAt: { lt: new Date() } }
   const swept =

@@ -28,7 +28,7 @@ export async function deleteUser(
   for (const identifier of [user.email, user.phoneNumber]) {
     if (!identifier) continue
     await internals.db.delete({
-      table: "verificationCodes",
+      table: "otps",
       where: { identifier }
     })
   }

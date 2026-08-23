@@ -504,7 +504,7 @@ describe("account deletion", () => {
       })
     )
     expect(
-      await selectRows(context.db, "verificationCodes", {
+      await selectRows(context.db, "otps", {
         identifier: "ada@example.com"
       })
     ).not.toEqual([])
@@ -515,7 +515,7 @@ describe("account deletion", () => {
 
     expect(response.status).toBe(204)
     expect(
-      await selectRows(context.db, "verificationCodes", {
+      await selectRows(context.db, "otps", {
         identifier: "ada@example.com"
       })
     ).toEqual([])

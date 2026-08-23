@@ -1,4 +1,4 @@
-import type { UserType, VerificationCodeAction } from "@auth-ts/server"
+import type { OTPAction, UserType } from "@auth-ts/server"
 import { sql } from "drizzle-orm"
 import { authenticatedRole } from "drizzle-orm/neon"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
@@ -91,17 +91,14 @@ export const sessions = pgTable.withRLS(
   ]
 )
 
-export const verificationCodes = pgTable.withRLS(
-  "verificationCodes",
+export const otps = pgTable.withRLS(
+  "otps",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     identifier: text("identifier").notNull(),
     codeHash: text("codeHash").notNull(),
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
-    action: text("action")
-      .$type<VerificationCodeAction>()
-      .notNull()
-      .default("signIn"),
+    action: text("action").$type<OTPAction>().notNull().default("signIn"),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -111,12 +108,9 @@ export const verificationCodes = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    index("verificationCodesIdentifierIndex").on(table.identifier),
-    index("verificationCodesExpiresAtIndex").on(table.expiresAt),
-    check(
-      "verificationCodesActionCheck",
-      sql`"action" in ('signIn', 'deleteUser')`
-    )
+    index("otpsIdentifierIndex").on(table.identifier),
+    index("otpsExpiresAtIndex").on(table.expiresAt),
+    check("otpsActionCheck", sql`"action" in ('signIn', 'deleteUser')`)
   ]
 )
 

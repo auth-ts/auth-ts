@@ -31,7 +31,7 @@ cost of not having an adapter package.
 | --- | --- | --- | --- | --- |
 | `users` | `id`, `email`, `phoneNumber`, `name`, `imageURL`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
 | `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
-| `verificationCodes` | `id`, `identifier`, `codeHash`, `action`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
+| `otps` | `id`, `identifier`, `codeHash`, `action`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
 
@@ -122,7 +122,7 @@ index, because the missing constraint only shows under a race.
 - **`delete` with a range is the sweep.** The library cleans up after itself by
   issuing `delete` where `expiresAt` is `{ lt: now }`, on the requests that
   insert new rows: a sign-in sweeps `sessions`, a code send sweeps
-  `verificationCodes`, the first attempt of each rate-limit window sweeps
+  `otps`, the first attempt of each rate-limit window sweeps
   `attempts`. There is nothing extra to implement and no schedule to own — but
   it does mean an index on `expiresAt` is load-bearing for those tables, not
   just for reads. Pass `waitUntil` to
@@ -315,7 +315,7 @@ The core fields of a user. Your declared additional fields sit beside them on
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthSession" />
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthVerificationCode" />
+<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthOTP" />
 
 <auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthAttempt" />
 

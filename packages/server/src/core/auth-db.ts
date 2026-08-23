@@ -115,7 +115,7 @@ export interface AuthSession {
 }
 
 /** What a live verification code authorizes. Checked on every verify, so a code cannot cross actions. */
-export type VerificationCodeAction = "signIn" | "deleteUser"
+export type OTPAction = "signIn" | "deleteUser"
 
 /**
  * A verification code, stored as an HMAC of the six digits.
@@ -124,13 +124,13 @@ export type VerificationCodeAction = "signIn" | "deleteUser"
  * codes and inserts a new one, and a verify reads the newest by `expiresAt`.
  * Latest wins, so a resend still invalidates the code before it.
  */
-export interface AuthVerificationCode {
+export interface AuthOTP {
   id: string
   /** Normalized email or E.164 phone number. */
   identifier: string
   codeHash: string
   expiresAt: Date
-  action: VerificationCodeAction
+  action: OTPAction
   /** Written by core on insert. */
   createdAt: Date
   /** Written by core on insert and on every update it makes. */
@@ -192,7 +192,7 @@ export interface AuthIdentity {
 export type AuthTable =
   | "users"
   | "sessions"
-  | "verificationCodes"
+  | "otps"
   | "attempts"
   | "identities"
 
@@ -202,7 +202,7 @@ export interface AuthTables<
 > {
   users: AuthUser<S>
   sessions: AuthSession
-  verificationCodes: AuthVerificationCode
+  otps: AuthOTP
   attempts: AuthAttempt
   identities: AuthIdentity
 }
@@ -341,7 +341,7 @@ export type AuthDeleteInput<
  * | --- | --- | --- | --- |
  * | `users` | `email`, `phoneNumber` | | |
  * | `sessions` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
- * | `verificationCodes` | | `identifier`, `expiresAt` | `expiresAt` |
+ * | `otps` | | `identifier`, `expiresAt` | `expiresAt` |
  * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
  * | `identities` | `(provider, providerUserId)` | `userId` | |
  *
