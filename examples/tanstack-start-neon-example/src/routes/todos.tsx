@@ -2,7 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
 
 import { TrashIcon } from "../components/icons"
-import { useTodos } from "../hooks/use-todos"
+import {
+  useDeleteTodo,
+  useInsertTodo,
+  useTodos,
+  useUpdateTodo
+} from "../hooks/use-todos"
 import { useUser } from "../hooks/use-user"
 
 export const Route = createFileRoute("/todos")({ component: TodosPage })
@@ -10,7 +15,10 @@ export const Route = createFileRoute("/todos")({ component: TodosPage })
 /** The todo list — the whole point of the demo. */
 function TodosPage() {
   const { data: user, isPending } = useUser()
-  const { todos, add, toggle, remove } = useTodos(user?.id)
+  const todos = useTodos(user?.id)
+  const add = useInsertTodo(user?.id)
+  const toggle = useUpdateTodo(user?.id)
+  const remove = useDeleteTodo(user?.id)
   const [title, setTitle] = useState("")
 
   if (isPending) {
@@ -62,7 +70,7 @@ function TodosPage() {
         onSubmit={(event) => {
           event.preventDefault()
           if (!title.trim()) return
-          add.mutate(title.trim())
+          add.mutate({ title: title.trim() })
           setTitle("")
         }}
       >
