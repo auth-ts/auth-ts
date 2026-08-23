@@ -68,6 +68,7 @@ export type {
   RevokeSessionResult
 } from "./endpoints/sessions/$id"
 export type { SignInProviderInput } from "./endpoints/sign-in/$provider"
+export type { SignInCodeInput } from "./endpoints/sign-in/code"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest"
 export type {
   SignOutInput,
@@ -75,7 +76,6 @@ export type {
 } from "./endpoints/sign-out"
 export type { TokenInput, TokenResult } from "./endpoints/token"
 export type { DeleteUserInput, UpdateUserInput } from "./endpoints/user"
-export type { VerifyCodeInput } from "./endpoints/verify-code"
 export { AuthApiError } from "./http/auth-api-error"
 export { AuthConfigError } from "./http/auth-config-error"
 export type { AuthHandler } from "./http/create-handler"

@@ -212,7 +212,7 @@ export function createAuthServer<
  * Says out loud that the per-IP limits are configured and cannot fire.
  *
  * `ipAddress.disableTracking` derives no address at all, which leaves
- * `sendCodePerIP`, `verifyCodePerIP`, and `guestPerIP` inert and
+ * `sendCodePerIP`, `signInCodePerIP`, and `guestPerIP` inert and
  * `session.ipAddress` null — a safe failure, and exactly the kind that is never
  * noticed until someone sprays `/send-code` across a thousand addresses. A
  * warning rather than an error, because turning tracking off on purpose is a
@@ -228,7 +228,7 @@ function warnAboutInertIpLimits(internals: AuthServerInternals) {
 
   internals.log.warn(
     "per-IP rate limits are configured but will not apply: ipAddress.disableTracking is on, so no client address is derived. " +
-      "sendCodePerIP, verifyCodePerIP, and guestPerIP are inert and session.ipAddress will be null."
+      "sendCodePerIP, signInCodePerIP, and guestPerIP are inert and session.ipAddress will be null."
   )
 }
 

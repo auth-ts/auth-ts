@@ -19,7 +19,7 @@ describe("verification code sign-in over HTTP", () => {
     expect(db.users()).toHaveLength(0)
 
     const verifyResponse = await authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: { email: "ada@example.com", code: sent.code }
       })
     )
@@ -63,7 +63,7 @@ describe("verification code sign-in over HTTP", () => {
     const wrongCode = sent.code === "000000" ? "111111" : "000000"
 
     const response = await authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: { email: "ada@example.com", code: wrongCode }
       })
     )
@@ -164,7 +164,7 @@ describe("token and user endpoints", () => {
     )
     const sent = required(context.sentCodes[0], "sent code")
     const verifyResponse = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: { email: "ada@example.com", code: sent.code }
       })
     )
@@ -422,7 +422,7 @@ describe("jwks and discovery", () => {
       })
     )
     const verifyResponse = await authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(sentCodes[0], "sent").code
@@ -497,7 +497,7 @@ describe("GET /token", () => {
       })
     )
     const signIn = await authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(sentCodes[0], "sent code").code
@@ -540,7 +540,7 @@ describe("where a token comes from", () => {
       })
     )
     const verified = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes[0], "sent code").code

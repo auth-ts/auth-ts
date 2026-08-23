@@ -331,7 +331,7 @@ describe("a refused token", () => {
     // A key rotated between mint and use, or a device clock far enough off that
     // the refresh-ahead window never fired. Both look like a 401 on a token the
     // client believed in.
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -345,7 +345,7 @@ describe("a refused token", () => {
       token: fakeAccessToken()
     })
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
 
     expect(await client.listSessions()).toEqual([])
     expect(
@@ -358,14 +358,14 @@ describe("a refused token", () => {
       status: 401,
       body: { code: "unauthenticated", message: "You are not signed in." }
     }
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
     server.on("GET", "/api/auth/sessions", refused)
     server.on("GET", "/api/auth/token", refused)
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
 
     await expect(client.listSessions()).rejects.toMatchObject({
       code: "unauthenticated"

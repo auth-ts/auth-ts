@@ -47,7 +47,7 @@ read-modify-written, so no request can be lost — but the count is not exact
 either: requests that are genuinely simultaneous can each read a number below
 the cap before the others land. The overshoot is bounded by that one burst and
 cannot be repeated. If you want exactness, enforce it at your edge on
-`/send-code` and `/verify-code` and set `rateLimit: false`; the five-guess cap
+`/send-code` and `/sign-in/code` and set `rateLimit: false`; the five-guess cap
 on each code is keyed on the code rather than the caller and stays on regardless.
 
 Scope is authentication abuse only — email flooding and credential guessing. It

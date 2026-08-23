@@ -10,7 +10,7 @@ import { readSetCookies } from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
-const REQUEST_URL = "https://app.example.com/api/auth/verify-code"
+const REQUEST_URL = "https://app.example.com/api/auth/sign-in/code"
 
 const refreshTokenOf = (issued: { headers: Headers }) =>
   required(readSetCookies(issued).get("auth-ts.refresh"), "refresh cookie")
@@ -69,7 +69,7 @@ describe("issueSession", () => {
     const issuedCross = await issueSession(cross.internals, {
       user: await insertUser(cross.db, { email: "ada@example.com" }),
       headers: new Headers(),
-      requestURL: "https://api.example.com/api/auth/verify-code"
+      requestURL: "https://api.example.com/api/auth/sign-in/code"
     })
 
     expect(
@@ -85,7 +85,7 @@ describe("issueSession", () => {
     const issuedTld = await issueSession(tld.internals, {
       user: await insertUser(tld.db, { email: "ada@example.com" }),
       headers: new Headers(),
-      requestURL: "https://api.other.example/api/auth/verify-code"
+      requestURL: "https://api.other.example/api/auth/sign-in/code"
     })
 
     expect(
@@ -138,7 +138,7 @@ describe("issueSession", () => {
     const issued = await issueSession(internals, {
       user,
       headers: new Headers(),
-      requestURL: "http://localhost:3000/api/auth/verify-code"
+      requestURL: "http://localhost:3000/api/auth/sign-in/code"
     })
 
     expect(

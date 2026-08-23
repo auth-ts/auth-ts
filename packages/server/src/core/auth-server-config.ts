@@ -87,7 +87,7 @@ export const RESERVED_USER_FIELDS = [
 const DEFAULT_RATE_LIMIT: Required<RateLimitOptions> = {
   sendCodePerIdentifier: { max: 3, window: "10m" },
   sendCodePerIP: { max: 30, window: "10m" },
-  verifyCodePerIP: { max: 30, window: "10m" },
+  signInCodePerIP: { max: 30, window: "10m" },
   deleteUserPerIdentifier: { max: 3, window: "10m" },
   guestPerIP: { max: 30, window: "10m" },
   sendCodeCooldown: "60s"

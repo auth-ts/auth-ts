@@ -17,11 +17,11 @@ import {
   createListIdentities,
   createSwitchAccount
 } from "../methods/identities-and-accounts"
-import { createConnect, createSignIn } from "../methods/oauth"
+import { createConnect, createSignInProvider } from "../methods/oauth"
 import {
   createSendCode,
-  createSignInAsGuest,
-  createVerifyCode
+  createSignInCode,
+  createSignInGuest
 } from "../methods/sign-in-with-code"
 import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
@@ -55,9 +55,9 @@ export interface AuthClient {
   /** The session this browser is on, confirming it is live and keeping it that way. */
   getSession: ReturnType<typeof createGetSession>
   sendCode: ReturnType<typeof createSendCode>
-  verifyCode: ReturnType<typeof createVerifyCode>
-  signInAsGuest: ReturnType<typeof createSignInAsGuest>
-  signIn: ReturnType<typeof createSignIn>
+  signInCode: ReturnType<typeof createSignInCode>
+  signInGuest: ReturnType<typeof createSignInGuest>
+  signInProvider: ReturnType<typeof createSignInProvider>
   connect: ReturnType<typeof createConnect>
   listIdentities: ReturnType<typeof createListIdentities>
   disconnect: ReturnType<typeof createDisconnect>
@@ -104,9 +104,9 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     getUser: createGetUser(internals, refresh),
     getSession: createGetSession(internals),
     sendCode: createSendCode(internals),
-    verifyCode: createVerifyCode(internals),
-    signInAsGuest: createSignInAsGuest(internals),
-    signIn: createSignIn(internals),
+    signInCode: createSignInCode(internals),
+    signInGuest: createSignInGuest(internals),
+    signInProvider: createSignInProvider(internals),
     connect: createConnect(internals),
     listIdentities: createListIdentities(internals),
     disconnect: createDisconnect(internals),

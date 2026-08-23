@@ -14,7 +14,7 @@ const PROVIDERS: Record<string, OAuthProvider> = { github, google }
  * `guest` is a literal path under `/sign-in`, so a provider by that name would
  * shadow it.
  */
-export const RESERVED_PROVIDER_NAMES = ["guest"]
+export const RESERVED_PROVIDER_NAMES = ["guest", "code"]
 
 /**
  * Looks up a configured provider by the name in the URL.

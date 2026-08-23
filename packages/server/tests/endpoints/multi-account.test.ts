@@ -26,7 +26,7 @@ async function signIn(
     request("POST", "/api/auth/send-code", { body: { email }, cookies })
   )
   const response = await context.authServer.handler(
-    request("POST", "/api/auth/verify-code", {
+    request("POST", "/api/auth/sign-in/code", {
       body: { email, code: required(context.sentCodes.at(-1), "code").code },
       cookies
     })

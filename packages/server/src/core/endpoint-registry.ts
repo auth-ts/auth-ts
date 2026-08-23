@@ -12,11 +12,11 @@ import { getSession } from "../endpoints/session"
 import { listSessions } from "../endpoints/sessions"
 import { revokeSession } from "../endpoints/sessions/$id"
 import { signInProvider } from "../endpoints/sign-in/$provider"
+import { signInCode } from "../endpoints/sign-in/code"
 import { signInGuest } from "../endpoints/sign-in/guest"
 import { signOut } from "../endpoints/sign-out"
 import { getToken } from "../endpoints/token"
 import { deleteUser, getUser, updateUser } from "../endpoints/user"
-import { verifyCode } from "../endpoints/verify-code"
 
 /**
  * Every endpoint, keyed by the name it is exposed under.
@@ -32,7 +32,7 @@ import { verifyCode } from "../endpoints/verify-code"
 export const endpointRegistry = {
   sendCode,
   getToken,
-  verifyCode,
+  signInCode,
   signOut,
   getSession,
   getUser,

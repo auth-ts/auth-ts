@@ -317,7 +317,7 @@ describe("GET /identities/:id/token", () => {
       })
     )
     const verified = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "grace@example.com",
           code: required(context.sentCodes.at(-1), "code").code

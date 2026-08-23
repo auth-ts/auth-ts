@@ -6,7 +6,7 @@ import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
 const guestOptions = { guest: true }
 
-async function signInAsGuest(
+async function signInGuest(
   context: Awaited<ReturnType<typeof createTestServer>>
 ) {
   const response = await context.authServer.handler(
@@ -35,7 +35,7 @@ describe("guest sign-in", () => {
 
   it("creates an identifier-less user and issues a session", async () => {
     const context = await createTestServer(guestOptions)
-    const { user, refreshToken, token } = await signInAsGuest(context)
+    const { user, refreshToken, token } = await signInGuest(context)
 
     expect(user.type).toBe("guest")
     expect(context.db.users()).toHaveLength(1)
@@ -52,8 +52,8 @@ describe("guest sign-in", () => {
 
   it("creates a separate user per guest sign-in", async () => {
     const context = await createTestServer(guestOptions)
-    const first = await signInAsGuest(context)
-    const second = await signInAsGuest(context)
+    const first = await signInGuest(context)
+    const second = await signInGuest(context)
 
     expect(first.user.id).not.toBe(second.user.id)
     expect(context.db.users()).toHaveLength(2)
@@ -85,7 +85,7 @@ describe("guest sign-in", () => {
 describe("guests and multiAccount never mix", () => {
   it("refuses a guest sign-in while the browser is signed in", async () => {
     const context = await createTestServer(guestOptions)
-    const { refreshToken } = await signInAsGuest(context)
+    const { refreshToken } = await signInGuest(context)
 
     const refused = await context.authServer.handler(
       request("POST", "/api/auth/sign-in/guest", {
@@ -102,7 +102,7 @@ describe("guests and multiAccount never mix", () => {
 
   it("allows a guest sign-in over a dead cookie", async () => {
     const context = await createTestServer(guestOptions)
-    const { refreshToken, user } = await signInAsGuest(context)
+    const { refreshToken, user } = await signInGuest(context)
     await context.db.delete({
       table: "sessions",
       where: { userId: user.id }
@@ -122,7 +122,7 @@ describe("guests and multiAccount never mix", () => {
     // signed-in browser means a guest can never hold parked accounts, so the
     // switch's own target lookup already answers.
     const context = await createTestServer({ guest: true, multiAccount: true })
-    const { token, refreshToken } = await signInAsGuest(context)
+    const { token, refreshToken } = await signInGuest(context)
 
     const refused = await context.authServer.handler(
       request("POST", "/api/auth/accounts/switch", {
@@ -139,7 +139,7 @@ describe("guests and multiAccount never mix", () => {
 describe("guest reaping", () => {
   it("signing out deletes the guest, not just the session", async () => {
     const context = await createTestServer(guestOptions)
-    const { refreshToken, token } = await signInAsGuest(context)
+    const { refreshToken, token } = await signInGuest(context)
 
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
@@ -155,7 +155,7 @@ describe("guest reaping", () => {
 
   it("signing out keeps a real user's row", async () => {
     const context = await createTestServer(guestOptions)
-    const { refreshToken } = await signInAsGuest(context)
+    const { refreshToken } = await signInGuest(context)
     const cookies = { "auth-ts.refresh": refreshToken }
 
     // Convert, so the very same session now belongs to a real user.
@@ -166,7 +166,7 @@ describe("guest reaping", () => {
       })
     )
     const verified = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
@@ -193,7 +193,7 @@ describe("guest reaping", () => {
 
   it("revoking the guest's only session reaps the guest", async () => {
     const context = await createTestServer(guestOptions)
-    const { refreshToken, token } = await signInAsGuest(context)
+    const { refreshToken, token } = await signInGuest(context)
     const sessionId = required(context.db.sessions()[0], "session").id
 
     const response = await context.authServer.handler(
@@ -232,7 +232,7 @@ describe("guest reaping", () => {
     })
 
     // Any sign-in sweeps sessions; the reap follows from what it removed.
-    await signInAsGuest(context)
+    await signInGuest(context)
 
     const remaining = new Set(context.db.users().map((user) => user.id))
     expect(remaining.has(orphan.id)).toBe(false)
@@ -244,7 +244,7 @@ describe("guest reaping", () => {
 describe("guest conversion", () => {
   it("upgrades the guest in place when the identifier is new, keeping every row they own", async () => {
     const context = await createTestServer(guestOptions)
-    const { refreshToken, user: guest } = await signInAsGuest(context)
+    const { refreshToken, user: guest } = await signInGuest(context)
     const cookies = { "auth-ts.refresh": refreshToken }
 
     await context.authServer.handler(
@@ -254,7 +254,7 @@ describe("guest conversion", () => {
       })
     )
     const verifyResponse = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
@@ -289,7 +289,7 @@ describe("guest conversion", () => {
     // The guest to upgrade is whoever this tab thinks it is, and a client that
     // sends its bearer says so without the cookie having to travel.
     const context = await createTestServer(guestOptions)
-    const { user: guest, token } = await signInAsGuest(context)
+    const { user: guest, token } = await signInGuest(context)
 
     await context.authServer.handler(
       request("POST", "/api/auth/send-code", {
@@ -297,7 +297,7 @@ describe("guest conversion", () => {
       })
     )
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         token,
         body: {
           email: "ada@example.com",
@@ -313,8 +313,8 @@ describe("guest conversion", () => {
 
   it("falls back to the cookie when the token names a session that is gone", async () => {
     const context = await createTestServer(guestOptions)
-    const { refreshToken, token } = await signInAsGuest(context)
-    const second = await signInAsGuest(context)
+    const { refreshToken, token } = await signInGuest(context)
+    const second = await signInGuest(context)
 
     await context.authServer.handler(
       request("POST", "/api/auth/send-code", {
@@ -335,7 +335,7 @@ describe("guest conversion", () => {
     expect(refreshToken).not.toBe(second.refreshToken)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         token,
         cookies: { "auth-ts.refresh": second.refreshToken },
         body: {
@@ -355,7 +355,7 @@ describe("guest conversion", () => {
       email: "ada@example.com"
     })
 
-    const { refreshToken, user: guest } = await signInAsGuest(context)
+    const { refreshToken, user: guest } = await signInGuest(context)
     const cookies = { "auth-ts.refresh": refreshToken }
 
     await context.authServer.handler(
@@ -365,7 +365,7 @@ describe("guest conversion", () => {
       })
     )
     const verifyResponse = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
@@ -401,7 +401,7 @@ describe("guest conversion", () => {
       })
     )
     const first = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
@@ -422,7 +422,7 @@ describe("guest conversion", () => {
       })
     )
     const second = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "grace@example.com",
           code: required(context.sentCodes.at(-1), "code").code
@@ -450,7 +450,7 @@ describe("account deletion", () => {
       })
     )
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
@@ -746,7 +746,7 @@ describe("account deletion", () => {
       guest: true,
       user: { deleteFreshWindow: "0s" }
     })
-    const { refreshToken, token } = await signInAsGuest(context)
+    const { refreshToken, token } = await signInGuest(context)
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {

@@ -13,7 +13,7 @@ describe("matchRoute", () => {
     const probes: Array<[string, string]> = [
       ["POST", "/api/auth/send-code"],
       ["GET", "/api/auth/token"],
-      ["POST", "/api/auth/verify-code"],
+      ["POST", "/api/auth/sign-in/code"],
       ["POST", "/api/auth/user"],
       ["POST", "/api/auth/sign-out"],
       ["GET", "/api/auth/user"],
@@ -327,7 +327,7 @@ describe("origin check", () => {
     const { authServer } = await createTestServer({ guest: true })
     const post = (headers: Record<string, string>, body: string) =>
       authServer.handler(
-        new Request("https://app.example.com/api/auth/verify-code", {
+        new Request("https://app.example.com/api/auth/sign-in/code", {
           method: "POST",
           headers,
           body

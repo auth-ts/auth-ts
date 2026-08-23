@@ -48,7 +48,7 @@ describe("cookieStorage", () => {
 
   it("keeps what the server sets and sends it back, with credentials omitted", async () => {
     const { storage, items } = memoryStorage()
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken(),
       setCookies: [
@@ -58,7 +58,7 @@ describe("cookieStorage", () => {
     server.on("GET", "/api/auth/session", { body: { id: "session-1" } })
     const client = createAuthClient({ cookieStorage: storage })
 
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
     await client.getSession()
 
     expect(server.requests[0]?.credentials).toBe("omit")

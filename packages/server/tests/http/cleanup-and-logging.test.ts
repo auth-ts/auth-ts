@@ -26,7 +26,7 @@ describe("sweeping", () => {
   const signIn = async (context: TestContext, email = "ada@example.com") => {
     await context.authServer.handler(sendCode(email))
     return context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: { email, code: required(context.sentCodes.at(-1), "code").code }
       })
     )
@@ -126,7 +126,7 @@ describe("logging redaction", () => {
     const sent = required(context.sentCodes.at(-1), "sent code")
 
     const verifyResponse = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: { email: "ada@example.com", code: sent.code }
       })
     )

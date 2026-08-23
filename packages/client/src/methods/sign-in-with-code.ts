@@ -7,7 +7,7 @@ export type SendCodeInput =
   | { phoneNumber: string; email?: never }
 
 /** The identifier, the code, and any declared sign-up fields. */
-export type VerifyCodeInput = SendCodeInput & {
+export type SignInCodeInput = SendCodeInput & {
   code: string
   /** Applied only if this verification creates the account. */
   additionalFields?: Record<string, string | number | boolean>
@@ -47,13 +47,13 @@ export function createSendCode(internals: AuthClientInternals) {
  * sign-in and the first render cost one round trip between them rather than a
  * sign-in followed by a refresh.
  */
-export function createVerifyCode(internals: AuthClientInternals) {
-  return async function verifyCode(
-    input: VerifyCodeInput
+export function createSignInCode(internals: AuthClientInternals) {
+  return async function signInCode(
+    input: SignInCodeInput
   ): Promise<SignInResult> {
     const result = await internals.fetchJson<SignInResult>({
       method: "POST",
-      path: "/verify-code",
+      path: "/sign-in/code",
       body: input
     })
     internals.tokenStore.set(result.token)
@@ -63,7 +63,7 @@ export function createVerifyCode(internals: AuthClientInternals) {
 }
 
 /** Input for anonymous sign-in. */
-export interface SignInAsGuestInput {
+export interface SignInGuestInput {
   additionalFields?: Record<string, string | number | boolean>
 }
 
@@ -74,9 +74,9 @@ export interface SignInAsGuestInput {
  * in every way that matters — they own rows, they have a session — which is what
  * lets them keep everything when they later add an email or connect a provider.
  */
-export function createSignInAsGuest(internals: AuthClientInternals) {
-  return async function signInAsGuest(
-    input: SignInAsGuestInput = {}
+export function createSignInGuest(internals: AuthClientInternals) {
+  return async function signInGuest(
+    input: SignInGuestInput = {}
   ): Promise<SignInResult> {
     const result = await internals.fetchJson<SignInResult>({
       method: "POST",

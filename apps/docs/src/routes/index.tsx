@@ -72,7 +72,7 @@ const CLIENT_SNIPPET = `import { createAuthClient } from "@auth-ts/client"
 export const authClient = createAuthClient()
 
 await authClient.sendCode({ email })
-await authClient.verifyCode({ email, code })
+await authClient.signInCode({ email, code })
 
 // Hand this to your PostgREST client as its access token.
 const token = await authClient.getToken()`

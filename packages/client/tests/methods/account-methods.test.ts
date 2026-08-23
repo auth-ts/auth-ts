@@ -14,12 +14,12 @@ let server: FakeAuthServer
 
 /** A client holding a live token, which every authenticated call needs. */
 const signedIn = async () => {
-  server.on("POST", "/api/auth/verify-code", {
+  server.on("POST", "/api/auth/sign-in/code", {
     body: { user },
     token: fakeAccessToken()
   })
   const client = createAuthClient()
-  await client.verifyCode({ email: "ada@example.com", code: "123456" })
+  await client.signInCode({ email: "ada@example.com", code: "123456" })
 
   return client
 }
@@ -33,15 +33,15 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe("verifyCode", () => {
+describe("signInCode", () => {
   it("primes the token and user without a second round-trip", async () => {
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
     const client = createAuthClient()
 
-    const result = await client.verifyCode({
+    const result = await client.signInCode({
       email: "ada@example.com",
       code: "123456"
     })
@@ -123,7 +123,7 @@ describe("sendCode", () => {
   })
 })
 
-describe("signInAsGuest", () => {
+describe("signInGuest", () => {
   it("throws the error body's fields when the browser is already signed in", async () => {
     const wireBody = {
       name: "AuthError",
@@ -137,7 +137,7 @@ describe("signInAsGuest", () => {
     const client = createAuthClient()
 
     const thrown = await client
-      .signInAsGuest()
+      .signInGuest()
       .then(() => null)
       .catch((error: unknown) => error)
 
@@ -166,13 +166,13 @@ describe("updateUser", () => {
 
 describe("signOut", () => {
   it("clears local state for the local scope", async () => {
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
 
     await client.signOut()
 
@@ -181,13 +181,13 @@ describe("signOut", () => {
   })
 
   it("keeps local state for the others scope, which is the point of it", async () => {
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
 
     await client.signOut({ scope: "others" })
   })
@@ -213,7 +213,7 @@ describe("signOut", () => {
   })
 
   it("adopts the promoted account when the server switches to one", async () => {
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -221,7 +221,7 @@ describe("signOut", () => {
       body: { switchedTo: other, token: fakeAccessToken() }
     })
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
 
     const result = await client.signOut()
 
@@ -287,13 +287,13 @@ describe("sessions and accounts", () => {
       ]
     })
     server.on("DELETE", "/api/auth/sessions/b", { body: { current: false } })
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
 
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
 
     const sessions = await client.listSessions()
     expect(sessions).toHaveLength(2)
@@ -315,19 +315,19 @@ describe("sessions and accounts", () => {
 
   it("clears local state when the server reports the revoked session as current", async () => {
     server.on("DELETE", "/api/auth/sessions/a", { body: { current: true } })
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
 
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
     await client.revokeSession({ id: "a" })
   })
 
   it("returns the account it switched to, and keeps that account's token", async () => {
     const switched = fakeAccessToken()
-    server.on("POST", "/api/auth/verify-code", {
+    server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -337,7 +337,7 @@ describe("sessions and accounts", () => {
     })
 
     const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    await client.signInCode({ email: "ada@example.com", code: "123456" })
 
     const result = await client.switchAccount({ userId: "user-2" })
 
@@ -352,7 +352,7 @@ describe("oauth navigation", () => {
     const assign = vi.fn()
     vi.stubGlobal("location", { href: "https://app.example.com/login", assign })
 
-    createAuthClient({ locale: "de" }).signIn({
+    createAuthClient({ locale: "de" }).signInProvider({
       provider: "github",
       redirect: "/dashboard"
     })

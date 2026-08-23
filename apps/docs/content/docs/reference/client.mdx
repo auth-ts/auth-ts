@@ -13,6 +13,11 @@ Construction performs no network request and touches no storage, so importing th
 module is free and safe during server-side rendering. Everything reconciles on
 the first read.
 
+Every method here has an identically named callable on the server, and both are
+named after their route — `signInCode` is `POST /sign-in/code` either way. Moving
+a call between a loader and a component is changing `authServer` to `authClient`
+and nothing else.
+
 <auto-type-table path="../../../../../packages/client/src/core/auth-client-options.ts" name="AuthClientOptions" />
 
 ## The two reads
@@ -197,7 +202,7 @@ Anything that changes who is signed in has to invalidate that key, because
 nothing else will:
 
 ```tsx
-await authClient.verifyCode({ email, code })
+await authClient.signInCode({ email, code })
 await refetch()          // or queryClient.invalidateQueries(...)
 
 await authClient.signOut()
@@ -235,7 +240,7 @@ protects — the keychain or keystore — because what lands in it is the sessio
 
 Everything else is unchanged: `getToken()` still serves the JWT from memory for
 your data client, and the app never touches the cookie. OAuth is the exception
-for now — `signIn` and `connect` navigate the page, which a native app cannot do;
+for now — `signInProvider` and `connect` navigate the page, which a native app cannot do;
 deep-link flows are on the roadmap.
 
 ## Errors

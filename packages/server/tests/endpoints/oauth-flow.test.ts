@@ -946,7 +946,7 @@ describe("oauth callback", () => {
       })
     )
     await authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(sentCodes[0], "code").code
@@ -985,7 +985,7 @@ describe("connect and disconnect", () => {
       })
     )
     const verifyResponse = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code

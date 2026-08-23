@@ -230,7 +230,7 @@ export interface RateLimitOptions {
    * spraying and code-burning griefing, and bounds the non-atomic attempt count.
    * @default { max: 30, window: "10m" }
    */
-  verifyCodePerIP?: RateLimitWindow
+  signInCodePerIP?: RateLimitWindow
   /** @default { max: 3, window: "10m" } */
   deleteUserPerIdentifier?: RateLimitWindow
   /** @default { max: 30, window: "10m" } */
@@ -335,7 +335,7 @@ export interface AuthServerOptions<
    *
    * That turns off the per-IP and per-identifier windows and the send cooldown.
    * Turning them off is the recommended posture when something in front of this
-   * server already limits `/send-code` and `/verify-code` — a Cloudflare rule
+   * server already limits `/send-code` and `/sign-in/code` — a Cloudflare rule
    * or a Durable Object counts a burst more precisely than a database round
    * trip can, and stops it before it reaches you at all.
    *

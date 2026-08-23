@@ -37,8 +37,8 @@ function buildURL(
  *
  * Signing in while already signed in never links accounts. Use `connect` for that.
  */
-export function createSignIn(internals: AuthClientInternals) {
-  return function signIn(input: OAuthNavigationInput): void {
+export function createSignInProvider(internals: AuthClientInternals) {
+  return function signInProvider(input: OAuthNavigationInput): void {
     globalThis.location.assign(buildURL(internals, "/sign-in", input))
   }
 }

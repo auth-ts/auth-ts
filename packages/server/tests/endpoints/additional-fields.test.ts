@@ -26,7 +26,7 @@ async function verifyWith(
   )
 
   return context.authServer.handler(
-    request("POST", "/api/auth/verify-code", {
+    request("POST", "/api/auth/sign-in/code", {
       body: {
         email,
         code: required(context.sentCodes.at(-1), "code").code,
@@ -86,7 +86,7 @@ describe("additionalFields on sign-up", () => {
 
     // Same code, fixed body: the code must still be there to consume.
     const retried = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code,
@@ -145,7 +145,7 @@ describe("additionalFields on sign-up", () => {
       })
     )
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         cookies,
         body: {
           email: "ada@example.com",
@@ -182,7 +182,7 @@ describe("additionalFields on sign-up", () => {
       })
     )
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/verify-code", {
+      request("POST", "/api/auth/sign-in/code", {
         cookies,
         body: {
           email: "ada@example.com",

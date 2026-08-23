@@ -167,7 +167,7 @@ the rest of the window is refused. For a six-digit code that is roughly twenty
 guesses instead of five, once, against a million values.
 
 If you want exactness, put it in front: a rule at your edge on `/send-code` and
-`/verify-code` counts a burst more precisely than any database round trip, and
+`/sign-in/code` counts a burst more precisely than any database round trip, and
 you can then set `rateLimit: false`. The five-guess cap on each individual code
 is not a rate limit, is keyed on the code rather than the caller, and stays on
 regardless — nothing in front of this server can enforce it.

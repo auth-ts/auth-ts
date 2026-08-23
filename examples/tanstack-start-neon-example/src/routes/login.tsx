@@ -56,7 +56,7 @@ function LoginPage() {
   const submitCode = async () => {
     setNotice(null)
     try {
-      await authClient.verifyCode({ email, code })
+      await authClient.signInCode({ email, code })
       // Nothing pushes the new session into the cache, so ask for it.
       await refetchToken()
       await navigate({ to: "/todos" })
@@ -68,7 +68,7 @@ function LoginPage() {
   const continueAsGuest = async () => {
     setNotice(null)
     try {
-      await authClient.signInAsGuest()
+      await authClient.signInGuest()
       await refetchToken()
       await navigate({ to: "/todos" })
     } catch (error) {
@@ -169,7 +169,10 @@ function LoginPage() {
             <button
               type="button"
               onClick={() =>
-                authClient.signIn({ provider: "github", redirect: "/todos" })
+                authClient.signInProvider({
+                  provider: "github",
+                  redirect: "/todos"
+                })
               }
               className="btn btn-outline w-full"
             >

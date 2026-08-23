@@ -22,7 +22,7 @@ export interface CodeIdentifier {
   value: string
 }
 
-/** The body shape shared by `send-code` and `verify-code`. */
+/** The body shape shared by `send-code` and `sign-in/code`. */
 export interface IdentifierBody {
   email?: unknown
   phoneNumber?: unknown

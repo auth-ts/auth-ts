@@ -294,9 +294,9 @@ describe("construction failures", () => {
     expect(() =>
       createAuthServer({
         ...baseOptions(),
-        rateLimit: { verifyCodePerIP: { max: 30, window: "0.0001s" } }
+        rateLimit: { signInCodePerIP: { max: 30, window: "0.0001s" } }
       })
-    ).toThrow(/rateLimit\.verifyCodePerIP\.window must be a positive duration/)
+    ).toThrow(/rateLimit\.signInCodePerIP\.window must be a positive duration/)
     // The cooldown is a spacing, not a window: zero means "no spacing" and stays legal.
     expect(() =>
       createAuthServer({
@@ -316,9 +316,9 @@ describe("construction failures", () => {
     expect(() =>
       createAuthServer({
         ...baseOptions(),
-        rateLimit: { verifyCodePerIP: { max: 2.5, window: "10m" } }
+        rateLimit: { signInCodePerIP: { max: 2.5, window: "10m" } }
       })
-    ).toThrow(/rateLimit.verifyCodePerIP.max/)
+    ).toThrow(/rateLimit.signInCodePerIP.max/)
   })
 
   it("refuses sub, iat, and exp as configured default claims", () => {

@@ -1,17 +1,17 @@
-import { AuthApiError } from "../http/auth-api-error"
-import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
-import { defineEndpoint } from "../http/define-endpoint"
-import { validateAdditionalFields } from "../http/validate-additional-fields"
-import { convertGuest } from "../session/convert-guest"
-import { issueSession } from "../session/issue-session"
-import { resolveCallerSession } from "../session/resolve-session"
-import { findOrCreateUser } from "../user/find-or-create-user"
-import { consumeVerificationCode } from "../verification-code/consume-verification-code"
-import type { IdentifierBody } from "../verification-code/resolve-code-identifier"
-import { resolveCodeIdentifier } from "../verification-code/resolve-code-identifier"
+import { AuthApiError } from "../../http/auth-api-error"
+import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
+import { defineEndpoint } from "../../http/define-endpoint"
+import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import { convertGuest } from "../../session/convert-guest"
+import { issueSession } from "../../session/issue-session"
+import { resolveCallerSession } from "../../session/resolve-session"
+import { findOrCreateUser } from "../../user/find-or-create-user"
+import { consumeVerificationCode } from "../../verification-code/consume-verification-code"
+import type { IdentifierBody } from "../../verification-code/resolve-code-identifier"
+import { resolveCodeIdentifier } from "../../verification-code/resolve-code-identifier"
 
-/** Body accepted by `POST /verify-code`. */
-export interface VerifyCodeInput extends IdentifierBody {
+/** Body accepted by `POST /sign-in/code`. */
+export interface SignInCodeInput extends IdentifierBody {
   code: string
   /** Values for fields declared in `user.additionalFields`, applied on creation only. */
   additionalFields?: Record<string, unknown>
@@ -29,15 +29,15 @@ export interface VerifyCodeInput extends IdentifierBody {
  * upgrading the guest row in place or attaching it to the account that already
  * owns the identifier.
  */
-export const verifyCode = defineEndpoint({
+export const signInCode = defineEndpoint({
   method: "POST",
-  path: "/verify-code",
-  parse: async ({ request }): Promise<VerifyCodeInput> => {
-    const body = (await request.json().catch(() => ({}))) as VerifyCodeInput
+  path: "/sign-in/code",
+  parse: async ({ request }): Promise<SignInCodeInput> => {
+    const body = (await request.json().catch(() => ({}))) as SignInCodeInput
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },
-  run: async (internals, input: VerifyCodeInput) => {
+  run: async (internals, input: SignInCodeInput) => {
     const headers = input.headers ?? new Headers()
     const identifier = resolveCodeIdentifier(internals, input)
 
@@ -56,12 +56,12 @@ export const verifyCode = defineEndpoint({
     )
 
     if (internals.config.rateLimit !== false) {
-      const ipKey = ipRateLimitKey(internals, headers, "verifyCode")
+      const ipKey = ipRateLimitKey(internals, headers, "signInCode")
       if (ipKey) {
         await checkRateLimit(
           internals,
           ipKey,
-          internals.config.rateLimit.verifyCodePerIP
+          internals.config.rateLimit.signInCodePerIP
         )
       }
     }
