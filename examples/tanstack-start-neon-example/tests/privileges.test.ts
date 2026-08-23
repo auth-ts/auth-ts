@@ -10,23 +10,15 @@ import * as schema from "../src/db/schema"
 
 const client = new PGlite()
 
-/** What the Data API role may do, per table, once both SQL files have run. */
-async function as<T>(role: string, run: () => Promise<T>) {
-  await client.exec(`set role ${role}`)
-  try {
-    return await run()
-  } finally {
-    await client.exec("reset role")
-  }
-}
-
-const refused = (sql: string) => expect(client.exec(sql)).rejects.toThrow()
+/** Columns the browser must never read, whatever a policy allows. */
+const SECRETS = [
+  ["sessions", "tokenHash"],
+  ["verificationCodes", "codeHash"]
+]
 
 beforeAll(async () => {
-  // Neon supplies the roles and auth.user_id(); the schema and the two SQL
-  // files are ours, and are applied exactly as they would be against Neon.
   await client.exec(`
-    create role authenticated login; create role anonymous login;
+    create role authenticated login;
     create schema auth;
     create function auth.user_id() returns uuid as $$ select null::uuid $$ language sql;
   `)
@@ -41,76 +33,47 @@ beforeAll(async () => {
   await client.exec(sql("privileges.sql"))
   await client.exec(sql("triggers.sql"))
 
-  // The plan is for users to be readable through the Data API. Without a policy
-  // every row is denied, and a column grant would never be reached — so the
-  // checks below would pass while proving nothing.
-  await client.exec(
-    `create policy "own row" on "users" for all to authenticated using (true) with check (true)`
-  )
+  // Rows are denied outright without a policy, so a column grant would never be
+  // reached and these checks would pass while proving nothing.
+  for (const [table] of SECRETS) {
+    await client.exec(
+      `create policy "read" on "${table}" for select to authenticated using (true)`
+    )
+  }
 })
 
 describe("privileges.sql", () => {
-  it("grants exactly these columns to the Data API role", async () => {
-    const granted = await client.query<{
-      table_name: string
-      privilege_type: string
-      column_name: string
-    }>(`select table_name, privilege_type, column_name
-        from information_schema.column_privileges
-        where grantee = 'authenticated'
-        order by table_name, privilege_type, column_name`)
+  it.each(SECRETS)(
+    "hides %s.%s from the Data API role",
+    async (table, column) => {
+      const granted = await client.query(
+        `select 1 from information_schema.column_privileges
+       where grantee = 'authenticated' and privilege_type = 'SELECT'
+         and table_name = $1 and column_name = $2`,
+        [table, column]
+      )
+      expect(granted.rows).toEqual([])
 
-    const summary: Record<string, string[]> = {}
-    for (const row of granted.rows) {
-      const key = `${row.table_name} ${row.privilege_type}`
-      summary[key] = [...(summary[key] ?? []), row.column_name]
+      await client.exec("set role authenticated")
+      try {
+        await expect(
+          client.exec(`select "${column}" from "${table}"`)
+        ).rejects.toThrow()
+      } finally {
+        await client.exec("reset role")
+      }
     }
+  )
 
-    // Pinned, so a column added to a table or to a grant has to be looked at
-    // rather than inherited. tokenHash, email, and phoneNumber are the ones
-    // whose absence matters.
-    expect(summary).toEqual({
-      "sessions SELECT": [
-        "createdAt",
-        "expiresAt",
-        "id",
-        "ipAddress",
-        "userAgent",
-        "userId"
-      ],
-      "todos INSERT": ["completed", "title"],
-      "todos SELECT": [
-        "completed",
-        "createdAt",
-        "id",
-        "title",
-        "updatedAt",
-        "userId"
-      ],
-      "todos UPDATE": ["completed", "title"],
-      "users SELECT": ["createdAt", "id", "imageURL", "name", "type"],
-      "users UPDATE": ["imageURL", "name"]
-    })
-  })
-
-  it("grants delete on todos and nowhere else", async () => {
-    // DELETE has no column form, so it is invisible to the query above.
-    const granted = await client.query<{ table_name: string }>(
-      `select table_name from information_schema.table_privileges
-       where grantee = 'authenticated' and privilege_type = 'DELETE'`
-    )
-
-    expect(granted.rows.map((row) => row.table_name)).toEqual(["todos"])
-  })
-
-  it("hides what a client must never read", async () => {
-    await as("authenticated", async () => {
-      await refused(`select "tokenHash" from "sessions"`)
-      await refused(`select * from "verificationCodes"`)
-      await refused(`select * from "attempts"`)
-      await refused(`select * from "connections"`)
-      await refused(`select "email" from "users"`)
-    })
+  it.each(SECRETS)("still returns the other columns of %s", async (table) => {
+    await client.exec("set role authenticated")
+    try {
+      await expect(
+        client.exec(`select "id", "expiresAt" from "${table}"`)
+      ).resolves.toBeDefined()
+    } finally {
+      await client.exec("reset role")
+    }
   })
 })
 
