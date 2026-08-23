@@ -1,49 +1,17 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
 
 import { TrashIcon } from "../components/icons"
+import { useTodos } from "../hooks/use-todos"
 import { useUser } from "../hooks/use-user"
-import {
-  createTodo,
-  deleteTodo,
-  listTodos,
-  setTodoCompleted
-} from "../lib/todos"
 
 export const Route = createFileRoute("/todos")({ component: TodosPage })
 
-/**
- * The todo list — the whole point of the demo.
- *
- * Nothing here filters by user. The query asks the Data API for every row in the
- * table, and the database returns only this user's, because the policy is
- * evaluated against the `sub` claim of the token this library signed.
- */
+/** The todo list — the whole point of the demo. */
 function TodosPage() {
   const { data: user, isPending } = useUser()
-  const queryClient = useQueryClient()
+  const { todos, add, toggle, remove } = useTodos(user?.id)
   const [title, setTitle] = useState("")
-
-  // Scoped by user id, and cleared on sign-out, so switching accounts cannot
-  // paint the previous user's rows from cache for a frame. Row-level security
-  // means the data would never be wrong; the render would be.
-  const todosKey = ["todos", user?.id]
-
-  const todos = useQuery({
-    queryKey: todosKey,
-    queryFn: listTodos,
-    enabled: Boolean(user)
-  })
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: todosKey })
-  const add = useMutation({ mutationFn: createTodo, onSuccess: invalidate })
-  const toggle = useMutation({
-    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      setTodoCompleted(id, completed),
-    onSuccess: invalidate
-  })
-  const remove = useMutation({ mutationFn: deleteTodo, onSuccess: invalidate })
 
   if (isPending) {
     return (
