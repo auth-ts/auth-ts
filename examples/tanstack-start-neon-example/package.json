@@ -16,6 +16,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "bun run build && wrangler deploy",
+    "db:push": "bun src/db/push.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "cf-typegen": "wrangler types",

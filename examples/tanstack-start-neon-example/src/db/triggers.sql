@@ -30,7 +30,5 @@ create or replace trigger "verificationCodesUpdatedAt" before update on "verific
   for each row execute function set_updated_at();
 create or replace trigger "connectionsUpdatedAt" before update on "connections"
   for each row execute function set_updated_at();
-create or replace trigger "attemptsUpdatedAt" before update on "attempts"
-  for each row execute function set_updated_at();
 create or replace trigger "todosUpdatedAt" before update on "todos"
   for each row execute function set_updated_at();
