@@ -146,8 +146,8 @@ type SessionInfoWire = Omit<SessionInfo, "createdAt" | "expiresAt"> & {
 }
 
 /** Lists this user's sessions — the devices screen. */
-export function createListSessions(internals: AuthClientInternals) {
-  return async function listSessions(): Promise<SessionInfo[]> {
+export function createGetSessions(internals: AuthClientInternals) {
+  return async function getSessions(): Promise<SessionInfo[]> {
     const sessions = await internals.fetchJson<SessionInfoWire[]>({
       method: "GET",
       path: "/sessions",

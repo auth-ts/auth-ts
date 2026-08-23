@@ -228,7 +228,7 @@ describe("sessions and accounts", () => {
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    const sessions = await client.listSessions()
+    const sessions = await client.getSessions()
     expect(sessions).toHaveLength(2)
     // Dates are revived, so `SessionInfo` is honest on the client too.
     expect(sessions[0]?.createdAt).toBeInstanceOf(Date)

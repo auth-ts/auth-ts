@@ -103,7 +103,7 @@ so a loader branches instead of catching:
 const session = await authServer.getToken({ headers })
 if (!session) return { user: null }
 
-const sessions = await authServer.listSessions({ token: session.token })
+const sessions = await authServer.getSessions({ token: session.token })
 ```
 
 That shape is the point. A loader that called four endpoints with `{ headers }`

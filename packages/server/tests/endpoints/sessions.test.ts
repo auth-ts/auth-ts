@@ -26,7 +26,7 @@ async function signIn(context: TestContext, email: string) {
 const tokenFor = (context: TestContext, cookies: Record<string, string>) =>
   mintToken(context.authServer, cookies["auth-ts.refresh"] ?? "")
 
-async function listSessions(
+async function getSessions(
   context: TestContext,
   cookies: Record<string, string>
 ) {
@@ -57,7 +57,7 @@ describe("DELETE /sessions/:id", () => {
     const context = await createTestServer()
     const phone = await signIn(context, "ada@example.com")
     const laptop = await signIn(context, "ada@example.com")
-    const sessions = await listSessions(context, laptop)
+    const sessions = await getSessions(context, laptop)
     const mine = await currentSessionId(context, laptop)
     // Which one is this device is the caller's comparison to make.
     const other = required(
@@ -81,7 +81,7 @@ describe("DELETE /sessions/:id", () => {
         )
       ).status
     ).toBe(401)
-    expect(await listSessions(context, laptop)).toHaveLength(1)
+    expect(await getSessions(context, laptop)).toHaveLength(1)
   })
 
   it("revokes the current session as a local sign-out, clearing the cookie and saying so", async () => {
@@ -119,7 +119,7 @@ describe("DELETE /sessions/:id", () => {
     const context = await createTestServer()
     const ada = await signIn(context, "ada@example.com")
     const grace = await signIn(context, "grace@example.com")
-    const [adasSession] = await listSessions(context, ada)
+    const [adasSession] = await getSessions(context, ada)
 
     const response = await context.authServer.handler(
       request(
@@ -130,6 +130,6 @@ describe("DELETE /sessions/:id", () => {
     )
 
     expect(response.status).toBe(404)
-    expect(await listSessions(context, ada)).toHaveLength(1)
+    expect(await getSessions(context, ada)).toHaveLength(1)
   })
 })

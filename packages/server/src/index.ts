@@ -50,7 +50,7 @@ export type {
   AuthServer
 } from "./core/create-auth-server"
 export { createAuthServer } from "./core/create-auth-server"
-export type { AccountInfo, ListAccountsInput } from "./endpoints/accounts"
+export type { AccountInfo, GetAccountsInput } from "./endpoints/accounts"
 export type { SwitchAccountInput } from "./endpoints/accounts/switch"
 export type { CallbackProviderInput } from "./endpoints/callback/$provider"
 export type { ConnectProviderInput } from "./endpoints/connect/$provider"

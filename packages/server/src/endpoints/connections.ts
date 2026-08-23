@@ -8,7 +8,7 @@ import { authenticate } from "../session/authenticate"
 export type ConnectionInfo = AuthConnection
 
 /** Lists the signed-in user's linked providers. */
-export const listConnections = defineEndpoint({
+export const getConnections = defineEndpoint({
   method: "GET",
   path: "/connections",
   parse: ({ request }): CallerInput => ({ headers: request.headers }),

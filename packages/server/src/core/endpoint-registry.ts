@@ -1,14 +1,14 @@
 import { getDiscovery } from "../endpoints/.well-known/openid-configuration"
-import { listAccounts } from "../endpoints/accounts"
+import { getAccounts } from "../endpoints/accounts"
 import { switchAccount } from "../endpoints/accounts/switch"
 import { callbackProvider } from "../endpoints/callback/$provider"
 import { connectProvider } from "../endpoints/connect/$provider"
-import { listConnections } from "../endpoints/connections"
+import { getConnections } from "../endpoints/connections"
 import { disconnectProvider } from "../endpoints/connections/$provider"
 import { getJwks } from "../endpoints/jwks"
 import { sendCode } from "../endpoints/send-code"
 import { getSession } from "../endpoints/session"
-import { listSessions } from "../endpoints/sessions"
+import { getSessions } from "../endpoints/sessions"
 import { revokeSession } from "../endpoints/sessions/$id"
 import { signInProvider } from "../endpoints/sign-in/$provider"
 import { signInGuest } from "../endpoints/sign-in/guest"
@@ -37,15 +37,15 @@ export const endpointRegistry = {
   getUser,
   updateUser,
   deleteUser,
-  listSessions,
+  getSessions,
   revokeSession,
-  listAccounts,
+  getAccounts,
   switchAccount,
   signInGuest,
   signInProvider,
   callbackProvider,
   connectProvider,
-  listConnections,
+  getConnections,
   disconnectProvider,
   getJwks,
   getDiscovery

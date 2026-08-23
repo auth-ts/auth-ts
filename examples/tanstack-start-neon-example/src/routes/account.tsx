@@ -49,7 +49,7 @@ function AccountPage() {
   const connections = useConnections(user?.id)
   const accounts = useQuery({
     queryKey: ["accounts"],
-    queryFn: authClient.listAccounts,
+    queryFn: authClient.getAccounts,
     enabled: Boolean(user),
     // 404 means multiAccount is off on the server; that is a configuration
     // answer, not a failure worth retrying.

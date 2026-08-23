@@ -199,7 +199,7 @@ describe("getToken", () => {
 
     // Asking who is here and asking to act as them are different questions.
     expect(await client.getToken()).toBeNull()
-    await expect(client.listSessions()).rejects.toMatchObject({
+    await expect(client.getSessions()).rejects.toMatchObject({
       code: "unauthenticated"
     })
   })
@@ -272,7 +272,7 @@ describe("the session hint", () => {
     setSessionHint(undefined)
     const client = createAuthClient()
 
-    await expect(client.listSessions()).rejects.toMatchObject({
+    await expect(client.getSessions()).rejects.toMatchObject({
       code: "unauthenticated",
       status: 401
     })
@@ -355,7 +355,7 @@ describe("a refused token", () => {
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    expect(await client.listSessions()).toEqual([])
+    expect(await client.getSessions()).toEqual([])
     expect(
       server.requests.filter((entry) => entry.path === "/api/auth/token")
     ).toHaveLength(1)
@@ -377,7 +377,7 @@ describe("a refused token", () => {
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    await expect(client.listSessions()).rejects.toMatchObject({
+    await expect(client.getSessions()).rejects.toMatchObject({
       code: "unauthenticated"
     })
     expect(

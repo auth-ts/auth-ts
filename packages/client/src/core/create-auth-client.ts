@@ -1,15 +1,15 @@
 import { decodeToken } from "../lib/decode-token"
 import {
   createDeleteUser,
-  createListSessions,
+  createGetSessions,
   createRevokeSession,
   createSignOut,
   createUpdateUser
 } from "../methods/account"
 import {
   createDisconnect,
-  createListAccounts,
-  createListConnections,
+  createGetAccounts,
+  createGetConnections,
   createSwitchAccount
 } from "../methods/connections-and-accounts"
 import { createGetSession } from "../methods/get-session"
@@ -58,11 +58,11 @@ export interface AuthClient {
   signInAsGuest: ReturnType<typeof createSignInAsGuest>
   signIn: ReturnType<typeof createSignIn>
   connect: ReturnType<typeof createConnect>
-  listConnections: ReturnType<typeof createListConnections>
+  getConnections: ReturnType<typeof createGetConnections>
   disconnect: ReturnType<typeof createDisconnect>
-  listSessions: ReturnType<typeof createListSessions>
+  getSessions: ReturnType<typeof createGetSessions>
   revokeSession: ReturnType<typeof createRevokeSession>
-  listAccounts: ReturnType<typeof createListAccounts>
+  getAccounts: ReturnType<typeof createGetAccounts>
   switchAccount: ReturnType<typeof createSwitchAccount>
   updateUser: ReturnType<typeof createUpdateUser>
   deleteUser: ReturnType<typeof createDeleteUser>
@@ -106,11 +106,11 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     signInAsGuest: createSignInAsGuest(internals),
     signIn: createSignIn(internals),
     connect: createConnect(internals),
-    listConnections: createListConnections(internals),
+    getConnections: createGetConnections(internals),
     disconnect: createDisconnect(internals),
-    listSessions: createListSessions(internals),
+    getSessions: createGetSessions(internals),
     revokeSession: createRevokeSession(internals),
-    listAccounts: createListAccounts(internals),
+    getAccounts: createGetAccounts(internals),
     switchAccount: createSwitchAccount(internals),
     updateUser: createUpdateUser(internals),
     deleteUser: createDeleteUser(internals),
