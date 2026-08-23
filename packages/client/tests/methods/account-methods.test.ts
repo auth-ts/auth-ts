@@ -127,8 +127,8 @@ describe("signInAsGuest", () => {
   it("throws the error body's fields when the browser is already signed in", async () => {
     const wireBody = {
       name: "AuthError",
-      code: "alreadySignedIn",
-      message: "You are already signed in."
+      code: "guestRequiresSignOut",
+      message: "Sign out before continuing as a guest."
     }
     server.on("POST", "/api/auth/sign-in/guest", {
       status: 409,

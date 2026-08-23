@@ -17,7 +17,7 @@ interface Notice {
 function LoginPage() {
   const navigate = useNavigate()
   // The token gates the user query, so refetching it pulls the rest through.
-  const { refetch: refetchToken } = useToken()
+  const { data: token, refetch: refetchToken } = useToken()
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [stage, setStage] = useState<"email" | "code">("email")
@@ -176,13 +176,17 @@ function LoginPage() {
               <GitHubIcon />
               Continue with GitHub
             </button>
-            <button
-              type="button"
-              onClick={() => void continueAsGuest()}
-              className="btn btn-ghost w-full"
-            >
-              Continue as guest
-            </button>
+            {/* A guest needs a signed-out browser, so a signed-in visitor —
+                here to add another account — is not offered one. */}
+            {token ? null : (
+              <button
+                type="button"
+                onClick={() => void continueAsGuest()}
+                className="btn btn-ghost w-full"
+              >
+                Continue as guest
+              </button>
+            )}
           </div>
         </div>
       </div>

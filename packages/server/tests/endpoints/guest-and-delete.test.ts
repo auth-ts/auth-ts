@@ -95,7 +95,7 @@ describe("guests and multiAccount never mix", () => {
 
     expect(refused.status).toBe(409)
     expect(((await refused.json()) as { code: string }).code).toBe(
-      "alreadySignedIn"
+      "guestRequiresSignOut"
     )
     expect(context.db.users()).toHaveLength(1)
   })

@@ -58,7 +58,7 @@ export const signInGuest = defineEndpoint({
         tokenHash: await sha256Hex(presented),
         expiresAt: { gt: new Date() }
       })
-      if (live) throw new AuthApiError("alreadySignedIn", 409)
+      if (live) throw new AuthApiError("guestRequiresSignOut", 409)
     }
 
     const additionalFields = validateAdditionalFields(
