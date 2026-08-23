@@ -4,14 +4,10 @@ import type { AuthClientInternals } from "../core/auth-client-internals"
 /** Lists the providers linked to this user. */
 export function createListConnections(internals: AuthClientInternals) {
   return async function listConnections(): Promise<ConnectionInfo[]> {
-    const { connections } = await internals.fetchJson<{
-      connections: ConnectionInfo[]
-    }>({
+    return internals.fetchJson<ConnectionInfo[]>({
       method: "GET",
       path: "/connections"
     })
-
-    return connections
   }
 }
 
@@ -33,14 +29,10 @@ export function createDisconnect(internals: AuthClientInternals) {
 /** Lists every account signed in to this browser. Requires `multiAccount` server-side. */
 export function createListAccounts(internals: AuthClientInternals) {
   return async function listAccounts(): Promise<AccountInfo[]> {
-    const { accounts } = await internals.fetchJson<{ accounts: AccountInfo[] }>(
-      {
-        method: "GET",
-        path: "/accounts"
-      }
-    )
-
-    return accounts
+    return internals.fetchJson<AccountInfo[]>({
+      method: "GET",
+      path: "/accounts"
+    })
   }
 }
 

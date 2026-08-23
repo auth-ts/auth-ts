@@ -197,7 +197,9 @@ describe("token and user endpoints", () => {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
-    const body = (await response.json()) as { session: Record<string, unknown> }
+    const body = (await response.json()) as {
+      session: Record<string, unknown>
+    }
     const storedHash = required(db.sessions()[0], "session").tokenHash
 
     expect(JSON.stringify(body)).not.toContain("tokenHash")
@@ -285,10 +287,8 @@ describe("token and user endpoints", () => {
     const response = await authServer.handler(
       request("GET", "/api/auth/sessions", { cookies })
     )
-    const body = (await response.json()) as {
-      sessions: Array<Record<string, unknown>>
-    }
-    const [session] = body.sessions
+    const body = (await response.json()) as Array<Record<string, unknown>>
+    const [session] = body
 
     expect(JSON.stringify(body)).not.toContain("tokenHash")
     // Everything else is the caller's own row: `updatedAt` is when the device
@@ -607,10 +607,10 @@ describe("authenticating from the access token", () => {
         headers: { authorization: `Bearer ${token}` }
       })
     )
-    const body = (await response.json()) as { sessions: Array<{ id: string }> }
+    const body = (await response.json()) as Array<{ id: string }>
 
     expect(response.status).toBe(200)
-    expect(body.sessions).toHaveLength(1)
+    expect(body).toHaveLength(1)
     // The session was never resolved, which is the whole point.
     expect(
       update.mock.calls.filter(([input]) => input.table === "sessions")

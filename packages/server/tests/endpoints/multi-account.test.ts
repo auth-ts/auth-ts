@@ -102,16 +102,17 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies: second.cookies })
     )
-    const body = (await response.json()) as {
-      accounts: Array<{ user: { email: string }; current: boolean }>
-    }
+    const body = (await response.json()) as Array<{
+      user: { email: string }
+      current: boolean
+    }>
 
-    expect(body.accounts).toHaveLength(2)
-    expect(body.accounts.find((account) => account.current)?.user.email).toBe(
+    expect(body).toHaveLength(2)
+    expect(body.find((account) => account.current)?.user.email).toBe(
       "grace@example.com"
     )
     expect(
-      body.accounts
+      body
         .filter((account) => !account.current)
         .map((account) => account.user.email)
     ).toEqual(["ada@example.com"])
@@ -128,11 +129,9 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies })
     )
-    const body = (await response.json()) as {
-      accounts: Array<{ user: { email: string } }>
-    }
+    const body = (await response.json()) as Array<{ user: { email: string } }>
 
-    expect(body.accounts).toHaveLength(6)
+    expect(body).toHaveLength(6)
     expect(context.db.sessions()).toHaveLength(6)
   })
 
@@ -155,12 +154,10 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies })
     )
-    const body = (await response.json()) as {
-      accounts: Array<{ user: { email: string } }>
-    }
+    const body = (await response.json()) as Array<{ user: { email: string } }>
 
-    expect(body.accounts).toHaveLength(6)
-    expect(body.accounts.map((account) => account.user.email)).not.toContain(
+    expect(body).toHaveLength(6)
+    expect(body.map((account) => account.user.email)).not.toContain(
       "one@example.com"
     )
 
@@ -247,11 +244,9 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies: second.cookies })
     )
-    const body = (await response.json()) as {
-      accounts: Array<{ user: { email: string } }>
-    }
+    const body = (await response.json()) as Array<{ user: { email: string } }>
 
-    expect(body.accounts.map((account) => account.user.email)).toEqual([
+    expect(body.map((account) => account.user.email)).toEqual([
       "grace@example.com"
     ])
     expect(
@@ -280,11 +275,9 @@ describe("multiAccount enabled", () => {
         cookies: { ...cookies, "auth-ts.refresh.accounts": forged }
       })
     )
-    const body = (await response.json()) as {
-      accounts: Array<{ user: { email: string } }>
-    }
+    const body = (await response.json()) as Array<{ user: { email: string } }>
 
-    expect(body.accounts.map((account) => account.user.email)).toEqual([
+    expect(body.map((account) => account.user.email)).toEqual([
       "ada@example.com"
     ])
     // Nothing at all: the forged entries are dropped whole.
@@ -585,7 +578,7 @@ describe("multiAccount enabled", () => {
     const read = await context.authServer.handler(
       request("GET", "/api/auth/session", { cookies: second.cookies })
     )
-    const current = ((await read.json()) as { session: { id: string } }).session
+    const current = (await read.json()) as { id: string }
     const response = await context.authServer.handler(
       request("DELETE", `/api/auth/sessions/${current.id}`, {
         cookies: second.cookies
@@ -639,12 +632,13 @@ describe("guest conversion under multiAccount", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies })
     )
-    const body = (await response.json()) as {
-      accounts: Array<{ user: { email: string | null }; current: boolean }>
-    }
+    const body = (await response.json()) as Array<{
+      user: { email: string | null }
+      current: boolean
+    }>
 
-    expect(body.accounts).toHaveLength(1)
-    expect(body.accounts[0]?.user.email).toBe("ada@example.com")
+    expect(body).toHaveLength(1)
+    expect(body[0]?.user.email).toBe("ada@example.com")
     expect(cookies["auth-ts.refresh.accounts"]).not.toContain(guestToken)
     expect(context.db.sessions()).toHaveLength(1)
     expect(

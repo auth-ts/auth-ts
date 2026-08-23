@@ -22,6 +22,6 @@ export const listConnections = defineEndpoint({
       offset: 0,
       orderBy: { provider: "asc" }
     })
-    return { data: { connections: connections satisfies ConnectionInfo[] } }
+    return { data: connections satisfies ConnectionInfo[] }
   }
 })

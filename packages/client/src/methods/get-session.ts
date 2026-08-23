@@ -10,11 +10,9 @@ import type { AuthClientInternals } from "../core/auth-client-internals"
  */
 export function createGetSession(internals: AuthClientInternals) {
   return async function getSession(): Promise<CurrentSession> {
-    const { session } = await internals.fetchJson<{ session: CurrentSession }>({
+    return internals.fetchJson<CurrentSession>({
       method: "GET",
       path: "/session"
     })
-
-    return session
   }
 }

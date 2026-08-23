@@ -46,6 +46,6 @@ export const listSessions = defineEndpoint({
       ({ tokenHash, ...session }) => session
     )
 
-    return { data: { sessions: data } }
+    return { data }
   }
 })

@@ -1,3 +1,4 @@
+import type { AuthUser } from "../core/auth-db"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
 import { defineEndpoint } from "../http/define-endpoint"
@@ -95,13 +96,12 @@ export const verifyCode = defineEndpoint({
       ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
     })
 
-    return {
-      data: {
-        token: issued.token,
-        user: issued.user,
-        ...(issued.refreshToken ? { refreshToken: issued.refreshToken } : {})
-      },
-      headers: issued.headers
+    const data: { token: string; user: AuthUser; refreshToken?: string } = {
+      token: issued.token,
+      user: issued.user
     }
+    if (issued.refreshToken) data.refreshToken = issued.refreshToken
+
+    return { data, headers: issued.headers }
   }
 })

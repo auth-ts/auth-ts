@@ -164,7 +164,7 @@ describe("getSession", () => {
     const refreshToken = await signIn(context)
 
     const headers = cookieHeaders(refreshToken)
-    const { session } = await context.authServer.getSession({ headers })
+    const session = await context.authServer.getSession({ headers })
     const { user } = await context.authServer.getUser({ headers })
 
     // Two calls, because they are two questions: one keeps the session alive
@@ -296,7 +296,7 @@ describe("calling with a token instead of a request", () => {
 
     // No cookie, no request — the shape a custom API has after reading its own
     // Authorization header, or a service handed a token some other way.
-    const { sessions } = await context.authServer.listSessions({
+    const sessions = await context.authServer.listSessions({
       token: required(token, "token")
     })
 

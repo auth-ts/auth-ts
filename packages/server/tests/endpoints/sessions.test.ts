@@ -30,8 +30,7 @@ async function listSessions(
   const response = await context.authServer.handler(
     request("GET", "/api/auth/sessions", { cookies })
   )
-  return ((await response.json()) as { sessions: Array<{ id: string }> })
-    .sessions
+  return (await response.json()) as Array<{ id: string }>
 }
 
 /** The id of the session these cookies belong to, as a client would learn it. */
@@ -43,7 +42,7 @@ async function currentSessionId(
     request("GET", "/api/auth/session", { cookies })
   )
 
-  return ((await response.json()) as { session: { id: string } }).session.id
+  return ((await response.json()) as { id: string }).id
 }
 
 describe("DELETE /sessions/:id", () => {

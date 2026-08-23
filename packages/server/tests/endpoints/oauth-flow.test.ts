@@ -1009,12 +1009,8 @@ describe("connect and disconnect", () => {
     const listed = await context.authServer.handler(
       request("GET", "/api/auth/connections", { cookies })
     )
-    const body = (await listed.json()) as {
-      connections: Array<{ provider: string }>
-    }
-    expect(body.connections.map((connection) => connection.provider)).toEqual([
-      "github"
-    ])
+    const body = (await listed.json()) as Array<{ provider: string }>
+    expect(body.map((connection) => connection.provider)).toEqual(["github"])
   })
 
   it("rejects a connect callback arriving without the original session", async () => {

@@ -81,6 +81,6 @@ export const listAccounts = defineEndpoint({
       })
     )
 
-    return { data: { accounts }, headers: responseHeaders }
+    return { data: accounts, headers: responseHeaders }
   }
 })

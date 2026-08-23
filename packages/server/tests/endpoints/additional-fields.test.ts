@@ -214,11 +214,11 @@ describe("additionalFields on update", () => {
         body: { name: "Ada", referralCode: "UPDATED", seats: 9 }
       })
     )
-    const body = (await response.json()) as { user: Record<string, unknown> }
+    const user = (await response.json()) as Record<string, unknown>
 
-    expect(body.user.name).toBe("Ada")
-    expect(body.user.referralCode).toBe("UPDATED")
-    expect(body.user.seats).toBe(9)
+    expect(user.name).toBe("Ada")
+    expect(user.referralCode).toBe("UPDATED")
+    expect(user.seats).toBe(9)
   })
 
   it("answers 400 for a body that changes nothing, without touching the database", async () => {

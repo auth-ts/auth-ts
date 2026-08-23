@@ -178,22 +178,18 @@ describe("deleteUser", () => {
 describe("sessions and accounts", () => {
   it("lists sessions and revokes another device without clearing local state", async () => {
     server.on("GET", "/api/auth/sessions", {
-      body: {
-        sessions: [
-          {
-            id: "a",
-            current: true,
-            createdAt: "2026-08-01T10:00:00.000Z",
-            expiresAt: "2026-08-31T10:00:00.000Z"
-          },
-          {
-            id: "b",
-            current: false,
-            createdAt: "2026-08-02T10:00:00.000Z",
-            expiresAt: "2026-09-01T10:00:00.000Z"
-          }
-        ]
-      }
+      body: [
+        {
+          id: "a",
+          createdAt: "2026-08-01T10:00:00.000Z",
+          expiresAt: "2026-08-31T10:00:00.000Z"
+        },
+        {
+          id: "b",
+          createdAt: "2026-08-02T10:00:00.000Z",
+          expiresAt: "2026-09-01T10:00:00.000Z"
+        }
+      ]
     })
     server.on("DELETE", "/api/auth/sessions/b", { body: { current: false } })
     server.on("POST", "/api/auth/verify-code", {

@@ -164,7 +164,7 @@ export const updateUser = defineEndpoint({
       ...additionalFields
     })
 
-    return { data: { user } }
+    return { data: user }
   }
 })
 

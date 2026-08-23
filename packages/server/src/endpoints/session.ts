@@ -28,6 +28,6 @@ export const getSession = defineEndpoint({
     // The hash is the credential itself, and the only column that cannot cross.
     const { tokenHash, ...session } = resolved.session
 
-    return { data: { session } satisfies { session: CurrentSession } }
+    return { data: session satisfies CurrentSession }
   }
 })
