@@ -102,20 +102,14 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies: second.cookies })
     )
-    const body = (await response.json()) as Array<{
-      user: { email: string }
-      current: boolean
-    }>
+    const body = (await response.json()) as Array<{ email: string }>
 
-    expect(body).toHaveLength(2)
-    expect(body.find((account) => account.current)?.user.email).toBe(
-      "grace@example.com"
-    )
-    expect(
-      body
-        .filter((account) => !account.current)
-        .map((account) => account.user.email)
-    ).toEqual(["ada@example.com"])
+    // Active first, then the parked ones — the order is the answer, so no flag
+    // has to say which is which.
+    expect(body.map((account) => account.email)).toEqual([
+      "grace@example.com",
+      "ada@example.com"
+    ])
   })
 
   it("holds five parked accounts alongside the active one", async () => {
@@ -129,7 +123,7 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies })
     )
-    const body = (await response.json()) as Array<{ user: { email: string } }>
+    const body = (await response.json()) as Array<{ email: string }>
 
     expect(body).toHaveLength(6)
     expect(context.db.sessions()).toHaveLength(6)
@@ -154,10 +148,10 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies })
     )
-    const body = (await response.json()) as Array<{ user: { email: string } }>
+    const body = (await response.json()) as Array<{ email: string }>
 
     expect(body).toHaveLength(6)
-    expect(body.map((account) => account.user.email)).not.toContain(
+    expect(body.map((account) => account.email)).not.toContain(
       "one@example.com"
     )
 
@@ -244,11 +238,9 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies: second.cookies })
     )
-    const body = (await response.json()) as Array<{ user: { email: string } }>
+    const body = (await response.json()) as Array<{ email: string }>
 
-    expect(body.map((account) => account.user.email)).toEqual([
-      "grace@example.com"
-    ])
+    expect(body.map((account) => account.email)).toEqual(["grace@example.com"])
     expect(
       readSetCookies(response).get("auth-ts.refresh.accounts")?.value
     ).toBe("[]")
@@ -275,11 +267,9 @@ describe("multiAccount enabled", () => {
         cookies: { ...cookies, "auth-ts.refresh.accounts": forged }
       })
     )
-    const body = (await response.json()) as Array<{ user: { email: string } }>
+    const body = (await response.json()) as Array<{ email: string }>
 
-    expect(body.map((account) => account.user.email)).toEqual([
-      "ada@example.com"
-    ])
+    expect(body.map((account) => account.email)).toEqual(["ada@example.com"])
     // Nothing at all: the forged entries are dropped whole.
     expect(sessionReads()).toBe(0)
     expect(
@@ -632,13 +622,10 @@ describe("guest conversion under multiAccount", () => {
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", { cookies })
     )
-    const body = (await response.json()) as Array<{
-      user: { email: string | null }
-      current: boolean
-    }>
+    const body = (await response.json()) as Array<{ email: string | null }>
 
     expect(body).toHaveLength(1)
-    expect(body[0]?.user.email).toBe("ada@example.com")
+    expect(body[0]?.email).toBe("ada@example.com")
     expect(cookies["auth-ts.refresh.accounts"]).not.toContain(guestToken)
     expect(context.db.sessions()).toHaveLength(1)
     expect(

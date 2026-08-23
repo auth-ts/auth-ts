@@ -293,19 +293,18 @@ function AccountPage() {
             <h2 className="card-title">Switch account</h2>
             <ul className="list rounded-box bg-base-200">
               {accounts.data.map((account) => (
-                <li key={account.user.id} className="list-row items-center">
+                <li key={account.id} className="list-row items-center">
                   <span className="list-col-grow text-sm">
-                    {account.user.email ??
-                      `Guest ${account.user.id.slice(0, 8)}`}
+                    {account.email ?? `Guest ${account.id.slice(0, 8)}`}
                   </span>
-                  {account.current ? (
+                  {account.id === user.id ? (
                     <span className="badge badge-soft badge-sm">current</span>
                   ) : (
                     <button
                       type="button"
                       onClick={async () => {
                         await authClient.switchAccount({
-                          userId: account.user.id
+                          userId: account.id
                         })
                         queryClient.clear()
                       }}

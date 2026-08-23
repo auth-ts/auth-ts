@@ -14,12 +14,13 @@ import {
 } from "../session/accounts-cookie"
 import { resolveSession } from "../session/resolve-session"
 
-/** One signed-in user in this browser. */
-export interface AccountInfo {
-  user: AuthUser
-  /** Whether this is the account the browser is currently acting as. */
-  current: boolean
-}
+/**
+ * One signed-in user in this browser.
+ *
+ * Which of them is active is the caller's comparison: `getUser` already says
+ * who that is, so a flag here would be the same answer written twice.
+ */
+export type AccountInfo = AuthUser
 
 /** Input for listing accounts. */
 export interface ListAccountsInput {
@@ -64,9 +65,9 @@ export const listAccounts = defineEndpoint({
         selectOne(internals, "users", { id: session.userId })
       )
     )
-    const accounts: AccountInfo[] = [{ user: active.user, current: true }]
+    const accounts: AccountInfo[] = [active.user]
     for (const user of parkedUsers) {
-      if (user) accounts.push({ user, current: false })
+      if (user) accounts.push(user)
     }
 
     const responseHeaders = new Headers()
