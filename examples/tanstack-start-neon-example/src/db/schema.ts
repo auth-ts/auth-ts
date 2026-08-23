@@ -40,12 +40,12 @@ export const users = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    pgPolicy("read_own_user", {
+    pgPolicy("readOwnUser", {
       for: "select",
       to: authenticatedRole,
       using: authUuid(table.id)
     }),
-    pgPolicy("update_own_user", {
+    pgPolicy("updateOwnUser", {
       for: "update",
       to: authenticatedRole,
       using: authUuid(table.id),
@@ -180,7 +180,7 @@ export const todos = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    pgPolicy("manage_own_todos", {
+    pgPolicy("manageOwnTodos", {
       for: "all",
       to: authenticatedRole,
       using: authUuid(table.userId),
