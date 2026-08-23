@@ -304,67 +304,6 @@ describe("delete", () => {
   })
 })
 
-describe("cleanup", () => {
-  it("deletes rows past their expiry in every table that has one", async () => {
-    const ada = await user({ email: "ada@example.com" })
-    const past = new Date(Date.now() - 1000)
-    const future = new Date(Date.now() + 60_000)
-
-    for (const expiresAt of [past, future]) {
-      await db.insert({
-        table: "sessions",
-        values: {
-          userId: ada.id,
-          tokenHash: `hash-${expiresAt.getTime()}`,
-          createdAt: new Date(),
-          expiresAt,
-          userAgent: null,
-          ipAddress: null,
-          updatedAt: new Date()
-        }
-      })
-      await db.insert({
-        table: "verificationCodes",
-        values: {
-          identifier: "ada@example.com",
-          codeHash: `code-${expiresAt.getTime()}`,
-          expiresAt,
-          action: "signIn",
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      })
-      await attempt(`key-${expiresAt.getTime()}`, expiresAt)
-    }
-
-    await db.cleanup?.()
-
-    expect(await read("sessions")).toHaveLength(1)
-    expect(await read("verificationCodes")).toHaveLength(1)
-    expect(await read("attempts")).toHaveLength(1)
-    expect(db.users()).toHaveLength(1)
-  })
-
-  it("leaves identities alone, since nothing about a link expires", async () => {
-    const ada = await user({ email: "ada@example.com" })
-    await db.insert({
-      table: "identities",
-      values: {
-        userId: ada.id,
-        provider: "github",
-        providerUserId: "1",
-        label: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    })
-
-    await db.cleanup?.()
-
-    expect(await db.rows("identities")).toHaveLength(1)
-  })
-})
-
 describe("reset", () => {
   it("empties every table", async () => {
     await user({ email: "ada@example.com" })

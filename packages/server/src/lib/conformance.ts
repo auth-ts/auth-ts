@@ -458,10 +458,8 @@ export const authDBChecks: AuthDBCheck[] = [
     }
   },
   {
-    name: "cleanup deletes what has expired and keeps what has not",
+    name: "delete honours a range, removing what has expired and keeping what has not",
     async run(db) {
-      if (!db.cleanup) return
-
       const identifier = `${unique()}@example.test`
       for (const expiresAt of [past(), future()]) {
         await create(db, "verificationCodes", {
@@ -474,33 +472,30 @@ export const authDBChecks: AuthDBCheck[] = [
         })
       }
       try {
-        await db.cleanup()
-
-        // The contract lets cleanup finish after it returns — the reference
-        // implementation hands the sweep to `waitUntil` — so this waits for the
-        // effect rather than assuming it has already landed.
-        const remaining = () =>
-          db.select({
-            table: "verificationCodes",
-            where: { identifier },
-            limit: 10,
-            offset: 0,
-            orderBy: { id: "asc" }
-          })
-
-        let left = await remaining()
-        for (let attempt = 0; attempt < 20 && left.length === 2; attempt++) {
-          await new Promise((resolve) => setTimeout(resolve, 100))
-          left = await remaining()
-        }
+        const removed = await db.delete({
+          table: "verificationCodes",
+          where: { identifier, expiresAt: { lt: new Date() } }
+        })
 
         expect(
-          left.length === 1,
-          "cleanup left both rows. It should delete rows past expiresAt — every code, session, and rate-limit row your database keeps is one it will never read again."
+          removed.length === 1 &&
+            removed[0] !== undefined &&
+            removed[0].expiresAt.getTime() < Date.now(),
+          "deleting where expiresAt is past must remove exactly the expired row. The sweep that keeps sessions, codes, and attempts from accumulating is this one delete."
         )
+
+        const left = await db.select({
+          table: "verificationCodes",
+          where: { identifier },
+          limit: 10,
+          offset: 0,
+          orderBy: { id: "asc" }
+        })
         expect(
-          left[0] && left[0].expiresAt.getTime() > Date.now(),
-          "cleanup deleted the row that had not expired yet, signing people out early"
+          left.length === 1 &&
+            left[0] !== undefined &&
+            left[0].expiresAt.getTime() > Date.now(),
+          "the delete removed the row that had not expired yet, signing people out early"
         )
       } finally {
         await db.delete({ table: "verificationCodes", where: { identifier } })

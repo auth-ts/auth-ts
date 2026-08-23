@@ -8,6 +8,7 @@ import { hmacSha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
+import { sweepExpired } from "../lib/sweep-expired"
 import type { CodeIdentifier } from "./resolve-code-identifier"
 
 /**
@@ -83,6 +84,7 @@ export async function sendVerificationCode(
   // Delete then insert: latest wins. Two sends racing can leave both rows for
   // an instant, and that is harmless — verification reads the newest, so the
   // earlier code is dead either way and the sweep collects it.
+  const swept = sweepExpired(internals, "verificationCodes")
   await internals.db.delete({
     table: "verificationCodes",
     where: { identifier: identifier.value }
@@ -93,6 +95,7 @@ export async function sendVerificationCode(
     expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
     action
   })
+  await swept
 
   // Stored first, then delivered, and rolled back if delivery throws. The
   // rollback keeps a sender outage from costing the user anything: the cooldown

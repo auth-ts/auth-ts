@@ -351,4 +351,13 @@ export interface AuthServerOptions<
   logLevel?: LogLevel
   /** Log sink override, e.g. pino. Defaults to `console`. */
   logger?: Logger
+  /**
+   * Extends work past the response, e.g. Cloudflare's `ctx.waitUntil`.
+   *
+   * Sweeping expired rows piggybacks on the request that made new ones. Provide
+   * this and the sweep rides behind the response instead of ahead of it; leave
+   * it out and the sweep is awaited, because an unawaited promise is not
+   * guaranteed to run on Cloudflare Workers once the response has returned.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void
 }

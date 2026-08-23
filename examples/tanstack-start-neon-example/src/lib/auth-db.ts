@@ -1,4 +1,3 @@
-import { waitUntil } from "cloudflare:workers"
 import type {
   AuthDirection,
   AuthOrderBy,
@@ -7,18 +6,7 @@ import type {
   AuthWhere
 } from "@auth-ts/server"
 import { defineAuthDB } from "@auth-ts/server"
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  getColumns,
-  gt,
-  is,
-  lt,
-  notExists,
-  sql
-} from "drizzle-orm"
+import { and, asc, desc, eq, getColumns, gt, is, lt } from "drizzle-orm"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import { PgTable } from "drizzle-orm/pg-core"
 
@@ -82,32 +70,5 @@ export const authDB = defineAuthDB({
       .where(buildWhere(table, where))
       .returning(),
   delete: ({ table, where }) =>
-    db.delete(authTables[table]).where(buildWhere(table, where)).returning(),
-  cleanup: () =>
-    waitUntil(
-      Promise.all(
-        [
-          authTables.sessions,
-          authTables.verificationCodes,
-          authTables.attempts
-        ].map((table) =>
-          db.delete(table).where(lt(table.expiresAt, sql`now()`))
-        )
-      ).then(() =>
-        db
-          .delete(authTables.users)
-          .where(
-            and(
-              eq(authTables.users.type, "guest"),
-              lt(authTables.users.updatedAt, sql`now() - interval '30 days'`),
-              notExists(
-                db
-                  .select()
-                  .from(authTables.sessions)
-                  .where(eq(authTables.sessions.userId, authTables.users.id))
-              )
-            )
-          )
-      )
-    )
+    db.delete(authTables[table]).where(buildWhere(table, where)).returning()
 })

@@ -65,8 +65,8 @@ describe("public API documentation", () => {
     const undocumented: string[] = []
     for (const [index, line] of lines.entries()) {
       // Every member is a method, and each may be generic (`select<T…>(`),
-      // optional (`cleanup?()`), or phantom (`__schema?(`) — none of which
-      // exempts it from carrying a doc comment.
+      // optional, or phantom (`__schema?(`) — none of which exempts it from
+      // carrying a doc comment.
       const matched = /^ {2}(__)?([a-zA-Z]+)\??(<[^>]*>)?\(/.exec(line)
       if (!matched) continue
 

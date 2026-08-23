@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { checkRateLimit } from "../../src/http/check-rate-limit"
 import { createTestInternals } from "../helpers/create-test-internals"
 import { selectRows } from "../helpers/rows"
@@ -20,6 +20,19 @@ describe("checkRateLimit", () => {
     // A refused request still leaves its row, so continuing to hammer the
     // endpoint cannot win back an allowance.
     expect(await selectRows(db, "attempts")).toHaveLength(4)
+  })
+
+  it("sweeps only on the first attempt of a window, so a flood cannot amplify it", async () => {
+    const { internals, db } = await createTestInternals()
+    const deletes = vi.spyOn(db, "delete")
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await checkRateLimit(internals, KEY, WINDOW)
+    }
+
+    expect(
+      deletes.mock.calls.filter(([input]) => input.table === "attempts")
+    ).toHaveLength(1)
   })
 
   it("loses no attempt under concurrency, because attempts are only ever appended", async () => {
@@ -70,7 +83,8 @@ describe("checkRateLimit", () => {
 
     // Windows are aligned to the clock rather than started by the first
     // request, so crossing the boundary is what resets the count — no stored
-    // `resetAt` is read, and nothing has to be written back.
+    // `resetAt` is read, and nothing has to be written back. The first attempt
+    // of the fresh window also sweeps, so the spent window's rows are gone.
     await new Promise((resolve) => setTimeout(resolve, 1100))
     await expect(
       checkRateLimit(internals, KEY, window)
@@ -79,7 +93,7 @@ describe("checkRateLimit", () => {
     const keys = new Set(
       (await selectRows(db, "attempts")).map((row) => row.key)
     )
-    expect(keys.size).toBe(2)
+    expect(keys.size).toBe(1)
   })
 
   it("does nothing at all when the limiter is off", async () => {

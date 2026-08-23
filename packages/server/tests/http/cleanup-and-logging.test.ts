@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { CLEANUP_INTERVAL_MS } from "../../src/http/sweep-expired"
+import type { AuthDeleteInput } from "../../src/core/auth-db"
 import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
@@ -7,94 +7,108 @@ import { required } from "../helpers/required"
 /** Lets any work a request scheduled after its response settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-describe("cleanup", () => {
-  const sendCode = () =>
-    request("POST", "/api/auth/send-code", {
-      body: { email: "ada@example.com" }
+/** Whether a delete is the sweep — the only delete keyed on an expiry range. */
+const isSweep = (input: AuthDeleteInput) => {
+  const expiresAt = (input.where as Record<string, unknown>).expiresAt
+  return (
+    typeof expiresAt === "object" &&
+    expiresAt !== null &&
+    !(expiresAt instanceof Date)
+  )
+}
+
+describe("sweeping", () => {
+  type TestContext = Awaited<ReturnType<typeof createTestServer>>
+
+  const sendCode = (email = "ada@example.com") =>
+    request("POST", "/api/auth/send-code", { body: { email } })
+
+  const signIn = async (context: TestContext, email = "ada@example.com") => {
+    await context.authServer.handler(sendCode(email))
+    return context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        body: { email, code: required(context.sentCodes.at(-1), "code").code }
+      })
+    )
+  }
+
+  const seedExpiredSession = (context: TestContext) =>
+    context.db.insert({
+      table: "sessions",
+      values: {
+        userId: "someone-long-gone",
+        tokenHash: "stale-hash",
+        expiresAt: new Date(Date.now() - 1000),
+        userAgent: null,
+        ipAddress: null,
+        createdAt: new Date(Date.now() - 2000),
+        updatedAt: new Date(Date.now() - 2000)
+      }
     })
 
-  it("sweeps after a mutating request", async () => {
+  it("a sign-in sweeps expired sessions, including someone else's", async () => {
     const context = await createTestServer()
-    const cleanup = vi.spyOn(context.db, "cleanup")
+    await seedExpiredSession(context)
 
-    await context.authServer.handler(sendCode())
+    await signIn(context)
 
-    expect(cleanup).toHaveBeenCalled()
+    const remaining = context.db.sessions()
+    expect(remaining).toHaveLength(1)
+    expect(
+      required(remaining[0], "session").expiresAt.getTime()
+    ).toBeGreaterThan(Date.now())
   })
 
-  it("waits for the sweep rather than firing and forgetting it", async () => {
-    // An unawaited promise is not guaranteed to run on Workers once the
-    // response is returned, and a framework-agnostic library never sees
-    // `ctx.waitUntil` — so the sweep has to be finished before the handler is.
+  it("sending a code sweeps expired verification rows", async () => {
     const context = await createTestServer()
-    let swept = false
-    vi.spyOn(context.db, "cleanup").mockImplementation(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      swept = true
+    await context.db.insert({
+      table: "verificationCodes",
+      values: {
+        identifier: "grace@example.com",
+        codeHash: "stale-code",
+        expiresAt: new Date(Date.now() - 1000),
+        action: "signIn",
+        createdAt: new Date(Date.now() - 2000),
+        updatedAt: new Date(Date.now() - 2000)
+      }
     })
 
     await context.authServer.handler(sendCode())
 
-    expect(swept).toBe(true)
+    const remaining = context.db.rows("verificationCodes")
+    expect(remaining).toHaveLength(1)
+    expect(required(remaining[0], "code").identifier).toBe("ada@example.com")
   })
 
-  it("sweeps at most once an interval, however many requests arrive", async () => {
-    const context = await createTestServer()
-    const cleanup = vi.spyOn(context.db, "cleanup")
+  it("hands the sweep to waitUntil instead of making the request wait", async () => {
+    const deferred: Promise<unknown>[] = []
+    const context = await createTestServer({
+      waitUntil: (promise) => deferred.push(promise)
+    })
+    await seedExpiredSession(context)
 
-    await context.authServer.handler(sendCode())
-    await context.authServer.handler(sendCode())
-    await context.authServer.handler(sendCode())
+    await signIn(context)
 
-    expect(cleanup).toHaveBeenCalledTimes(1)
+    expect(deferred.length).toBeGreaterThan(0)
+    await Promise.all(deferred)
+    expect(context.db.sessions()).toHaveLength(1)
   })
 
-  it("sweeps again once the interval has passed", async () => {
+  it("routes a failed sweep to the logger and never into the response", async () => {
     const context = await createTestServer()
-    const cleanup = vi.spyOn(context.db, "cleanup")
-
-    await context.authServer.handler(sendCode())
-    vi.spyOn(Date, "now").mockReturnValue(Date.now() + CLEANUP_INTERVAL_MS + 1)
-    await context.authServer.handler(sendCode())
-    vi.restoreAllMocks()
-
-    expect(cleanup).toHaveBeenCalledTimes(2)
-  })
-
-  it("never sweeps on a read, because a read creates nothing to clean up", async () => {
-    const context = await createTestServer()
-    const cleanup = vi.spyOn(context.db, "cleanup")
-
-    await context.authServer.handler(request("GET", "/api/auth/jwks"))
-    // A token refresh writes a session, but it is still a GET and still the
-    // request a read-heavy deployment makes most often.
-    await context.authServer.handler(request("GET", "/api/auth/token"))
-
-    expect(cleanup).not.toHaveBeenCalled()
-  })
-
-  it("never sweeps when the store does not implement cleanup", async () => {
-    // Leaving it off the contract is how a deployment says "my cron owns this".
-    const context = await createTestServer()
-    context.db.cleanup = undefined
-
-    const response = await context.authServer.handler(sendCode())
-
-    expect(response.status).toBe(200)
-  })
-
-  it("routes a failed sweep to the logger instead of an empty catch", async () => {
-    const context = await createTestServer()
-    vi.spyOn(context.db, "cleanup").mockRejectedValue(
-      new Error("connection lost")
+    const realDelete = context.db.delete.bind(context.db)
+    vi.spyOn(context.db, "delete").mockImplementation((input) =>
+      isSweep(input)
+        ? Promise.reject(new Error("connection lost"))
+        : realDelete(input)
     )
 
-    const response = await context.authServer.handler(sendCode())
+    const response = await signIn(context)
 
     expect(response.status).toBe(200)
     expect(
       context.logCalls.some(
-        (call) => call.level === "error" && call.message.includes("cleanup")
+        (call) => call.level === "error" && call.message.includes("sweep")
       )
     ).toBe(true)
   })

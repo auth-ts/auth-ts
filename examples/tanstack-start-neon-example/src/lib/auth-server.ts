@@ -1,8 +1,10 @@
+import { waitUntil } from "cloudflare:workers"
 import { createAuthServer } from "@auth-ts/server"
 import { authDB } from "./auth-db"
 
 export const authServer = createAuthServer({
   db: authDB,
+  waitUntil,
   email: {
     sendCode: ({ email, code, action }) => {
       if (process.env.NODE_ENV === "development") {

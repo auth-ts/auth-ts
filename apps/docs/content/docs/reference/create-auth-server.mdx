@@ -48,11 +48,24 @@ row's `id`.
 
 ## Cleanup
 
-There is no `cleanup` option. Sweeping expired rows is a query, so it lives on
-[`AuthDB.cleanup`](/docs/reference/auth-db) — implement it and the library runs
-it for you, at most once a minute after a request that could have written
-something; leave it out and the schedule is yours. Something has to run it:
-the `attempts` table gains a row per rate-limited request.
+There is no cleanup schedule to own. The library sweeps expired rows itself,
+through your own [`AuthDB.delete`](/docs/reference/auth-db), on the requests
+that create new ones: a sign-in sweeps `sessions`, a code send sweeps
+`verificationCodes`, and the first attempt of each rate-limit window sweeps
+`attempts`. Garbage accrues only through inserts, so sweeping at insert time
+keys the sweep rate to the growth rate — including the rows left by people who
+never come back.
+
+```ts
+import { waitUntil } from "cloudflare:workers"
+
+createAuthServer({ waitUntil, ... })
+```
+
+`waitUntil` is optional. Provide it and the sweep runs behind the response;
+leave it out and the sweep is awaited, because an unawaited promise is not
+guaranteed to run on Cloudflare Workers once the response has returned. A
+failed sweep is logged, never surfaced — expiry is enforced on read regardless.
 
 ## What you get back
 

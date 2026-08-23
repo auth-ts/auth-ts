@@ -70,17 +70,24 @@ describe("authDBChecks", () => {
     )
   })
 
-  it("catches a cleanup that sweeps nothing", async () => {
-    const failed = await failures(broken({ cleanup: () => undefined }))
+  it("catches a delete that ignores a range and removes every match", async () => {
+    const db = createMemoryDb()
+    const failed = await failures(
+      broken({
+        delete: (input) => {
+          const where = Object.fromEntries(
+            Object.entries(input.where).filter(
+              ([, value]) =>
+                !value || typeof value !== "object" || value instanceof Date
+            )
+          )
+          return db.delete({ ...input, where } as typeof input)
+        }
+      })
+    )
 
     expect(failed).toContain(
-      "cleanup deletes what has expired and keeps what has not"
+      "delete honours a range, removing what has expired and keeping what has not"
     )
-  })
-
-  it("skips the cleanup check for a store that does not implement it", async () => {
-    const { cleanup, ...withoutCleanup } = createMemoryDb()
-
-    expect(await failures(withoutCleanup)).toEqual([])
   })
 })

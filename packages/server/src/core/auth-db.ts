@@ -418,28 +418,6 @@ export interface AuthDB<
   }): Promise<AuthRow<S, T>[]>
 
   /**
-   * Deletes rows whose `expiresAt` has passed, in `sessions`, `verificationCodes`, and
-   * `attempts`. Optional.
-   *
-   * Implement it and core calls it for you — awaited, at most once a minute per
-   * server, and only after a request that could have written something. Awaited
-   * because an unawaited promise is not guaranteed to run on Cloudflare Workers
-   * once the response is returned, and a framework-agnostic library never sees
-   * `ctx.waitUntil`. Leave it out and cleanup is yours: a cron, a scheduled
-   * worker, a partitioned table. Either way it is hygiene, never a security
-   * boundary — expiry is enforced on read regardless of whether a sweep has
-   * ever run — but `attempts` grows by a row per counted request, so something
-   * must eventually delete them.
-   *
-   * It takes no arguments deliberately. "Expired" means expired *now*, and your
-   * database already knows what time it is; using its clock avoids the skew a
-   * passed-in timestamp would introduce, and makes the natural SQL the correct
-   * SQL. Sweeping in batches is fine — the contract does not ask for one
-   * statement.
-   */
-  cleanup?(): unknown
-
-  /**
    * Pins `S` so a schema mismatch is caught.
    *
    * `S` appears only inside generic methods, and TypeScript measures a type
@@ -491,7 +469,6 @@ export function defineAuthDB<
   insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable> | undefined>
   update(input: AuthUpdateInput<S>): Promise<unknown>
   delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
-  cleanup?(): unknown
 }): AuthDB<S> {
   return implementation as unknown as AuthDB<S>
 }

@@ -404,14 +404,14 @@ describe("sendVerificationCode", () => {
 
       expect(sentCodes).toHaveLength(4)
       // Nothing was reset: the window start is part of the key, so the fourth
-      // send counts under a key of its own and the spent window's rows simply
-      // sit there until the sweep collects them.
+      // send counts under a key of its own — and as the first attempt of a
+      // fresh window it swept the spent windows' expired rows on the way.
       const keys = new Set(
         (await selectRows(db, "attempts"))
           .filter((row) => row.key.startsWith("sendCode:id:ada@example.com:"))
           .map((row) => row.key)
       )
-      expect(keys.size).toBe(2)
+      expect(keys.size).toBe(1)
     } finally {
       vi.useRealTimers()
     }

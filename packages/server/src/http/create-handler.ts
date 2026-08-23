@@ -7,7 +7,6 @@ import { errorResponse } from "./error-response"
 import { getErrorMessage } from "./get-error-message"
 import { matchEndpointParams } from "./match-route"
 import { resolveLocale } from "./resolve-locale"
-import { sweepExpired } from "./sweep-expired"
 
 /** A mounted endpoint: what the consumer's framework calls. */
 export type AuthHandler = (request: Request) => Promise<Response>
@@ -18,9 +17,8 @@ export type AuthHandler = (request: Request) => Promise<Response>
  * The one piece of middleware in the package, and the only place HTTP meets the
  * logic. Before: answer a CORS preflight, refuse a method the endpoint does
  * not declare, and refuse a state-changing request from an origin this server
- * does not serve. After: attach CORS headers, serialize a thrown
- * {@link AuthApiError} into the standard envelope in the request's locale, and
- * sweep expired rows fire-and-forget.
+ * does not serve. After: attach CORS headers, and serialize a thrown
+ * {@link AuthApiError} into the standard envelope in the request's locale.
  *
  * The method check has to live here and not only in the router: a consumer who
  * mounts `authServer.handlers.getToken` on their own route may hand it any method
@@ -97,8 +95,6 @@ export async function handleRequest(
     return new Response(JSON.stringify(result.data), { status, headers })
   } catch (error) {
     return toErrorResponse(internals, error, locale)
-  } finally {
-    await sweepExpired(internals, request.method)
   }
 }
 

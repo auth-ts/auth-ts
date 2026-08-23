@@ -210,7 +210,7 @@ Verified against the reference application's Neon database, all eleven checks
 passing, and the library's own suite runs them against `createMemoryDb` plus a
 set of deliberately broken stores — a `delete` that returns nothing, a `where`
 that matches on any column rather than all of them, a `select` that ignores
-`limit`, a `cleanup` that sweeps nothing — so the checks are known to fail when
+`limit`, a `delete` that ignores ranges — so the checks are known to fail when
 the contract is broken, not merely to pass when it is not.
 
 They also run in CI, from the reference application, against its own

@@ -38,9 +38,6 @@ const UNIQUE_COLUMNS: { [T in AuthTable]?: string[][] } = {
   identities: [["provider", "providerUserId"]]
 }
 
-/** The tables core sweeps, all keyed on `expiresAt`. */
-const EXPIRING_TABLES = ["sessions", "verificationCodes", "attempts"] as const
-
 /** Orders two column values, with nulls and undefined last in either direction. */
 function compare(left: unknown, right: unknown) {
   if (left === right) return 0
@@ -179,18 +176,6 @@ export function createMemoryDb(): MemoryDb {
       for (const row of removed) tableOf(table).delete(row.id)
 
       return removed.map((row) => ({ ...row })) as never
-    },
-
-    async cleanup() {
-      const now = Date.now()
-      for (const table of EXPIRING_TABLES) {
-        for (const [id, row] of tableOf(table)) {
-          const expiresAt = row.expiresAt
-          if (expiresAt instanceof Date && expiresAt.getTime() < now) {
-            tableOf(table).delete(id)
-          }
-        }
-      }
     },
 
     rows: (table) =>

@@ -9,6 +9,7 @@ import {
   serializeCookie,
   shouldUseSecureCookies
 } from "../lib/serialize-cookie"
+import { sweepExpired } from "../lib/sweep-expired"
 import {
   demoteActive,
   parkedTokens,
@@ -77,12 +78,15 @@ export async function issueSession(
   const tokenHash = await sha256Hex(rawToken)
   const now = new Date()
 
-  const session = await insertRow(internals, "sessions", {
-    userId: user.id,
-    tokenHash,
-    expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
-    ...sessionStamp(internals, headers)
-  })
+  const [session] = await Promise.all([
+    insertRow(internals, "sessions", {
+      userId: user.id,
+      tokenHash,
+      expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
+      ...sessionStamp(internals, headers)
+    }),
+    sweepExpired(internals, "sessions")
+  ])
 
   // Without multiAccount a sign-in replaces rather than appends: the session
   // the request presented is about to become unreachable from this browser,

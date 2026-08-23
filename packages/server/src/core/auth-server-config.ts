@@ -63,6 +63,7 @@ export interface AuthServerConfig {
   cors?: CorsOptions
   logLevel: LogLevel
   logger?: Logger
+  waitUntil?: (promise: Promise<unknown>) => void
 }
 
 /**
@@ -396,7 +397,8 @@ export function resolveAuthServerConfig(
     ipAddress: requireIpAddress(options.ipAddress),
     ...(options.cors ? { cors: options.cors } : {}),
     logLevel: options.logLevel ?? "warn",
-    ...(options.logger ? { logger: options.logger } : {})
+    ...(options.logger ? { logger: options.logger } : {}),
+    ...(options.waitUntil ? { waitUntil: options.waitUntil } : {})
   }
 }
 

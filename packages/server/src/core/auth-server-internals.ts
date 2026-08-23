@@ -49,14 +49,6 @@ export interface AuthServerInternals {
    * and the key is imported on the first sign or verify.
    */
   keys(): Promise<KeyMaterial>
-  /**
-   * When this server last ran {@link AuthDB.cleanup}, as an epoch millisecond.
-   *
-   * Mutable state on the internals rather than a module-level variable, so two
-   * servers in one process sweep independently and a test never inherits the
-   * previous test's clock. `0` means never.
-   */
-  sweep: { lastRanAt: number }
 }
 
 /** Builds the internals struct from the resolved configuration. */
@@ -87,7 +79,6 @@ export function createAuthServerInternals(
     config,
     db: config.db,
     log,
-    sweep: { lastRanAt: 0 },
     warnOnce(key, message, data) {
       if (warned.has(key)) return
       warned.add(key)

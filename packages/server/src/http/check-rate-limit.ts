@@ -3,6 +3,7 @@ import type { RateLimitWindow } from "../core/auth-server-options"
 import { insertRow } from "../lib/insert-row"
 import { getIpAddress, getIpAddressKey } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
+import { sweepExpired } from "../lib/sweep-expired"
 import { AuthApiError } from "./auth-api-error"
 
 /**
@@ -80,6 +81,11 @@ export async function checkRateLimit(
     endsAt,
     window.max
   )
+
+  // The first attempt of a fresh window sweeps, so under a flood — the moment
+  // the table grows fastest — the sweep still runs once per key per window
+  // rather than once per request.
+  if (counted === 1) await sweepExpired(internals, "attempts")
 
   // The count includes this request, so the cap is exceeded at max + 1 — and a
   // refused request is still counted, which is what stops a caller who is

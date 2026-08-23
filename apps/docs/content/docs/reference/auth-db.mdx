@@ -6,8 +6,8 @@ description: The four functions that connect this library to your database.
 This interface is the product. You write these functions against your own tables,
 and in exchange the library never owns your schema, your migrations, or your data.
 
-There are four of them — `select`, `insert`, `update`, `delete` — plus an
-optional `cleanup`. Every query the library makes is one of those four against
+There are four of them — `select`, `insert`, `update`, `delete`.
+Every query the library makes is one of those four against
 one of five tables, filtered on named columns by equality or, for the one
 question equality cannot ask, by order. There is no operator language beyond
 that: no `OR`, no joins, no expressions. That is the property that makes the
@@ -103,27 +103,24 @@ index, because the missing constraint only shows under a race.
   both pass the check; only one of them deletes the row, and the other gets an
   empty array. That single atomic conditional delete is the one concurrency
   property this contract asks of your store.
-- **`cleanup` is optional and takes no arguments.** Implement it and the library
-  calls it for you — awaited, at most once a minute, and only after a request
-  that could have written something. Awaited because an unawaited promise is not
-  guaranteed to run on Cloudflare Workers once the response is returned; if you
-  are on Workers and would rather keep the sweep off the response's path, hand
-  it to `waitUntil` from `cloudflare:workers` and return nothing, which is why
-  `cleanup` returns `unknown` — a promise the library will await, or nothing at all. Leave it out and the
-  schedule is yours: a cron, a scheduled worker, a partitioned table.
-  **Something has to do it**:
-  `attempts` grows by a row per counted request, so a deployment that sweeps
-  nowhere grows without bound under a flood. Expired means expired *now*, and
-  your database already knows the time, so `expiresAt < now()` avoids any skew
-  between your application server and it.
+- **`delete` with a range is the sweep.** The library cleans up after itself by
+  issuing `delete` where `expiresAt` is `{ lt: now }`, on the requests that
+  insert new rows: a sign-in sweeps `sessions`, a code send sweeps
+  `verificationCodes`, the first attempt of each rate-limit window sweeps
+  `attempts`. There is nothing extra to implement and no schedule to own — but
+  it does mean an index on `expiresAt` is load-bearing for those tables, not
+  just for reads. Pass `waitUntil` to
+  [`createAuthServer`](/docs/reference/create-auth-server) and the sweep runs
+  behind the response instead of ahead of it.
 
 ## Rate limiting is a log, not a counter
 
 The `attempts` table holds one row per counted request, under a key that
 contains the window: `sendCode:ip:203.0.113.7:1755864000000`. Counting is an
 insert and a read capped at `max + 1`; a window that has passed is simply a set
-of old rows waiting for the sweep — which is why something has to sweep, whether
-that is `cleanup` or a cron of your own. Nothing is read-modify-written, so no attempt
+of old rows, and the first attempt of each fresh window is what sweeps them —
+once per key per window, never once per request, so a flood cannot amplify its
+own bookkeeping. Nothing is read-modify-written, so no attempt
 can be lost and no atomic increment is required of your store — which is what
 lets rate limiting stay inside these four functions instead of needing a
 special-purpose fifth.
@@ -322,10 +319,8 @@ by equality and by range, `update` returning what it changed, equality `where`
 on one column and on several, `limit`, `offset`, `orderBy` in both directions,
 `update` applying only what it was given, `delete` returning what it removed and
 matching on every column, a duplicate insert being refused for each unique set
-above, and `cleanup` deleting what has expired while keeping what has not. The
-`cleanup` check is skipped when you have not implemented it, and waits for the
-sweep rather than assuming it has already landed, so deferring it — to
-`waitUntil`, say — still passes.
+above, and `delete` honouring a range — removing what has expired while keeping
+what has not, which is the delete the sweep is made of.
 
 One limit, stated plainly: a duplicate check proves the constraint exists by
 inserting twice in sequence. The failure it prevents only shows under a race,
