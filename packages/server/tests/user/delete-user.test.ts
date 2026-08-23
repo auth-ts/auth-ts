@@ -20,7 +20,8 @@ async function seed() {
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 60_000),
       userAgent: null,
-      ipAddress: null
+      ipAddress: null,
+      updatedAt: new Date()
     }
   })
   await db.insert({
@@ -29,7 +30,9 @@ async function seed() {
       userId: user.id,
       provider: "github",
       providerAccountId: "1",
-      label: "ada@example.com"
+      label: "ada@example.com",
+      createdAt: new Date(),
+      updatedAt: new Date()
     }
   })
   for (const identifier of ["ada@example.com", "+15550100"]) {
@@ -39,7 +42,9 @@ async function seed() {
         identifier,
         codeHash: `code-${identifier}`,
         expiresAt: new Date(Date.now() + 60_000),
-        action: "signIn"
+        action: "signIn",
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     })
   }
@@ -99,7 +104,8 @@ describe("deleteUser", () => {
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,
-        ipAddress: null
+        ipAddress: null,
+        updatedAt: new Date()
       }
     })
 

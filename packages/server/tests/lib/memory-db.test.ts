@@ -19,6 +19,8 @@ const user = async (fields: Record<string, unknown> = {}) => {
       imageURL: null,
       primaryUserId: null,
       type: "user",
+      createdAt: new Date(),
+      updatedAt: new Date(),
       ...fields
     }
   })
@@ -27,7 +29,10 @@ const user = async (fields: Record<string, unknown> = {}) => {
 }
 
 const attempt = (key: string, expiresAt = new Date(Date.now() + 60_000)) =>
-  db.insert({ table: "attempts", values: { key, expiresAt } })
+  db.insert({
+    table: "attempts",
+    values: { key, expiresAt, createdAt: new Date(), updatedAt: new Date() }
+  })
 
 const read = <
   T extends "users" | "sessions" | "verificationCodes" | "attempts"
@@ -76,7 +81,9 @@ describe("insert", () => {
       userId: owner.id,
       provider: "github",
       providerAccountId: "1",
-      label: null
+      label: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
     }
     await db.insert({ table: "connections", values: link })
 
@@ -164,7 +171,9 @@ describe("select", () => {
         identifier,
         codeHash: "old",
         expiresAt: older,
-        action: "signIn"
+        action: "signIn",
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     })
     await db.insert({
@@ -173,7 +182,9 @@ describe("select", () => {
         identifier,
         codeHash: "new",
         expiresAt: newer,
-        action: "signIn"
+        action: "signIn",
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     })
 
@@ -278,7 +289,8 @@ describe("delete", () => {
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,
-        ipAddress: null
+        ipAddress: null,
+        updatedAt: new Date()
       }
     })
 
@@ -307,7 +319,8 @@ describe("cleanup", () => {
           createdAt: new Date(),
           expiresAt,
           userAgent: null,
-          ipAddress: null
+          ipAddress: null,
+          updatedAt: new Date()
         }
       })
       await db.insert({
@@ -316,7 +329,9 @@ describe("cleanup", () => {
           identifier: "ada@example.com",
           codeHash: `code-${expiresAt.getTime()}`,
           expiresAt,
-          action: "signIn"
+          action: "signIn",
+          createdAt: new Date(),
+          updatedAt: new Date()
         }
       })
       await attempt(`key-${expiresAt.getTime()}`, expiresAt)
@@ -338,7 +353,9 @@ describe("cleanup", () => {
         userId: ada.id,
         provider: "github",
         providerAccountId: "1",
-        label: null
+        label: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     })
 

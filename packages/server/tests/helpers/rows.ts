@@ -22,6 +22,8 @@ export async function insertUser(
       imageURL: null,
       primaryUserId: null,
       type: "user",
+      createdAt: new Date(),
+      updatedAt: new Date(),
       ...fields
     }
   })

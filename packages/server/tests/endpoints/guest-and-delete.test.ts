@@ -304,7 +304,8 @@ describe("account deletion", () => {
           createdAt: new Date(),
           expiresAt: new Date(Date.now() + 60_000),
           userAgent: null,
-          ipAddress: null
+          ipAddress: null,
+          updatedAt: new Date()
         }
       })
     await session(ada.id, "ada-other-device")

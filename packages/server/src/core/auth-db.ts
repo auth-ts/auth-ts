@@ -69,6 +69,10 @@ export interface CoreUserFields {
    * describes a data migration rather than who is signed in.
    */
   primaryUserId?: string | null
+  /** Written by core on insert. */
+  createdAt: Date
+  /** Written by core on insert and on every update it makes. */
+  updatedAt: Date
 }
 
 /**
@@ -106,6 +110,8 @@ export interface AuthSession {
   expiresAt: Date
   userAgent?: string | null
   ipAddress?: string | null
+  /** Written by core on insert and on every update it makes. */
+  updatedAt: Date
 }
 
 /** What a live verification code authorizes. Checked on every verify, so a code cannot cross actions. */
@@ -125,6 +131,10 @@ export interface AuthVerificationCode {
   codeHash: string
   expiresAt: Date
   action: VerificationCodeAction
+  /** Written by core on insert. */
+  createdAt: Date
+  /** Written by core on insert and on every update it makes. */
+  updatedAt: Date
 }
 
 /**
@@ -138,6 +148,10 @@ export interface AuthAttempt {
   id: string
   key: string
   expiresAt: Date
+  /** Written by core on insert. */
+  createdAt: Date
+  /** Written by core on insert and on every update it makes. */
+  updatedAt: Date
 }
 
 /** A provider identity linked to a user. */
@@ -149,6 +163,10 @@ export interface AuthConnection {
   providerAccountId: string
   /** Whatever the provider gives that a person recognises. Display only. */
   label?: string | null
+  /** Written by core on insert. */
+  createdAt: Date
+  /** Written by core on insert and on every update it makes. */
+  updatedAt: Date
 }
 
 /** The tables core reads and writes. */

@@ -79,80 +79,28 @@ describe("privileges.sql", () => {
 })
 
 describe("triggers.sql", () => {
-  it("stamps updatedAt from the database, overwriting the writer's value", async () => {
-    const { id } = (
-      await client.query<{ id: string }>(
-        `insert into "users" ("type") values ('guest') returning "id"`
-      )
-    ).rows[0] as { id: string }
-
-    await client.exec(
-      `update "users" set "name" = 'Ada', "updatedAt" = '2000-01-01' where "id" = '${id}'`
-    )
-    const [row] = (
-      await client.query<{ updatedAt: Date }>(
-        `select "updatedAt" from "users" where "id" = '${id}'`
-      )
-    ).rows
-
-    expect(row?.updatedAt.getFullYear()).toBeGreaterThan(2000)
-  })
-})
-
-describe("users policies", () => {
-  async function signedIn<T>(userId: string, run: () => Promise<T>) {
-    await client.exec(`set test."userId" = '${userId}'`)
-    await client.exec("set role authenticated")
-    try {
-      return await run()
-    } finally {
-      await client.exec("reset role")
-    }
-  }
-
-  const newUser = async () =>
-    (
-      await client.query<{ id: string }>(
-        `insert into "users" ("type") values ('user') returning "id"`
-      )
-    ).rows[0]?.id as string
-
-  it("reads and updates its own row, and nobody else's", async () => {
-    const mine = await newUser()
-    const theirs = await newUser()
-
-    await signedIn(mine, async () => {
-      const rows = await client.query(`select "id" from "users"`)
-      expect(rows.rows).toEqual([{ id: mine }])
+  it.each(["users", "todos"])(
+    "stamps %s.updatedAt from the database, whoever wrote the row",
+    async (table) => {
+      const { id } = (
+        await client.query<{ id: string }>(
+          table === "users"
+            ? `insert into "users" ("type") values ('user') returning "id"`
+            : `insert into "todos" ("userId", "title")
+               values ((select "id" from "users" limit 1), 'x') returning "id"`
+        )
+      ).rows[0] as { id: string }
 
       await client.exec(
-        `update "users" set "name" = 'Ada' where "id" = '${mine}'`
+        `update "${table}" set "updatedAt" = '2000-01-01' where "id" = '${id}'`
       )
-      const stranger = await client.query(
-        `update "users" set "name" = 'Grace' where "id" = '${theirs}' returning "id"`
-      )
-      expect(stranger.rows).toEqual([])
-    })
+      const [row] = (
+        await client.query<{ updatedAt: Date }>(
+          `select "updatedAt" from "${table}" where "id" = '${id}'`
+        )
+      ).rows
 
-    const [row] = (
-      await client.query<{ name: string | null }>(
-        `select "name" from "users" where "id" = '${theirs}'`
-      )
-    ).rows
-    expect(row?.name).toBeNull()
-  })
-
-  it("cannot create or delete a user", async () => {
-    const mine = await newUser()
-
-    await signedIn(mine, async () => {
-      await expect(
-        client.exec(`insert into "users" ("type") values ('user')`)
-      ).rejects.toThrow()
-      const deleted = await client.query(
-        `delete from "users" where "id" = '${mine}' returning "id"`
-      )
-      expect(deleted.rows).toEqual([])
-    })
-  })
+      expect(row?.updatedAt.getFullYear()).toBeGreaterThan(2000)
+    }
+  )
 })

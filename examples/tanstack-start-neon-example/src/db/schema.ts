@@ -135,9 +135,6 @@ export const attempts = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
-    // A log, not a counter: one row per counted request, read back by key. Both
-    // columns are indexed because both are read on every hot path — `key` to
-    // count a window, `expiresAt` to sweep it.
     index("attemptsKeyIndex").on(table.key),
     index("attemptsExpiresAtIndex").on(table.expiresAt)
   ]

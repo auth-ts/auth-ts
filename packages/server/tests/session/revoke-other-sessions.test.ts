@@ -20,7 +20,8 @@ async function seedSessions(
         createdAt: new Date(Date.now() + index),
         expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,
-        ipAddress: null
+        ipAddress: null,
+        updatedAt: new Date()
       }
     })
     hashes.push(tokenHash)
@@ -76,7 +77,8 @@ describe("revokeOtherSessions", () => {
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,
-        ipAddress: null
+        ipAddress: null,
+        updatedAt: new Date()
       }
     })
     const [current] = await seedSessions(db, ada.id, 2)

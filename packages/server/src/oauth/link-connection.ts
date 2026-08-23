@@ -51,7 +51,7 @@ export async function linkConnection(
       await internals.db.update({
         table: "connections",
         where: { id: existing.id },
-        values: { label }
+        values: { label, updatedAt: new Date() }
       })
     }
     return

@@ -46,6 +46,8 @@ const past = () => new Date(Date.now() - 60_000)
 
 /** Every column core writes on a users row, so a check varies only what it means to. */
 const person = (fields: Record<string, unknown> = {}) => ({
+  createdAt: new Date(),
+  updatedAt: new Date(),
   email: null,
   phoneNumber: null,
   name: null,
@@ -145,7 +147,12 @@ export const authDBChecks: AuthDBCheck[] = [
         (minutes) => new Date(Date.now() + minutes * 60_000)
       )
       for (const expiresAt of times) {
-        await create(db, "attempts", { key, expiresAt })
+        await create(db, "attempts", {
+          key,
+          expiresAt,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
       }
       try {
         const page = (
@@ -252,6 +259,7 @@ export const authDBChecks: AuthDBCheck[] = [
         userId: owner.id,
         tokenHash,
         createdAt: new Date(),
+        updatedAt: new Date(),
         expiresAt: future(),
         userAgent: null,
         ipAddress: null
@@ -316,6 +324,7 @@ export const authDBChecks: AuthDBCheck[] = [
         userId: owner.id,
         tokenHash,
         createdAt: new Date(),
+        updatedAt: new Date(),
         expiresAt: future(),
         userAgent: null,
         ipAddress: null
@@ -345,7 +354,9 @@ export const authDBChecks: AuthDBCheck[] = [
         userId: owner.id,
         provider: "github",
         providerAccountId,
-        email: null
+        label: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       })
       try {
         await create(db, "connections", connection())
@@ -370,7 +381,9 @@ export const authDBChecks: AuthDBCheck[] = [
           identifier,
           codeHash: `${unique()}`,
           expiresAt,
-          action: "signIn"
+          action: "signIn",
+          createdAt: new Date(),
+          updatedAt: new Date()
         })
       }
       try {

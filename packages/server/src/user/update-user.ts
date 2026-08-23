@@ -15,6 +15,9 @@ export type UserValues = Partial<Record<string, unknown>>
  * skipped entirely and the existing row is handed straight back, so "this
  * request changed nothing" costs no round trip and cannot fail.
  *
+ * `updatedAt` rides along, but only once there is something to write: a request
+ * that changed nothing should not move the timestamp the guest sweep reads.
+ *
  * The returned user is composed in memory rather than read back: core already
  * holds the row, and `users` has no database-generated column the store would
  * know better than this.
@@ -29,11 +32,12 @@ export async function updateUser<T extends AuthUser>(
   )
   if (Object.keys(defined).length === 0) return user
 
+  const stamped = { ...defined, updatedAt: new Date() }
   await internals.db.update({
     table: "users",
     where: { id: user.id },
-    values: defined
+    values: stamped
   })
 
-  return { ...user, ...defined }
+  return { ...user, ...stamped }
 }

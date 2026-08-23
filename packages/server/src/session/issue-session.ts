@@ -103,7 +103,6 @@ export async function issueSession(
   await insertRow(internals, "sessions", {
     userId: user.id,
     tokenHash,
-    createdAt: now,
     expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
     ...sessionStamp(internals, headers)
   })
@@ -238,7 +237,11 @@ export async function slideSession(
   await internals.db.update({
     table: "sessions",
     where: { id: session.id },
-    values: { expiresAt, ...sessionStamp(internals, headers) }
+    values: {
+      expiresAt,
+      updatedAt: new Date(),
+      ...sessionStamp(internals, headers)
+    }
   })
 
   return expiresAt

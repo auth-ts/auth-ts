@@ -65,10 +65,18 @@ describe("AuthUser carries the declared fields", () => {
   it("leaves the bare row an open map, because a select * returns your columns", () => {
     // No schema in scope — the client, a bare adapter — so the row admits
     // anything beside the core fields, and says nothing about what it is.
-    expectTypeOf<AuthUser["createdAt"]>().toEqualTypeOf<unknown>()
+    expectTypeOf<AuthUser["plan"]>().toEqualTypeOf<unknown>()
+    // Core's own columns keep their types even in the open map.
+    expectTypeOf<AuthUser["createdAt"]>().toEqualTypeOf<Date>()
     expectTypeOf<AuthUser["type"]>().toEqualTypeOf<"guest" | "user" | "admin">()
     // A row with extra columns of any type is a bare AuthUser.
-    const row = { id: "1", type: "user" as const, createdAt: new Date() }
+    const row = {
+      id: "1",
+      type: "user" as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      plan: "pro"
+    }
     expectTypeOf(row).toMatchTypeOf<AuthUser>()
   })
 })
