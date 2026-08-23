@@ -18,12 +18,10 @@ grant usage on schema public to authenticated;
 grant select, update, insert, delete on all tables in schema public to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
 
--- A table added later is reachable the moment it exists. That is the right
--- default for application tables and the wrong one for anything holding a
--- secret, so a new table is a decision: either it is the browser's to read, or
--- it is revoked here alongside the auth tables.
-alter default privileges in schema public
-  grant select, update, insert, delete on tables to authenticated;
+-- No ALTER DEFAULT PRIVILEGES: this file is re-run after every push, so the
+-- grant above already reaches a table added since. A standing rule would only
+-- cover tables created without running this file — which is exactly the table
+-- nobody has decided about yet.
 
 -- Auth tables: the library's own, reachable only by the server's connection.
 revoke all on table
