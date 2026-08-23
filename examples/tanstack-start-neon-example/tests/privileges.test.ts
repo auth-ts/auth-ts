@@ -20,7 +20,9 @@ beforeAll(async () => {
   await client.exec(`
     create role authenticated login;
     create schema auth;
-    create function auth.user_id() returns uuid as $$ select null::uuid $$ language sql;
+    create function auth.user_id() returns text as $$
+      select nullif(current_setting('test.userId', true), '')
+    $$ language sql;
   `)
   for (const statement of await generateMigration(
     await generateDrizzleJson({}),
@@ -33,8 +35,7 @@ beforeAll(async () => {
   await client.exec(sql("privileges.sql"))
   await client.exec(sql("triggers.sql"))
 
-  // Rows are denied outright without a policy, so a column grant would never be
-  // reached and these checks would pass while proving nothing.
+  // Without a policy every row is denied, so a column grant is never reached.
   for (const [table] of SECRETS) {
     await client.exec(
       `create policy "read" on "${table}" for select to authenticated using (true)`
@@ -95,5 +96,63 @@ describe("triggers.sql", () => {
     ).rows
 
     expect(row?.updatedAt.getFullYear()).toBeGreaterThan(2000)
+  })
+})
+
+describe("users policies", () => {
+  async function signedIn<T>(userId: string, run: () => Promise<T>) {
+    await client.exec(`set test."userId" = '${userId}'`)
+    await client.exec("set role authenticated")
+    try {
+      return await run()
+    } finally {
+      await client.exec("reset role")
+    }
+  }
+
+  const newUser = async () =>
+    (
+      await client.query<{ id: string }>(
+        `insert into "users" ("type") values ('user') returning "id"`
+      )
+    ).rows[0]?.id as string
+
+  it("reads and updates its own row, and nobody else's", async () => {
+    const mine = await newUser()
+    const theirs = await newUser()
+
+    await signedIn(mine, async () => {
+      const rows = await client.query(`select "id" from "users"`)
+      expect(rows.rows).toEqual([{ id: mine }])
+
+      await client.exec(
+        `update "users" set "name" = 'Ada' where "id" = '${mine}'`
+      )
+      const stranger = await client.query(
+        `update "users" set "name" = 'Grace' where "id" = '${theirs}' returning "id"`
+      )
+      expect(stranger.rows).toEqual([])
+    })
+
+    const [row] = (
+      await client.query<{ name: string | null }>(
+        `select "name" from "users" where "id" = '${theirs}'`
+      )
+    ).rows
+    expect(row?.name).toBeNull()
+  })
+
+  it("cannot create or delete a user", async () => {
+    const mine = await newUser()
+
+    await signedIn(mine, async () => {
+      await expect(
+        client.exec(`insert into "users" ("type") values ('user')`)
+      ).rejects.toThrow()
+      const deleted = await client.query(
+        `delete from "users" where "id" = '${mine}' returning "id"`
+      )
+      expect(deleted.rows).toEqual([])
+    })
   })
 })

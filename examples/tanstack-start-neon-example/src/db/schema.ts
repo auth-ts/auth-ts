@@ -13,24 +13,48 @@ import {
   uuid
 } from "drizzle-orm/pg-core"
 
-export const users = pgTable.withRLS("users", {
-  id: uuid("id").primaryKey().default(sql`uuidv7()`),
-  email: text("email").unique(),
-  phoneNumber: text("phoneNumber").unique(),
-  name: text("name"),
-  imageURL: text("imageURL"),
-  type: text("type").$type<UserType>().notNull().default("user"),
-  primaryUserId: uuid("primaryUserId").references((): AnyPgColumn => users.id, {
-    onDelete: "cascade"
-  }),
-  createdAt: timestamp("createdAt", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date())
-})
+/** Drizzle's `authUid`, cast: `auth.user_id()` returns text. */
+const authUuid = (userIdColumn: AnyPgColumn) =>
+  sql`(select (auth.user_id())::uuid = ${userIdColumn})`
+
+export const users = pgTable.withRLS(
+  "users",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    email: text("email").unique(),
+    phoneNumber: text("phoneNumber").unique(),
+    name: text("name"),
+    imageURL: text("imageURL"),
+    type: text("type").$type<UserType>().notNull().default("user"),
+    primaryUserId: uuid("primaryUserId").references(
+      (): AnyPgColumn => users.id,
+      {
+        onDelete: "cascade"
+      }
+    ),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
+  },
+  (table) => [
+    // No insert or delete policy: RLS denies what none permits.
+    pgPolicy("read_own_user", {
+      for: "select",
+      to: authenticatedRole,
+      using: authUuid(table.id)
+    }),
+    pgPolicy("update_own_user", {
+      for: "update",
+      to: authenticatedRole,
+      using: authUuid(table.id),
+      withCheck: authUuid(table.id)
+    })
+  ]
+)
 
 export const sessions = pgTable.withRLS(
   "sessions",
@@ -145,7 +169,7 @@ export const todos = pgTable.withRLS(
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     userId: uuid("userId")
       .notNull()
-      .default(sql`(auth.user_id())::uuid`)
+      .default(sql`cast(auth.user_id() as uuid)`)
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     completed: boolean("completed").notNull().default(false),

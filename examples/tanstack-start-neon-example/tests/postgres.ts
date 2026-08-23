@@ -13,12 +13,14 @@ import {
 } from "../src/db/schema"
 
 const client = new PGlite()
+await client.exec(`
+  create role authenticated;
+  create schema auth;
+  create function auth.user_id() returns text as $$ select null::text $$ language sql;
+`)
 
-// Postgres 18 in this process — real constraints, real cascades, no connection
-// string. The DDL is generated from schema.ts rather than written out again, so
-// the tables the checks run against cannot drift from the deployed ones. Only
-// the auth tables: todos carries a Neon-specific default and a policy, and
-// nothing here tests row-level security.
+// DDL generated from schema.ts, so the tables cannot drift from the deployed
+// ones. Auth tables only: todos carries a Neon-specific default.
 const statements = await generateMigration(
   await generateDrizzleJson({}),
   await generateDrizzleJson({
@@ -31,6 +33,5 @@ const statements = await generateMigration(
 )
 for (const statement of statements) await client.exec(statement)
 
-// The client is passed explicitly: `drizzle(client)` treats it as connection
-// config and quietly starts a second, empty database instead.
+// Explicit: `drizzle(client)` reads it as config and starts a second, empty one.
 export const db = drizzle({ client })
