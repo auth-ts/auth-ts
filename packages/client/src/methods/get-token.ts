@@ -56,7 +56,6 @@ export function createGetToken(internals: AuthClientInternals) {
           throw new Error("the user read returned no token to refresh with")
         }
         internals.tokenStore.set(result.token, readLifetimeClaims(result.token))
-        internals.userStore.set(result.user)
 
         return result.token
       } catch (error) {
@@ -66,7 +65,6 @@ export function createGetToken(internals: AuthClientInternals) {
         if (error instanceof AuthError && error.code === "unauthenticated") {
           internals.log.debug("refresh refused, clearing local state")
           internals.tokenStore.clear()
-          internals.userStore.set(null)
         }
 
         throw error

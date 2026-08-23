@@ -1,3 +1,4 @@
+import type { AuthUser } from "../core/auth-db"
 import { AuthApiError, unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import { resolveLocale } from "../http/resolve-locale"
@@ -13,6 +14,7 @@ import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
 import { consumeVerificationCode } from "../verification-code/consume-verification-code"
 import { sendVerificationCode } from "../verification-code/send-verification-code"
+import type { CurrentSession } from "./session"
 
 /**
  * Reads the signed-in user.
@@ -59,9 +61,17 @@ export const getUser = defineEndpoint({
       ? undefined
       : await mintAccessToken(internals, resolved.user)
 
-    return {
-      data: { session, user: resolved.user, ...(token ? { token } : {}) }
-    }
+    // Typed rather than spread: a conditional spread widens the inferred data
+    // to something the callable types cannot see through, and every consumer
+    // then reads `getUser` as returning `any`.
+    const data: {
+      session: CurrentSession
+      user: AuthUser
+      token?: string
+    } = { session, user: resolved.user }
+    if (token) data.token = token
+
+    return { data }
   }
 })
 
@@ -148,15 +158,13 @@ export const updateUser = defineEndpoint({
       })
     }
 
-    await updateUserFields(internals, resolved.user, {
+    const user = await updateUserFields(internals, resolved.user, {
       name,
       imageURL,
       ...additionalFields
     })
 
-    // No user in the body: the client holds a mirror and knows what it sent, so
-    // returning the row would only re-send what the caller already has.
-    return { data: { status: true } }
+    return { data: { user } }
   }
 })
 

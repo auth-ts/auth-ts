@@ -4,7 +4,6 @@ export type { AuthClient } from "./core/create-auth-client"
 export { createAuthClient } from "./core/create-auth-client"
 export type { TokenState } from "./core/token-store"
 export { REFRESH_AHEAD_MS } from "./core/token-store"
-export type { UserListener } from "./core/user-store"
 
 export { AuthError, AuthNetworkError, isAuthError } from "./lib/auth-error"
 export type { FetchJson, FetchJsonOptions } from "./lib/fetch-json"

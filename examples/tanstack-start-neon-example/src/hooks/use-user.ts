@@ -1,33 +1,17 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { authClient } from "../lib/auth-client"
 
 /** The query key the session lives under, shared so other hooks can scope to it. */
 export const sessionQueryKey = ["session"] as const
 
 /**
- * The signed-in user, kept in step with the auth client.
+ * The signed-in user, the session, and a token — or `null` when signed out.
  *
- * The subscribe bridge is not optional. Without it the store and React Query
- * become two sources of truth: signing out, verifying a code, or a sign-out in
- * another tab would update the store while the query kept serving its stale
- * cache.
- *
- * `getUser` costs nothing while the access token is valid, so refetching on
- * window focus is cheap — it becomes a real request only once the token is old
- * enough to need renewing anyway.
+ * `getUser` always reads the server, so caching, refetching, and persistence
+ * are decided here rather than inside the auth client. Anything that changes
+ * who is signed in invalidates this key.
  */
 export function useUser() {
-  const queryClient = useQueryClient()
-
-  useEffect(
-    () =>
-      authClient.subscribe((user) =>
-        queryClient.setQueryData(sessionQueryKey, user)
-      ),
-    [queryClient]
-  )
-
   return useQuery({
     queryKey: sessionQueryKey,
     queryFn: authClient.getUser

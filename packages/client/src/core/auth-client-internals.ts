@@ -7,8 +7,6 @@ import { resolveAuthClientConfig } from "./auth-client-config"
 import type { AuthClientOptions } from "./auth-client-options"
 import type { TokenStore } from "./token-store"
 import { createTokenStore } from "./token-store"
-import type { UserStore } from "./user-store"
-import { createUserStore } from "./user-store"
 
 /**
  * The shared state every client method is built on.
@@ -21,7 +19,6 @@ export interface AuthClientInternals {
   /** The resolved configuration — options after defaults. */
   config: AuthClientConfig
   tokenStore: TokenStore
-  userStore: UserStore
   fetchJson: FetchJson
   log: LeveledLogger
   /** The current locale, which `setLocale` replaces at runtime. */
@@ -39,9 +36,6 @@ export function createAuthClientInternals(
   const internals: AuthClientInternals = {
     config,
     tokenStore,
-    userStore: createUserStore(() => {
-      tokenStore.clear()
-    }),
     fetchJson: undefined as unknown as FetchJson,
     log: createLogger(config.logLevel, config.logger),
     locale: config.locale

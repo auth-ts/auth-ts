@@ -1,4 +1,3 @@
-import type { AuthUser } from "@auth-ts/server"
 import { readLifetimeClaims } from "../lib/read-lifetime-claims"
 import {
   createDeleteUser,
@@ -25,7 +24,6 @@ import {
 } from "../methods/sign-in-with-code"
 import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
-import type { UserListener } from "./user-store"
 
 /**
  * The browser client.
@@ -39,14 +37,10 @@ import type { UserListener } from "./user-store"
 export interface AuthClient {
   /** A valid access token, refreshed when needed. Hand this to your data client. */
   getToken: () => Promise<string>
-  /** The signed-in user, or `null`. Always reads the server. */
-  getUser: () => Promise<AuthUser | null>
+  /** The user, the session, and a token — or `null`. Always reads the server. */
+  getUser: ReturnType<typeof createGetUser>
   /** The session this browser is on, confirming it is live and keeping it that way. */
   getSession: ReturnType<typeof createGetSession>
-  /** Subscribes to user changes. Returns the unsubscribe function. */
-  subscribe: (listener: UserListener) => () => void
-  /** The last known user, without any network call. For synchronous render paths. */
-  getCachedUser: () => AuthUser | null
   sendCode: ReturnType<typeof createSendCode>
   verifyCode: ReturnType<typeof createVerifyCode>
   signInAsGuest: ReturnType<typeof createSignInAsGuest>
@@ -80,10 +74,9 @@ export interface AuthClient {
 export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   const internals = createAuthClientInternals(options)
 
-  /** Writes a completed sign-in into both caches at once, so they cannot disagree. */
+  /** Keeps the token a sign-in already produced, so the next call needs no refresh. */
   const primeSession = (result: SignInResult) => {
     internals.tokenStore.set(result.token, readLifetimeClaims(result.token))
-    internals.userStore.set(result.user)
   }
 
   const getToken = createGetToken(internals)
@@ -92,8 +85,6 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     getToken,
     getUser: createGetUser(internals),
     getSession: createGetSession(internals),
-    subscribe: (listener) => internals.userStore.subscribe(listener),
-    getCachedUser: () => internals.userStore.restore(),
     sendCode: createSendCode(internals),
     verifyCode: createVerifyCode(internals, primeSession),
     signInAsGuest: createSignInAsGuest(internals, primeSession),

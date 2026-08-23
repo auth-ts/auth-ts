@@ -24,21 +24,22 @@ callers share a single refresh, so a page mounting ten components makes one
 round-trip and they all see the same token. Hand it to your PostgREST client as
 its access token.
 
-`getUser()` returns the signed-in user or `null`, and **always reads the
-server**. A name or avatar changed in another tab, on another device, or by
-anything other than this client would otherwise never arrive, and deduplicating
-is the caller's decision — wrap it in your query library, which already does that
-well. Only the server answering `unauthenticated` is a verdict of `null`. A network failure, a
-server error, or a proxy answering in the server's place all resolve to the
-**last known user** — which is `null` only on a device that has never signed in —
-because being offline is not being signed out, and neither is the auth server
-being mid-deploy. An application that forgets who you are whenever something
-between it and the server hiccups is worse than one that is briefly optimistic.
-(`getToken()` likewise clears local state only on `unauthenticated`; every other
-failure is thrown and leaves the caches alone.)
+`getUser()` returns `{ user, session, token }`, or `null`, and **always reads the
+server**. There is no cache behind it on purpose: a name or avatar changed in
+another tab, on another device, or by anything other than this client has to
+arrive somehow, and deciding when to ask again is yours to make.
 
-The two are one request underneath. `GET /user` answers with the user, the
-session, and a freshly signed token, so reading the user refreshes the token that
+`null` means the server said the session is gone, and the stored token is dropped
+with it. Every other failure throws — a 502 from a proxy is not a statement about
+whether anyone is signed in, and swallowing it would make it look like one.
+
+The client keeps no user state at all. No mirror, no `localStorage`, no cross-tab
+listener. Caching, persistence, retry, and refetch-on-focus are what a query
+library already does well, and doing them here would only give you two sources of
+truth to keep in step.
+
+The two reads are one request underneath. `GET /user` answers with the user, the
+session, and a freshly signed token, so reading the user refreshes the token
 `getToken()` hands out. The client sends the token it already holds along with
 every request, and the server answers with a new one only when that one is spent
 — so a token nothing has invalidated is not rotated on every tab focus, which
@@ -46,19 +47,10 @@ matters for anything else holding it.
 
 ## React
 
-The subscribe bridge is not optional. Without it the store and your query cache
-become two sources of truth, and signing out updates one while the other keeps
-serving stale data.
+Nothing bridges into your cache, so the query is the only source of truth:
 
 ```tsx
 export function useUser() {
-  const queryClient = useQueryClient()
-
-  useEffect(
-    () => authClient.subscribe((user) => queryClient.setQueryData(["session"], user)),
-    [queryClient]
-  )
-
   return useQuery({
     queryKey: ["session"],
     queryFn: authClient.getUser,
@@ -67,6 +59,23 @@ export function useUser() {
   })
 }
 ```
+
+`data` is `{ user, session, token }` or `null`. `session.id` is how a device list
+tells which entry is this device — the list does not carry a flag saying so.
+
+Anything that changes who is signed in has to invalidate that key, because
+nothing else will:
+
+```tsx
+await authClient.verifyCode({ email, code })
+await refetch()          // or queryClient.invalidateQueries(...)
+
+await authClient.signOut()
+queryClient.clear()
+```
+
+Persistence across a cold load, if you want it, is your query client's persister
+— the same one you would use for any other data.
 
 ## Errors
 

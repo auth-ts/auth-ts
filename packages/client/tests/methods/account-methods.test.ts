@@ -13,7 +13,6 @@ const other = {
 let server: FakeAuthServer
 
 beforeEach(() => {
-  localStorage.clear()
   server = fakeAuthServer()
 })
 
@@ -29,10 +28,13 @@ describe("verifyCode", () => {
     })
     const client = createAuthClient()
 
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    const result = await client.verifyCode({
+      email: "ada@example.com",
+      code: "123456"
+    })
 
-    // The mirror, not getUser: reading the user is always a request now.
-    expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
+    // The user comes back from the sign-in itself; nothing is read afterwards.
+    expect(result.user).toMatchObject({ email: "ada@example.com" })
     expect(server.requests).toHaveLength(1)
   })
 })
@@ -70,7 +72,6 @@ describe("updateUser", () => {
     const updated = await client.updateUser({ name: "Ada" })
 
     expect(updated.name).toBe("Ada")
-    expect(client.getCachedUser()?.name).toBe("Ada")
     // One request: the update answers with the row, so nothing is read back.
     expect(server.requests).toHaveLength(1)
   })
@@ -87,8 +88,8 @@ describe("signOut", () => {
 
     await client.signOut()
 
-    expect(client.getCachedUser()).toBeNull()
-    expect(localStorage.getItem("auth-ts.user")).toBeNull()
+    // The token went with it, so the next call has to go and get one.
+    await expect(client.getToken()).rejects.toThrow()
   })
 
   it("keeps local state for the others scope, which is the point of it", async () => {
@@ -100,8 +101,6 @@ describe("signOut", () => {
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
     await client.signOut({ scope: "others" })
-
-    expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
   })
 
   it("names an account only when it is given one", async () => {
@@ -132,7 +131,6 @@ describe("signOut", () => {
     const result = await client.signOut()
 
     expect(result?.switchedTo.email).toBe("grace@example.com")
-    expect(client.getCachedUser()?.email).toBe("grace@example.com")
   })
 })
 
@@ -161,7 +159,6 @@ describe("deleteUser", () => {
     expect(await client.deleteUser({ code: "123456" })).toEqual({
       status: "deleted"
     })
-    expect(client.getCachedUser()).toBeNull()
   })
 
   it("still throws for a wrong code", async () => {
@@ -217,8 +214,6 @@ describe("sessions and accounts", () => {
       Date.parse("2026-09-01T10:00:00.000Z")
     )
     await client.revokeSession({ id: "b" })
-
-    expect(client.getCachedUser()).toMatchObject({ email: "ada@example.com" })
     // One DELETE, and no second GET /sessions to work out whether it was the
     // current one — the server says so in the response.
     expect(
@@ -235,27 +230,25 @@ describe("sessions and accounts", () => {
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
     await client.revokeSession({ id: "a" })
-
-    expect(client.getCachedUser()).toBeNull()
   })
 
-  it("switches accounts through the store, so subscribers see one change", async () => {
+  it("returns the account it switched to, and keeps that account's token", async () => {
+    const switched = fakeAccessToken()
     server.on("POST", "/api/auth/verify-code", {
       body: { token: fakeAccessToken(), user }
     })
     server.on("POST", "/api/auth/accounts/switch", {
-      body: { token: fakeAccessToken(), user: other }
+      body: { token: switched, user: other }
     })
 
     const client = createAuthClient()
     await client.verifyCode({ email: "ada@example.com", code: "123456" })
 
-    const seen: Array<string | null> = []
-    client.subscribe((next) => seen.push(next?.email ?? null))
-    await client.switchAccount({ userId: "user-2" })
+    const result = await client.switchAccount({ userId: "user-2" })
 
-    expect(seen).toEqual(["grace@example.com"])
-    expect(client.getCachedUser()?.email).toBe("grace@example.com")
+    expect(result.email).toBe("grace@example.com")
+    // The switch primes the token, so nothing refreshes afterwards.
+    expect(await client.getToken()).toBe(switched)
   })
 })
 

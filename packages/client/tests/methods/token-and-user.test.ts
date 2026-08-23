@@ -9,7 +9,6 @@ const user = { id: "user-1", email: "ada@example.com", type: "user" as const }
 let server: FakeAuthServer
 
 beforeEach(() => {
-  localStorage.clear()
   server = fakeAuthServer()
 })
 
@@ -19,15 +18,10 @@ afterEach(() => {
 })
 
 describe("construction", () => {
-  it("performs no network request and touches no storage", () => {
-    const setItem = vi.spyOn(Storage.prototype, "setItem")
-    const getItem = vi.spyOn(Storage.prototype, "getItem")
-
+  it("performs no network request", () => {
     createAuthClient()
 
     expect(server.requests).toHaveLength(0)
-    expect(setItem).not.toHaveBeenCalled()
-    expect(getItem).not.toHaveBeenCalled()
   })
 
   it("works where there is no window at all, as during server rendering", () => {
@@ -106,13 +100,12 @@ describe("getToken", () => {
     expect(server.requests).toHaveLength(2)
   })
 
-  it("clears both caches and throws on 401", async () => {
+  it("clears the token and throws on 401", async () => {
     server.on("GET", "/api/auth/user", {
       body: { token: fakeAccessToken(), user }
     })
     const client = createAuthClient()
     await client.getToken()
-    expect(localStorage.getItem("auth-ts.user")).toContain("ada@example.com")
 
     server.restore()
     server = fakeAuthServer()
@@ -125,11 +118,9 @@ describe("getToken", () => {
     client.clearToken()
 
     await expect(client.getToken()).rejects.toBeInstanceOf(AuthError)
-    expect(localStorage.getItem("auth-ts.user")).toBeNull()
-    expect(client.getCachedUser()).toBeNull()
   })
 
-  it("throws on a server failure but keeps both caches, because a 500 is not a verdict", async () => {
+  it("throws on a server failure and keeps the token, because a 500 is not a verdict", async () => {
     server.on("GET", "/api/auth/user", {
       body: { token: fakeAccessToken(), user }
     })
@@ -159,10 +150,6 @@ describe("getToken", () => {
         client.getToken(),
         String(reply.status)
       ).rejects.toBeInstanceOf(AuthError)
-      expect(client.getCachedUser(), String(reply.status)).toMatchObject({
-        email: "ada@example.com"
-      })
-      expect(localStorage.getItem("auth-ts.user")).toContain("ada@example.com")
     }
   })
 
@@ -186,16 +173,6 @@ describe("getToken", () => {
 })
 
 describe("getUser", () => {
-  it("signs the user back in from a valid cookie when storage is empty", async () => {
-    server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
-    })
-
-    expect(await createAuthClient().getUser()).toMatchObject({
-      email: "ada@example.com"
-    })
-  })
-
   it("reads the server every time, because a name can change elsewhere", async () => {
     server.on("GET", "/api/auth/user", {
       body: { token: fakeAccessToken(), user }
@@ -222,41 +199,6 @@ describe("getUser", () => {
     })
 
     expect(await createAuthClient().getUser()).toBeNull()
-  })
-
-  it("keeps the last known user when the network fails, because offline is not signed out", async () => {
-    server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
-    })
-    const client = createAuthClient()
-    await client.getUser()
-
-    server.restore()
-    server = fakeAuthServer()
-    server.on("GET", "/api/auth/user", { networkError: true })
-    client.clearToken()
-
-    expect(await client.getUser()).toMatchObject({ email: "ada@example.com" })
-    expect(localStorage.getItem("auth-ts.user")).toContain("ada@example.com")
-  })
-
-  it("keeps the last known user when the server fails, not only when the network does", async () => {
-    server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
-    })
-    const client = createAuthClient()
-    await client.getUser()
-
-    server.restore()
-    server = fakeAuthServer()
-    server.on("GET", "/api/auth/user", {
-      status: 500,
-      body: { error: { code: "internalError", message: "Something broke." } }
-    })
-    client.clearToken()
-
-    // The auth server being mid-deploy is not the session being gone.
-    expect(await client.getUser()).toMatchObject({ email: "ada@example.com" })
   })
 
   it("returns a token nearing expiry at once, refreshing behind the caller", async () => {
@@ -328,128 +270,5 @@ describe("getUser", () => {
     expect(
       server.requests.filter((request) => request.path === "/api/auth/user")
     ).toHaveLength(1)
-  })
-})
-
-describe("subscribe", () => {
-  it("fires once per change with the new user, and stops after unsubscribing", async () => {
-    server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
-    })
-    server.on("POST", "/api/auth/sign-out", { status: 204 })
-
-    const client = createAuthClient()
-    const seen: Array<string | null> = []
-    const unsubscribe = client.subscribe((next) =>
-      seen.push(next?.email ?? null)
-    )
-
-    await client.getUser()
-    await client.signOut()
-
-    expect(seen).toEqual(["ada@example.com", null])
-
-    unsubscribe()
-    await client
-      .verifyCode({ email: "ada@example.com", code: "123456" })
-      .catch(() => {})
-    expect(seen).toHaveLength(2)
-  })
-
-  it("follows a sign-out in another tab without making a request", async () => {
-    const client = createAuthClient()
-    const seen: Array<string | null> = []
-    client.subscribe((next) => seen.push(next?.email ?? null))
-
-    globalThis.dispatchEvent(
-      new StorageEvent("storage", {
-        key: "auth-ts.user",
-        newValue: JSON.stringify(user)
-      })
-    )
-    globalThis.dispatchEvent(
-      new StorageEvent("storage", { key: "auth-ts.user", newValue: null })
-    )
-
-    expect(seen).toEqual(["ada@example.com", null])
-    expect(server.requests).toHaveLength(0)
-  })
-})
-
-describe("cross-tab sync", () => {
-  it("drops this tab's access token when another tab signs out", async () => {
-    server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
-    })
-    const client = createAuthClient()
-
-    await client.getToken()
-    expect(server.requests).toHaveLength(1)
-
-    // Another tab signs out: the storage event carries the user change, but the
-    // token is per-tab memory and must be discarded here too, or this tab would
-    // keep querying the data plane as a signed-out user.
-    globalThis.dispatchEvent(
-      new StorageEvent("storage", { key: "auth-ts.user", newValue: null })
-    )
-
-    server.on("GET", "/api/auth/user", {
-      status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
-    })
-
-    await expect(client.getToken()).rejects.toMatchObject({
-      code: "unauthenticated"
-    })
-    expect(server.requests).toHaveLength(2)
-  })
-
-  it("treats an unreadable value from another tab as signed out rather than throwing", async () => {
-    // Another tab — an older app version, another same-origin script — wrote
-    // something that is not JSON. A throw inside the listener would leave this
-    // tab's token alive while every other tab has moved on.
-    server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
-    })
-    const client = createAuthClient()
-    await client.getToken()
-    const seen: Array<string | null> = []
-    client.subscribe((next) => seen.push(next?.email ?? null))
-
-    globalThis.dispatchEvent(
-      new StorageEvent("storage", {
-        key: "auth-ts.user",
-        newValue: "{not json"
-      })
-    )
-
-    expect(seen).toEqual([null])
-    server.on("GET", "/api/auth/user", {
-      status: 401,
-      body: {
-        error: { code: "unauthenticated", message: "You are not signed in." }
-      }
-    })
-    await expect(client.getToken()).rejects.toMatchObject({
-      code: "unauthenticated"
-    })
-  })
-
-  it("ignores storage events for unrelated keys", async () => {
-    server.on("GET", "/api/auth/user", {
-      body: { token: fakeAccessToken(), user }
-    })
-    const client = createAuthClient()
-    client.subscribe(() => {})
-    await client.getToken()
-
-    globalThis.dispatchEvent(
-      new StorageEvent("storage", { key: "some-other-app", newValue: null })
-    )
-
-    await client.getToken()
-    expect(server.requests).toHaveLength(1)
   })
 })

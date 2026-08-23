@@ -214,13 +214,7 @@ describe("additionalFields on update", () => {
         body: { name: "Ada", referralCode: "UPDATED", seats: 9 }
       })
     )
-    expect(await response.json()).toEqual({ status: true })
-
-    // The update answers with a status, so the row is read back to see it.
-    const read = await context.authServer.handler(
-      request("GET", "/api/auth/user", { cookies })
-    )
-    const body = (await read.json()) as { user: Record<string, unknown> }
+    const body = (await response.json()) as { user: Record<string, unknown> }
 
     expect(body.user.name).toBe("Ada")
     expect(body.user.referralCode).toBe("UPDATED")

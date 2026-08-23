@@ -22,7 +22,8 @@ const noticeClass = {
 
 /** Profile, linked providers, devices, account switching, and deletion. */
 function AccountPage() {
-  const { data: user, isPending } = useUser()
+  const { data, isPending } = useUser()
+  const user = data?.user
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   // `null` until the user edits, so the input shows the stored name and Save
@@ -39,13 +40,6 @@ function AccountPage() {
   const sessions = useQuery({
     queryKey: ["sessions", user?.id],
     queryFn: authClient.listSessions,
-    enabled: Boolean(user)
-  })
-  // Which entry is this device is decided here, by comparing ids — the list
-  // does not carry a flag saying so.
-  const currentSession = useQuery({
-    queryKey: ["session", user?.id],
-    queryFn: authClient.getSession,
     enabled: Boolean(user)
   })
   const connections = useQuery({
@@ -266,7 +260,7 @@ function AccountPage() {
                     >
                       {session.userAgent ?? "Unknown device"}
                     </span>
-                    {session.id === currentSession.data?.id ? (
+                    {session.id === data?.session.id ? (
                       <span className="badge badge-soft badge-success badge-sm shrink-0">
                         this device
                       </span>

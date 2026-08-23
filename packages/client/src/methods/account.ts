@@ -12,7 +12,7 @@ export type UpdateUserInput = {
   imageURL?: string
 } & Record<string, string | number | boolean | undefined>
 
-/** Updates the signed-in user and refreshes the local mirror. */
+/** Updates the signed-in user and returns the row as stored. */
 export function createUpdateUser(internals: AuthClientInternals) {
   return async function updateUser(input: UpdateUserInput): Promise<AuthUser> {
     const { user } = await internals.fetchJson<{ user: AuthUser }>({
@@ -20,8 +20,6 @@ export function createUpdateUser(internals: AuthClientInternals) {
       path: "/user",
       body: input
     })
-    internals.userStore.set(user)
-
     return user
   }
 }
@@ -76,7 +74,6 @@ export function createSignOut(
     }
 
     internals.tokenStore.clear()
-    internals.userStore.set(null)
 
     return null
   }
@@ -120,7 +117,6 @@ export function createDeleteUser(internals: AuthClientInternals) {
     }
 
     internals.tokenStore.clear()
-    internals.userStore.set(null)
 
     return { status: "deleted" }
   }
@@ -175,7 +171,6 @@ export function createRevokeSession(internals: AuthClientInternals) {
 
     if (result?.current) {
       internals.tokenStore.clear()
-      internals.userStore.set(null)
     }
   }
 }
