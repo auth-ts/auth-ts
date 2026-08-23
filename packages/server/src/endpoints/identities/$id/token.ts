@@ -1,0 +1,183 @@
+import type { AuthIdentity } from "../../../core/auth-db"
+import type { AuthServerInternals } from "../../../core/auth-server-internals"
+import { AuthApiError, notFound } from "../../../http/auth-api-error"
+import { defineEndpoint } from "../../../http/define-endpoint"
+import { decryptSecret } from "../../../lib/encrypt"
+import { selectOne } from "../../../lib/select-one"
+import { encryptTokens } from "../../../oauth/link-identity"
+import { getProvider } from "../../../oauth/providers/get-provider"
+import type { ProviderTokens } from "../../../oauth/providers/oauth-provider"
+import { PROVIDER_DEADLINE_MS } from "../../../oauth/providers/provider-response"
+import type { CallerInput } from "../../../session/authenticate"
+import { authenticate } from "../../../session/authenticate"
+
+/**
+ * How much of an access token's remaining life is treated as already spent.
+ *
+ * A token that expires in ten seconds is no use to a caller who still has to
+ * make a request with it, so it is refreshed early rather than handed over to
+ * fail somewhere the failure is harder to read.
+ */
+const EXPIRY_SKEW_MS = 60_000
+
+/** Input for reading a live provider access token. */
+export interface GetProviderTokenInput extends CallerInput {
+  /** The identity's own id, from `GET /identities`. */
+  id: string
+}
+
+/** A live provider access token, and what is known about it. */
+export interface ProviderTokenResult {
+  token: string
+  /** When it expires, or `null` for a provider whose tokens do not. */
+  expiresAt: Date | null
+  /** The scopes actually granted, space-delimited. */
+  scope: string | null
+}
+
+/**
+ * Returns a usable access token for one connected account, refreshing it first
+ * if the stored one is spent.
+ *
+ * This is what makes a connection worth keeping: the application calls Google
+ * or GitHub as the user, for as long as the grant lives, without sending them
+ * back through a consent screen. The durable half of the grant never leaves the
+ * server — only this short-lived token does, which is the same posture as the
+ * library's own access token, and short enough that handing it to the browser
+ * for a direct CORS call to the provider is a reasonable thing to do.
+ *
+ * @throws {AuthApiError} `notFound` when the caller has no such identity, and
+ * `providerReconnectRequired` when the grant cannot produce a token any more.
+ */
+export const getProviderToken = defineEndpoint({
+  method: "GET",
+  path: "/identities/$id/token",
+  parse: ({ request, params }): GetProviderTokenInput => ({
+    id: params.id ?? "",
+    headers: request.headers
+  }),
+  run: async (internals, input: GetProviderTokenInput) => {
+    const caller = await authenticate(internals, input)
+
+    // Ownership is part of the query, so another user's identity matches
+    // nothing and the empty result is the 404.
+    const identity = await selectOne(internals, "identities", {
+      id: input.id,
+      userId: caller.userId
+    })
+    if (!identity) throw notFound()
+
+    const stored = await liveAccessToken(internals, identity)
+    if (stored) {
+      return {
+        data: {
+          token: stored,
+          expiresAt: identity.accessTokenExpiresAt ?? null,
+          scope: identity.scope ?? null
+        } satisfies ProviderTokenResult
+      }
+    }
+
+    return { data: await refreshProviderToken(internals, identity) }
+  }
+})
+
+/**
+ * The stored access token, when it is still worth using.
+ *
+ * A missing expiry means the provider issues tokens that do not expire — a
+ * GitHub OAuth App does — so the absence is "good indefinitely", not "unknown".
+ * A token this secret can no longer decrypt reads the same as no token: the
+ * refresh path below re-mints one, and only fails if that is impossible too.
+ */
+function liveAccessToken(
+  internals: AuthServerInternals,
+  identity: AuthIdentity
+) {
+  if (!identity.accessToken) return null
+
+  const expiry = identity.accessTokenExpiresAt
+  if (expiry && expiry.getTime() <= Date.now() + EXPIRY_SKEW_MS) return null
+
+  return decryptSecret(internals.config.secret, identity.accessToken)
+}
+
+/** Trades the stored refresh token for a fresh grant, and records what comes back. */
+async function refreshProviderToken(
+  internals: AuthServerInternals,
+  identity: AuthIdentity
+): Promise<ProviderTokenResult> {
+  const configured = getProvider(internals.config.providers, identity.provider)
+  const refreshToken = identity.refreshToken
+    ? await decryptSecret(internals.config.secret, identity.refreshToken)
+    : null
+
+  // Nothing to refresh with, nothing that knows how, or a refresh token whose
+  // own lifetime has run out. All three end the same way for the caller, and
+  // only reconnecting fixes any of them.
+  if (
+    !configured?.provider.refreshAccessToken ||
+    !refreshToken ||
+    (identity.refreshTokenExpiresAt &&
+      identity.refreshTokenExpiresAt.getTime() <= Date.now())
+  ) {
+    throw new AuthApiError("providerReconnectRequired", 403)
+  }
+
+  let tokens: ProviderTokens
+  try {
+    tokens = await configured.provider.refreshAccessToken({
+      credentials: configured.credentials,
+      refreshToken,
+      signal: AbortSignal.timeout(PROVIDER_DEADLINE_MS)
+    })
+  } catch (error) {
+    // A grant the provider has forgotten is never coming back, so the columns
+    // claiming otherwise are cleared: the account screen then says "reconnect"
+    // instead of offering a connection that fails on every use.
+    if (
+      error instanceof AuthApiError &&
+      error.code === "providerReconnectRequired"
+    ) {
+      await internals.db.update({
+        table: "identities",
+        where: { id: identity.id },
+        values: {
+          accessToken: null,
+          accessTokenExpiresAt: null,
+          refreshToken: null,
+          refreshTokenExpiresAt: null,
+          scope: null,
+          updatedAt: new Date()
+        }
+      })
+      internals.log.warn("provider grant is gone, cleared its tokens", {
+        provider: identity.provider
+      })
+    }
+    throw error
+  }
+
+  if (!tokens.accessToken) {
+    throw new AuthApiError("providerReconnectRequired", 403)
+  }
+
+  // Written back before it is returned, so the next caller pays nothing. Two
+  // refreshes racing both write, and last writer wins — harmless where the
+  // refresh token is stable, and where a provider rotates it the loser's copy
+  // is spent, which surfaces as one reconnect rather than silent breakage.
+  await internals.db.update({
+    table: "identities",
+    where: { id: identity.id },
+    values: {
+      ...(await encryptTokens(internals.config.secret, tokens)),
+      updatedAt: new Date()
+    }
+  })
+
+  return {
+    token: tokens.accessToken,
+    expiresAt: tokens.accessTokenExpiresAt ?? null,
+    scope: tokens.scope ?? identity.scope ?? null
+  }
+}

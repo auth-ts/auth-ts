@@ -4,7 +4,8 @@ import { switchAccount } from "../endpoints/accounts/switch"
 import { callbackProvider } from "../endpoints/callback/$provider"
 import { connectProvider } from "../endpoints/connect/$provider"
 import { listIdentities } from "../endpoints/identities"
-import { disconnectProvider } from "../endpoints/identities/$provider"
+import { disconnectIdentity } from "../endpoints/identities/$id"
+import { getProviderToken } from "../endpoints/identities/$id/token"
 import { getJwks } from "../endpoints/jwks"
 import { sendCode } from "../endpoints/send-code"
 import { getSession } from "../endpoints/session"
@@ -46,7 +47,8 @@ export const endpointRegistry = {
   callbackProvider,
   connectProvider,
   listIdentities,
-  disconnectProvider,
+  disconnectIdentity,
+  getProviderToken,
   getJwks,
   getDiscovery
 } as const

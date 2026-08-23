@@ -11,7 +11,11 @@ import * as schema from "../src/db/schema"
 const client = new PGlite()
 
 /** Columns the browser must never read, whatever a policy allows. */
-const SECRETS = [["sessions", "tokenHash"]]
+const SECRETS = [
+  ["sessions", "tokenHash"],
+  ["identities", "accessToken"],
+  ["identities", "refreshToken"]
+]
 
 /** Tables with RLS on and no policy — the Data API role sees and writes nothing. */
 const SERVER_ONLY = ["verificationCodes", "attempts"]
@@ -36,7 +40,7 @@ beforeAll(async () => {
   await client.exec(sql("triggers.sql"))
 
   // Without a policy every row is denied, so a column grant is never reached.
-  for (const [table] of SECRETS) {
+  for (const table of new Set(SECRETS.map(([table]) => table))) {
     await client.exec(
       `create policy "read" on "${table}" for select to authenticated using (true)`
     )
@@ -66,16 +70,19 @@ describe("privileges.sql", () => {
     }
   )
 
-  it.each(SECRETS)("still returns the other columns of %s", async (table) => {
-    await client.exec("set role authenticated")
-    try {
-      await expect(
-        client.exec(`select "id", "expiresAt" from "${table}"`)
-      ).resolves.toBeDefined()
-    } finally {
-      await client.exec("reset role")
+  it.each([...new Set(SECRETS.map(([table]) => table))])(
+    "still returns the other columns of %s",
+    async (table) => {
+      await client.exec("set role authenticated")
+      try {
+        await expect(
+          client.exec(`select "id", "createdAt" from "${table}"`)
+        ).resolves.toBeDefined()
+      } finally {
+        await client.exec("reset role")
+      }
     }
-  })
+  )
 
   it.each(SERVER_ONLY)(
     "denies every row and write of %s under policy-less RLS",

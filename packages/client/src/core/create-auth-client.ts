@@ -12,6 +12,7 @@ import { createGetToken } from "../methods/get-token"
 import { createGetUser } from "../methods/get-user"
 import {
   createDisconnect,
+  createGetProviderToken,
   createListAccounts,
   createListIdentities,
   createSwitchAccount
@@ -60,6 +61,7 @@ export interface AuthClient {
   connect: ReturnType<typeof createConnect>
   listIdentities: ReturnType<typeof createListIdentities>
   disconnect: ReturnType<typeof createDisconnect>
+  getProviderToken: ReturnType<typeof createGetProviderToken>
   listSessions: ReturnType<typeof createListSessions>
   revokeSession: ReturnType<typeof createRevokeSession>
   listAccounts: ReturnType<typeof createListAccounts>
@@ -108,6 +110,7 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     connect: createConnect(internals),
     listIdentities: createListIdentities(internals),
     disconnect: createDisconnect(internals),
+    getProviderToken: createGetProviderToken(internals),
     listSessions: createListSessions(internals),
     revokeSession: createRevokeSession(internals),
     listAccounts: createListAccounts(internals),

@@ -299,3 +299,42 @@ if (response.status === 401) {
   response = await send()
 }
 ```
+
+## Calling a connected account's API
+
+`connect` links a provider; `getProviderToken` is what makes the link worth
+keeping. It returns a live access token for one connected account, refreshing it
+server-side first when the stored one is spent:
+
+```ts
+const identities = await authClient.listIdentities()
+const google = identities.find((identity) => identity.provider === "google")
+
+const { token } = await authClient.getProviderToken({ id: google.id })
+const events = await fetch(
+  "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+  { headers: { authorization: `Bearer ${token}` } }
+).then((response) => response.json())
+```
+
+Ask for it per use and hold it in a variable — never in storage. It expires, and
+it belongs to a service this library does not control. The refresh token behind
+it never leaves your server.
+
+Everything here is addressed by the identity's `id`, not by provider name,
+because one account can have two of the same provider connected — a personal and
+a work Google. `disconnect({ id })` takes the same address.
+
+Catch `providerReconnectRequired`: the grant is gone — revoked at the provider,
+expired, or never durable — and only sending them through `connect` again
+restores it.
+
+```ts
+try {
+  const { token } = await authClient.getProviderToken({ id: google.id })
+} catch (error) {
+  if (isAuthError(error) && error.code === "providerReconnectRequired") {
+    authClient.connect({ provider: "google", redirect: "/account" })
+  }
+}
+```

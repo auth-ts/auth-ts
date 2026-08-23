@@ -98,6 +98,52 @@ Plus the JWT-plane functions:
   function that reads the cookie.
 - `getSession({ headers })` — the session the caller is acting from. One
   read, no user lookup: the one the token's `sid` names.
+- `getProviderRefreshToken(identityId)` — the decrypted refresh token for one
+  connected account. **Not an endpoint**, at any status: it is the durable half
+  of a provider grant, and only server code that manages its own refresh cycle —
+  a nightly sync job, say — has any use for it. Everything interactive wants
+  `getProviderToken` instead.
+
+## Connected accounts
+
+Configure a provider with the scopes your application needs and, where the
+provider distinguishes them, ask for a grant that outlives the sign-in:
+
+```ts
+createAuthServer({
+  providers: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+      offlineAccess: true
+    }
+  }
+})
+```
+
+Google issues a refresh token only for an offline grant, and only from a consent
+screen — so `offlineAccess` also means the consent screen appears on every
+sign-in with that provider. That is the visible cost of a connection that keeps
+working; leave it off and you get sign-in only.
+
+What the provider hands over is stored on the identity, encrypted. To use it,
+ask for a live access token by identity id:
+
+```ts
+const { token, expiresAt, scope } = await authServer.getProviderToken({
+  token: accessToken,
+  id: identity.id
+})
+```
+
+It refreshes first when the stored token is spent, so what comes back is usable
+now. Addressed by identity rather than by provider because one user may connect
+two Google accounts, and `authClient.getProviderToken({ id })` is the same call
+from the browser — provider APIs are CORS-enabled, so a short-lived scoped token
+in a variable is often better than proxying every call through your server.
+`providerReconnectRequired` means the grant is gone: send them through `connect`
+again.
 
 ### The token is the credential
 

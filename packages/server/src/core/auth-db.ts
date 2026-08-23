@@ -163,6 +163,25 @@ export interface AuthIdentity {
   providerUserId: string
   /** Whatever the provider gives that a person recognises. Display only. */
   label?: string | null
+  /**
+   * The provider's access token, **encrypted**. Never plaintext, never sent to
+   * a browser: `GET /identities` strips it, and the data plane must not be
+   * granted the column. Short-lived — read it through `getProviderToken`,
+   * which refreshes it rather than handing back a spent one.
+   */
+  accessToken?: string | null
+  /** When {@link accessToken} expires, as the provider reported it. */
+  accessTokenExpiresAt?: Date | null
+  /**
+   * The provider's refresh token, **encrypted**. The durable half of the grant:
+   * this is what keeps calling a provider's API working for months without the
+   * user signing in again, and the one column whose leak matters most.
+   */
+  refreshToken?: string | null
+  /** When {@link refreshToken} expires. Null where the provider reports none. */
+  refreshTokenExpiresAt?: Date | null
+  /** The scopes actually granted, space-delimited as the provider returned them. */
+  scope?: string | null
   /** Written by core on insert. */
   createdAt: Date
   /** Written by core on insert and on every update it makes. */

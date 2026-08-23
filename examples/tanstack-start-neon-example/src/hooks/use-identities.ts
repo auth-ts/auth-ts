@@ -11,9 +11,14 @@ export function useIdentities(userId?: string) {
     queryKey: identitiesQueryKey(userId),
     queryFn: userId
       ? async () => {
+          // Columns named rather than `*`: the two token columns are revoked
+          // from this role, and PostgREST expands `*` to every column of the
+          // table — including the ones it may not read.
           const { data } = await postgrest
             .from("identities")
-            .select()
+            .select(
+              "id, userId, provider, providerUserId, label, scope, accessTokenExpiresAt, createdAt, updatedAt"
+            )
             .order("provider", { ascending: true })
             .throwOnError()
 

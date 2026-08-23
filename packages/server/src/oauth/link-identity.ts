@@ -1,6 +1,9 @@
+import type { AuthIdentity } from "../core/auth-db"
 import type { AuthServerInternals } from "../core/auth-server-internals"
+import { encryptSecret } from "../lib/encrypt"
 import { insertRow } from "../lib/insert-row"
 import { selectOne } from "../lib/select-one"
+import type { ProviderTokens } from "./providers/oauth-provider"
 
 /**
  * How many linked providers core reads at a time.
@@ -18,6 +21,39 @@ export interface LinkIdentityInput {
   providerUserId: string
   /** Display only. Recorded when present, left alone when the provider sent none. */
   label?: string
+  /**
+   * The grant this flow produced. Each field is recorded when present and left
+   * alone when absent — a refresh that returns no new refresh token must not
+   * erase the one on file.
+   */
+  tokens?: ProviderTokens
+}
+
+/**
+ * The stored form of a grant: the two credentials encrypted, the rest as given.
+ *
+ * Exported because refreshing writes the same columns as linking does, and the
+ * two must not drift into encrypting different things.
+ */
+export async function encryptTokens(
+  secret: string,
+  tokens: ProviderTokens
+): Promise<Partial<AuthIdentity>> {
+  return {
+    ...(tokens.accessToken
+      ? { accessToken: await encryptSecret(secret, tokens.accessToken) }
+      : {}),
+    ...(tokens.refreshToken
+      ? { refreshToken: await encryptSecret(secret, tokens.refreshToken) }
+      : {}),
+    ...(tokens.accessTokenExpiresAt
+      ? { accessTokenExpiresAt: tokens.accessTokenExpiresAt }
+      : {}),
+    ...(tokens.refreshTokenExpiresAt
+      ? { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }
+      : {}),
+    ...(tokens.scope ? { scope: tokens.scope } : {})
+  }
 }
 
 /**
@@ -39,19 +75,28 @@ export interface LinkIdentityInput {
  */
 export async function linkIdentity(
   internals: AuthServerInternals,
-  { userId, provider, providerUserId, label }: LinkIdentityInput
+  { userId, provider, providerUserId, label, tokens }: LinkIdentityInput
 ) {
   const existing = await selectOne(internals, "identities", {
     provider,
     providerUserId
   })
+  const stored = tokens
+    ? await encryptTokens(internals.config.secret, tokens)
+    : {}
 
   if (existing) {
-    if (label !== undefined && label !== existing.label) {
+    // Both halves, not just the label: a sign-in that changes nothing about the
+    // name still arrives with a fresh grant, and that is the write worth making.
+    const values = {
+      ...(label !== undefined && label !== existing.label ? { label } : {}),
+      ...stored
+    }
+    if (Object.keys(values).length > 0) {
       await internals.db.update({
         table: "identities",
         where: { id: existing.id },
-        values: { label, updatedAt: new Date() }
+        values: { ...values, updatedAt: new Date() }
       })
     }
     return
@@ -61,6 +106,7 @@ export async function linkIdentity(
     userId,
     provider,
     providerUserId,
-    label: label ?? null
+    label: label ?? null,
+    ...stored
   })
 }

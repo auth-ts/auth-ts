@@ -42,6 +42,12 @@ export type AuthErrorCode =
   | "guestRequiresSignOut"
   /** The OAuth provider timed out or failed while the code was being exchanged. */
   | "providerUnavailable"
+  /**
+   * The stored grant for a linked provider cannot produce an access token any
+   * more — never issued, expired, or revoked at the provider. Only reconnecting
+   * fixes it, so it is not `unauthenticated`: the session here is perfectly fine.
+   */
+  | "providerReconnectRequired"
   /** Something threw that this library did not anticipate. */
   | "internalError"
 

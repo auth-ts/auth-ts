@@ -1,10 +1,13 @@
 import { createRemoteJWKSet, errors, jwtVerify } from "jose"
 import { AuthApiError } from "../../http/auth-api-error"
+import { expiresAt, requestedScopes } from "./grant"
 import type {
   AuthorizeURLInput,
   ExchangeCodeInput,
   OAuthProvider,
-  ProviderIdentity
+  ProviderIdentity,
+  ProviderTokens,
+  RefreshAccessTokenInput
 } from "./oauth-provider"
 import { providerRejected } from "./provider-response"
 
@@ -54,12 +57,20 @@ export const google: OAuthProvider = {
       client_id: credentials.clientId,
       redirect_uri: redirectURI,
       response_type: "code",
-      scope: "openid email profile",
+      scope: requestedScopes(credentials, ["openid", "email", "profile"]),
       state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
       nonce
     })
+
+    // Google returns a refresh token only for an offline grant, and only from a
+    // consent screen — a returning user who already consented gets none, which
+    // is why `prompt` is forced rather than left to Google's default.
+    if (credentials.offlineAccess) {
+      parameters.set("access_type", "offline")
+      parameters.set("prompt", "consent")
+    }
 
     return `https://accounts.google.com/o/oauth2/v2/auth?${parameters.toString()}`
   },
@@ -87,9 +98,7 @@ export const google: OAuthProvider = {
     })
 
     if (!tokenResponse.ok) throw providerRejected(tokenResponse)
-    const token = (await tokenResponse.json().catch(() => ({}))) as {
-      id_token?: string
-    }
+    const token = (await tokenResponse.json().catch(() => ({}))) as GoogleTokens
     if (!token.id_token) throw new AuthApiError("unauthenticated", 401)
 
     // Verified in full — signature against Google's published keys, issuer,
@@ -132,8 +141,59 @@ export const google: OAuthProvider = {
       ...(email ? { label: email.toLowerCase() } : {}),
       ...(email ? { email: email.toLowerCase() } : {}),
       ...(claims.name ? { name: claims.name } : {}),
-      ...(claims.picture ? { imageURL: claims.picture } : {})
+      ...(claims.picture ? { imageURL: claims.picture } : {}),
+      tokens: readTokens(token)
     }
+  },
+
+  async refreshAccessToken({
+    credentials,
+    refreshToken,
+    signal
+  }: RefreshAccessTokenInput): Promise<ProviderTokens> {
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: credentials.clientId,
+        client_secret: credentials.clientSecret,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken
+      }),
+      signal
+    })
+
+    // Google answers a revoked or expired grant with 400 `invalid_grant`, which
+    // is a permanent verdict rather than a transport failure: retrying will
+    // never work, and only the user reconnecting will.
+    if (response.status === 400) {
+      throw new AuthApiError("providerReconnectRequired", 403)
+    }
+    if (!response.ok) throw providerRejected(response)
+
+    // A refresh response carries no `refresh_token` — the original stays valid,
+    // and `readTokens` leaving the field out is what preserves it downstream.
+    return readTokens((await response.json().catch(() => ({}))) as GoogleTokens)
+  }
+}
+
+/** The token endpoint's response, in both the exchange and refresh directions. */
+interface GoogleTokens {
+  id_token?: string
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  scope?: string
+}
+
+function readTokens(token: GoogleTokens): ProviderTokens {
+  return {
+    ...(token.access_token ? { accessToken: token.access_token } : {}),
+    ...(token.refresh_token ? { refreshToken: token.refresh_token } : {}),
+    ...(typeof token.expires_in === "number"
+      ? { accessTokenExpiresAt: expiresAt(token.expires_in) }
+      : {}),
+    ...(token.scope ? { scope: token.scope } : {})
   }
 }
 

@@ -55,7 +55,11 @@ export type { SwitchAccountInput } from "./endpoints/accounts/switch"
 export type { CallbackProviderInput } from "./endpoints/callback/$provider"
 export type { ConnectProviderInput } from "./endpoints/connect/$provider"
 export type { IdentityInfo } from "./endpoints/identities"
-export type { DisconnectProviderInput } from "./endpoints/identities/$provider"
+export type { DisconnectIdentityInput } from "./endpoints/identities/$id"
+export type {
+  GetProviderTokenInput,
+  ProviderTokenResult
+} from "./endpoints/identities/$id/token"
 export type { SendCodeInput } from "./endpoints/send-code"
 export type { CurrentSession } from "./endpoints/session"
 export type { SessionInfo } from "./endpoints/sessions"

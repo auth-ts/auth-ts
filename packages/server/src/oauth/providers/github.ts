@@ -1,9 +1,12 @@
 import { AuthApiError } from "../../http/auth-api-error"
+import { expiresAt, requestedScopes } from "./grant"
 import type {
   AuthorizeURLInput,
   ExchangeCodeInput,
   OAuthProvider,
-  ProviderIdentity
+  ProviderIdentity,
+  ProviderTokens,
+  RefreshAccessTokenInput
 } from "./oauth-provider"
 import { isProviderUnavailable, providerRejected } from "./provider-response"
 
@@ -42,7 +45,7 @@ export const github: OAuthProvider = {
     const parameters = new URLSearchParams({
       client_id: credentials.clientId,
       redirect_uri: redirectURI,
-      scope: "read:user user:email",
+      scope: requestedScopes(credentials, ["read:user", "user:email"]),
       state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256"
@@ -78,9 +81,7 @@ export const github: OAuthProvider = {
     )
 
     if (!tokenResponse.ok) throw providerRejected(tokenResponse)
-    const token = (await tokenResponse.json().catch(() => ({}))) as {
-      access_token?: string
-    }
+    const token = (await tokenResponse.json().catch(() => ({}))) as GitHubTokens
     if (!token.access_token) throw new AuthApiError("unauthenticated", 401)
 
     const authorization = {
@@ -120,7 +121,73 @@ export const github: OAuthProvider = {
       label: profile.login,
       ...(verified ? { email: verified.email.toLowerCase() } : {}),
       ...(profile.name ? { name: profile.name } : { name: profile.login }),
-      ...(profile.avatar_url ? { imageURL: profile.avatar_url } : {})
+      ...(profile.avatar_url ? { imageURL: profile.avatar_url } : {}),
+      tokens: readTokens(token)
     }
+  },
+
+  async refreshAccessToken({
+    credentials,
+    refreshToken,
+    signal
+  }: RefreshAccessTokenInput): Promise<ProviderTokens> {
+    const response = await fetch(
+      "https://github.com/login/oauth/access_token",
+      {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          client_id: credentials.clientId,
+          client_secret: credentials.clientSecret,
+          grant_type: "refresh_token",
+          refresh_token: refreshToken
+        }),
+        signal
+      }
+    )
+
+    if (!response.ok) throw providerRejected(response)
+    const token = (await response.json().catch(() => ({}))) as GitHubTokens
+
+    // GitHub reports a dead grant as a 200 with an `error` body rather than a
+    // status, so the refusal has to be read out of the payload.
+    if (!token.access_token) {
+      throw new AuthApiError("providerReconnectRequired", 403)
+    }
+
+    return readTokens(token)
+  }
+}
+
+/**
+ * The token endpoint's response.
+ *
+ * A classic OAuth App issues a bare, non-expiring `access_token` and nothing
+ * else; a GitHub App with expiring tokens issues all five, and rotates the
+ * refresh token on every use — which is why a refresh writes back whatever it
+ * returns rather than only the access token.
+ */
+interface GitHubTokens {
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  refresh_token_expires_in?: number
+  scope?: string
+}
+
+function readTokens(token: GitHubTokens): ProviderTokens {
+  return {
+    ...(token.access_token ? { accessToken: token.access_token } : {}),
+    ...(token.refresh_token ? { refreshToken: token.refresh_token } : {}),
+    ...(typeof token.expires_in === "number"
+      ? { accessTokenExpiresAt: expiresAt(token.expires_in) }
+      : {}),
+    ...(typeof token.refresh_token_expires_in === "number"
+      ? { refreshTokenExpiresAt: expiresAt(token.refresh_token_expires_in) }
+      : {}),
+    ...(token.scope ? { scope: token.scope } : {})
   }
 }

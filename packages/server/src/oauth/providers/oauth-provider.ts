@@ -1,5 +1,23 @@
 import type { ProviderCredentials } from "../../core/auth-server-options"
 
+/**
+ * What a provider handed over with the grant, in plaintext.
+ *
+ * Only ever in memory and in transit: persistence encrypts these, and nothing
+ * returns them to a browser except the short-lived access token, deliberately.
+ * Every field is optional because providers differ wildly in what they issue —
+ * GitHub's classic tokens never expire and carry no refresh token, Google
+ * returns a refresh token only when the flow asked for offline access.
+ */
+export interface ProviderTokens {
+  accessToken?: string
+  accessTokenExpiresAt?: Date
+  refreshToken?: string
+  refreshTokenExpiresAt?: Date
+  /** Space-delimited, as granted — which is not always what was requested. */
+  scope?: string
+}
+
 /** The identity a provider vouches for, after its verification rules are applied. */
 export interface ProviderIdentity {
   /**
@@ -28,6 +46,14 @@ export interface ProviderIdentity {
   email?: string
   name?: string
   imageURL?: string
+  /**
+   * The grant itself, when the provider issued one worth keeping.
+   *
+   * Present on every exchange; what it contains depends on what was asked for.
+   * Stored encrypted so the application can keep calling that provider's API on
+   * the user's behalf — see `getProviderToken`.
+   */
+  tokens?: ProviderTokens
 }
 
 /** What building an authorize URL needs. */
@@ -46,6 +72,15 @@ export interface AuthorizeURLInput {
    * refuse a token that does not echo it; plain OAuth providers ignore it.
    */
   nonce: string
+}
+
+/** What refreshing a stored provider grant needs. */
+export interface RefreshAccessTokenInput {
+  credentials: ProviderCredentials
+  /** The stored refresh token, already decrypted. */
+  refreshToken: string
+  /** Deadline for the call, owned by the endpoint that asked for the refresh. */
+  signal: AbortSignal
 }
 
 /** What exchanging an authorization code needs. */
@@ -79,4 +114,15 @@ export interface OAuthProvider {
   authorizeURL(input: AuthorizeURLInput): string
   /** Trades the authorization code for whatever the identity lookup needs. */
   exchangeCode(input: ExchangeCodeInput): Promise<ProviderIdentity>
+  /**
+   * Trades a stored refresh token for a fresh access token. Optional.
+   *
+   * Left out by providers whose access tokens do not expire, where there is
+   * nothing to refresh and the stored token is used until the user revokes it.
+   *
+   * @throws {AuthApiError} `providerReconnectRequired` when the provider says
+   * the grant is gone — revoked, expired, or superseded. The caller clears the
+   * stored tokens on that, so the account stops claiming a grant it lost.
+   */
+  refreshAccessToken?(input: RefreshAccessTokenInput): Promise<ProviderTokens>
 }

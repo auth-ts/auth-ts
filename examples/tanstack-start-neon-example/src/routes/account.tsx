@@ -78,15 +78,12 @@ function AccountPage() {
       queryClient.invalidateQueries({ queryKey: sessionsQueryKey(user?.id) })
   })
 
-  // No userId filter: deleteOwnIdentities narrows the delete to this user's
-  // rows, and a provider is linked at most once per user.
+  // By id, not by provider: two accounts at the same provider can be connected
+  // at once, and disconnecting one must not take the other. No userId filter —
+  // deleteOwnIdentities narrows the delete to this user's rows.
   const disconnect = useMutation({
-    mutationFn: async (provider: string) => {
-      await postgrest
-        .from("identities")
-        .delete()
-        .eq("provider", provider)
-        .throwOnError()
+    mutationFn: async (id: string) => {
+      await postgrest.from("identities").delete().eq("id", id).throwOnError()
     },
     onSuccess: () =>
       queryClient.invalidateQueries({
@@ -246,7 +243,7 @@ function AccountPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => disconnect.mutate(identity.provider)}
+                    onClick={() => disconnect.mutate(identity.id)}
                     className="btn btn-ghost btn-sm"
                   >
                     Disconnect

@@ -9,6 +9,8 @@ import type { SignTokenClaims } from "../jwt/sign-token"
 import { signToken } from "../jwt/sign-token"
 import type { TokenClaims } from "../jwt/verify-token"
 import { verifyToken } from "../jwt/verify-token"
+import { decryptSecret } from "../lib/encrypt"
+import { selectOne } from "../lib/select-one"
 import type { CallerInput } from "../session/authenticate"
 import { readRefreshToken } from "../session/resolve-session"
 import type { AdditionalFieldsSchema, AuthUser } from "./auth-db"
@@ -79,6 +81,21 @@ export interface AuthServer<
   signToken: (claims?: SignTokenClaims) => Promise<string>
   /** Decodes without verifying. Never authorize with this. */
   decodeToken: typeof decodeToken
+  /**
+   * The decrypted refresh token for one connected account, or `null`.
+   *
+   * Deliberately not an endpoint: this is the durable half of a provider grant,
+   * and no HTTP route serves it at any status. It exists for work that manages
+   * its own refresh cycle — a background job that syncs a mailbox for weeks
+   * without a request to hang off. Everything interactive wants
+   * `getProviderToken` instead, which refreshes and hands back the short-lived
+   * half.
+   *
+   * Takes the identity's own id, unscoped by user, because a worker has no
+   * session to be scoped by. Whatever calls it is inside your server and is
+   * trusted accordingly.
+   */
+  getProviderRefreshToken: (identityId: string) => Promise<string | null>
 }
 
 /**
@@ -178,7 +195,16 @@ export function createAuthServer<
         claims
       )
     },
-    decodeToken
+    decodeToken,
+    getProviderRefreshToken: async (identityId) => {
+      const identity = await selectOne(internals, "identities", {
+        id: identityId
+      })
+
+      return identity?.refreshToken
+        ? decryptSecret(resolved.secret, identity.refreshToken)
+        : null
+    }
   }
 }
 

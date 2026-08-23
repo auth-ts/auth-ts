@@ -378,6 +378,39 @@ describe("oauth navigation", () => {
   })
 })
 
+describe("connected accounts", () => {
+  it("addresses the token and the disconnect by identity id", async () => {
+    // Not by provider: two accounts at one provider is the case that breaks.
+    server.on("GET", "/api/auth/identities/identity-1/token", {
+      body: { token: "provider-token", expiresAt: null, scope: "repo" }
+    })
+    server.on("DELETE", "/api/auth/identities/identity-1", { status: 204 })
+    const client = await signedIn()
+
+    const grant = await client.getProviderToken({ id: "identity-1" })
+    expect(grant.token).toBe("provider-token")
+
+    await client.disconnect({ id: "identity-1" })
+    expect(server.requests.at(-1)?.path).toBe("/api/auth/identities/identity-1")
+  })
+
+  it("throws providerReconnectRequired when the grant is gone", async () => {
+    server.on("GET", "/api/auth/identities/identity-1/token", {
+      status: 403,
+      body: {
+        name: "AuthError",
+        code: "providerReconnectRequired",
+        message: "Reconnect that account to continue using it here."
+      }
+    })
+    const client = await signedIn()
+
+    await expect(
+      client.getProviderToken({ id: "identity-1" })
+    ).rejects.toMatchObject({ code: "providerReconnectRequired", status: 403 })
+  })
+})
+
 describe("locale", () => {
   it("sends Accept-Language and updates it at runtime", async () => {
     server.on("POST", "/api/auth/send-code", { body: { sent: true } })

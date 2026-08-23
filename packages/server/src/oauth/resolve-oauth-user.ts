@@ -63,7 +63,8 @@ export async function resolveOAuthUser(
         userId: linked.id,
         provider,
         providerUserId: identity.providerUserId,
-        ...(identity.label ? { label: identity.label } : {})
+        ...(identity.label ? { label: identity.label } : {}),
+        ...(identity.tokens ? { tokens: identity.tokens } : {})
       })
 
       if (guest && guest.id !== linked.id) {
@@ -104,7 +105,8 @@ export async function resolveOAuthUser(
     userId: user.id,
     provider,
     providerUserId: identity.providerUserId,
-    ...(identity.label ? { label: identity.label } : {})
+    ...(identity.label ? { label: identity.label } : {}),
+    ...(identity.tokens ? { tokens: identity.tokens } : {})
   })
 
   return user

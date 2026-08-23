@@ -31,6 +31,8 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   guestRequiresSignOut: "Sign out before continuing as a guest.",
   providerUnavailable:
     "The sign-in provider did not respond. Please try again.",
+  providerReconnectRequired:
+    "Reconnect that account to continue using it here.",
   internalError: "Something went wrong."
 }
 

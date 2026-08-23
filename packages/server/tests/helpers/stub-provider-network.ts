@@ -10,6 +10,23 @@ export interface StubGitHubIdentity {
   emails?: Array<{ email: string; primary: boolean; verified: boolean }>
   /** Omit the token to simulate a rejected code exchange. */
   token?: string | null
+  /** Extra fields the token endpoint returns beside `access_token`. */
+  grant?: {
+    refresh_token?: string
+    expires_in?: number
+    refresh_token_expires_in?: number
+    scope?: string
+  }
+  /**
+   * What the token endpoint answers a `grant_type=refresh_token` call with.
+   * Defaults to the same body a code exchange gets.
+   */
+  refreshed?: {
+    access_token?: string
+    refresh_token?: string
+    expires_in?: number
+    scope?: string
+  }
   /** HTTP statuses to answer with instead of 200, per endpoint. */
   status?: { token?: number; profile?: number; emails?: number }
   /** Extra response headers, per endpoint — GitHub signals rate limits this way. */
@@ -28,47 +45,63 @@ export interface StubGitHubIdentity {
  * provider would test nothing.
  */
 export function stubGitHub(identity: StubGitHubIdentity) {
-  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(async (input, init) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url
 
-    if (url.includes("login/oauth/access_token")) {
-      return jsonResponse(
-        identity.token === null
-          ? {}
-          : { access_token: identity.token ?? "provider-token" },
-        identity.status?.token,
-        identity.headers?.token
-      )
-    }
+      if (url.includes("login/oauth/access_token")) {
+        const refreshing = String(init?.body ?? "").includes(
+          '"grant_type":"refresh_token"'
+        )
+        if (refreshing) {
+          return jsonResponse(
+            identity.refreshed ?? { access_token: "refreshed-token" },
+            identity.status?.token,
+            identity.headers?.token
+          )
+        }
 
-    if (url.endsWith("/user/emails")) {
-      return jsonResponse(
-        identity.emails ?? [],
-        identity.status?.emails,
-        identity.headers?.emails
-      )
-    }
+        return jsonResponse(
+          identity.token === null
+            ? {}
+            : {
+                access_token: identity.token ?? "provider-token",
+                ...identity.grant
+              },
+          identity.status?.token,
+          identity.headers?.token
+        )
+      }
 
-    if (url.endsWith("api.github.com/user")) {
-      return jsonResponse(
-        {
-          id: identity.id,
-          name: identity.name ?? null,
-          login: identity.login ?? "octocat",
-          avatar_url: identity.avatarURL ?? null
-        },
-        identity.status?.profile,
-        identity.headers?.profile
-      )
-    }
+      if (url.endsWith("/user/emails")) {
+        return jsonResponse(
+          identity.emails ?? [],
+          identity.status?.emails,
+          identity.headers?.emails
+        )
+      }
 
-    throw new Error(`Unexpected fetch in test: ${url}`)
-  })
+      if (url.endsWith("api.github.com/user")) {
+        return jsonResponse(
+          {
+            id: identity.id,
+            name: identity.name ?? null,
+            login: identity.login ?? "octocat",
+            avatar_url: identity.avatarURL ?? null
+          },
+          identity.status?.profile,
+          identity.headers?.profile
+        )
+      }
+
+      throw new Error(`Unexpected fetch in test: ${url}`)
+    })
 }
 
 /** What the fake Google should answer with. */

@@ -1,4 +1,9 @@
-import type { AccountInfo, AuthUser, IdentityInfo } from "@auth-ts/server"
+import type {
+  AccountInfo,
+  AuthUser,
+  IdentityInfo,
+  ProviderTokenResult
+} from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Lists the providers linked to this user. */
@@ -12,17 +17,55 @@ export function createListIdentities(internals: AuthClientInternals) {
   }
 }
 
-/** Input for unlinking a provider. */
+/** Input for unlinking one connected account. */
 export interface DisconnectInput {
-  provider: string
+  /** The identity's `id`, from {@link createListIdentities}. */
+  id: string
 }
 
-/** Unlinks a provider. */
+/**
+ * Unlinks one connected account.
+ *
+ * By identity, not by provider: someone may have two Google accounts connected,
+ * and disconnecting "Google" would take both.
+ */
 export function createDisconnect(internals: AuthClientInternals) {
   return async function disconnect(input: DisconnectInput): Promise<void> {
     await internals.fetchJson({
       method: "DELETE",
-      path: `/identities/${encodeURIComponent(input.provider)}`,
+      path: `/identities/${encodeURIComponent(input.id)}`,
+      authenticated: true
+    })
+  }
+}
+
+/** Input for reading a connected account's access token. */
+export interface GetProviderTokenInput {
+  /** The identity's `id`, from {@link createListIdentities}. */
+  id: string
+}
+
+/**
+ * Gets a live access token for one connected account, so this browser can call
+ * that provider's API directly.
+ *
+ * The server refreshes it first when the stored one is spent, so what comes
+ * back is usable now. Hold it in a variable for the call you are about to make
+ * and ask again next time — it expires, and persisting it would put a
+ * credential for somebody else's service in storage this library does not
+ * control. The refresh token behind it never leaves the server.
+ *
+ * @throws {AuthError} `providerReconnectRequired` when the grant is gone —
+ * revoked at the provider, expired, or never durable. Send them through
+ * `connect` again.
+ */
+export function createGetProviderToken(internals: AuthClientInternals) {
+  return async function getProviderToken(
+    input: GetProviderTokenInput
+  ): Promise<ProviderTokenResult> {
+    return internals.fetchJson<ProviderTokenResult>({
+      method: "GET",
+      path: `/identities/${encodeURIComponent(input.id)}/token`,
       authenticated: true
     })
   }

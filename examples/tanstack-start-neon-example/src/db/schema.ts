@@ -150,6 +150,18 @@ export const identities = pgTable.withRLS(
     provider: text("provider").notNull(),
     providerUserId: text("providerUserId").notNull(),
     label: text("label"),
+    // Encrypted by the library before they ever arrive here, and revoked from
+    // the Data API role in privileges.sql — a connected account's credentials
+    // have no business in a browser, ciphertext or not.
+    accessToken: text("accessToken"),
+    accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
+      withTimezone: true
+    }),
+    refreshToken: text("refreshToken"),
+    refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
+      withTimezone: true
+    }),
+    scope: text("scope"),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
       .defaultNow(),

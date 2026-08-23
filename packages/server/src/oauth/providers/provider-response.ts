@@ -1,6 +1,15 @@
 import { AuthApiError } from "../../http/auth-api-error"
 
 /**
+ * How long a provider gets to answer, for every call core makes to one.
+ *
+ * Generous next to the sub-second responses GitHub and Google normally give, but
+ * bounded: without it a stalled provider holds the request open for as long as
+ * the platform allows, and a burst of those is an outage.
+ */
+export const PROVIDER_DEADLINE_MS = 10_000
+
+/**
  * Whether a provider response means "try again later" rather than "no".
  *
  * A 5xx is the provider being down; a 429 is the provider throttling us. In

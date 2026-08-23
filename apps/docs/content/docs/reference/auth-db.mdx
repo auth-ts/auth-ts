@@ -33,7 +33,17 @@ cost of not having an adapter package.
 | `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
 | `verificationCodes` | `id`, `identifier`, `codeHash`, `action`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
-| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
+| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
+
+**Two of those columns are credentials for somebody else's service.**
+`identities.accessToken` and `identities.refreshToken` hold the grant a
+connected account gave you, encrypted with AES-256-GCM under a key derived from
+your `secret` before they ever reach your `insert`. Store them as text and let
+them be — the library is the only thing that reads them back. They must not be
+readable by whatever role your data plane runs as: see
+[the Neon guide](/docs/guides/neon) for the column grant that keeps them out of
+the browser. Rotating `secret` makes them unreadable, which surfaces as
+"reconnect this account" and never as a wrong token sent to a provider.
 
 **`createdAt` and `updatedAt` are written by core**, on every insert and on
 every update it makes. Your columns need no default and no trigger: the values

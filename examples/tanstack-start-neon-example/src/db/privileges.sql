@@ -17,5 +17,12 @@ grant select (
   "id", "userId", "userAgent", "ipAddress", "expiresAt", "createdAt", "updatedAt"
 ) on table "sessions" to authenticated;
 
+revoke select on table "identities" from authenticated;
+grant select (
+  "id", "userId", "provider", "providerUserId", "label",
+  "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope",
+  "createdAt", "updatedAt"
+) on table "identities" to authenticated;
+
 revoke update on table "users" from authenticated;
 grant update ("name", "imageURL", "updatedAt") on table "users" to authenticated;

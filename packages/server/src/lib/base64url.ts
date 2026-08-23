@@ -15,20 +15,27 @@ export function encodeBase64url(text: string) {
 }
 
 /**
+ * Decodes base64url back to raw bytes.
+ *
+ * @returns The bytes, or `null` when the input is not base64url at all.
+ */
+export function base64urlToBytes(value: string) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/")
+  try {
+    const binary = atob(base64)
+    return Uint8Array.from(binary, (character) => character.charCodeAt(0))
+  } catch {
+    return null
+  }
+}
+
+/**
  * Decodes base64url back to a UTF-8 string.
  *
  * @returns The text, or `null` when the input is not base64url at all — the
  * caller is reading untrusted input and should treat that as a plain mismatch.
  */
 export function decodeBase64url(value: string) {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/")
-  try {
-    const binary = atob(base64)
-    const bytes = Uint8Array.from(binary, (character) =>
-      character.charCodeAt(0)
-    )
-    return textDecoder.decode(bytes)
-  } catch {
-    return null
-  }
+  const bytes = base64urlToBytes(value)
+  return bytes === null ? null : textDecoder.decode(bytes)
 }

@@ -11,20 +11,12 @@ import { getCallbackURL } from "../../oauth/callback-url"
 import { linkIdentity } from "../../oauth/link-identity"
 import { getProvider } from "../../oauth/providers/get-provider"
 import type { ProviderIdentity } from "../../oauth/providers/oauth-provider"
+import { PROVIDER_DEADLINE_MS } from "../../oauth/providers/provider-response"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user"
 import { clearStateCookie, readStateCookie } from "../../oauth/state-cookie"
 import { issueSession } from "../../session/issue-session"
 import type { ResolvedSession } from "../../session/resolve-session"
 import { resolveCallerSession } from "../../session/resolve-session"
-
-/**
- * How long the provider gets to answer the whole code exchange.
- *
- * Generous next to the sub-second responses GitHub and Google normally give, but
- * bounded: without it a stalled provider holds the callback request open for as
- * long as the platform allows, and a burst of those is a sign-in outage.
- */
-const PROVIDER_DEADLINE_MS = 10_000
 
 /** Input for finishing an OAuth flow. */
 export interface CallbackProviderInput {
@@ -220,7 +212,8 @@ async function connectIdentity(
     userId: resolved.user.id,
     provider: input.provider,
     providerUserId: identity.providerUserId,
-    ...(identity.label ? { label: identity.label } : {})
+    ...(identity.label ? { label: identity.label } : {}),
+    ...(identity.tokens ? { tokens: identity.tokens } : {})
   })
 
   const headers = new Headers({ location: redirect })

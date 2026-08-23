@@ -40,6 +40,13 @@ GitHub is in real use. Google is the part with no real-world evidence behind it.
       place with name and avatar.
 - [ ] **Google** — run it through sign in, connect from the account page,
       disconnect, and sign in again to confirm the stable-id match holds.
+- [ ] **Connected accounts, live.** Provider tokens are stored encrypted and
+      `getProviderToken` refreshes them, but no real provider has issued a
+      refresh token to this code yet. Prove it with Google and
+      `offlineAccess: true`: connect, wait past the hour, call the API again,
+      then revoke the app at Google and confirm the next call clears the row and
+      answers `providerReconnectRequired`. GitHub's refresh path needs a GitHub
+      App with expiring tokens — a classic OAuth App never exercises it.
 
 ### The JWKS gist, if you keep using one for local development
 
@@ -265,6 +272,15 @@ registry — is a v2-scale subsystem. Worth naming because it is the real answer
 multi-domain single sign-on: each domain keeps its own first-party session and
 the central domain is an IdP reached by top-level redirect, never by shared
 cookies. Until then, the centre can be any existing provider.
+
+### Revoking a grant at the provider on disconnect
+
+Disconnecting deletes the identity and the tokens with it, which ends this
+side's access. The grant itself stays listed on the user's Google or GitHub
+account until they remove it there. Calling each provider's revocation endpoint
+would close that, and needs a decision about what a failed revocation means —
+refusing the disconnect leaves a row nobody wanted, and ignoring it makes the
+call decorative.
 
 ### Identifier linking for guests
 

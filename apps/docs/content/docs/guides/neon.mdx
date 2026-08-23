@@ -78,6 +78,33 @@ set local role authenticated;
 select count(*) from users;  -- must be 0
 ```
 
+### Columns, where a policy is not enough
+
+A table the browser is *supposed* to read still has columns it is not. Add a
+policy for `sessions` or `identities` — a device list, a connected-accounts
+screen — and the policy alone hands over the session's `tokenHash` and a
+connected account's provider tokens along with it. Grants are per column, so
+narrow them:
+
+```sql
+revoke select on table "sessions" from authenticated;
+grant select (
+  "id", "userId", "userAgent", "ipAddress", "expiresAt", "createdAt", "updatedAt"
+) on table "sessions" to authenticated;
+
+revoke select on table "identities" from authenticated;
+grant select (
+  "id", "userId", "provider", "providerUserId", "label",
+  "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope",
+  "createdAt", "updatedAt"
+) on table "identities" to authenticated;
+```
+
+The provider tokens are encrypted at rest, so this is a second lock rather than
+the only one — but ciphertext in a browser has no use and every downside. Note
+that PostgREST expands `select()` to `*`: once a column is revoked, your client
+must name the columns it wants, or the request fails as a whole.
+
 ## 5. Set the allowed origins
 
 Set the Data API's allowed origins to your own domain — and know precisely what

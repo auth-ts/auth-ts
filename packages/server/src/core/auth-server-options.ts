@@ -48,6 +48,25 @@ export interface SmsOptions {
 export interface ProviderCredentials {
   clientId: string
   clientSecret: string
+  /**
+   * Scopes to request on top of the ones sign-in needs.
+   *
+   * `["https://www.googleapis.com/auth/calendar.readonly"]` and the like — what
+   * the application intends to *do* with the account, rather than what
+   * identifying the user requires. What the user actually granted is recorded on
+   * the identity as `scope`, because those are not always the same list.
+   */
+  scopes?: string[]
+  /**
+   * Asks for a grant that outlives the sign-in, so the API can be called later.
+   *
+   * Google issues a refresh token only when asked, and only from a consent
+   * screen — so this also forces consent to be shown on every sign-in with that
+   * provider, which is the visible cost of keeping the connection alive.
+   * Providers whose tokens are already durable ignore it.
+   * @default false
+   */
+  offlineAccess?: boolean
 }
 
 /** The OAuth providers shipped in v1. Adding more is configuration, not new endpoints. */
