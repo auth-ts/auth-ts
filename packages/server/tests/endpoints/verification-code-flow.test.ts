@@ -278,20 +278,28 @@ describe("token and user endpoints", () => {
     }
   })
 
-  it("lists sessions with exactly one marked current and no token hash", async () => {
+  it("lists the whole session row, less the token hash", async () => {
     const { authServer, refreshToken } = await signIn()
+    const cookies = { "auth-ts.refresh": refreshToken }
 
     const response = await authServer.handler(
-      request("GET", "/api/auth/sessions", {
-        cookies: { "auth-ts.refresh": refreshToken }
-      })
+      request("GET", "/api/auth/sessions", { cookies })
     )
     const body = (await response.json()) as {
-      sessions: Array<{ id: string; current: boolean }>
+      sessions: Array<Record<string, unknown>>
     }
+    const [session] = body.sessions
 
-    expect(body.sessions.filter((session) => session.current)).toHaveLength(1)
     expect(JSON.stringify(body)).not.toContain("tokenHash")
+    // Everything else is the caller's own row: `updatedAt` is when the device
+    // was last used, and `id` is how they tell which one they are on.
+    expect(Object.keys(session ?? {}).sort()).toEqual([
+      "createdAt",
+      "expiresAt",
+      "id",
+      "updatedAt",
+      "userId"
+    ])
   })
 
   it("signs out locally and clears the cookie", async () => {
@@ -599,14 +607,11 @@ describe("authenticating from the access token", () => {
         headers: { authorization: `Bearer ${token}` }
       })
     )
-    const body = (await response.json()) as {
-      sessions: Array<{ current: boolean }>
-    }
+    const body = (await response.json()) as { sessions: Array<{ id: string }> }
 
     expect(response.status).toBe(200)
-    // `current` still resolves: the cookie is hashed, not looked up.
-    expect(body.sessions).toEqual([expect.objectContaining({ current: true })])
-    // And the session was never resolved, which is the whole point.
+    expect(body.sessions).toHaveLength(1)
+    // The session was never resolved, which is the whole point.
     expect(
       update.mock.calls.filter(([input]) => input.table === "sessions")
     ).toHaveLength(0)

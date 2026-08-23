@@ -41,6 +41,13 @@ function AccountPage() {
     queryFn: authClient.listSessions,
     enabled: Boolean(user)
   })
+  // Which entry is this device is decided here, by comparing ids — the list
+  // does not carry a flag saying so.
+  const currentSession = useQuery({
+    queryKey: ["session", user?.id],
+    queryFn: authClient.getSession,
+    enabled: Boolean(user)
+  })
   const connections = useQuery({
     queryKey: ["connections", user?.id],
     queryFn: authClient.listConnections,
@@ -259,7 +266,7 @@ function AccountPage() {
                     >
                       {session.userAgent ?? "Unknown device"}
                     </span>
-                    {session.current ? (
+                    {session.id === currentSession.data?.id ? (
                       <span className="badge badge-soft badge-success badge-sm shrink-0">
                         this device
                       </span>

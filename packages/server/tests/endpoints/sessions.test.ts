@@ -30,11 +30,20 @@ async function listSessions(
   const response = await context.authServer.handler(
     request("GET", "/api/auth/sessions", { cookies })
   )
-  return (
-    (await response.json()) as {
-      sessions: Array<{ id: string; current: boolean }>
-    }
-  ).sessions
+  return ((await response.json()) as { sessions: Array<{ id: string }> })
+    .sessions
+}
+
+/** The id of the session these cookies belong to, as a client would learn it. */
+async function currentSessionId(
+  context: TestContext,
+  cookies: Record<string, string>
+) {
+  const response = await context.authServer.handler(
+    request("GET", "/api/auth/session", { cookies })
+  )
+
+  return ((await response.json()) as { session: { id: string } }).session.id
 }
 
 describe("DELETE /sessions/:id", () => {
@@ -43,8 +52,10 @@ describe("DELETE /sessions/:id", () => {
     const phone = await signIn(context, "ada@example.com")
     const laptop = await signIn(context, "ada@example.com")
     const sessions = await listSessions(context, laptop)
+    const mine = await currentSessionId(context, laptop)
+    // Which one is this device is the caller's comparison to make.
     const other = required(
-      sessions.find((session) => !session.current),
+      sessions.find((session) => session.id !== mine),
       "other session"
     )
 
@@ -70,7 +81,7 @@ describe("DELETE /sessions/:id", () => {
     // was revoking itself. The server knows, so it says.
     const context = await createTestServer()
     const cookies = await signIn(context, "ada@example.com")
-    const [current] = await listSessions(context, cookies)
+    const current = { id: await currentSessionId(context, cookies) }
 
     const response = await context.authServer.handler(
       request(

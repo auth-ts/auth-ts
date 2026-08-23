@@ -13,6 +13,7 @@ import {
   createListConnections,
   createSwitchAccount
 } from "../methods/connections-and-accounts"
+import { createGetSession } from "../methods/get-session"
 import { createGetToken } from "../methods/get-token"
 import { createGetUser } from "../methods/get-user"
 import { createConnect, createSignIn } from "../methods/oauth"
@@ -38,8 +39,10 @@ import type { UserListener } from "./user-store"
 export interface AuthClient {
   /** A valid access token, refreshed when needed. Hand this to your data client. */
   getToken: () => Promise<string>
-  /** The signed-in user, or `null`. Free when the token is valid. */
+  /** The signed-in user, or `null`. Always reads the server. */
   getUser: () => Promise<AuthUser | null>
+  /** The session this browser is on, confirming it is live and keeping it that way. */
+  getSession: ReturnType<typeof createGetSession>
   /** Subscribes to user changes. Returns the unsubscribe function. */
   subscribe: (listener: UserListener) => () => void
   /** The last known user, without any network call. For synchronous render paths. */
@@ -88,6 +91,7 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   return {
     getToken,
     getUser: createGetUser(internals),
+    getSession: createGetSession(internals),
     subscribe: (listener) => internals.userStore.subscribe(listener),
     getCachedUser: () => internals.userStore.restore(),
     sendCode: createSendCode(internals),

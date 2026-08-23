@@ -580,16 +580,12 @@ describe("multiAccount enabled", () => {
     const first = await signIn(context, "ada@example.com")
     const second = await signIn(context, "grace@example.com", first.cookies)
 
-    const listed = await context.authServer.handler(
-      request("GET", "/api/auth/sessions", { cookies: second.cookies })
+    // Which session this browser is on comes from the session read, not from a
+    // flag on the list.
+    const read = await context.authServer.handler(
+      request("GET", "/api/auth/session", { cookies: second.cookies })
     )
-    const { sessions } = (await listed.json()) as {
-      sessions: { id: string; current: boolean }[]
-    }
-    const current = required(
-      sessions.find((session) => session.current),
-      "current session"
-    )
+    const current = ((await read.json()) as { session: { id: string } }).session
     const response = await context.authServer.handler(
       request("DELETE", `/api/auth/sessions/${current.id}`, {
         cookies: second.cookies

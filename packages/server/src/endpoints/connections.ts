@@ -1,14 +1,11 @@
+import type { AuthConnection } from "../core/auth-db"
 import { defineEndpoint } from "../http/define-endpoint"
 import { CONNECTION_PAGE_SIZE } from "../oauth/link-connection"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 
 /** One linked provider, as shown on an account screen. */
-export interface ConnectionInfo {
-  provider: string
-  /** What the provider calls this account. Display only. */
-  label?: string | null
-}
+export type ConnectionInfo = AuthConnection
 
 /** Lists the signed-in user's linked providers. */
 export const listConnections = defineEndpoint({
@@ -25,11 +22,6 @@ export const listConnections = defineEndpoint({
       offset: 0,
       orderBy: { provider: "asc" }
     })
-    const data: ConnectionInfo[] = connections.map((connection) => ({
-      provider: connection.provider,
-      label: connection.label ?? null
-    }))
-
-    return { data: { connections: data } }
+    return { data: { connections: connections satisfies ConnectionInfo[] } }
   }
 })
