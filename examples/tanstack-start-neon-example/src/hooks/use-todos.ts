@@ -1,46 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { authClient } from "../lib/auth-client"
+import { dataApi } from "../lib/data-api"
 
-/** A row from the `todos` table. */
-export interface Todo {
-  id: string
-  userId: string
-  title: string
-  completed: boolean
-  createdAt: string
-}
-
-const DATA_API_URL = import.meta.env.VITE_NEON_DATA_API_URL ?? ""
-
-/**
- * Calls the Neon Data API with the current access token.
- *
- * The entire data plane: a `fetch` with no client library in between, so the
- * thing being demonstrated — our JWT producing row-scoped results — is visible
- * in one place. On a 401 it drops the cached token and retries **once**; if the
- * second attempt is also refused the session is genuinely gone.
- */
-async function dataApi<Result>(path: string, init: RequestInit = {}) {
-  const send = async () =>
-    fetch(`${DATA_API_URL}${path}`, {
-      ...init,
-      headers: {
-        authorization: `Bearer ${await authClient.getToken()}`,
-        "content-type": "application/json",
-        prefer: "return=representation"
-      }
-    })
-
-  let response = await send()
-  if (response.status === 401) {
-    authClient.clearToken()
-    response = await send()
-  }
-  if (!response.ok) {
-    throw new Error(`Data API ${response.status}: ${await response.text()}`)
-  }
-
-  return (response.status === 204 ? undefined : await response.json()) as Result
+/** Unwraps a PostgREST result, throwing so the query library sees the failure. */
+function unwrap<T>({
+  data,
+  error
+}: {
+  data: T
+  error: { message: string } | null
+}) {
+  if (error) throw new Error(error.message)
+  return data
 }
 
 /**
@@ -63,28 +33,28 @@ export function useTodos(userId: string | undefined) {
 
   const todos = useQuery({
     queryKey,
-    queryFn: () => dataApi<Todo[]>("/todos?order=createdAt.desc"),
+    queryFn: async () =>
+      unwrap(
+        await dataApi
+          .from("todos")
+          .select()
+          .order("createdAt", { ascending: false })
+      ),
     enabled: Boolean(userId)
   })
   const add = useMutation({
-    mutationFn: (title: string) =>
-      dataApi<Todo[]>("/todos", {
-        method: "POST",
-        body: JSON.stringify({ title })
-      }),
+    mutationFn: async (title: string) =>
+      unwrap(await dataApi.from("todos").insert({ title })),
     onSuccess
   })
   const toggle = useMutation({
-    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      dataApi(`/todos?id=eq.${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ completed })
-      }),
+    mutationFn: async ({ id, completed }: { id: string; completed: boolean }) =>
+      unwrap(await dataApi.from("todos").update({ completed }).eq("id", id)),
     onSuccess
   })
   const remove = useMutation({
-    mutationFn: (id: string) =>
-      dataApi(`/todos?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }),
+    mutationFn: async (id: string) =>
+      unwrap(await dataApi.from("todos").delete().eq("id", id)),
     onSuccess
   })
 

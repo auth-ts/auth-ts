@@ -25,6 +25,7 @@
   "dependencies": {
     "@auth-ts/client": "workspace:*",
     "@auth-ts/server": "workspace:*",
+    "@neondatabase/postgrest-js": "^0.2.0-beta",
     "@neondatabase/serverless": "1.1.0",
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-router": "1.170.31",

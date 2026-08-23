@@ -187,13 +187,14 @@ export const todos = pgTable.withRLS(
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     completed: boolean("completed").notNull().default(false),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    // Strings, because rows reach the browser as JSON from the Data API.
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
     pgPolicy("manageOwnTodos", {
@@ -204,3 +205,5 @@ export const todos = pgTable.withRLS(
     })
   ]
 )
+
+export type Todo = typeof todos.$inferSelect
