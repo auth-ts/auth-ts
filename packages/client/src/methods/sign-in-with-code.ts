@@ -13,9 +13,11 @@ export type VerifyCodeInput = SendCodeInput & {
   additionalFields?: Record<string, string | number | boolean>
 }
 
-/** What a completed sign-in returns. The token arrived in the response header. */
+/** What a completed sign-in returns. */
 export interface SignInResult {
   user: AuthUser
+  /** The access token for the new session, already stored by the client. */
+  token: string
 }
 
 /**
@@ -41,8 +43,9 @@ export function createSendCode(internals: AuthClientInternals) {
 /**
  * Verifies a code and starts a session.
  *
- * The token rides back in the response header and is stored on the way through,
- * so the sign-in and the first render cost one round trip between them.
+ * The token comes back with the user and is stored on the way through, so the
+ * sign-in and the first render cost one round trip between them rather than a
+ * sign-in followed by a refresh.
  */
 export function createVerifyCode(internals: AuthClientInternals) {
   return async function verifyCode(
@@ -53,6 +56,8 @@ export function createVerifyCode(internals: AuthClientInternals) {
       path: "/verify-code",
       body: input
     })
+    internals.tokenStore.set(result.token)
+
     return result
   }
 }
@@ -78,6 +83,8 @@ export function createSignInAsGuest(internals: AuthClientInternals) {
       path: "/sign-in/guest",
       body: input
     })
+    internals.tokenStore.set(result.token)
+
     return result
   }
 }

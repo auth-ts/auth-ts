@@ -14,7 +14,8 @@ import type { ProviderIdentity } from "../../oauth/providers/oauth-provider"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user"
 import { clearStateCookie, readStateCookie } from "../../oauth/state-cookie"
 import { issueSession } from "../../session/issue-session"
-import { resolveSession } from "../../session/resolve-session"
+import type { ResolvedSession } from "../../session/resolve-session"
+import { resolveCallerSession } from "../../session/resolve-session"
 
 /**
  * How long the provider gets to answer the whole code exchange.
@@ -138,7 +139,7 @@ export const callbackProvider = defineEndpoint({
       )
     }
 
-    const active = await resolveSession(internals, input.headers)
+    const active = await resolveCallerSession(internals, input)
 
     // Linking only means linking for a real user. A guest who "connects" a
     // provider is really signing in: the identity decides whether they upgrade
@@ -193,7 +194,7 @@ export const callbackProvider = defineEndpoint({
 async function connectIdentity(
   internals: AuthServerInternals,
   input: CallbackProviderInput,
-  resolved: Awaited<ReturnType<typeof resolveSession>>,
+  resolved: ResolvedSession | null,
   expectedUserId: string | undefined,
   identity: ProviderIdentity,
   locale: string,

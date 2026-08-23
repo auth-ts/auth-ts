@@ -41,7 +41,7 @@ describe("construction", () => {
 
 describe("getToken", () => {
   it("refreshes once and caches the token", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -52,12 +52,12 @@ describe("getToken", () => {
 
     expect(first).toBe(second)
     expect(
-      server.requests.filter((entry) => entry.path === "/api/auth/user")
+      server.requests.filter((entry) => entry.path === "/api/auth/token")
     ).toHaveLength(1)
   })
 
   it("sends credentials, which is what carries the refresh cookie", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -68,7 +68,7 @@ describe("getToken", () => {
   })
 
   it("makes exactly one request for ten concurrent callers", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -84,7 +84,7 @@ describe("getToken", () => {
 
   it("refreshes early, inside the 60 second window before expiry", async () => {
     vi.useFakeTimers()
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken({ lifetimeSeconds: 600 })
     })
@@ -105,7 +105,7 @@ describe("getToken", () => {
   })
 
   it("clears the token and throws on 401", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -114,7 +114,7 @@ describe("getToken", () => {
 
     server.restore()
     server = fakeAuthServer()
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       status: 401,
       body: {
         error: { code: "unauthenticated", message: "You are not signed in." }
@@ -126,7 +126,7 @@ describe("getToken", () => {
   })
 
   it("throws on a server failure and keeps the token, because a 500 is not a verdict", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -149,7 +149,7 @@ describe("getToken", () => {
     ]) {
       server.restore()
       server = fakeAuthServer()
-      server.on("GET", "/api/auth/user", reply)
+      server.on("GET", "/api/auth/token", reply)
       client.clearToken()
 
       await expect(
@@ -160,7 +160,7 @@ describe("getToken", () => {
   })
 
   it("surfaces retryAfter from a throttled response", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       status: 429,
       body: {
         error: {
@@ -178,27 +178,97 @@ describe("getToken", () => {
   })
 })
 
-describe("getUser", () => {
-  it("reads the server every time, because a name can change elsewhere", async () => {
-    server.on("GET", "/api/auth/user", {
+describe("a refused token", () => {
+  it("retries once with a fresh one, because refresh-ahead can still lose", async () => {
+    // A key rotated between mint and use, or a device clock far enough off that
+    // the refresh-ahead window never fired. Both look like a 401 on a token the
+    // client believed in.
+    server.on("POST", "/api/auth/verify-code", {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("GET", "/api/auth/user", { body: { user } })
+    server.on("GET", "/api/auth/sessions", {
+      status: 401,
+      body: {
+        error: { code: "unauthenticated", message: "You are not signed in." }
+      }
+    })
+    server.on("GET", "/api/auth/sessions", { body: [] })
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    const client = createAuthClient()
+    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+
+    expect(await client.listSessions()).toEqual([])
+    expect(
+      server.requests.filter((entry) => entry.path === "/api/auth/token")
+    ).toHaveLength(1)
+  })
+
+  it("gives up when the refresh is refused too, rather than looping", async () => {
+    const refused = {
+      status: 401,
+      body: {
+        error: { code: "unauthenticated", message: "You are not signed in." }
+      }
+    }
+    server.on("POST", "/api/auth/verify-code", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    server.on("GET", "/api/auth/sessions", refused)
+    server.on("GET", "/api/auth/token", refused)
+    const client = createAuthClient()
+    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+
+    await expect(client.listSessions()).rejects.toMatchObject({
+      code: "unauthenticated"
+    })
+    expect(
+      server.requests.filter((entry) => entry.path === "/api/auth/sessions")
+    ).toHaveLength(1)
+  })
+})
+
+describe("getUser", () => {
+  it("reads the server every time, because a name can change elsewhere", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    server.on("GET", "/api/auth/user", { body: user })
     const client = createAuthClient()
 
     await client.getUser()
     await client.getUser()
     await client.getUser()
 
-    // One refresh, then a read per call. Caching is the caller's to decide.
+    // The first call takes the user off the refresh it needed anyway; after
+    // that it is a read per call, because caching is the caller's to decide.
     expect(
-      server.requests.filter((request) => request.method === "GET")
-    ).toHaveLength(3)
+      server.requests.filter((entry) => entry.path === "/api/auth/token")
+    ).toHaveLength(1)
+    expect(
+      server.requests.filter((entry) => entry.path === "/api/auth/user")
+    ).toHaveLength(2)
+  })
+
+  it("costs one request on a cold start, since the refresh carries the user", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+
+    const found = await createAuthClient().getUser()
+
+    expect(found?.email).toBe("ada@example.com")
+    expect(server.requests).toHaveLength(1)
   })
 
   it("resolves null when the session is gone", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       status: 401,
       body: {
         error: { code: "unauthenticated", message: "You are not signed in." }
@@ -215,11 +285,11 @@ describe("getUser", () => {
     try {
       const first = fakeAccessToken()
       const second = fakeAccessToken()
-      server.on("GET", "/api/auth/user", {
+      server.on("GET", "/api/auth/token", {
         body: { user },
         token: first
       })
-      server.on("GET", "/api/auth/user", {
+      server.on("GET", "/api/auth/token", {
         body: { user },
         token: second
       })
@@ -235,7 +305,7 @@ describe("getUser", () => {
       // It did not wait, but it did start the refresh.
       for (let tick = 0; tick < 10; tick++) await Promise.resolve()
       expect(
-        server.requests.filter((request) => request.path === "/api/auth/user")
+        server.requests.filter((request) => request.path === "/api/auth/token")
       ).toHaveLength(2)
       expect(await client.getToken()).toBe(second)
     } finally {
@@ -248,11 +318,11 @@ describe("getUser", () => {
     try {
       const spent = fakeAccessToken()
       const fresh = fakeAccessToken()
-      server.on("GET", "/api/auth/user", {
+      server.on("GET", "/api/auth/token", {
         body: { user },
         token: spent
       })
-      server.on("GET", "/api/auth/user", {
+      server.on("GET", "/api/auth/token", {
         body: { user },
         token: fresh
       })
@@ -269,7 +339,7 @@ describe("getUser", () => {
   })
 
   it("shares one refresh between concurrent callers", async () => {
-    server.on("GET", "/api/auth/user", {
+    server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -280,7 +350,7 @@ describe("getUser", () => {
     await Promise.all(Array.from({ length: 5 }, () => client.getToken()))
 
     expect(
-      server.requests.filter((request) => request.path === "/api/auth/user")
+      server.requests.filter((request) => request.path === "/api/auth/token")
     ).toHaveLength(1)
   })
 })

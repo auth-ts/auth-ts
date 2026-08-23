@@ -66,6 +66,9 @@ describe("cleanup", () => {
     const cleanup = vi.spyOn(context.db, "cleanup")
 
     await context.authServer.handler(request("GET", "/api/auth/jwks"))
+    // A token refresh writes a session, but it is still a GET and still the
+    // request a read-heavy deployment makes most often.
+    await context.authServer.handler(request("GET", "/api/auth/token"))
 
     expect(cleanup).not.toHaveBeenCalled()
   })

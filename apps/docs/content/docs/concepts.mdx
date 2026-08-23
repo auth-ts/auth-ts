@@ -9,9 +9,9 @@ icon: Lightbulb
 **The refresh token** is the session. It is 32 random bytes, delivered to the
 browser only as an `HttpOnly`, `Secure`, `SameSite=Lax`, host-only cookie. It is
 rooted at `/` so a page request carries it, which is what lets a loader or a
-server component read the session during rendering; `cookie.path` narrows it to
+server component call `getToken` during rendering; `cookie.path` narrows it to
 the auth mount if you would rather the token stayed out of the `Cookie` header
-of every same-origin request, at the cost of those reads. Your database stores
+of every same-origin request, at the cost of that exchange. Your database stores
 nothing but `sha256` of it, so a leaked table cannot
 be replayed as a session. That is the whole of what hashing buys. The token
 itself is a bearer credential: whoever holds it holds the session until it is
@@ -21,13 +21,14 @@ revoked or expires, and hashing does nothing to change that.
 PostgREST verifies. It lives in a JavaScript variable for at most ten minutes and
 is never persisted anywhere.
 
-Once a session exists, every client method presents the access token it holds
-and is authenticated from it with no session lookup; when it holds none — first
-load, or the one it had has expired — the cookie authenticates instead and a new
-token comes back in the response. The sign-in methods are the exception only in
-the obvious sense: they run before a cookie exists, because they are what create
-it. An application that never touches the access token still gets working
-sign-in, profile updates, deletion, and a correct user object.
+Once a session exists, every client method presents the access token and is
+authenticated from it with no session lookup; when it holds none — first load, or
+the one it had has expired — it exchanges the cookie for one at `/token` first,
+which is the only request that reads the cookie and the only one that touches a
+session. The sign-in methods are the exception only in the obvious sense: they
+run before a cookie exists, because they are what create it, and they hand back a
+token with the user. An application that never touches the access token still
+gets working sign-in, profile updates, deletion, and a correct user object.
 
 ## Why the token is only in memory
 

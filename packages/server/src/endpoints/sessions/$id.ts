@@ -8,6 +8,7 @@ import {
 } from "../../session/accounts-cookie"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
+import { mintAccessToken } from "../../session/issue-session"
 import { promoteNextAccount } from "../../session/promote-account"
 
 /** Input for revoking one session. */
@@ -33,6 +34,8 @@ export interface RevokeSessionResult {
    * to revoke.
    */
   switchedTo?: AuthUser
+  /** That account's access token, present whenever `switchedTo` is. */
+  token?: string
 }
 
 /**
@@ -70,7 +73,7 @@ export const revokeSession = defineEndpoint({
     const current = revoked.id === caller.sessionId
     if (!current) {
       const data: RevokeSessionResult = { current }
-      return { data, headers: caller.headers }
+      return { data }
     }
 
     const secure = shouldUseSecureCookies(input.requestURL)
@@ -84,12 +87,17 @@ export const revokeSession = defineEndpoint({
     if (promoted) {
       const data: RevokeSessionResult = {
         current,
-        switchedTo: promoted.user
+        switchedTo: promoted.user,
+        token: await mintAccessToken(
+          internals,
+          promoted.user,
+          promoted.session.id
+        )
       }
       return { data, headers: promoted.headers }
     }
 
-    const responseHeaders = new Headers(caller.headers)
+    const responseHeaders = new Headers()
     responseHeaders.append(
       "set-cookie",
       clearCookie(

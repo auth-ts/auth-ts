@@ -35,7 +35,10 @@ afterEach(() => {
 
 describe("cookieStorage", () => {
   it("leaves the browser's jar alone when unset", async () => {
-    server.on("GET", "/api/auth/user", { body: user })
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
 
     await createAuthClient().getUser()
 
@@ -72,6 +75,12 @@ describe("cookieStorage", () => {
       "auth-ts.cookies",
       JSON.stringify({ "auth-ts.refresh": "secret", other: "kept" })
     )
+    // The jar carries the refresh cookie to `/token`, which is the one place
+    // it is spent — and the token it buys is what signs the caller out.
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
     server.on("POST", "/api/auth/sign-out", {
       status: 204,
       setCookies: [
@@ -82,6 +91,8 @@ describe("cookieStorage", () => {
 
     await client.signOut()
 
+    expect(server.requests[0]?.path).toBe("/api/auth/token")
+    expect(server.requests[0]?.credentials).toBe("omit")
     expect(server.requests[0]?.cookie).toBe(
       "auth-ts.refresh=secret; other=kept"
     )
@@ -94,6 +105,10 @@ describe("cookieStorage", () => {
       "auth-ts.cookies",
       JSON.stringify({ "auth-ts.refresh": "secret" })
     )
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
     server.on("POST", "/api/auth/sign-out", {
       status: 204,
       setCookies: ["auth-ts.refresh=; Max-Age=0; Path=/"]
@@ -107,11 +122,35 @@ describe("cookieStorage", () => {
   it("treats unreadable storage as empty rather than failing the request", async () => {
     const { storage } = memoryStorage()
     await storage.setItem("auth-ts.cookies", "not json")
-    server.on("GET", "/api/auth/user", { body: user })
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
 
     await createAuthClient({ cookieStorage: storage }).getUser()
 
     expect(server.requests[0]?.cookie).toBeNull()
+  })
+
+  it("empties the jar when the refresh cookie is refused", async () => {
+    const { storage, items } = memoryStorage()
+    await storage.setItem(
+      "auth-ts.cookies",
+      JSON.stringify({ "auth-ts.refresh": "spent" })
+    )
+    server.on("GET", "/api/auth/token", {
+      status: 401,
+      body: {
+        error: { code: "unauthenticated", message: "You are not signed in." }
+      }
+    })
+
+    expect(
+      await createAuthClient({ cookieStorage: storage }).getUser()
+    ).toBeNull()
+
+    // A jar holding a refused refresh token is holding a dead credential.
+    expect(items.has("auth-ts.cookies")).toBe(false)
   })
 })
 

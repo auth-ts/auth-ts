@@ -47,8 +47,7 @@ export type {
 export type {
   AuthCallables,
   AuthHandlers,
-  AuthServer,
-  AuthSessionResult
+  AuthServer
 } from "./core/create-auth-server"
 export { createAuthServer } from "./core/create-auth-server"
 export type { AccountInfo, ListAccountsInput } from "./endpoints/accounts"
@@ -70,6 +69,7 @@ export type {
   SignOutInput,
   SignOutScope
 } from "./endpoints/sign-out"
+export type { TokenResult } from "./endpoints/token"
 export type { DeleteUserInput, UpdateUserInput } from "./endpoints/user"
 export type { VerifyCodeInput } from "./endpoints/verify-code"
 export { AuthApiError } from "./http/auth-api-error"

@@ -12,6 +12,18 @@ const other = {
 
 let server: FakeAuthServer
 
+/** A client holding a live token, which every authenticated call needs. */
+const signedIn = async () => {
+  server.on("POST", "/api/auth/verify-code", {
+    body: { user },
+    token: fakeAccessToken()
+  })
+  const client = createAuthClient()
+  await client.verifyCode({ email: "ada@example.com", code: "123456" })
+
+  return client
+}
+
 beforeEach(() => {
   server = fakeAuthServer()
 })
@@ -68,13 +80,16 @@ describe("updateUser", () => {
     server.on("POST", "/api/auth/user", {
       body: { user: { ...user, name: "Ada" } }
     })
-    const client = createAuthClient()
+    const client = await signedIn()
 
     const updated = await client.updateUser({ name: "Ada" })
 
     expect(updated.name).toBe("Ada")
-    // One request: the update answers with the row, so nothing is read back.
-    expect(server.requests).toHaveLength(1)
+    // The update answers with the row, so nothing is read back — and the token
+    // from the sign-in is still live, so nothing is refreshed either.
+    expect(
+      server.requests.filter((entry) => entry.path === "/api/auth/user")
+    ).toHaveLength(1)
   })
 })
 
@@ -109,7 +124,12 @@ describe("signOut", () => {
   it("names an account only when it is given one", async () => {
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
-    const client = createAuthClient()
+    // The first sign-out drops the token, so the second buys another.
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    const client = await signedIn()
 
     await client.signOut()
     expect(server.requests.at(-1)?.body).toEqual({ scope: "local" })
@@ -146,20 +166,14 @@ describe("deleteUser", () => {
         error: { code: "codeSent", message: "Confirm with the code we sent." }
       }
     })
+    const client = await signedIn()
 
-    expect(await createAuthClient().deleteUser()).toEqual({
-      status: "codeRequired"
-    })
+    expect(await client.deleteUser()).toEqual({ status: "codeRequired" })
   })
 
   it("clears everything once the account is gone", async () => {
-    server.on("POST", "/api/auth/verify-code", {
-      body: { user },
-      token: fakeAccessToken()
-    })
     server.on("DELETE", "/api/auth/user", { status: 204 })
-    const client = createAuthClient()
-    await client.verifyCode({ email: "ada@example.com", code: "123456" })
+    const client = await signedIn()
 
     expect(await client.deleteUser({ code: "123456" })).toEqual({
       status: "deleted"
@@ -173,10 +187,19 @@ describe("deleteUser", () => {
         error: { code: "invalidCode", message: "That code is not valid." }
       }
     })
+    const client = await signedIn()
 
-    await expect(
-      createAuthClient().deleteUser({ code: "000000" })
-    ).rejects.toMatchObject({ code: "invalidCode" })
+    // Not retried: a wrong code is a verdict on the request, not on the
+    // credential, so the delete is sent once and no token is refreshed.
+    await expect(client.deleteUser({ code: "000000" })).rejects.toMatchObject({
+      code: "invalidCode"
+    })
+    expect(
+      server.requests.filter((entry) => entry.path === "/api/auth/token")
+    ).toHaveLength(0)
+    expect(
+      server.requests.filter((entry) => entry.path === "/api/auth/user")
+    ).toHaveLength(1)
   })
 })
 

@@ -18,7 +18,8 @@ export function createUpdateUser(internals: AuthClientInternals) {
     const { user } = await internals.fetchJson<{ user: AuthUser }>({
       method: "POST",
       path: "/user",
-      body: input
+      body: input,
+      authenticated: true
     })
     return user
   }
@@ -49,25 +50,44 @@ export interface SignOutInput {
  * clear the token and the user mirror; when the account signed out was the
  * active one and another is parked, the server promotes it and the caches are
  * primed with that user instead of emptied.
+ *
+ * A session that is already gone resolves to `null` rather than throwing: the
+ * caller asked to end up signed out, and they are.
  */
 export function createSignOut(internals: AuthClientInternals) {
   return async function signOut(
     input: SignOutInput = {}
   ): Promise<{ switchedTo: AuthUser } | null> {
     const scope = input.scope ?? "local"
-    const result = await internals.fetchJson<
-      { switchedTo?: AuthUser } | undefined
-    >({
-      method: "POST",
-      path: "/sign-out",
-      body: { scope, ...(input.userId ? { userId: input.userId } : {}) }
-    })
+    let result: { switchedTo?: AuthUser; token?: string } | undefined
+    try {
+      result = await internals.fetchJson({
+        method: "POST",
+        path: "/sign-out",
+        body: { scope, ...(input.userId ? { userId: input.userId } : {}) },
+        authenticated: true
+      })
+    } catch (error) {
+      // Nothing to sign out of is the outcome this asked for, not a failure to
+      // report to someone who has already clicked the button.
+      if (!(error instanceof AuthError && error.code === "unauthenticated")) {
+        throw error
+      }
+      internals.tokenStore.clear()
+
+      return null
+    }
 
     if (scope === "others") return null
 
-    // The promoted account's token came back in the header and is already
-    // stored; only a sign-out with nothing to promote clears it.
-    if (result?.switchedTo) return { switchedTo: result.switchedTo }
+    // Signing out of the active account under `multiAccount` promotes a parked
+    // one and hands back its token; only a sign-out with nothing to promote
+    // leaves the browser with no token at all.
+    if (result?.switchedTo && result.token) {
+      internals.tokenStore.set(result.token)
+
+      return { switchedTo: result.switchedTo }
+    }
 
     internals.tokenStore.clear()
 
@@ -104,7 +124,8 @@ export function createDeleteUser(internals: AuthClientInternals) {
       await internals.fetchJson({
         method: "DELETE",
         path: "/user",
-        body: input
+        body: input,
+        authenticated: true
       })
     } catch (error) {
       if (error instanceof AuthError && error.code === "codeSent")
@@ -129,7 +150,8 @@ export function createListSessions(internals: AuthClientInternals) {
   return async function listSessions(): Promise<SessionInfo[]> {
     const sessions = await internals.fetchJson<SessionInfoWire[]>({
       method: "GET",
-      path: "/sessions"
+      path: "/sessions",
+      authenticated: true
     })
 
     // Revived here so `SessionInfo` means the same thing on both sides: the
@@ -160,11 +182,19 @@ export function createRevokeSession(internals: AuthClientInternals) {
   ): Promise<void> {
     const result = await internals.fetchJson<RevokeSessionResult | undefined>({
       method: "DELETE",
-      path: `/sessions/${encodeURIComponent(input.id)}`
+      path: `/sessions/${encodeURIComponent(input.id)}`,
+      authenticated: true
     })
 
-    if (result?.current) {
-      internals.tokenStore.clear()
+    if (!result?.current) return
+
+    // Revoking the current session under `multiAccount` moves the browser to a
+    // parked account, and that account's token comes back with it.
+    if (result.token) {
+      internals.tokenStore.set(result.token)
+      return
     }
+
+    internals.tokenStore.clear()
   }
 }

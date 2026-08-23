@@ -61,7 +61,7 @@ disagree:
 
 ```ts
 // 1. Call it directly from your own backend. No HTTP round-trip to yourself.
-const { session, user, token } = await authServer.getUser({ headers })
+const { token, user } = await authServer.getToken({ headers })
 
 // 2. One catch-all handler, mounted once.
 authServer.handler(request)
@@ -78,51 +78,51 @@ Plus the JWT-plane functions:
   private key with a function signature; never expose it through a route.
 - `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
   Never authorize with it.
+- `getToken({ headers })` — exchanges the refresh cookie for an access token,
+  and returns the user with it. The one function that reads the cookie.
 - `getSession({ headers })` — the session the caller is acting from. One
-  read, no user lookup; with a token, the one its `sid` names.
+  read, no user lookup: the one the token's `sid` names.
 
-### Headers, a token, or both
+### The token is the credential
 
-Every authenticated endpoint takes `{ headers?, token? }`, and reads them in that
-order of preference: a token passed directly, then an `Authorization: Bearer`
-header, then the session cookie.
+Every authenticated endpoint takes `{ headers?, token? }` and authenticates from
+the access token alone: a token passed directly, then an `Authorization: Bearer`
+header, then a 401. There is no cookie fallback.
+
+`GET /token` is the exception, and the only one. It reads the refresh cookie,
+slides the session, signs a token, and answers with `{ token, user }`. Nothing
+else touches a session at all.
 
 ```ts
-// Server-side rendering: hand over the request you already have.
-await authServer.listSessions({ headers })
-
-// Your own API, forwarding the bearer it was given — no cookie in sight.
-await authServer.listSessions({ token })
+// Server-side rendering: buy a token once, then spend it.
+const { token, user } = await authServer.getToken({ headers })
+const sessions = await authServer.listSessions({ token })
 ```
 
-A valid token names the caller with no database work at all, which is the point
-of issuing tokens. Missing, expired, and unreadable all mean the same thing: fall
-back to the cookie, touch the session, mint a replacement, and send it back in
-the `x-auth-token` response header. A client that has lost its token gets another
-rather than an error it cannot act on.
+That shape is the point. A loader that called four endpoints with `{ headers }`
+under a cookie fallback would slide the session four times, read the user four
+times, and sign four tokens it then threw away. One exchange plus four token
+reads costs one session write and no signatures.
 
-That is the only place a token is ever produced, sign-ins included. Nothing
-returns one in a body.
+Sign-ins hand back a token in the body alongside the user — verification code,
+guest, account switch, and the sign-out that promotes a parked account — so
+signing in and the first render cost one round trip between them rather than a
+sign-in followed by a refresh. Nothing crosses in a response header any more,
+which is also why there is nothing for CORS to expose.
 
-**Cross-origin clients need the header exposed**, and the server does that
-automatically alongside the other CORS headers. Without it a browser silently
-cannot read the token, and only same-origin deployments would ever refresh.
-
-Sessions are touched on that fallback and nowhere else, so a session is written
-about once per token lifetime per client rather than once per request. Signing
-out is the one endpoint that mints nothing — handing over a fresh credential on
-the way out would be perverse — unless it promotes another account, which gets
-that account's token.
+`GET /connect/:provider` is the one authenticated route that still accepts the
+cookie, because `location.assign` is a top-level navigation and cannot carry an
+`Authorization` header. It prefers the token when one is there.
 
 The cost of trusting a token is revocation latency: a session revoked elsewhere
 keeps working until that token expires, `jwt.ttl` at the outside. That is the
 same bound your database already lives with, since it authorizes on the token
 too.
 
-Every fallback is logged at `debug` with a `reason` of `missing`, `expired`, or
-`invalid`. Counting them is worth doing: a healthy client falls back about once
-per token lifetime, so a rate above that is a client that has stopped reading the
-header, showing up as a graph rather than as unexplained database load.
+Every refusal is logged at `debug` with a `reason` of `missing`, `expired`, or
+`invalid`. Counting them is worth doing: a client refreshes ahead of expiry, so a
+healthy deployment refuses about never — a rate above that is a client that has
+stopped refreshing, showing up as a graph rather than as user reports.
 
 <auto-type-table path="../../../../../packages/server/src/jwt/sign-token.ts" name="SignTokenClaims" />
 
@@ -139,8 +139,8 @@ const authServer = createAuthServer({
   user: { additionalFields: { plan: "string", seats: "number" } }
 })
 
-const result = await authServer.getUser({ headers })
-result.user.plan // string | null | undefined
+const user = await authServer.getUser({ token })
+user.plan // string | null | undefined
 ```
 
 Optional and nullable on the way out, because nothing guarantees a row has set

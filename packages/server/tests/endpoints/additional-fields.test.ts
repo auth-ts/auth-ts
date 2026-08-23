@@ -201,16 +201,11 @@ describe("additionalFields on update", () => {
   it("accepts declared fields flat, beside name and imageURL", async () => {
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
-    const cookies = {
-      "auth-ts.refresh": required(
-        readSetCookies(signInResponse).get("auth-ts.refresh"),
-        "refresh"
-      ).value
-    }
+    const { token } = (await signInResponse.json()) as { token: string }
 
     const response = await context.authServer.handler(
       request("POST", "/api/auth/user", {
-        cookies,
+        token,
         body: { name: "Ada", referralCode: "UPDATED", seats: 9 }
       })
     )
@@ -228,26 +223,21 @@ describe("additionalFields on update", () => {
     // never reaches the store now.
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
-    const cookies = {
-      "auth-ts.refresh": required(
-        readSetCookies(signInResponse).get("auth-ts.refresh"),
-        "refresh"
-      ).value
-    }
+    const { token } = (await signInResponse.json()) as { token: string }
     const update = vi.spyOn(context.db, "update")
     const insert = vi.spyOn(context.db, "insert")
 
     for (const body of [{}, { name: undefined }, { seats: undefined }]) {
       const response = await context.authServer.handler(
-        request("POST", "/api/auth/user", { cookies, body })
+        request("POST", "/api/auth/user", { token, body })
       )
       expect(response.status).toBe(400)
       expect(
         ((await response.json()) as { error: { code: string } }).error.code
       ).toBe("invalidField")
     }
-    // The session slides on every authenticated request, so the assertion is
-    // that the users table is never touched — not that nothing is written.
+    // The token authenticates, so nothing is written at all — not the session,
+    // and certainly not the user.
     expect(
       update.mock.calls.filter(([input]) => input.table === "users")
     ).toHaveLength(0)
@@ -257,12 +247,7 @@ describe("additionalFields on update", () => {
   it("still rejects identity fields and undeclared keys", async () => {
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
-    const cookies = {
-      "auth-ts.refresh": required(
-        readSetCookies(signInResponse).get("auth-ts.refresh"),
-        "refresh"
-      ).value
-    }
+    const { token } = (await signInResponse.json()) as { token: string }
 
     for (const body of [
       { type: "admin" },
@@ -270,7 +255,7 @@ describe("additionalFields on update", () => {
       { somethingElse: 1 }
     ]) {
       const response = await context.authServer.handler(
-        request("POST", "/api/auth/user", { cookies, body })
+        request("POST", "/api/auth/user", { token, body })
       )
       expect(response.status).toBe(400)
     }

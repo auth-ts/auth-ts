@@ -32,7 +32,8 @@ function buildURL(
  * Not a fetch: OAuth is a redirect dance that must happen at the top level, and
  * this returns nothing because the page is on its way out. When the user comes
  * back the session cookie is already set, so the application boots, calls
- * `getUser`, and finds them signed in — the callback hands the SPA no token.
+ * `getUser`, and finds them signed in — the callback hands the SPA no token, and
+ * the cookie is what buys the first one.
  *
  * Signing in while already signed in never links accounts. Use `connect` for that.
  */

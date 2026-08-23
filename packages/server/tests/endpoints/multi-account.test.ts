@@ -1,10 +1,20 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import { mintToken, readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
 type TestContext = Awaited<ReturnType<typeof createTestServer>>
+
+/**
+ * The access token this browser's cookies buy right now.
+ *
+ * Every authenticated call goes through one, so switching accounts means the
+ * next call carries the token the new cookie minted — which is exactly the
+ * sequence a client runs.
+ */
+const tokenFor = (context: TestContext, cookies: Record<string, string>) =>
+  mintToken(context.authServer, cookies["auth-ts.refresh"] ?? "")
 
 /** Signs an address in, carrying whatever cookies the browser already holds. */
 async function signIn(
@@ -38,7 +48,10 @@ describe("multiAccount disabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("GET", "/api/auth/accounts", { cookies: second.cookies })
+          request("GET", "/api/auth/accounts", {
+            cookies: second.cookies,
+            token: await tokenFor(context, second.cookies)
+          })
         )
       ).status
     ).toBe(404)
@@ -47,14 +60,18 @@ describe("multiAccount disabled", () => {
         await context.authServer.handler(
           request("POST", "/api/auth/accounts/switch", {
             cookies: second.cookies,
-            body: { userId: "x" }
+            body: { userId: "x" },
+            token: await tokenFor(context, second.cookies)
           })
         )
       ).status
     ).toBe(404)
 
     const whoami = await context.authServer.handler(
-      request("GET", "/api/auth/user", { cookies: second.cookies })
+      request("GET", "/api/auth/user", {
+        cookies: second.cookies,
+        token: await tokenFor(context, second.cookies)
+      })
     )
     expect(((await whoami.json()) as { email: string }).email).toBe(
       "grace@example.com"
@@ -100,7 +117,10 @@ describe("multiAccount enabled", () => {
     const second = await signIn(context, "grace@example.com", first.cookies)
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/accounts", { cookies: second.cookies })
+      request("GET", "/api/auth/accounts", {
+        cookies: second.cookies,
+        token: await tokenFor(context, second.cookies)
+      })
     )
     const body = (await response.json()) as Array<{ email: string }>
 
@@ -121,7 +141,10 @@ describe("multiAccount enabled", () => {
     }
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/accounts", { cookies })
+      request("GET", "/api/auth/accounts", {
+        cookies,
+        token: await tokenFor(context, cookies)
+      })
     )
     const body = (await response.json()) as Array<{ email: string }>
 
@@ -146,7 +169,10 @@ describe("multiAccount enabled", () => {
     }
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/accounts", { cookies })
+      request("GET", "/api/auth/accounts", {
+        cookies,
+        token: await tokenFor(context, cookies)
+      })
     )
     const body = (await response.json()) as Array<{ email: string }>
 
@@ -179,20 +205,20 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/accounts/switch", {
         cookies: second.cookies,
-        body: { userId: adaId }
+        body: { userId: adaId },
+        token: await tokenFor(context, second.cookies)
       })
     )
-    const body = (await response.json()) as { email: string }
+    const body = (await response.json()) as {
+      user: { email: string }
+      token: string
+    }
 
     expect(response.status).toBe(200)
-    expect(body.email).toBe("ada@example.com")
-    expect(
-      (
-        await context.authServer.verifyToken(
-          required(response.headers.get("x-auth-token"), "token header")
-        )
-      )?.sub
-    ).toBe(adaId)
+    expect(body.user.email).toBe("ada@example.com")
+    // The token comes back with the account it belongs to, so the switch and
+    // the render after it cost one round trip between them.
+    expect((await context.authServer.verifyToken(body.token))?.sub).toBe(adaId)
 
     const switched = readSetCookies(response)
     const whoami = await context.authServer.handler(
@@ -202,7 +228,8 @@ describe("multiAccount enabled", () => {
             switched.get("auth-ts.refresh"),
             "refresh"
           ).value
-        }
+        },
+        token: body.token
       })
     )
     expect(((await whoami.json()) as { email: string }).email).toBe(
@@ -220,7 +247,8 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/accounts/switch", {
         cookies,
-        body: { userId: stranger.id }
+        body: { userId: stranger.id },
+        token: await tokenFor(context, cookies)
       })
     )
 
@@ -239,7 +267,10 @@ describe("multiAccount enabled", () => {
     await context.db.delete({ table: "sessions", where: { userId: ada.id } })
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/accounts", { cookies: second.cookies })
+      request("GET", "/api/auth/accounts", {
+        cookies: second.cookies,
+        token: await tokenFor(context, second.cookies)
+      })
     )
     const body = (await response.json()) as Array<{ email: string }>
 
@@ -255,9 +286,12 @@ describe("multiAccount enabled", () => {
     // rather than turning a single request into a thousand sequential queries.
     const context = await createTestServer(options)
     const { cookies } = await signIn(context, "ada@example.com")
+    // Minted before the spy: buying the token is its own request, and its reads
+    // are not the cost being measured here.
+    const token = await tokenFor(context, cookies)
     // Every parked entry costs one read of `sessions`. The active session is not
-    // among them — resolving it is an update, not a select — and the users the
-    // listing reads afterwards are not the cost being measured.
+    // among them — the token names it — and the users the listing reads
+    // afterwards are not the cost being measured either.
     const select = vi.spyOn(context.db, "select")
     const sessionReads = () =>
       select.mock.calls.filter(([input]) => input.table === "sessions").length
@@ -267,7 +301,8 @@ describe("multiAccount enabled", () => {
     )
     const response = await context.authServer.handler(
       request("GET", "/api/auth/accounts", {
-        cookies: { ...cookies, "auth-ts.refresh.accounts": forged }
+        cookies: { ...cookies, "auth-ts.refresh.accounts": forged },
+        token
       })
     )
     const body = (await response.json()) as Array<{ email: string }>
@@ -289,7 +324,8 @@ describe("multiAccount enabled", () => {
         cookies: {
           ...cookies,
           "auth-ts.refresh.accounts": JSON.stringify([active, active, active])
-        }
+        },
+        token
       })
     )
     expect(sessionReads()).toBe(1)
@@ -300,7 +336,8 @@ describe("multiAccount enabled", () => {
         cookies: {
           ...cookies,
           "auth-ts.refresh.accounts": JSON.stringify([active, 42, null])
-        }
+        },
+        token
       })
     )
     // An entry that is not a string makes the whole cookie untrustworthy, so it
@@ -319,7 +356,10 @@ describe("multiAccount enabled", () => {
     expect(context.db.sessions()).toHaveLength(2)
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/sign-out", { cookies: second.cookies })
+      request("POST", "/api/auth/sign-out", {
+        cookies: second.cookies,
+        token: await tokenFor(context, second.cookies)
+      })
     )
     const cleared = readSetCookies(response)
 
@@ -359,7 +399,8 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { userId: grace.id }
+        body: { userId: grace.id },
+        token: await tokenFor(context, second.cookies)
       })
     )
     const body = (await response.json()) as {
@@ -382,7 +423,8 @@ describe("multiAccount enabled", () => {
             promoted.get("auth-ts.refresh"),
             "refresh"
           ).value
-        }
+        },
+        token: body.token
       })
     )
     expect(((await whoami.json()) as { email: string }).email).toBe(
@@ -402,7 +444,8 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { scope: "global" }
+        body: { scope: "global" },
+        token: await tokenFor(context, second.cookies)
       })
     )
 
@@ -437,7 +480,8 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { scope: "global", userId: graceId }
+        body: { scope: "global", userId: graceId },
+        token: await tokenFor(context, second.cookies)
       })
     )
     const body = (await response.json()) as { switchedTo: { email: string } }
@@ -476,7 +520,8 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { scope: "others" }
+        body: { scope: "others" },
+        token: await tokenFor(context, second.cookies)
       })
     )
 
@@ -503,7 +548,10 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("GET", "/api/auth/user", { cookies: second.cookies })
+          request("GET", "/api/auth/user", {
+            cookies: second.cookies,
+            token: await tokenFor(context, second.cookies)
+          })
         )
       ).status
     ).toBe(200)
@@ -521,7 +569,8 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: second.cookies,
-        body: { userId: adaId }
+        body: { userId: adaId },
+        token: await tokenFor(context, second.cookies)
       })
     )
 
@@ -533,7 +582,10 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("GET", "/api/auth/user", { cookies: second.cookies })
+          request("GET", "/api/auth/user", {
+            cookies: second.cookies,
+            token: await tokenFor(context, second.cookies)
+          })
         )
       ).status
     ).toBe(200)
@@ -550,7 +602,8 @@ describe("multiAccount enabled", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
         cookies: session.cookies,
-        body: { userId: graceId }
+        body: { userId: graceId },
+        token: await tokenFor(context, session.cookies)
       })
     )
 
@@ -569,12 +622,16 @@ describe("multiAccount enabled", () => {
     // Which session this browser is on comes from the session read, not from a
     // flag on the list.
     const read = await context.authServer.handler(
-      request("GET", "/api/auth/session", { cookies: second.cookies })
+      request("GET", "/api/auth/session", {
+        cookies: second.cookies,
+        token: await tokenFor(context, second.cookies)
+      })
     )
     const current = (await read.json()) as { id: string }
     const response = await context.authServer.handler(
       request("DELETE", `/api/auth/sessions/${current.id}`, {
-        cookies: second.cookies
+        cookies: second.cookies,
+        token: await tokenFor(context, second.cookies)
       })
     )
     const body = (await response.json()) as {
@@ -592,7 +649,10 @@ describe("multiAccount enabled", () => {
     const { cookies } = await signIn(context, "ada@example.com")
 
     const response = await context.authServer.handler(
-      request("POST", "/api/auth/sign-out", { cookies })
+      request("POST", "/api/auth/sign-out", {
+        cookies,
+        token: await tokenFor(context, cookies)
+      })
     )
     const cleared = readSetCookies(response)
 
@@ -623,7 +683,10 @@ describe("guest conversion under multiAccount", () => {
     const { cookies } = await signIn(context, "ada@example.com", guestCookies)
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/accounts", { cookies })
+      request("GET", "/api/auth/accounts", {
+        cookies,
+        token: await tokenFor(context, cookies)
+      })
     )
     const body = (await response.json()) as Array<{ email: string | null }>
 

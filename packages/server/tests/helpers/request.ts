@@ -7,6 +7,8 @@ export function request(
     cookies?: Record<string, string>
     headers?: Record<string, string>
     origin?: string
+    /** Presented as `Authorization: Bearer`, the way every client sends one. */
+    token?: string
   } = {}
 ) {
   const origin = options.origin ?? "https://app.example.com"
@@ -20,6 +22,8 @@ export function request(
         .join("; ")
     )
   }
+
+  if (options.token) headers.set("authorization", `Bearer ${options.token}`)
 
   if (options.body !== undefined)
     headers.set("content-type", "application/json")
@@ -49,4 +53,20 @@ export function readSetCookies(response: Response | { headers: Headers }) {
   }
 
   return cookies
+}
+
+/** Exchanges a refresh cookie for an access token, the way a client boots. */
+export async function mintToken(
+  authServer: { handler: (request: Request) => Promise<Response> },
+  refreshToken: string
+) {
+  const response = await authServer.handler(
+    request("GET", "/api/auth/token", {
+      cookies: { "auth-ts.refresh": refreshToken }
+    })
+  )
+  const body = (await response.json()) as { token?: string }
+  if (!body.token) throw new Error("no token for that refresh cookie")
+
+  return body.token
 }

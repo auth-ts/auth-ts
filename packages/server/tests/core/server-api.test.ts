@@ -20,24 +20,30 @@ async function signIn(context: TestContext) {
       }
     })
   )
+  const { token } = (await response.json()) as { token: string }
 
-  return required(readSetCookies(response).get("auth-ts.refresh"), "refresh")
-    .value
+  return {
+    refreshToken: required(
+      readSetCookies(response).get("auth-ts.refresh"),
+      "refresh"
+    ).value,
+    token
+  }
 }
 
 const cookieHeaders = (refreshToken: string) =>
   new Headers({ cookie: `auth-ts.refresh=${refreshToken}` })
 
-describe("getUser as a function", () => {
-  it("returns the user and slides the session it fell back to", async () => {
+describe("getToken as a function", () => {
+  it("returns the token and the user, and slides the session it read", async () => {
     const context = await createTestServer({ session: { ttl: "30d" } })
-    const refreshToken = await signIn(context)
+    const { refreshToken } = await signIn(context)
     const before = required(
       context.db.sessions()[0],
       "session"
     ).expiresAt.getTime()
 
-    const user = await context.authServer.getUser({
+    const { token, user } = await context.authServer.getToken({
       headers: cookieHeaders(refreshToken)
     })
     const after = required(
@@ -46,6 +52,7 @@ describe("getUser as a function", () => {
     ).expiresAt.getTime()
 
     expect(user.email).toBe("ada@example.com")
+    expect(await context.authServer.verifyToken(token)).toBeTruthy()
     expect(after).toBeGreaterThanOrEqual(before)
   })
 
@@ -55,11 +62,13 @@ describe("getUser as a function", () => {
       const context = await createTestServer({
         session: { ttl: "30d", sliding: false }
       })
-      const refreshToken = await signIn(context)
+      const { refreshToken } = await signIn(context)
       const before = required(context.db.sessions()[0], "session").expiresAt
 
       vi.advanceTimersByTime(60 * 60_000)
-      await context.authServer.getUser({ headers: cookieHeaders(refreshToken) })
+      await context.authServer.getToken({
+        headers: cookieHeaders(refreshToken)
+      })
 
       expect(
         required(context.db.sessions()[0], "session").expiresAt.getTime()
@@ -71,9 +80,9 @@ describe("getUser as a function", () => {
 
   it("accepts a Request directly, since it satisfies the headers shape", async () => {
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
+    const { refreshToken } = await signIn(context)
 
-    const user = await context.authServer.getUser(
+    const { user } = await context.authServer.getToken(
       request("GET", "/dashboard", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
@@ -83,18 +92,17 @@ describe("getUser as a function", () => {
   })
 
   it("throws unauthenticated for a revoked session, matching the endpoint", async () => {
-    // Callables throw AuthApiError so a caller can switch on `code`; getSession is
-    // the one that answers null, because "is anyone signed in" is a question with
-    // a legitimate negative answer.
+    // Callables throw AuthApiError so a caller can switch on `code` rather than
+    // pattern-matching a message.
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
+    const { refreshToken } = await signIn(context)
     await context.db.delete({
       table: "sessions",
       where: { userId: required(context.db.users()[0], "user").id }
     })
 
     await expect(
-      context.authServer.getUser({ headers: cookieHeaders(refreshToken) })
+      context.authServer.getToken({ headers: cookieHeaders(refreshToken) })
     ).rejects.toMatchObject({
       code: "unauthenticated",
       status: 401
@@ -107,43 +115,78 @@ describe("getUser as a function", () => {
     const context = await createTestServer({ cookie: { path: "/api/auth" } })
 
     await expect(
-      context.authServer.getUser({ headers: new Headers() })
+      context.authServer.getToken({ headers: new Headers() })
     ).rejects.toThrow(AuthConfigError)
     await expect(
-      context.authServer.getUser({ headers: new Headers() })
+      context.authServer.getToken({ headers: new Headers() })
     ).rejects.toThrow(/cookie.path/)
+  })
+
+  it("is the only callable that reads the cookie", async () => {
+    const context = await createTestServer()
+    const { refreshToken } = await signIn(context)
+    const headers = cookieHeaders(refreshToken)
+
+    for (const call of [
+      () => context.authServer.getUser({ headers }),
+      () => context.authServer.getSession({ headers }),
+      () => context.authServer.listSessions({ headers })
+    ]) {
+      await expect(call()).rejects.toMatchObject({
+        code: "unauthenticated",
+        status: 401
+      })
+    }
+  })
+
+  it("serves a whole render from one exchange, touching one session", async () => {
+    // The shape server-side rendering is meant to have: buy a token once, then
+    // spend it. Anything else would slide the session on every call.
+    const context = await createTestServer()
+    const { refreshToken } = await signIn(context)
+    const { token } = await context.authServer.getToken({
+      headers: cookieHeaders(refreshToken)
+    })
+
+    const update = vi.spyOn(context.db, "update")
+    const [session, user, sessions] = await Promise.all([
+      context.authServer.getSession({ token }),
+      context.authServer.getUser({ token }),
+      context.authServer.listSessions({ token })
+    ])
+
+    expect(update).not.toHaveBeenCalled()
+    expect(user.email).toBe("ada@example.com")
+    expect(sessions).toHaveLength(1)
+    expect(session).not.toHaveProperty("tokenHash")
   })
 })
 
 describe("getSession", () => {
-  it("resolves the session and user without minting a token", async () => {
+  it("reads the session the token names, without touching it", async () => {
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
+    const { token } = await signIn(context)
 
-    const headers = cookieHeaders(refreshToken)
-    const session = await context.authServer.getSession({ headers })
-    const user = await context.authServer.getUser({ headers })
+    const update = vi.spyOn(context.db, "update")
+    const session = await context.authServer.getSession({ token })
 
-    // Two calls, because they are two questions: one keeps the session alive
-    // without reading the user, the other reads the user.
-    expect(user.email).toBe("ada@example.com")
-    expect(session.id).toBeTruthy()
+    expect(update).not.toHaveBeenCalled()
+    expect(session.id).toBe(required(context.db.sessions()[0], "row").id)
     expect(session).not.toHaveProperty("tokenHash")
   })
 
   it("refuses a revoked or expired session", async () => {
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
+    const { refreshToken } = await signIn(context)
     const session = required(context.db.sessions()[0], "session")
 
     await context.db.delete({
       table: "sessions",
       where: { tokenHash: session.tokenHash }
     })
-    // The callable is the endpoint, so a dead session is refused rather than
-    // reported as null.
+
     await expect(
-      context.authServer.getSession({
+      context.authServer.getToken({
         headers: cookieHeaders(refreshToken)
       })
     ).rejects.toThrow()
@@ -153,7 +196,7 @@ describe("getSession", () => {
     const context = await createTestServer({ cookie: { path: "/api/auth" } })
 
     await expect(
-      context.authServer.getSession({ headers: new Headers() })
+      context.authServer.getToken({ headers: new Headers() })
     ).rejects.toThrow(AuthConfigError)
   })
 })
@@ -246,15 +289,14 @@ describe("callables and handlers agree", () => {
 describe("calling with a token instead of a request", () => {
   it("authenticates from a token alone, with no headers at all", async () => {
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
-    // Tokens arrive in the response header, so this is how a caller with only
-    // the cookie gets one to pass along.
+    const { refreshToken } = await signIn(context)
+    // How a caller holding only the cookie gets a token to pass along.
     const minted = await context.authServer.handler(
-      request("GET", "/api/auth/session", {
+      request("GET", "/api/auth/token", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
-    const token = required(minted.headers.get("x-auth-token"), "token header")
+    const { token } = (await minted.json()) as { token: string }
 
     // No cookie, no request — the shape a custom API has after reading its own
     // Authorization header, or a service handed a token some other way.
@@ -275,13 +317,7 @@ describe("calling with a token instead of a request", () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "1h" }
     })
-    const refreshToken = await signIn(context)
-    const minted = await context.authServer.handler(
-      request("GET", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
-      })
-    )
-    const token = required(minted.headers.get("x-auth-token"), "token header")
+    const { token } = await signIn(context)
     const { authServer } = context
 
     const session = await authServer.getSession({ token })
@@ -301,13 +337,7 @@ describe("calling with a token instead of a request", () => {
 
   it("names the session in the token, so bearer-only sign-out ends that session", async () => {
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
-    const minted = await context.authServer.handler(
-      request("GET", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
-      })
-    )
-    const token = required(minted.headers.get("x-auth-token"), "token header")
+    const { token } = await signIn(context)
     const [row] = context.db.sessions()
 
     expect(context.authServer.decodeToken(token)?.claims.sid).toBe(
@@ -321,13 +351,7 @@ describe("calling with a token instead of a request", () => {
 
   it("does not demand a cookie of a token caller when cookie.path is narrowed", async () => {
     const context = await createTestServer({ cookie: { path: "/api/auth" } })
-    const refreshToken = await signIn(context)
-    const minted = await context.authServer.handler(
-      request("GET", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
-      })
-    )
-    const token = required(minted.headers.get("x-auth-token"), "token header")
+    const { token } = await signIn(context)
 
     const user = await context.authServer.getUser({ token })
 

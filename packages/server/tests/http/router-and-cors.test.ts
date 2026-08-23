@@ -12,6 +12,7 @@ describe("matchRoute", () => {
     // Unauthenticated is fine here — what matters is that none of these 404.
     const probes: Array<[string, string]> = [
       ["POST", "/api/auth/send-code"],
+      ["GET", "/api/auth/token"],
       ["POST", "/api/auth/verify-code"],
       ["POST", "/api/auth/user"],
       ["POST", "/api/auth/sign-out"],
@@ -423,6 +424,10 @@ describe("cors", () => {
       "https://app.example.com"
     )
     expect(response.headers.get("access-control-allow-origin")).not.toBe("*")
+
+    // Nothing to expose: tokens cross in bodies, so a cross-origin client
+    // needs no special header access to read one.
+    expect(response.headers.get("access-control-expose-headers")).toBeNull()
   })
 
   it("keeps CORS headers on error responses too", async () => {

@@ -27,7 +27,9 @@ its access token.
 `getUser()` returns the signed-in user, or `null`, and **always reads the
 server**. There is no cache behind it on purpose: a name or avatar changed in
 another tab, on another device, or by anything other than this client has to
-arrive somehow, and deciding when to ask again is yours to make.
+arrive somehow, and deciding when to ask again is yours to make. When it has to
+refresh anyway — a page load, a fresh tab — the user comes off the refresh, so a
+cold read costs one request rather than two.
 
 `null` means the server said the session is gone, and the stored token is dropped
 with it. Every other failure throws — a 502 from a proxy is not a statement about
@@ -43,28 +45,31 @@ truth to keep in step.
 
 ## Where tokens come from
 
-Never a response body. Every endpoint answers with `x-auth-token` when it had to
-authenticate from the cookie, and the client stores whatever arrives — so any
-request refreshes the token, and there is no endpoint whose job that is.
+Two places, both a body. `GET /token` exchanges the refresh cookie for one, and
+a sign-in returns one with the user it signed in — verification code, guest,
+account switch, and the sign-out that promotes a parked account. Nothing arrives
+in a response header, so there is nothing for a framework's response plumbing to
+lose and nothing for CORS to expose.
 
-Send the token you hold and none comes back. That matters for anything else
-holding the JWT, a sync socket especially: a token nothing has invalidated is not
-rotated on every tab focus.
+Every authenticated method calls `getToken()` before it sends, because the server
+authenticates from the token and refuses anything else. That is invisible from
+the outside: the token is served from cache, so a page that already holds a live
+one costs no extra round trip, and ten methods called at once share one refresh
+if they need it.
 
 `getToken()` serves from that cache. Approaching expiry it hands back the cached
 token and refreshes behind you; only a token too close to expiry to outlive the
-request it would be used for makes you wait. Concurrent callers share one
-refresh.
+request it would be used for makes you wait.
 
-It refreshes through `GET /user`, deliberately. Minting a token needs the user
-row for its `type` claim, so that is the one endpoint where the read is not
-wasted.
+A 401 is retried once with a fresh token before it is believed. Refresh-ahead
+covers the ordinary case, but a key rotated between mint and use, or a device
+clock far enough off that the window never fired, both look like a refusal on a
+token the client had every reason to trust. A second refusal is the session
+genuinely being gone.
 
-**Your data plane cannot do this.** PostgREST talks to Neon directly and never
-passes through your server, so it can neither harvest a header nor mint
-anything — an expired token there is a hard 401 with nothing to rescue it. That
-is what `getToken()`'s proactive refresh is for, and why a 401 from your data
-client should refresh once and retry:
+**Your data plane gets the same treatment, but you have to write it.** PostgREST
+talks to Neon directly and never passes through your server, so an expired token
+there is a hard 401 with nothing to rescue it:
 
 ```ts
 const token = await authClient.getToken()
@@ -95,8 +100,8 @@ export function useUser() {
 }
 ```
 
-`data` is `{ user, session, token }` or `null`. `session.id` is how a device list
-tells which entry is this device — the list does not carry a flag saying so.
+`data` is the user, or `null`. `getSession()`'s `id` is how a device list tells
+which entry is this device — the list does not carry a flag saying so.
 
 Anything that changes who is signed in has to invalidate that key, because
 nothing else will:

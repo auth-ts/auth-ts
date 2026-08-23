@@ -21,6 +21,8 @@ export interface CookieJar {
   header(): Promise<string | undefined>
   /** Records every `Set-Cookie` on a response, clearing the ones it clears. */
   absorb(response: { headers: Headers }): Promise<void>
+  /** Empties the jar, for a refresh cookie the server has just refused. */
+  clear(): Promise<void>
 }
 
 /**
@@ -80,6 +82,14 @@ export function createCookieJar(storage: CookieStorage): CookieJar {
         await storage.removeItem(STORAGE_KEY)
       } else {
         await storage.setItem(STORAGE_KEY, JSON.stringify(cookies))
+      }
+    },
+
+    async clear() {
+      try {
+        await storage.removeItem(STORAGE_KEY)
+      } catch {
+        // A store that cannot be written to holds nothing worth keeping either.
       }
     }
   }

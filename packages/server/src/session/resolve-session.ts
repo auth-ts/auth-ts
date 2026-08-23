@@ -3,6 +3,8 @@ import type { AuthServerInternals } from "../core/auth-server-internals"
 import { sha256Hex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"
 import { selectOne } from "../lib/select-one"
+import type { CallerInput } from "./authenticate"
+import { verifyBearer } from "./authenticate"
 import { slideSession } from "./slide-session"
 
 /**
@@ -91,4 +93,41 @@ export async function resolveSession(
   }
 
   return { ...resolved, user }
+}
+
+/**
+ * Resolves the session the caller is acting from, by token where it can.
+ *
+ * For the handful of endpoints that need the *session*, not just who is
+ * calling: the guest a sign-in is about to convert, the account a connect flow
+ * links to. A live token names the session outright, and reading that row costs
+ * no write. Anything else — no token, a spent one, or one naming a session
+ * since revoked — falls through to the cookie, which is what makes this work
+ * for `/connect/:provider` and the OAuth callback, both of which arrive as
+ * top-level navigations that can carry no `Authorization` header.
+ *
+ * The expiry check has to be here as well as in `slideSession`: `selectOne` by
+ * id would happily return a row whose lifetime has run out.
+ *
+ * @returns The session and user, or `null` when neither credential resolves.
+ */
+export async function resolveCallerSession(
+  internals: AuthServerInternals,
+  input: CallerInput
+): Promise<ResolvedSession | null> {
+  const { caller } = await verifyBearer(internals, input)
+
+  if (caller) {
+    const session = await selectOne(internals, "sessions", {
+      id: caller.sessionId,
+      expiresAt: { gt: new Date() }
+    })
+    const user = session
+      ? await selectOne(internals, "users", { id: session.userId })
+      : null
+
+    if (session && user) return { session, user, tokenHash: session.tokenHash }
+  }
+
+  return input.headers ? resolveSession(internals, input.headers) : null
 }

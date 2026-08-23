@@ -323,9 +323,9 @@ Neither is built until there is an Expo example to test it against — see
 One exists, and it is the reference application. The others each prove a
 different edge of the design and should be built in roughly this order:
 
-- **Next.js.** Server components and route handlers reading the session with
-  `authServer.getUser({ headers })`, the cookie-path trap, and the
-  `x-auth-token` header surviving a framework's response plumbing.
+- **Next.js.** Server components and route handlers exchanging the cookie with
+  `authServer.getToken({ headers })` once per render and spending the token, and
+  the cookie-path trap.
 - **Supabase with row-level security.** The same data-plane story as Neon, with
   `auth.jwt()` policies instead of `auth.session()`, and the JWKS published
   where Supabase's verifier can find it. Proves the token is portable.

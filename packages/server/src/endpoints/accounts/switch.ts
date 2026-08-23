@@ -14,7 +14,7 @@ import {
   serializeAccounts
 } from "../../session/accounts-cookie"
 import type { CallerInput } from "../../session/authenticate"
-import { authenticate, TOKEN_HEADER } from "../../session/authenticate"
+import { authenticate } from "../../session/authenticate"
 import { mintAccessToken } from "../../session/issue-session"
 import { readRefreshToken } from "../../session/resolve-session"
 
@@ -68,11 +68,12 @@ export const switchAccount = defineEndpoint({
       : remaining
 
     const secure = shouldUseSecureCookies(input.requestURL)
-    const responseHeaders = new Headers()
-    responseHeaders.set(
-      TOKEN_HEADER,
-      await mintAccessToken(internals, targetUser, target.session.id)
+    const token = await mintAccessToken(
+      internals,
+      targetUser,
+      target.session.id
     )
+    const responseHeaders = new Headers()
     responseHeaders.append(
       "set-cookie",
       serializeCookie({
@@ -95,7 +96,7 @@ export const switchAccount = defineEndpoint({
     )
 
     return {
-      data: targetUser,
+      data: { user: targetUser, token },
       headers: responseHeaders
     }
   }

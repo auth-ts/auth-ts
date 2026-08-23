@@ -12,7 +12,8 @@ export function createGetSession(internals: AuthClientInternals) {
   return async function getSession(): Promise<CurrentSession> {
     return internals.fetchJson<CurrentSession>({
       method: "GET",
-      path: "/session"
+      path: "/session",
+      authenticated: true
     })
   }
 }

@@ -14,7 +14,7 @@ export interface RecordedRequest {
 export interface StubbedReply {
   status?: number
   body?: unknown
-  /** A token to send back the way the server does — in the response header. */
+  /** A token to send back the way the server does — in the JSON body. */
   token?: string
   /** `Set-Cookie` headers to send back, one per cookie. */
   setCookies?: string[]
@@ -110,9 +110,7 @@ export function fakeAuthServer(): FakeAuthServer {
       if (reply.networkError) throw new TypeError("Failed to fetch")
 
       const status = reply.status ?? 200
-      const responseHeaders = new Headers(
-        reply.token ? { "x-auth-token": reply.token } : {}
-      )
+      const responseHeaders = new Headers()
       for (const setCookie of reply.setCookies ?? []) {
         responseHeaders.append("set-cookie", setCookie)
       }
@@ -128,9 +126,12 @@ export function fakeAuthServer(): FakeAuthServer {
 
       responseHeaders.set("content-type", "application/json")
 
-      return withHeaders(
-        new Response(JSON.stringify(reply.body ?? {}), { status })
-      )
+      const body =
+        reply.token === undefined
+          ? (reply.body ?? {})
+          : { ...(reply.body as object | undefined), token: reply.token }
+
+      return withHeaders(new Response(JSON.stringify(body), { status }))
     })
 
   return {

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { verifyToken } from "../../src/jwt/verify-token"
 import { issueSession } from "../../src/session/issue-session"
-import { resolveSession } from "../../src/session/resolve-session"
+import {
+  resolveCallerSession,
+  resolveSession
+} from "../../src/session/resolve-session"
 import { createTestInternals } from "../helpers/create-test-internals"
 import { readSetCookies } from "../helpers/request"
 import { required } from "../helpers/required"
@@ -282,5 +285,79 @@ describe("resolveSession", () => {
       cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
     })
     expect(await resolveSession(internals, headers)).toBeNull()
+  })
+})
+
+describe("resolveCallerSession", () => {
+  const signedIn = async () => {
+    const { internals, db } = await createTestInternals()
+    const user = await insertUser(db, { email: "ada@example.com" })
+    const issued = await issueSession(internals, {
+      user,
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+
+    return {
+      internals,
+      db,
+      user,
+      token: issued.token,
+      cookie: new Headers({
+        cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
+      })
+    }
+  }
+
+  it("reads the session the token names, without touching it", async () => {
+    const { internals, db, user, token } = await signedIn()
+    const before = required(db.sessions()[0], "session").updatedAt
+
+    const resolved = await resolveCallerSession(internals, { token })
+
+    expect(resolved?.user.id).toBe(user.id)
+    expect(required(db.sessions()[0], "session").updatedAt).toEqual(before)
+  })
+
+  it("falls back to the cookie when the token names a session that is gone", async () => {
+    // The bearer outlives the row it names by up to `jwt.ttl`, so a browser
+    // that signed in again elsewhere must not be told it has no session.
+    const { internals, db, token, cookie } = await signedIn()
+    const other = await insertUser(db, { email: "grace@example.com" })
+    const reissued = await issueSession(internals, {
+      user: other,
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+    await db.delete({
+      table: "sessions",
+      where: { userId: required(db.users()[0], "ada").id }
+    })
+
+    const headers = new Headers({
+      cookie: `auth-ts.refresh=${refreshTokenOf(reissued)}`,
+      authorization: `Bearer ${token}`
+    })
+    const resolved = await resolveCallerSession(internals, { headers })
+
+    expect(resolved?.user.id).toBe(other.id)
+    expect(cookie.get("cookie")).toBeTruthy()
+  })
+
+  it("falls back to the cookie when there is no token at all", async () => {
+    const { internals, user, cookie } = await signedIn()
+
+    expect(
+      (await resolveCallerSession(internals, { headers: cookie }))?.user.id
+    ).toBe(user.id)
+  })
+
+  it("returns null when neither credential resolves", async () => {
+    const { internals } = await createTestInternals()
+
+    expect(await resolveCallerSession(internals, {})).toBeNull()
+    expect(
+      await resolveCallerSession(internals, { headers: new Headers() })
+    ).toBeNull()
   })
 })

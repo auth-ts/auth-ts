@@ -3,7 +3,6 @@ import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { insertRow } from "../../lib/insert-row"
-import { TOKEN_HEADER } from "../../session/authenticate"
 import { issueSession } from "../../session/issue-session"
 
 /** Body accepted by `POST /sign-in/guest`. */
@@ -70,9 +69,9 @@ export const signInGuest = defineEndpoint({
       requestURL: input.requestURL
     })
 
-    const responseHeaders = new Headers(issued.headers)
-    responseHeaders.set(TOKEN_HEADER, issued.token)
-
-    return { data: { user: issued.user }, headers: responseHeaders }
+    return {
+      data: { user: issued.user, token: issued.token },
+      headers: issued.headers
+    }
   }
 })

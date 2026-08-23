@@ -71,7 +71,7 @@ export const listAccounts = defineEndpoint({
       if (user) accounts.push(user)
     }
 
-    const responseHeaders = new Headers(caller.headers)
+    const responseHeaders = new Headers()
     responseHeaders.append(
       "set-cookie",
       serializeCookie({

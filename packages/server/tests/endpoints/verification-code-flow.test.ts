@@ -27,11 +27,13 @@ describe("verification code sign-in over HTTP", () => {
 
     const body = (await verifyResponse.json()) as {
       user: { email: string; type: string }
+      token: string
     }
     expect(body.user.email).toBe("ada@example.com")
     expect(body.user.type).toBe("user")
-    expect(verifyResponse.headers.get("x-auth-token")).toBeTruthy()
+    expect(await authServer.verifyToken(body.token)).toBeTruthy()
 
+    // The access token crosses in the body; the refresh token never does.
     const cookie = readSetCookies(verifyResponse).get("auth-ts.refresh")
     expect(cookie?.attributes).toContain("HttpOnly")
     expect(JSON.stringify(body)).not.toContain(cookie?.value ?? "impossible")
@@ -162,40 +164,55 @@ describe("token and user endpoints", () => {
       readSetCookies(verifyResponse).get("auth-ts.refresh"),
       "refresh cookie"
     ).value
+    const { token } = (await verifyResponse.json()) as { token: string }
 
-    return { ...context, refreshToken }
+    return { ...context, refreshToken, token }
   }
 
-  it("sends a token in the response header when the cookie did the work", async () => {
+  it("exchanges the cookie for a token, and returns the user with it", async () => {
     const { authServer, refreshToken } = await signIn()
 
     const response = await authServer.handler(
-      request("GET", "/api/auth/user", {
+      request("GET", "/api/auth/token", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
+    const body = (await response.json()) as {
+      token: string
+      user: { email: string }
+    }
 
     expect(response.status).toBe(200)
-    expect(((await response.json()) as { email: string }).email).toBe(
-      "ada@example.com"
+    expect(body.user.email).toBe("ada@example.com")
+    expect((await authServer.verifyToken(body.token))?.role).toBe(
+      "authenticated"
     )
+  })
 
-    // The header, never the body: that is the only place a token comes from.
-    const claims = await authServer.verifyToken(
-      required(response.headers.get("x-auth-token"), "token header")
-    )
-    expect(claims?.role).toBe("authenticated")
+  it("refuses every other endpoint the cookie alone", async () => {
+    const { authServer, refreshToken } = await signIn()
+    const cookies = { "auth-ts.refresh": refreshToken }
+
+    for (const path of [
+      "/api/auth/user",
+      "/api/auth/session",
+      "/api/auth/sessions"
+    ]) {
+      const response = await authServer.handler(
+        request("GET", path, { cookies })
+      )
+
+      expect(response.status).toBe(401)
+    }
   })
 
   it("never returns the stored token hash — every column but that one", async () => {
     // The hash at rest is the whole point of storing sha256(token) instead of the
     // token. Handing it back would undo that, and it once did.
-    const { authServer, refreshToken, db } = await signIn()
+    const { authServer, token, db } = await signIn()
 
     const response = await authServer.handler(
-      request("GET", "/api/auth/session", {
-        cookies: { "auth-ts.refresh": refreshToken }
-      })
+      request("GET", "/api/auth/session", { token })
     )
     const body = { session: (await response.json()) as Record<string, unknown> }
     const storedHash = required(db.sessions()[0], "session").tokenHash
@@ -225,12 +242,10 @@ describe("token and user endpoints", () => {
   })
 
   it("reads the current user and 401s without a session", async () => {
-    const { authServer, refreshToken } = await signIn()
+    const { authServer, token } = await signIn()
 
     const signedIn = await authServer.handler(
-      request("GET", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
-      })
+      request("GET", "/api/auth/user", { token })
     )
     expect(((await signedIn.json()) as { email: string }).email).toBe(
       "ada@example.com"
@@ -241,20 +256,19 @@ describe("token and user endpoints", () => {
   })
 
   it("updates name, leaves omitted fields alone, and rejects identity fields", async () => {
-    const { authServer, refreshToken } = await signIn()
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const { authServer, token } = await signIn()
 
     await authServer.handler(
       request("POST", "/api/auth/user", {
-        cookies,
+        token,
         body: { name: "Ada", imageURL: "https://img.example/a.png" }
       })
     )
     await authServer.handler(
-      request("POST", "/api/auth/user", { cookies, body: { name: "Ada L" } })
+      request("POST", "/api/auth/user", { token, body: { name: "Ada L" } })
     )
     const read = await authServer.handler(
-      request("GET", "/api/auth/user", { cookies })
+      request("GET", "/api/auth/user", { token })
     )
     const body = (await read.json()) as { name: string; imageURL: string }
 
@@ -267,7 +281,7 @@ describe("token and user endpoints", () => {
       { unknownField: 1 }
     ]) {
       const response = await authServer.handler(
-        request("POST", "/api/auth/user", { cookies, body: rejected })
+        request("POST", "/api/auth/user", { token, body: rejected })
       )
       expect(response.status).toBe(400)
       expect(
@@ -277,11 +291,10 @@ describe("token and user endpoints", () => {
   })
 
   it("lists the whole session row, less the token hash", async () => {
-    const { authServer, refreshToken } = await signIn()
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const { authServer, token } = await signIn()
 
     const response = await authServer.handler(
-      request("GET", "/api/auth/sessions", { cookies })
+      request("GET", "/api/auth/sessions", { token })
     )
     const body = (await response.json()) as Array<Record<string, unknown>>
     const [session] = body
@@ -299,11 +312,12 @@ describe("token and user endpoints", () => {
   })
 
   it("signs out locally and clears the cookie", async () => {
-    const { authServer, refreshToken } = await signIn()
+    const { authServer, refreshToken, token } = await signIn()
 
     const response = await authServer.handler(
       request("POST", "/api/auth/sign-out", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
       })
     )
 
@@ -316,7 +330,7 @@ describe("token and user endpoints", () => {
     ).toContain("Max-Age=0")
 
     const afterSignOut = await authServer.handler(
-      request("GET", "/api/auth/user", {
+      request("GET", "/api/auth/token", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
@@ -403,10 +417,7 @@ describe("jwks and discovery", () => {
         }
       })
     )
-    const token = required(
-      verifyResponse.headers.get("x-auth-token"),
-      "token header"
-    )
+    const { token } = (await verifyResponse.json()) as { token: string }
 
     expect(authServer.decodeToken(token)?.claims.iss).toBe(body.issuer)
   })
@@ -421,7 +432,7 @@ describe("jwks and discovery", () => {
   })
 })
 
-describe("GET /user", () => {
+describe("GET /token", () => {
   it("slides the session it read through", async () => {
     const { authServer, sentCodes, db } = await createTestServer()
 
@@ -450,7 +461,7 @@ describe("GET /user", () => {
     // land on the same value and prove nothing.
     await new Promise((resolve) => setTimeout(resolve, 5))
     const read = await authServer.handler(
-      request("GET", "/api/auth/user", { cookies })
+      request("GET", "/api/auth/token", { cookies })
     )
     expect(read.status).toBe(200)
 
@@ -465,7 +476,7 @@ describe("GET /user", () => {
   })
 })
 
-describe("the token every endpoint hands back", () => {
+describe("where a token comes from", () => {
   const signedIn = async () => {
     const context = await createTestServer()
     await context.authServer.handler(
@@ -481,13 +492,11 @@ describe("the token every endpoint hands back", () => {
         }
       })
     )
+    const { token } = (await verified.json()) as { token: string }
 
     return {
       context,
-      token: required(
-        verified.headers.get("x-auth-token"),
-        "token header from sign-in"
-      ),
+      token,
       cookies: {
         "auth-ts.refresh": required(
           readSetCookies(verified).get("auth-ts.refresh"),
@@ -497,35 +506,31 @@ describe("the token every endpoint hands back", () => {
     }
   }
 
-  it("mints one when the caller has no token", async () => {
+  it("hands one back with the sign-in, so the first render costs no refresh", async () => {
+    const { context, token } = await signedIn()
+
+    expect(await context.authServer.verifyToken(token)).toBeTruthy()
+  })
+
+  it("mints one at /token, and nowhere else", async () => {
     const { context, cookies } = await signedIn()
 
-    const response = await context.authServer.handler(
+    const refreshed = await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies })
+    )
+    expect(((await refreshed.json()) as { token: string }).token).toEqual(
+      expect.any(String)
+    )
+
+    // No endpoint hands a token back on the side any more, so there is no
+    // second answer to "where did this token come from".
+    const read = await context.authServer.handler(
       request("GET", "/api/auth/user", { cookies })
     )
-
-    expect(response.headers.get("x-auth-token")).toEqual(expect.any(String))
+    expect(read.status).toBe(401)
   })
 
-  it("sends none when the caller already holds a live one", async () => {
-    const { context, cookies, token } = await signedIn()
-
-    const response = await context.authServer.handler(
-      request("GET", "/api/auth/user", {
-        cookies,
-        headers: { authorization: `Bearer ${token}` }
-      })
-    )
-
-    // Nothing to send: the token they hold is the token they need, so whatever
-    // else is holding that JWT is not handed a new one.
-    expect(response.headers.get("x-auth-token")).toBeNull()
-    expect(((await response.json()) as { email: string }).email).toBe(
-      "ada@example.com"
-    )
-  })
-
-  it("mints one when what was presented does not verify", async () => {
+  it("refuses a token that does not verify rather than repairing it", async () => {
     const { context, cookies } = await signedIn()
 
     const response = await context.authServer.handler(
@@ -535,10 +540,22 @@ describe("the token every endpoint hands back", () => {
       })
     )
 
-    // Unreadable and expired mean the same thing here: fall back to the cookie
-    // and send a replacement, so a client with a spoiled token self-heals.
+    // A cookie on the request buys nothing: self-healing here would mean every
+    // endpoint could slide a session and sign a token.
+    expect(response.status).toBe(401)
+  })
+
+  it("ignores an Authorization header on /token, since a spent token is why callers are there", async () => {
+    const { context, cookies } = await signedIn()
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/token", {
+        cookies,
+        headers: { authorization: "Bearer not.a.token" }
+      })
+    )
+
     expect(response.status).toBe(200)
-    expect(response.headers.get("x-auth-token")).toEqual(expect.any(String))
   })
 
   it("reads the caller from the token, touching no session at all", async () => {
@@ -546,10 +563,7 @@ describe("the token every endpoint hands back", () => {
     const update = vi.spyOn(context.db, "update")
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/sessions", {
-        cookies,
-        headers: { authorization: `Bearer ${token}` }
-      })
+      request("GET", "/api/auth/sessions", { cookies, token })
     )
 
     expect(response.status).toBe(200)
@@ -558,14 +572,23 @@ describe("the token every endpoint hands back", () => {
     ).toHaveLength(0)
   })
 
-  it("touches the session only when it had to fall back", async () => {
-    const { context, cookies } = await signedIn()
+  it("touches the session on /token and on nothing else", async () => {
+    const { context, cookies, token } = await signedIn()
     const update = vi.spyOn(context.db, "update")
 
     await context.authServer.handler(
-      request("GET", "/api/auth/sessions", { cookies })
+      request("GET", "/api/auth/sessions", { token })
     )
+    await context.authServer.handler(
+      request("GET", "/api/auth/session", { token })
+    )
+    expect(
+      update.mock.calls.filter(([input]) => input.table === "sessions")
+    ).toHaveLength(0)
 
+    await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies })
+    )
     expect(
       update.mock.calls.filter(([input]) => input.table === "sessions")
     ).toHaveLength(1)

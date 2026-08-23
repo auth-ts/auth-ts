@@ -26,12 +26,13 @@ import type { AuthClientOptions } from "./auth-client-options"
 /**
  * The client.
  *
- * Two planes, one cookie: every method presents the access token it holds and
- * falls back to the refresh cookie, and the access token doubles as the
- * data-plane credential for something like PostgREST. An application that never
- * calls `getToken` still gets working sign-in, profile updates, and a correct
- * user. In a browser the cookie is the browser's; anywhere else, `cookieStorage`
- * is where the client keeps it.
+ * Two planes, one exchange: the refresh cookie buys an access token at
+ * `/token`, and that token authenticates everything else — this client's own
+ * methods and the data plane alike, so the same credential a PostgREST query
+ * carries is the one a profile update carries. An application that never calls
+ * `getToken` itself still gets all of this, because every method calls it. In a
+ * browser the cookie is the browser's; anywhere else, `cookieStorage` is where
+ * the client keeps it.
  */
 export interface AuthClient {
   /** A valid access token, refreshed when needed. Hand this to your data client. */
@@ -65,19 +66,22 @@ export interface AuthClient {
  *
  * Construction performs no network request and touches no storage, so importing
  * the module that calls it is free and safe during server-side rendering.
- * Everything reconciles on the first read: `getUser` refreshes when there is no
- * valid token, which covers every boot case — a revoked session resolves to
- * `null`, a valid cookie with wiped storage signs the user back in, and a
- * signed-out visitor makes exactly one request.
+ * Everything reconciles on the first read: with no token in memory the first
+ * authenticated call refreshes, which covers every boot case — a revoked
+ * session resolves to `null`, a valid cookie with wiped storage signs the user
+ * back in, and a signed-out visitor makes exactly one request.
  */
 export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   const internals = createAuthClientInternals(options)
 
-  const getToken = createGetToken(internals)
+  const { getToken, refresh } = createGetToken(internals)
+  // Late-bound: the refresh issues a request, so it needs `fetchJson`, which in
+  // turn needs to be able to refresh.
+  internals.getToken = getToken
 
   return {
     getToken,
-    getUser: createGetUser(internals),
+    getUser: createGetUser(internals, refresh),
     getSession: createGetSession(internals),
     sendCode: createSendCode(internals),
     verifyCode: createVerifyCode(internals),

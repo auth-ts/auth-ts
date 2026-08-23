@@ -6,7 +6,8 @@ export function createListConnections(internals: AuthClientInternals) {
   return async function listConnections(): Promise<ConnectionInfo[]> {
     return internals.fetchJson<ConnectionInfo[]>({
       method: "GET",
-      path: "/connections"
+      path: "/connections",
+      authenticated: true
     })
   }
 }
@@ -21,7 +22,8 @@ export function createDisconnect(internals: AuthClientInternals) {
   return async function disconnect(input: DisconnectInput): Promise<void> {
     await internals.fetchJson({
       method: "DELETE",
-      path: `/connections/${encodeURIComponent(input.provider)}`
+      path: `/connections/${encodeURIComponent(input.provider)}`,
+      authenticated: true
     })
   }
 }
@@ -31,7 +33,8 @@ export function createListAccounts(internals: AuthClientInternals) {
   return async function listAccounts(): Promise<AccountInfo[]> {
     return internals.fetchJson<AccountInfo[]>({
       method: "GET",
-      path: "/accounts"
+      path: "/accounts",
+      authenticated: true
     })
   }
 }
@@ -58,8 +61,10 @@ export function createSwitchAccount(internals: AuthClientInternals) {
     }>({
       method: "POST",
       path: "/accounts/switch",
-      body: input
+      body: input,
+      authenticated: true
     })
+    internals.tokenStore.set(result.token)
 
     return result.user
   }

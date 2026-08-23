@@ -1,3 +1,5 @@
+import { readLifetimeClaims } from "../lib/read-lifetime-claims"
+
 /** The in-memory access token and what is known about its lifetime. */
 export interface TokenState {
   token: string
@@ -32,7 +34,8 @@ export const REFRESH_BLOCKING_MS = 10_000
 /** Holds the access token in memory and answers whether it still has life in it. */
 export interface TokenStore {
   get(): TokenState | null
-  set(token: string, claims: { iat?: number; exp?: number }): void
+  /** Stores a token, reading its own lifetime claims to know when to refresh. */
+  set(token: string): void
   clear(): void
   /** True when there is no token, or it is inside the refresh-ahead window. */
   isExpiringSoon(): boolean
@@ -57,7 +60,8 @@ export function createTokenStore(): TokenStore {
   return {
     get: () => state,
 
-    set(token, claims) {
+    set(token) {
+      const claims = readLifetimeClaims(token)
       const now = Date.now()
       const issuedAt = typeof claims.iat === "number" ? claims.iat * 1000 : now
       const expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : now

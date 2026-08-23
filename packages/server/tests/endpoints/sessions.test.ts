@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import { mintToken, readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
 
 type TestContext = Awaited<ReturnType<typeof createTestServer>>
@@ -23,12 +23,17 @@ async function signIn(context: TestContext, email: string) {
   }
 }
 
+const tokenFor = (context: TestContext, cookies: Record<string, string>) =>
+  mintToken(context.authServer, cookies["auth-ts.refresh"] ?? "")
+
 async function listSessions(
   context: TestContext,
   cookies: Record<string, string>
 ) {
   const response = await context.authServer.handler(
-    request("GET", "/api/auth/sessions", { cookies })
+    request("GET", "/api/auth/sessions", {
+      token: await tokenFor(context, cookies)
+    })
   )
   return (await response.json()) as Array<{ id: string }>
 }
@@ -39,7 +44,9 @@ async function currentSessionId(
   cookies: Record<string, string>
 ) {
   const response = await context.authServer.handler(
-    request("GET", "/api/auth/session", { cookies })
+    request("GET", "/api/auth/session", {
+      token: await tokenFor(context, cookies)
+    })
   )
 
   return ((await response.json()) as { id: string }).id
@@ -59,7 +66,9 @@ describe("DELETE /sessions/:id", () => {
     )
 
     const response = await context.authServer.handler(
-      request("DELETE", `/api/auth/sessions/${other.id}`, { cookies: laptop })
+      request("DELETE", `/api/auth/sessions/${other.id}`, {
+        token: await tokenFor(context, laptop)
+      })
     )
 
     expect(response.status).toBe(200)
@@ -86,9 +95,7 @@ describe("DELETE /sessions/:id", () => {
       request(
         "DELETE",
         `/api/auth/sessions/${required(current, "current").id}`,
-        {
-          cookies
-        }
+        { token: await tokenFor(context, cookies) }
       )
     )
 
@@ -98,10 +105,12 @@ describe("DELETE /sessions/:id", () => {
       required(readSetCookies(response).get("auth-ts.refresh"), "refresh")
         .attributes
     ).toContain("Max-Age=0")
+    // Asked of the cookie: the revoked session's token stays readable until it
+    // expires, which is the revocation latency every token carries.
     expect(
       (
         await context.authServer.handler(
-          request("GET", "/api/auth/user", { cookies })
+          request("GET", "/api/auth/token", { cookies })
         )
       ).status
     ).toBe(401)
@@ -117,7 +126,7 @@ describe("DELETE /sessions/:id", () => {
       request(
         "DELETE",
         `/api/auth/sessions/${required(adasSession, "ada's session").id}`,
-        { cookies: grace }
+        { token: await tokenFor(context, grace) }
       )
     )
 

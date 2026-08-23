@@ -11,7 +11,7 @@ import type { TokenClaims } from "../jwt/verify-token"
 import { verifyToken } from "../jwt/verify-token"
 import type { CallerInput } from "../session/authenticate"
 import { readRefreshToken } from "../session/resolve-session"
-import type { AdditionalFieldsSchema, AuthSession, AuthUser } from "./auth-db"
+import type { AdditionalFieldsSchema, AuthUser } from "./auth-db"
 import type { AuthServerConfig } from "./auth-server-config"
 import { resolveAuthServerConfig } from "./auth-server-config"
 import type { AuthServerInternals } from "./auth-server-internals"
@@ -56,14 +56,6 @@ export type AuthCallables<
 
 /** Every endpoint as an HTTP handler. */
 export type AuthHandlers = { [Name in keyof EndpointRegistry]: AuthHandler }
-
-/** What `authServer.getSession` resolves to. */
-export interface AuthSessionResult<
-  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
-> {
-  session: AuthSession
-  user: AuthUser<S>
-}
 
 /** The configured server. `S` is the declared additional fields; see {@link AuthServerOptions}. */
 export interface AuthServer<
@@ -118,12 +110,15 @@ export function createAuthServer<
     [string, AnyEndpoint]
   >) {
     callables[name] = async (input: unknown) => {
-      // Called in-process rather than over HTTP, so this is where the "server-side
-      // rendering never sees the cookie" trap is explained instead of silently
-      // resolving to null.
-      const callerInput = input as CallerInput | undefined
-      if (COOKIE_PLANE_CALLABLES.has(name) && !callerInput?.token) {
-        assertCookieReachable(resolved, callerInput?.headers, internals)
+      // `getToken` is the one callable that reads the cookie, and called
+      // in-process is where the "server-side rendering never sees the cookie"
+      // trap is explained instead of silently resolving to null.
+      if (name === "getToken") {
+        assertCookieReachable(
+          resolved,
+          (input as CallerInput | undefined)?.headers,
+          internals
+        )
       }
 
       const result = await endpoint.run(internals, input as never)
@@ -210,15 +205,6 @@ function warnAboutInertIpLimits(internals: AuthServerInternals) {
       "sendCodePerIP, verifyCodePerIP, and guestPerIP are inert and session.ipAddress will be null."
   )
 }
-
-/**
- * Callables that read the refresh cookie and are meant for server-side use.
- *
- * Only these get the configuration guard: over HTTP a missing cookie is just an
- * unauthenticated request, but in a loader it almost always means `cookie.path`
- * has been narrowed to the auth mount.
- */
-const COOKIE_PLANE_CALLABLES = new Set(["getSession", "getUser"])
 
 /**
  * Turns a routing failure into an endpoint, so it flows through the usual

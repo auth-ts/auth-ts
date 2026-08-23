@@ -16,10 +16,10 @@ import { sendVerificationCode } from "../verification-code/send-verification-cod
 /**
  * Reads the signed-in user.
  *
- * Authenticated from the access token, so a caller holding one costs a single
- * read of `users` and nothing else. Without one it falls back to the cookie,
- * which is also where a replacement token comes from — sent back in the
- * response header rather than the body, like every other endpoint.
+ * One read of `users` and nothing else: the token names the caller, so there is
+ * no session to resolve. A caller without a live token gets a 401 and goes to
+ * `GET /token`, which returns the user along with the token — so a client
+ * refreshing anyway never needs this endpoint at all.
  */
 export const getUser = defineEndpoint({
   method: "GET",
@@ -33,7 +33,7 @@ export const getUser = defineEndpoint({
     // it.
     if (!user) throw unauthenticated()
 
-    return { data: user, headers: caller.headers }
+    return { data: user }
   }
 })
 
@@ -126,7 +126,7 @@ export const updateUser = defineEndpoint({
       ...additionalFields
     })
 
-    return { data: user, headers: caller.headers }
+    return { data: user }
   }
 })
 
@@ -168,9 +168,9 @@ export const deleteUser = defineEndpoint({
     const user = await selectOne(internals, "users", { id: caller.userId })
     // The fresh window is measured from the session, and a session already
     // revoked refuses the delete rather than honouring a token that outlived it.
-    const session =
-      caller.session ??
-      (await selectOne(internals, "sessions", { id: caller.sessionId }))
+    const session = await selectOne(internals, "sessions", {
+      id: caller.sessionId
+    })
     if (!user || !session) throw unauthenticated()
 
     const finishDeletion = async () => {

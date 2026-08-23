@@ -1,4 +1,4 @@
-import { notFound } from "../../http/auth-api-error"
+import { notFound, unauthenticated } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import { validateRedirect } from "../../lib/validate-redirect"
@@ -6,7 +6,7 @@ import { getCallbackURL } from "../../oauth/callback-url"
 import { getProvider } from "../../oauth/providers/get-provider"
 import { createStateCookie } from "../../oauth/state-cookie"
 import type { CallerInput } from "../../session/authenticate"
-import { authenticate } from "../../session/authenticate"
+import { resolveCallerSession } from "../../session/resolve-session"
 import type { SignInProviderInput } from "../sign-in/$provider"
 
 /** Input for starting a provider link. */
@@ -42,7 +42,10 @@ export const connectProvider = defineEndpoint({
     const { config } = internals
     const headers = input.headers ?? new Headers()
 
-    const caller = await authenticate(internals, input)
+    // A top-level navigation, so there is no `Authorization` header to read
+    // and the cookie is the credential that actually arrives.
+    const caller = await resolveCallerSession(internals, input)
+    if (!caller) throw unauthenticated()
 
     const configured = getProvider(config.providers, input.provider)
     if (!configured) throw notFound()
@@ -61,13 +64,13 @@ export const connectProvider = defineEndpoint({
       {
         intent: "connect",
         redirect: validateRedirect(input.redirect),
-        userId: caller.userId,
+        userId: caller.user.id,
         ...(input.locale ? { locale: input.locale } : {})
       },
       secure
     )
 
-    const responseHeaders = new Headers(caller.headers)
+    const responseHeaders = new Headers()
     responseHeaders.set(
       "location",
       configured.provider.authorizeURL({

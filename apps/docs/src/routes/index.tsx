@@ -265,7 +265,7 @@ function Snippets() {
           </h2>
           <p className="text-fd-muted-foreground text-sm text-pretty">
             Zero runtime dependencies. The access token lives in memory only,
-            and is refreshed from an httpOnly cookie.
+            and is bought from an httpOnly cookie at one endpoint.
           </p>
           <DynamicCodeBlock lang="ts" code={CLIENT_SNIPPET} />
         </div>

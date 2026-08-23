@@ -2,10 +2,9 @@ import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
 import { defineEndpoint } from "../http/define-endpoint"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
-import { TOKEN_HEADER } from "../session/authenticate"
 import { convertGuest } from "../session/convert-guest"
 import { issueSession } from "../session/issue-session"
-import { resolveSession } from "../session/resolve-session"
+import { resolveCallerSession } from "../session/resolve-session"
 import { findOrCreateUser } from "../user/find-or-create-user"
 import { consumeVerificationCode } from "../verification-code/consume-verification-code"
 import type { IdentifierBody } from "../verification-code/resolve-code-identifier"
@@ -73,7 +72,7 @@ export const verifyCode = defineEndpoint({
       action: "signIn"
     })
 
-    const active = await resolveSession(internals, headers)
+    const active = await resolveCallerSession(internals, input)
     const user =
       active?.user.type === "guest"
         ? (
@@ -92,9 +91,9 @@ export const verifyCode = defineEndpoint({
       ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
     })
 
-    const responseHeaders = new Headers(issued.headers)
-    responseHeaders.set(TOKEN_HEADER, issued.token)
-
-    return { data: { user: issued.user }, headers: responseHeaders }
+    return {
+      data: { user: issued.user, token: issued.token },
+      headers: issued.headers
+    }
   }
 })

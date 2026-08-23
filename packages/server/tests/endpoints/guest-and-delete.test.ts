@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import { mintToken, readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
@@ -16,9 +16,12 @@ async function signInAsGuest(
     readSetCookies(response).get("auth-ts.refresh"),
     "refresh"
   ).value
-  const body = (await response.json()) as { user: { id: string; type: string } }
+  const body = (await response.json()) as {
+    user: { id: string; type: string }
+    token: string
+  }
 
-  return { refreshToken, user: body.user }
+  return { refreshToken, user: body.user, token: body.token }
 }
 
 describe("guest sign-in", () => {
@@ -32,7 +35,7 @@ describe("guest sign-in", () => {
 
   it("creates an identifier-less user and issues a session", async () => {
     const context = await createTestServer(guestOptions)
-    const { user, refreshToken } = await signInAsGuest(context)
+    const { user, refreshToken, token } = await signInAsGuest(context)
 
     expect(user.type).toBe("guest")
     expect(context.db.users()).toHaveLength(1)
@@ -40,7 +43,8 @@ describe("guest sign-in", () => {
 
     const whoami = await context.authServer.handler(
       request("GET", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
       })
     )
     expect(((await whoami.json()) as { id: string }).id).toBe(user.id)
@@ -109,15 +113,82 @@ describe("guest conversion", () => {
     expect(body.user.email).toBe("ada@example.com")
     expect(context.db.users()).toHaveLength(1)
 
-    // The guest session is replaced, not left beside the new one.
+    // The guest session is replaced, not left beside the new one. Asked of the
+    // cookie, because the guest's access token names a user who still exists
+    // and stays good until it expires — that is the revocation latency every
+    // token buys, not a session surviving.
     expect(context.db.sessions()).toHaveLength(1)
     expect(
       (
         await context.authServer.handler(
-          request("GET", "/api/auth/user", { cookies })
+          request("GET", "/api/auth/token", { cookies })
         )
       ).status
     ).toBe(401)
+  })
+
+  it("finds the guest from the token when no cookie reaches the route", async () => {
+    // The guest to upgrade is whoever this tab thinks it is, and a client that
+    // sends its bearer says so without the cookie having to travel.
+    const context = await createTestServer(guestOptions)
+    const { user: guest, token } = await signInAsGuest(context)
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        token,
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes.at(-1), "code").code
+        }
+      })
+    )
+    const body = (await response.json()) as { user: { id: string } }
+
+    expect(body.user.id).toBe(guest.id)
+    expect(context.db.users()).toHaveLength(1)
+  })
+
+  it("falls back to the cookie when the token names a session that is gone", async () => {
+    const context = await createTestServer(guestOptions)
+    const { refreshToken, token } = await signInAsGuest(context)
+    const second = await signInAsGuest(context)
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    // The first guest's session is gone; the cookie says who this browser is
+    // now, and the stale bearer must not send the sign-in somewhere else.
+    await context.db.delete({
+      table: "sessions",
+      where: {
+        tokenHash: required(
+          context.db.sessions().find((row) => row.userId !== second.user.id),
+          "first guest session"
+        ).tokenHash
+      }
+    })
+    expect(refreshToken).not.toBe(second.refreshToken)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/verify-code", {
+        token,
+        cookies: { "auth-ts.refresh": second.refreshToken },
+        body: {
+          email: "ada@example.com",
+          code: required(context.sentCodes.at(-1), "code").code
+        }
+      })
+    )
+    const body = (await response.json()) as { user: { id: string } }
+
+    expect(body.user.id).toBe(second.user.id)
   })
 
   it("points the guest at the existing account when the identifier is taken", async () => {
@@ -159,7 +230,7 @@ describe("guest conversion", () => {
     expect(
       (
         await context.authServer.handler(
-          request("GET", "/api/auth/user", { cookies })
+          request("GET", "/api/auth/token", { cookies })
         )
       ).status
     ).toBe(401)
@@ -230,17 +301,25 @@ describe("account deletion", () => {
       })
     )
 
-    return required(readSetCookies(response).get("auth-ts.refresh"), "refresh")
-      .value
+    const { token } = (await response.json()) as { token: string }
+
+    return {
+      refreshToken: required(
+        readSetCookies(response).get("auth-ts.refresh"),
+        "refresh"
+      ).value,
+      token
+    }
   }
 
   it("deletes immediately when the session authenticated recently", async () => {
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
+    const { refreshToken, token } = await signIn(context)
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
       })
     )
 
@@ -257,7 +336,7 @@ describe("account deletion", () => {
     // Core deletes the children itself rather than requiring ON DELETE CASCADE,
     // and a code left behind would sign the address's next owner into nothing.
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
+    const { refreshToken, token } = await signIn(context)
     const cookies = { "auth-ts.refresh": refreshToken }
 
     // An outstanding code, sent and never verified.
@@ -274,7 +353,7 @@ describe("account deletion", () => {
     ).not.toEqual([])
 
     const response = await context.authServer.handler(
-      request("DELETE", "/api/auth/user", { cookies })
+      request("DELETE", "/api/auth/user", { cookies, token })
     )
 
     expect(response.status).toBe(204)
@@ -287,7 +366,7 @@ describe("account deletion", () => {
 
   it("takes every session of theirs, on every device, and nobody else's", async () => {
     const context = await createTestServer()
-    const refreshToken = await signIn(context)
+    const { refreshToken, token } = await signIn(context)
     const ada = required(
       await selectRow(context.db, "users", { email: "ada@example.com" }),
       "ada"
@@ -312,7 +391,8 @@ describe("account deletion", () => {
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
       })
     )
 
@@ -330,11 +410,12 @@ describe("account deletion", () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "0s" }
     })
-    const refreshToken = await signIn(context)
+    const { refreshToken, token } = await signIn(context)
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
       })
     )
 
@@ -354,11 +435,12 @@ describe("account deletion", () => {
       const context = await createTestServer({
         user: { deleteFreshWindow: "0s" }
       })
-      const refreshToken = await signIn(context)
+      const { refreshToken, token } = await signIn(context)
 
       const response = await context.authServer.handler(
         request("DELETE", "/api/auth/user", {
-          cookies: { "auth-ts.refresh": refreshToken }
+          cookies: { "auth-ts.refresh": refreshToken },
+          token
         })
       )
 
@@ -375,12 +457,14 @@ describe("account deletion", () => {
       const context = await createTestServer({
         user: { deleteFreshWindow: "15m" }
       })
-      const refreshToken = await signIn(context)
+      const { refreshToken } = await signIn(context)
 
       vi.advanceTimersByTime(15 * 60_000 - 1)
+      // Past the token's own lifetime, so the caller refreshes first — the
+      // freshness window is measured from the session, not from the token.
       const fresh = await context.authServer.handler(
         request("DELETE", "/api/auth/user", {
-          cookies: { "auth-ts.refresh": refreshToken }
+          token: await mintToken(context.authServer, refreshToken)
         })
       )
 
@@ -396,12 +480,12 @@ describe("account deletion", () => {
       const context = await createTestServer({
         user: { deleteFreshWindow: "15m" }
       })
-      const refreshToken = await signIn(context)
+      const { refreshToken } = await signIn(context)
 
       vi.advanceTimersByTime(15 * 60_000)
       const stale = await context.authServer.handler(
         request("DELETE", "/api/auth/user", {
-          cookies: { "auth-ts.refresh": refreshToken }
+          token: await mintToken(context.authServer, refreshToken)
         })
       )
 
@@ -416,11 +500,11 @@ describe("account deletion", () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "0s" }
     })
-    const refreshToken = await signIn(context)
+    const { refreshToken, token } = await signIn(context)
     const cookies = { "auth-ts.refresh": refreshToken }
 
     await context.authServer.handler(
-      request("DELETE", "/api/auth/user", { cookies })
+      request("DELETE", "/api/auth/user", { cookies, token })
     )
     const deletionCode = required(
       context.sentCodes.at(-1),
@@ -430,6 +514,7 @@ describe("account deletion", () => {
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
         cookies,
+        token,
         body: { code: deletionCode }
       })
     )
@@ -442,7 +527,7 @@ describe("account deletion", () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "0s" }
     })
-    const refreshToken = await signIn(context)
+    const { refreshToken, token } = await signIn(context)
     const cookies = { "auth-ts.refresh": refreshToken }
 
     // A fresh sign-in code for the same address must not authorize deletion.
@@ -458,6 +543,7 @@ describe("account deletion", () => {
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
         cookies,
+        token,
         body: { code: signInCode.code }
       })
     )
@@ -476,19 +562,19 @@ describe("account deletion", () => {
       const context = await createTestServer({
         user: { deleteFreshWindow: "0s" }
       })
-      const refreshToken = await signIn(context)
+      const { refreshToken, token } = await signIn(context)
       const cookies = { "auth-ts.refresh": refreshToken }
       const before = context.sentCodes.length
 
       for (let attempt = 0; attempt < 3; attempt++) {
         await context.authServer.handler(
-          request("DELETE", "/api/auth/user", { cookies })
+          request("DELETE", "/api/auth/user", { cookies, token })
         )
         vi.advanceTimersByTime(61_000)
       }
 
       const limited = await context.authServer.handler(
-        request("DELETE", "/api/auth/user", { cookies })
+        request("DELETE", "/api/auth/user", { cookies, token })
       )
 
       expect(limited.status).toBe(429)
@@ -503,11 +589,12 @@ describe("account deletion", () => {
       guest: true,
       user: { deleteFreshWindow: "0s" }
     })
-    const { refreshToken } = await signInAsGuest(context)
+    const { refreshToken, token } = await signInAsGuest(context)
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: { "auth-ts.refresh": refreshToken },
+        token
       })
     )
 

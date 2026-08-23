@@ -147,6 +147,14 @@ reaches the server, including when a privacy extension has stripped `Origin`.
 The client already sends it; bodiless requests such as `GET /session` are
 untouched.
 
+**`GET /token` is the one route a cookie alone authenticates**, and being a
+bodiless `GET` it is exempt from both layers above. That is safe for the reason
+CORS exists: a cross-site page can *send* the request, but without an allowed
+origin the browser will not let it *read* the reply, which is where the token is.
+Every other authenticated route takes the bearer and nothing else, so a request
+carrying only a cookie cannot act for anyone — the whole class of cross-site
+request forgery ends at that one route.
+
 ## Accounts
 
 `type` is written by core only as `guest` or `user`, and only on insert — so

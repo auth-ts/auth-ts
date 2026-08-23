@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { codeChallengeS256 } from "../../src/oauth/pkce"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import { mintToken, readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 import { decodeState, forgeState } from "../helpers/state-cookie"
@@ -571,12 +571,11 @@ describe("oauth callback", () => {
 
     const whoami = await authServer.handler(
       request("GET", "/api/auth/user", {
-        cookies: {
-          "auth-ts.refresh": required(
-            readSetCookies(response).get("auth-ts.refresh"),
-            "refresh"
-          ).value
-        }
+        token: await mintToken(
+          authServer,
+          required(readSetCookies(response).get("auth-ts.refresh"), "refresh")
+            .value
+        )
       })
     )
     expect(((await whoami.json()) as { id: string }).id).toBe(owner.id)
@@ -584,7 +583,7 @@ describe("oauth callback", () => {
     expect(
       (
         await authServer.handler(
-          request("GET", "/api/auth/user", {
+          request("GET", "/api/auth/token", {
             cookies: { "auth-ts.refresh": guestRefresh }
           })
         )
@@ -1036,10 +1035,39 @@ describe("connect and disconnect", () => {
     expect(context.db.users()).toHaveLength(1)
 
     const listed = await context.authServer.handler(
-      request("GET", "/api/auth/connections", { cookies })
+      request("GET", "/api/auth/connections", {
+        token: await mintToken(context.authServer, refreshToken)
+      })
     )
     const body = (await listed.json()) as Array<{ provider: string }>
     expect(body.map((connection) => connection.provider)).toEqual(["github"])
+  })
+
+  it("starts a connect from either credential, since it is a navigation", async () => {
+    // `location.assign` carries cookies and no Authorization header, so this is
+    // the one authenticated route that cannot insist on a bearer.
+    const context = await createTestServer(OAUTH_OPTIONS)
+    const refreshToken = await signInWithCode(context)
+    const token = await mintToken(context.authServer, refreshToken)
+
+    for (const options of [
+      { cookies: { "auth-ts.refresh": refreshToken } },
+      { token }
+    ]) {
+      const response = await context.authServer.handler(
+        request("GET", "/api/auth/connect/github", options)
+      )
+
+      expect(response.status).toBe(302)
+    }
+
+    expect(
+      (
+        await context.authServer.handler(
+          request("GET", "/api/auth/connect/github")
+        )
+      ).status
+    ).toBe(401)
   })
 
   it("rejects a connect callback arriving without the original session", async () => {
@@ -1119,7 +1147,6 @@ describe("connect and disconnect", () => {
   it("unlinks a provider", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)
     const refreshToken = await signInWithCode(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
     const user = required(context.db.users()[0], "user")
     await context.db.insert({
       table: "connections",
@@ -1134,7 +1161,9 @@ describe("connect and disconnect", () => {
     })
 
     const response = await context.authServer.handler(
-      request("DELETE", "/api/auth/connections/github", { cookies })
+      request("DELETE", "/api/auth/connections/github", {
+        token: await mintToken(context.authServer, refreshToken)
+      })
     )
 
     expect(response.status).toBe(204)
