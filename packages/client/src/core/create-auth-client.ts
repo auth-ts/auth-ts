@@ -12,6 +12,7 @@ import {
   createSwitchAccount
 } from "../methods/connections-and-accounts"
 import { createGetSession } from "../methods/get-session"
+import type { GetTokenOptions } from "../methods/get-token"
 import { createGetToken } from "../methods/get-token"
 import { createGetUser } from "../methods/get-user"
 import { createConnect, createSignIn } from "../methods/oauth"
@@ -46,7 +47,7 @@ export interface AuthClient {
    * without a request — so calling this on every render costs nothing until
    * there is something to refresh.
    */
-  getToken: () => Promise<string | null>
+  getToken: (options?: GetTokenOptions) => Promise<string | null>
   /** The user, the session, and a token — or `null`. Always reads the server. */
   getUser: ReturnType<typeof createGetUser>
   /** The session this browser is on, confirming it is live and keeping it that way. */

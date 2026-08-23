@@ -1,6 +1,7 @@
 import type { TokenResult } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
+import { reviveUser } from "../lib/revive-user"
 import { mayHaveSession } from "../lib/session-hint"
 
 /** A token refresh, and the two ways of asking for its result. */
@@ -8,9 +9,22 @@ export interface RefreshToken {
   /** Exchanges the refresh cookie for a token, or `null` when there is no session. */
   refresh: () => Promise<TokenResult | null>
   /** A usable token, or `null` when nobody is signed in. */
-  getToken: () => Promise<string | null>
+  getToken: (options?: GetTokenOptions) => Promise<string | null>
   /** A usable token, or the server's own `unauthenticated` error. */
   requireToken: () => Promise<string>
+}
+
+/** Per-call options for {@link RefreshToken.getToken}. */
+export interface GetTokenOptions {
+  /**
+   * Called when this call had to mint, with the token and the user it names.
+   *
+   * `GET /token` reads that row to mint, so the user arrives with the token and
+   * costs nothing extra. Seeding a cache from here is what lets a cold boot
+   * render from one request. A call served from memory never fires it: nothing
+   * was read, and the user it could report would be as old as the token.
+   */
+  onRefresh?: (result: TokenResult) => void
 }
 
 /**
@@ -70,10 +84,11 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
       internals.log.debug("refreshing access token")
 
       try {
-        const result = await internals.fetchJson<TokenResult | null>({
+        const wire = await internals.fetchJson<TokenResult | null>({
           method: "GET",
           path: "/token"
         })
+        const result = wire && { ...wire, user: reviveUser(wire.user) }
         if (!result) {
           internals.log.debug("no session, clearing local state")
           await forget()
@@ -96,11 +111,12 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
       }
     })
 
-  const requireToken = async () => {
+  const requireToken = async (options?: GetTokenOptions) => {
     const cached = internals.tokenStore.get()
     if (!cached || internals.tokenStore.mustRefresh()) {
       const result = await refresh()
       if (!result) throw noSession()
+      options?.onRefresh?.(result)
 
       return result.token
     }
@@ -110,7 +126,11 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
       // this call's to report: the token being returned is still good, and the
       // next call finds the state this one left — cleared, if the session is
       // gone.
-      void refresh().catch(() => {})
+      // Concurrent callers share the one refresh, so each of their callbacks
+      // sees the same result rather than only the first.
+      void refresh()
+        .then((result) => result && options?.onRefresh?.(result))
+        .catch(() => {})
     }
 
     return cached.token
@@ -120,9 +140,9 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
     refresh,
     requireToken,
 
-    getToken: async () => {
+    getToken: async (options) => {
       try {
-        return await requireToken()
+        return await requireToken(options)
       } catch (error) {
         if (error instanceof AuthError && error.code === "unauthenticated") {
           return null

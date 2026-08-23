@@ -44,6 +44,25 @@ describe("construction", () => {
 })
 
 describe("getToken", () => {
+  it("reports the user it minted from, and only when it minted", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    const client = createAuthClient()
+
+    const minted: unknown[] = []
+    await client.getToken({ onRefresh: (result) => minted.push(result.user) })
+    expect(minted).toHaveLength(1)
+    expect(minted[0]).toMatchObject({ id: user.id })
+    // Dates survive the wire as Dates, since the row's type says they are.
+    expect((minted[0] as { createdAt: Date }).createdAt).toBeInstanceOf(Date)
+
+    // Served from memory: nothing was read, so there is no user to report.
+    await client.getToken({ onRefresh: (result) => minted.push(result.user) })
+    expect(minted).toHaveLength(1)
+  })
+
   it("refreshes once and caches the token", async () => {
     server.on("GET", "/api/auth/token", {
       body: { user },

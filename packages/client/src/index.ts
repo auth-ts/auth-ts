@@ -4,7 +4,6 @@ export type { AuthClient } from "./core/create-auth-client"
 export { createAuthClient } from "./core/create-auth-client"
 export type { TokenState } from "./core/token-store"
 export { REFRESH_AHEAD_MS } from "./core/token-store"
-
 export { AuthError, AuthNetworkError, isAuthError } from "./lib/auth-error"
 export type { CookieStorage } from "./lib/cookie-jar"
 export type { FetchJson, FetchJsonOptions } from "./lib/fetch-json"
@@ -21,6 +20,7 @@ export type {
   DisconnectInput,
   SwitchAccountInput
 } from "./methods/connections-and-accounts"
+export type { GetTokenOptions } from "./methods/get-token"
 export type { OAuthNavigationInput } from "./methods/oauth"
 export type {
   SendCodeInput,
