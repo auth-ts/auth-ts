@@ -28,7 +28,7 @@ doing; nothing here is blocked on anything in the later sections.
 
 ### Prove OAuth against a live provider
 
-The one part of the build with no real-world evidence behind it.
+GitHub is in real use. Google is the part with no real-world evidence behind it.
 
 - [x] Register a **GitHub OAuth app**; callback
       `<origin>/api/auth/callback/github`. Done 2026-08-22 — the callback URL
@@ -36,11 +36,10 @@ The one part of the build with no real-world evidence behind it.
 - [ ] Register a **Google OAuth client**; callback
       `<origin>/api/auth/callback/google`.
 - [ ] Put the four credentials in the demo's `.env`. (GitHub's two are in.)
-- [ ] Run each provider through: sign in, connect from the account page,
+- [x] **GitHub** — in use. Sign-in from a guest session converts the guest in
+      place with name and avatar.
+- [ ] **Google** — run it through sign in, connect from the account page,
       disconnect, and sign in again to confirm the stable-id match holds.
-      GitHub: sign-in from a guest session completed live, converting the
-      guest in place with name and avatar. Connect, disconnect, and the
-      repeat sign-in are still unexercised; Google entirely so.
 
 ### The JWKS gist, if you keep using one for local development
 
