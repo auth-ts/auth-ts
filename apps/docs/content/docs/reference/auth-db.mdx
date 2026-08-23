@@ -33,7 +33,7 @@ cost of not having an adapter package.
 | `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
 | `verificationCodes` | `id`, `identifier`, `codeHash`, `action`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
-| `identities` | `id`, `userId`, `provider`, `providerAccountId`, `label`, `createdAt`, `updatedAt` | `(provider, providerAccountId)` | `userId` | |
+| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
 
 **`createdAt` and `updatedAt` are written by core**, on every insert and on
 every update it makes. Your columns need no default and no trigger: the values
@@ -44,7 +44,7 @@ whichever database is underneath. A store that sets its own is overruled.
 before it writes — that is what a generic contract can express — so two first
 sign-ins for one email both find nothing and both insert. The unique index is
 what turns that race into one failed request instead of two accounts for the
-same person, and the same is true of `(provider, providerAccountId)` for
+same person, and the same is true of `(provider, providerUserId)` for
 provider links. Nothing else in the design defends against it, and no test can
 stand in for it: inserting twice and reading one row passes with or without the
 index, because the missing constraint only shows under a race.

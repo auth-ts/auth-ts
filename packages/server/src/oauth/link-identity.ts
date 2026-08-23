@@ -15,7 +15,7 @@ export const IDENTITY_PAGE_SIZE = 100
 export interface LinkIdentityInput {
   userId: string
   provider: string
-  providerAccountId: string
+  providerUserId: string
   /** Display only. Recorded when present, left alone when the provider sent none. */
   label?: string
 }
@@ -33,17 +33,17 @@ export interface LinkIdentityInput {
  * routine sign-in.
  *
  * The race between the read and the insert is settled by the uniqueness the
- * contract requires on `(provider, providerAccountId)`: two callbacks for one
+ * contract requires on `(provider, providerUserId)`: two callbacks for one
  * provider account both find nothing, both insert, and the constraint refuses
  * the loser rather than letting one identity link twice.
  */
 export async function linkIdentity(
   internals: AuthServerInternals,
-  { userId, provider, providerAccountId, label }: LinkIdentityInput
+  { userId, provider, providerUserId, label }: LinkIdentityInput
 ) {
   const existing = await selectOne(internals, "identities", {
     provider,
-    providerAccountId
+    providerUserId
   })
 
   if (existing) {
@@ -60,7 +60,7 @@ export async function linkIdentity(
   await insertRow(internals, "identities", {
     userId,
     provider,
-    providerAccountId,
+    providerUserId,
     label: label ?? null
   })
 }

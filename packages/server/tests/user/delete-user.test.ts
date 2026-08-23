@@ -29,7 +29,7 @@ async function seed() {
     values: {
       userId: user.id,
       provider: "github",
-      providerAccountId: "1",
+      providerUserId: "1",
       label: "ada@example.com",
       createdAt: new Date(),
       updatedAt: new Date()

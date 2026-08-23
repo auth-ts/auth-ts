@@ -114,7 +114,7 @@ export const github: OAuthProvider = {
     const verified = emails.find((entry) => entry.primary && entry.verified)
 
     return {
-      providerAccountId: String(profile.id),
+      providerUserId: String(profile.id),
       // The handle, not the address: `login` is always present, while a primary
       // verified email frequently is not.
       label: profile.login,

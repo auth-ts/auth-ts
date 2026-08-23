@@ -8,7 +8,7 @@ export interface ProviderIdentity {
    * Stable is the operative word: people change their email at the provider, and
    * matching on email would quietly create a second account for the same person.
    */
-  providerAccountId: string
+  providerUserId: string
   /**
    * What this provider calls the account, for a person reading a list of links.
    *

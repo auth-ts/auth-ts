@@ -160,7 +160,7 @@ export interface AuthIdentity {
   userId: string
   provider: string
   /** The provider's stable id — GitHub's numeric id, Google's `sub`. */
-  providerAccountId: string
+  providerUserId: string
   /** Whatever the provider gives that a person recognises. Display only. */
   label?: string | null
   /** Written by core on insert. */
@@ -324,13 +324,13 @@ export type AuthDeleteInput<
  * | `sessions` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
  * | `verificationCodes` | | `identifier`, `expiresAt` | `expiresAt` |
  * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
- * | `identities` | `(provider, providerAccountId)` | `userId` | |
+ * | `identities` | `(provider, providerUserId)` | `userId` | |
  *
  * **The uniqueness column is not hygiene, it is the design.** Core composes a
  * read and a write where it used to hand your store an upsert, so two first
  * sign-ins for one email both find nothing and both insert. The constraint is
  * what turns that race into a failed request instead of two accounts for one
- * person. The same holds for `(provider, providerAccountId)`.
+ * person. The same holds for `(provider, providerUserId)`.
  *
  * The one concurrency property core requires is that {@link AuthDB.delete} is
  * atomic and returns what it removed: that is what makes a verification code usable

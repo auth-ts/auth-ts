@@ -80,7 +80,7 @@ describe("insert", () => {
     const link = {
       userId: owner.id,
       provider: "github",
-      providerAccountId: "1",
+      providerUserId: "1",
       label: null,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -352,7 +352,7 @@ describe("cleanup", () => {
       values: {
         userId: ada.id,
         provider: "github",
-        providerAccountId: "1",
+        providerUserId: "1",
         label: null,
         createdAt: new Date(),
         updatedAt: new Date()

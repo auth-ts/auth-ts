@@ -523,7 +523,7 @@ describe("oauth callback", () => {
       values: {
         userId: owner.id,
         provider: "github",
-        providerAccountId: "4242",
+        providerUserId: "4242",
         label: null,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -558,7 +558,7 @@ describe("oauth callback", () => {
       (
         await selectRow(db, "identities", {
           provider: "github",
-          providerAccountId: "4242"
+          providerUserId: "4242"
         })
       )?.userId
     ).toBe(owner.id)
@@ -638,7 +638,7 @@ describe("oauth callback", () => {
       values: {
         userId: owner.id,
         provider: "github",
-        providerAccountId: "4242",
+        providerUserId: "4242",
         label: null,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -684,7 +684,7 @@ describe("oauth callback", () => {
       (
         await selectRow(db, "identities", {
           provider: "github",
-          providerAccountId: "4242"
+          providerUserId: "4242"
         })
       )?.userId
     ).toBe(owner.id)
@@ -727,7 +727,7 @@ describe("oauth callback", () => {
       (
         await selectRow(db, "identities", {
           provider: "github",
-          providerAccountId: "5555"
+          providerUserId: "5555"
         })
       )?.userId
     ).toBe(guest.id)
@@ -1108,7 +1108,7 @@ describe("connect and disconnect", () => {
       values: {
         userId: firstUser.id,
         provider: "github",
-        providerAccountId: "4242",
+        providerUserId: "4242",
         label: null,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -1136,7 +1136,7 @@ describe("connect and disconnect", () => {
     expect(callbackResponse.status).toBe(409)
     const identity = await selectRow(context.db, "identities", {
       provider: "github",
-      providerAccountId: "4242"
+      providerUserId: "4242"
     })
     expect(identity?.userId).toBe(firstUser.id)
   })
@@ -1150,7 +1150,7 @@ describe("connect and disconnect", () => {
       values: {
         userId: user.id,
         provider: "github",
-        providerAccountId: "4242",
+        providerUserId: "4242",
         label: null,
         createdAt: new Date(),
         updatedAt: new Date()

@@ -148,7 +148,7 @@ export const identities = pgTable.withRLS(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
-    providerAccountId: text("providerAccountId").notNull(),
+    providerUserId: text("providerUserId").notNull(),
     label: text("label"),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
@@ -160,9 +160,9 @@ export const identities = pgTable.withRLS(
   },
   (table) => [
     index("identitiesUserIdIndex").on(table.userId),
-    uniqueIndex("identitiesProviderAccountIndex").on(
+    uniqueIndex("identitiesProviderUserIndex").on(
       table.provider,
-      table.providerAccountId
+      table.providerUserId
     ),
     pgPolicy("selectOwnIdentities", {
       for: "select",

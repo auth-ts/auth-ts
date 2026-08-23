@@ -48,7 +48,7 @@ export async function resolveOAuthUser(
 ): Promise<AuthUser> {
   const existing = await selectOne(internals, "identities", {
     provider,
-    providerAccountId: identity.providerAccountId
+    providerUserId: identity.providerUserId
   })
 
   if (existing) {
@@ -62,7 +62,7 @@ export async function resolveOAuthUser(
       await linkIdentity(internals, {
         userId: linked.id,
         provider,
-        providerAccountId: identity.providerAccountId,
+        providerUserId: identity.providerUserId,
         ...(identity.label ? { label: identity.label } : {})
       })
 
@@ -103,7 +103,7 @@ export async function resolveOAuthUser(
   await linkIdentity(internals, {
     userId: user.id,
     provider,
-    providerAccountId: identity.providerAccountId,
+    providerUserId: identity.providerUserId,
     ...(identity.label ? { label: identity.label } : {})
   })
 

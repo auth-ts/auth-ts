@@ -128,7 +128,7 @@ export const google: OAuthProvider = {
     const email = claims.email_verified === true ? claims.email : undefined
 
     return {
-      providerAccountId: claims.sub,
+      providerUserId: claims.sub,
       ...(email ? { label: email.toLowerCase() } : {}),
       ...(email ? { email: email.toLowerCase() } : {}),
       ...(claims.name ? { name: claims.name } : {}),
