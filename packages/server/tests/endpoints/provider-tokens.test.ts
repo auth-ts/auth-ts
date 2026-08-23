@@ -139,6 +139,9 @@ describe("storing a provider grant", () => {
     expect(listed).toBeDefined()
     expect(listed).not.toHaveProperty("accessToken")
     expect(listed).not.toHaveProperty("refreshToken")
+    // Not a secret, but not an answer either: the listing holds no token, so
+    // its expiry is churn. `getProviderToken` reports the one it hands over.
+    expect(listed).not.toHaveProperty("accessTokenExpiresAt")
     // The parts an account screen legitimately renders survive.
     expect(listed?.scope).toBe("read:user user:email repo")
     expect(listed?.provider).toBe("github")

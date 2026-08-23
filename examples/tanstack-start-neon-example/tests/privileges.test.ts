@@ -20,6 +20,25 @@ const SECRETS = [
 /** Tables with RLS on and no policy — the Data API role sees and writes nothing. */
 const SERVER_ONLY = ["verificationCodes", "attempts"]
 
+/**
+ * Every column withheld from the Data API role, per table with a column grant.
+ *
+ * Secrets only. A grant is a security boundary, so what it withholds should be
+ * readable as one list of one kind of thing — narrowing it for taste would mean
+ * a later, legitimate use of an ordinary column fails as a permission error,
+ * and would leave nobody able to tell which entries here are load-bearing.
+ * What the library's own `GET /identities` chooses to return is a separate
+ * question, and it answers a narrower one.
+ *
+ * Checked as an exact complement rather than a blocklist: a column added to the
+ * schema and forgotten in privileges.sql is granted by default, and that is the
+ * failure this catches.
+ */
+const WITHHELD: Record<string, string[]> = {
+  sessions: ["tokenHash"],
+  identities: ["accessToken", "refreshToken"]
+}
+
 beforeAll(async () => {
   await client.exec(`
     create role authenticated login;
@@ -81,6 +100,34 @@ describe("privileges.sql", () => {
       } finally {
         await client.exec("reset role")
       }
+    }
+  )
+
+  it.each(Object.keys(WITHHELD))(
+    "grants %s exactly the columns it does not withhold",
+    async (table) => {
+      const columns = async (query: string, parameters: unknown[]) =>
+        (await client.query<{ column_name: string }>(query, parameters)).rows
+          .map((row) => row.column_name)
+          .sort()
+
+      const all = await columns(
+        `select column_name from information_schema.columns
+         where table_name = $1 and table_schema = 'public'`,
+        [table]
+      )
+      const granted = await columns(
+        `select column_name from information_schema.column_privileges
+         where grantee = 'authenticated' and privilege_type = 'SELECT'
+           and table_name = $1`,
+        [table]
+      )
+
+      const withheld = WITHHELD[table] ?? []
+      expect(granted).toEqual(all.filter((name) => !withheld.includes(name)))
+      // The list is only meaningful if those columns are really there — a
+      // renamed column would otherwise pass by being absent from both sides.
+      expect(all).toEqual(expect.arrayContaining(withheld))
     }
   )
 

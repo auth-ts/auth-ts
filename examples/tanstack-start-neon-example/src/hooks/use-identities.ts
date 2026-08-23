@@ -17,7 +17,7 @@ export function useIdentities(userId?: string) {
           const { data } = await postgrest
             .from("identities")
             .select(
-              "id, userId, provider, providerUserId, label, scope, accessTokenExpiresAt, createdAt, updatedAt"
+              "id, userId, provider, providerUserId, label, scope, refreshTokenExpiresAt, createdAt, updatedAt"
             )
             .order("provider", { ascending: true })
             .throwOnError()
