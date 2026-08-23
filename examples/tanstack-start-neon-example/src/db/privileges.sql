@@ -17,10 +17,5 @@ grant select (
   "id", "userId", "userAgent", "ipAddress", "expiresAt", "createdAt", "updatedAt"
 ) on table "sessions" to authenticated;
 
-revoke select on table "verificationCodes" from authenticated;
-grant select (
-  "id", "identifier", "action", "expiresAt", "createdAt", "updatedAt"
-) on table "verificationCodes" to authenticated;
-
 revoke update on table "users" from authenticated;
 grant update ("name", "imageURL", "updatedAt") on table "users" to authenticated;

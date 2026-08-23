@@ -11,10 +11,10 @@ import * as schema from "../src/db/schema"
 const client = new PGlite()
 
 /** Columns the browser must never read, whatever a policy allows. */
-const SECRETS = [
-  ["sessions", "tokenHash"],
-  ["verificationCodes", "codeHash"]
-]
+const SECRETS = [["sessions", "tokenHash"]]
+
+/** Tables with RLS on and no policy — the Data API role sees and writes nothing. */
+const SERVER_ONLY = ["verificationCodes", "attempts"]
 
 beforeAll(async () => {
   await client.exec(`
@@ -76,6 +76,33 @@ describe("privileges.sql", () => {
       await client.exec("reset role")
     }
   })
+
+  it.each(SERVER_ONLY)(
+    "denies every row and write of %s under policy-less RLS",
+    async (table) => {
+      await client.exec(
+        `insert into "${table}" ${
+          table === "attempts"
+            ? `("key", "expiresAt") values ('k', now() + interval '10 minutes')`
+            : `("identifier", "codeHash", "action", "expiresAt")
+               values ('a@example.test', 'x', 'signIn', now() + interval '10 minutes')`
+        }`
+      )
+
+      await client.exec("set role authenticated")
+      try {
+        const visible = await client.query(
+          `select count(*) as n from "${table}"`
+        )
+        expect(visible.rows).toEqual([{ n: 0 }])
+        await expect(
+          client.exec(`delete from "${table}"`)
+        ).resolves.toMatchObject([{ affectedRows: 0 }])
+      } finally {
+        await client.exec("reset role")
+      }
+    }
+  )
 })
 
 describe("triggers.sql", () => {
