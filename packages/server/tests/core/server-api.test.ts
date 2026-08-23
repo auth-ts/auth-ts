@@ -39,7 +39,7 @@ describe("getToken as a function", () => {
       context.db.sessions()[0],
       "session"
     ).expiresAt.getTime()
-    const result = await context.authServer.getToken({
+    const result = await context.authServer.getUser({
       headers: cookieHeaders(refreshToken)
     })
     const after = required(
@@ -48,11 +48,14 @@ describe("getToken as a function", () => {
     ).expiresAt.getTime()
 
     expect(result?.user.email).toBe("ada@example.com")
-    // Shares run() with POST /token, so it gets the same projection — no hash.
+    // The session is projected on the way out — never the hash.
     expect(JSON.stringify(result)).not.toContain("tokenHash")
     expect(
-      (await context.authServer.verifyToken(required(result, "result").token))
-        ?.sub
+      (
+        await context.authServer.verifyToken(
+          required(required(result, "result").token, "token")
+        )
+      )?.sub
     ).toBe(result?.user.id)
     expect(after).toBeGreaterThanOrEqual(before)
   })
@@ -68,7 +71,7 @@ describe("getToken as a function", () => {
 
       vi.advanceTimersByTime(60 * 60_000)
       const result = required(
-        await context.authServer.getToken({
+        await context.authServer.getUser({
           headers: cookieHeaders(refreshToken)
         }),
         "result"
@@ -94,7 +97,7 @@ describe("getToken as a function", () => {
 
       vi.advanceTimersByTime(60 * 60_000)
       const result = required(
-        await context.authServer.getToken({
+        await context.authServer.getUser({
           headers: cookieHeaders(refreshToken)
         }),
         "result"
@@ -113,7 +116,7 @@ describe("getToken as a function", () => {
     const context = await createTestServer()
     const refreshToken = await signIn(context)
 
-    const result = await context.authServer.getToken(
+    const result = await context.authServer.getUser(
       request("GET", "/dashboard", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
@@ -134,7 +137,7 @@ describe("getToken as a function", () => {
     })
 
     await expect(
-      context.authServer.getToken({ headers: cookieHeaders(refreshToken) })
+      context.authServer.getUser({ headers: cookieHeaders(refreshToken) })
     ).rejects.toMatchObject({
       code: "unauthenticated",
       status: 401
@@ -147,10 +150,10 @@ describe("getToken as a function", () => {
     const context = await createTestServer({ cookie: { path: "/api/auth" } })
 
     await expect(
-      context.authServer.getToken({ headers: new Headers() })
+      context.authServer.getUser({ headers: new Headers() })
     ).rejects.toThrow(AuthConfigError)
     await expect(
-      context.authServer.getToken({ headers: new Headers() })
+      context.authServer.getUser({ headers: new Headers() })
     ).rejects.toThrow(/cookie.path/)
   })
 })

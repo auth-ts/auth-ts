@@ -13,7 +13,7 @@ describe("matchRoute", () => {
     const probes: Array<[string, string]> = [
       ["POST", "/api/auth/send-code"],
       ["POST", "/api/auth/verify-code"],
-      ["POST", "/api/auth/token"],
+      ["POST", "/api/auth/user"],
       ["POST", "/api/auth/sign-out"],
       ["GET", "/api/auth/user"],
       ["POST", "/api/auth/user"],
@@ -383,14 +383,14 @@ describe("cors", () => {
     expect(response.headers.get("access-control-allow-origin")).toBeNull()
 
     const preflight = await authServer.handler(
-      request("OPTIONS", "/api/auth/token")
+      request("OPTIONS", "/api/auth/user")
     )
     expect(preflight.status).not.toBe(204)
 
     // And on a directly mounted handler an OPTIONS is a method mismatch, not a
     // request that reaches the endpoint's logic.
-    const direct = await authServer.handlers.getToken(
-      request("OPTIONS", "/api/auth/token")
+    const direct = await authServer.handlers.getSession(
+      request("OPTIONS", "/api/auth/session")
     )
     expect(direct.status).toBe(405)
   })
@@ -402,7 +402,7 @@ describe("cors", () => {
     })
 
     const preflight = await authServer.handler(
-      request("OPTIONS", "/api/auth/token")
+      request("OPTIONS", "/api/auth/user")
     )
     expect(preflight.status).toBe(204)
     expect(preflight.headers.get("access-control-allow-origin")).toBe(
@@ -430,9 +430,7 @@ describe("cors", () => {
       cors: { origin: "https://app.example.com" },
       jwks: { json: { keys: [] } }
     })
-    const response = await authServer.handler(
-      request("POST", "/api/auth/token")
-    )
+    const response = await authServer.handler(request("GET", "/api/auth/user"))
 
     expect(response.status).toBe(401)
     expect(response.headers.get("access-control-allow-origin")).toBe(

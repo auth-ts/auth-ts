@@ -24,7 +24,7 @@ import { endpointRegistry } from "./endpoint-registry"
  * `T` with every user inside it carrying the declared additional fields.
  *
  * Endpoints are written once, against the erased `AuthUser`; this is what puts
- * the schema back on the way out, so `getToken()` returns `user.plan` typed
+ * the schema back on the way out, so `getUser()` returns `user.plan` typed
  * when `plan` was declared. Everything that is not a user passes through
  * unchanged.
  */
@@ -221,7 +221,7 @@ function warnAboutInertIpLimits(internals: AuthServerInternals) {
  * unauthenticated request, but in a loader it almost always means `cookie.path`
  * has been narrowed to the auth mount.
  */
-const COOKIE_PLANE_CALLABLES = new Set(["getToken", "getSession", "getUser"])
+const COOKIE_PLANE_CALLABLES = new Set(["getSession", "getUser"])
 
 /**
  * Turns a routing failure into an endpoint, so it flows through the usual

@@ -19,7 +19,7 @@ export const authServer = createAuthServer({
 ```
 
 You get the same endpoints three ways, derived from one registry so they cannot
-disagree: callable directly from your backend (`authServer.getToken({ headers })`),
+disagree: callable directly from your backend (`authServer.getUser({ headers })`),
 as one catch-all handler (`authServer.handler`), or as individual handlers
 (`authServer.handlers.sendCode`).
 

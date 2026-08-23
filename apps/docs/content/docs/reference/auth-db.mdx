@@ -8,8 +8,9 @@ and in exchange the library never owns your schema, your migrations, or your dat
 
 There are four of them — `select`, `insert`, `update`, `delete` — plus an
 optional `cleanup`. Every query the library makes is one of those four against
-one of five tables, filtered by equality on named columns. There is no operator
-language to learn and none to implement: that is the property that makes the
+one of five tables, filtered on named columns by equality or, for the one
+question equality cannot ask, by order. There is no operator language beyond
+that: no `OR`, no joins, no expressions. That is the property that makes the
 same four functions trivial against Drizzle, raw SQL, a data API, or a document
 store.
 
@@ -50,9 +51,30 @@ index, because the missing constraint only shows under a race.
 
 ## The rules
 
-- **`where` is equality only** — a plain object of column/value pairs, all of
-  which must match. No operators, no ranges, no `OR`. One operator would be the
-  thin end of a query language.
+- **`where` is column/value pairs, all of which must match.** A plain value
+  compares for equality. A `{ lt }`, a `{ gt }`, or both compares for order,
+  with exclusive bounds:
+
+  ```ts
+  where: { tokenHash, expiresAt: { gt: new Date() } }
+  ```
+
+  Telling the two apart is one check, and the shape is chosen so it stays one —
+  a range is a non-null object that is not a `Date`:
+
+  ```ts
+  const isRange = (value: unknown) =>
+    typeof value === "object" && value !== null && !(value instanceof Date)
+  ```
+
+  That is the whole operator surface: no `OR`, no `in`, no negation. Order
+  exists because a live session is one whose expiry is still ahead, and asking
+  that in the same statement that touches the row is what makes resolving a
+  session a single round trip — instead of reading to find out whether it may
+  write, then writing.
+- **`update` returns the rows it wrote**, as `delete` does. That is the other
+  half of the single round trip: the library asks for a session that has not
+  expired and learns from what comes back whether there was one.
 - **`select` takes `limit`, `offset`, and `orderBy`, always.** Nothing is
   optional, so there is no `undefined` to branch on and your implementation has
   one code path. `orderBy` is one column and a direction —
@@ -295,7 +317,8 @@ unique constraints are really there, and whether your `delete` really returns
 what it removed. Neither is observable against a mock, because a mock agrees
 with whatever you assumed.
 
-The checks cover `insert` returning the stored row with its id, equality `where`
+The checks cover `insert` returning the stored row with its id, `where` matching
+by equality and by range, `update` returning what it changed, equality `where`
 on one column and on several, `limit`, `offset`, `orderBy` in both directions,
 `update` applying only what it was given, `delete` returning what it removed and
 matching on every column, a duplicate insert being refused for each unique set

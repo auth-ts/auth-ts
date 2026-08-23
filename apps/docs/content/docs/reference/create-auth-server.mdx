@@ -61,7 +61,7 @@ disagree:
 
 ```ts
 // 1. Call it directly from your own backend. No HTTP round-trip to yourself.
-const { token, user } = await authServer.getToken({ headers })
+const { session, user, token } = await authServer.getUser({ headers })
 
 // 2. One catch-all handler, mounted once.
 authServer.handler(request)
@@ -78,8 +78,39 @@ Plus the JWT-plane functions:
   private key with a function signature; never expose it through a route.
 - `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
   Never authorize with it.
-- `getSession({ headers })` — resolves the cookie to a session and user. Two
-  database reads, and instant revocation truth.
+- `getSession({ headers })` — confirms the session is live and keeps it that
+  way. One statement, no user read, no token.
+
+### Headers, a token, or both
+
+Every authenticated endpoint takes `{ headers?, token? }`, and reads them in that
+order of preference: a token passed directly, then an `Authorization: Bearer`
+header, then the session cookie.
+
+```ts
+// Server-side rendering: hand over the request you already have.
+await authServer.listSessions({ headers })
+
+// Your own API, forwarding the bearer it was given — no cookie in sight.
+await authServer.listSessions({ token })
+```
+
+The token path does no database work to establish who is calling, which is the
+point of issuing tokens at all. The cookie path is what keeps server-side
+rendering to a single call rather than making every page fetch a token first.
+
+An **expired** token falls through to the cookie, because expiry is ordinary.
+A token that fails any other check is refused rather than ignored: falling back
+there would make a forged token indistinguishable from a slow request.
+
+Two endpoints are cookie-only by nature. `GET /session` and `GET /user` are what
+resolve and slide the session in the first place, and `/user` is what mints
+tokens — so neither can be authenticated by the token it exists to produce.
+
+The cost of trusting a token is revocation latency: a session revoked elsewhere
+keeps working here until that token expires, `jwt.ttl` at the outside. That is
+the same bound your database already lives with, since it authorizes on the token
+too.
 
 <auto-type-table path="../../../../../packages/server/src/jwt/sign-token.ts" name="SignTokenClaims" />
 
@@ -96,7 +127,7 @@ const authServer = createAuthServer({
   user: { additionalFields: { plan: "string", seats: "number" } }
 })
 
-const result = await authServer.getToken({ headers })
+const result = await authServer.getUser({ headers })
 result.user.plan // string | null | undefined
 ```
 

@@ -58,7 +58,7 @@ describe("DELETE /sessions/:id", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", { cookies: phone })
+          request("GET", "/api/auth/user", { cookies: phone })
         )
       ).status
     ).toBe(401)
@@ -91,7 +91,7 @@ describe("DELETE /sessions/:id", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", { cookies })
+          request("GET", "/api/auth/user", { cookies })
         )
       ).status
     ).toBe(401)

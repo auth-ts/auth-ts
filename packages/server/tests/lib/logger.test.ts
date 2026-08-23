@@ -25,10 +25,10 @@ describe("createLogger", () => {
   it("passes message and structured data through to a custom sink", () => {
     const sink = vi.fn()
     createLogger("debug", sink).debug("resolved session", {
-      path: "/api/auth/token"
+      path: "/api/auth/user"
     })
     expect(sink).toHaveBeenCalledWith("debug", "resolved session", {
-      path: "/api/auth/token"
+      path: "/api/auth/user"
     })
   })
 

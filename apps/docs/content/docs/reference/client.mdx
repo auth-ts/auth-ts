@@ -17,15 +17,18 @@ the first read.
 
 ## The two reads
 
-`getToken()` returns a valid access token, refreshing only when the current one
-is within sixty seconds of expiring. Concurrent callers share a single request, so
-a page mounting ten components makes one round-trip and they all see the same
-token. Hand it to your PostgREST client as its access token.
+`getToken()` returns a valid access token from its cache. Approaching expiry it
+hands back the cached one and refreshes behind you; only a token too close to
+expiry to outlive the request it would be used for makes you wait. Concurrent
+callers share a single refresh, so a page mounting ten components makes one
+round-trip and they all see the same token. Hand it to your PostgREST client as
+its access token.
 
-`getUser()` returns the signed-in user or `null`. It is gated on the token rather
-than a separate cache, so it costs nothing while the token is valid; without a
-valid token it refreshes once and takes the user from that response. Only the
-server answering `unauthenticated` is a verdict of `null`. A network failure, a
+`getUser()` returns the signed-in user or `null`, and **always reads the
+server**. A name or avatar changed in another tab, on another device, or by
+anything other than this client would otherwise never arrive, and deduplicating
+is the caller's decision — wrap it in your query library, which already does that
+well. Only the server answering `unauthenticated` is a verdict of `null`. A network failure, a
 server error, or a proxy answering in the server's place all resolve to the
 **last known user** — which is `null` only on a device that has never signed in —
 because being offline is not being signed out, and neither is the auth server
@@ -33,6 +36,13 @@ being mid-deploy. An application that forgets who you are whenever something
 between it and the server hiccups is worse than one that is briefly optimistic.
 (`getToken()` likewise clears local state only on `unauthenticated`; every other
 failure is thrown and leaves the caches alone.)
+
+The two are one request underneath. `GET /user` answers with the user, the
+session, and a freshly signed token, so reading the user refreshes the token that
+`getToken()` hands out. The client sends the token it already holds along with
+every request, and the server answers with a new one only when that one is spent
+— so a token nothing has invalidated is not rotated on every tab focus, which
+matters for anything else holding it.
 
 ## React
 

@@ -70,7 +70,6 @@ export type {
   SignOutInput,
   SignOutScope
 } from "./endpoints/sign-out"
-export type { AuthTokenResult, TokenSession } from "./endpoints/token"
 export type { DeleteUserInput, UpdateUserInput } from "./endpoints/user"
 export type { VerifyCodeInput } from "./endpoints/verify-code"
 export { AuthApiError } from "./http/auth-api-error"

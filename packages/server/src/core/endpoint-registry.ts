@@ -13,7 +13,6 @@ import { revokeSession } from "../endpoints/sessions/$id"
 import { signInProvider } from "../endpoints/sign-in/$provider"
 import { signInGuest } from "../endpoints/sign-in/guest"
 import { signOut } from "../endpoints/sign-out"
-import { getToken } from "../endpoints/token"
 import { deleteUser, getUser, updateUser } from "../endpoints/user"
 import { verifyCode } from "../endpoints/verify-code"
 
@@ -31,7 +30,6 @@ import { verifyCode } from "../endpoints/verify-code"
 export const endpointRegistry = {
   sendCode,
   verifyCode,
-  getToken,
   signOut,
   getSession,
   getUser,

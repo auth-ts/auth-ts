@@ -171,7 +171,7 @@ describe("token and user endpoints", () => {
     const { authServer, refreshToken } = await signIn()
 
     const response = await authServer.handler(
-      request("POST", "/api/auth/token", {
+      request("GET", "/api/auth/user", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
@@ -187,13 +187,13 @@ describe("token and user endpoints", () => {
     expect(claims?.role).toBe("authenticated")
   })
 
-  it("never returns the stored token hash on refresh — only a projection of the session", async () => {
+  it("never returns the stored token hash — every column but that one", async () => {
     // The hash at rest is the whole point of storing sha256(token) instead of the
     // token. Handing it back on every refresh would undo that, and it was.
     const { authServer, refreshToken, db } = await signIn()
 
     const response = await authServer.handler(
-      request("POST", "/api/auth/token", {
+      request("GET", "/api/auth/user", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )
@@ -203,18 +203,20 @@ describe("token and user endpoints", () => {
     expect(JSON.stringify(body)).not.toContain("tokenHash")
     expect(JSON.stringify(body)).not.toContain(storedHash)
     // Exact key set, so a new AuthSession column cannot widen this silently.
+    // No userAgent or ipAddress: this sign-in carried neither header, and the
+    // stamp writes only what it was given.
     expect(Object.keys(body.session).sort()).toEqual([
       "createdAt",
       "expiresAt",
-      "id"
+      "id",
+      "updatedAt",
+      "userId"
     ])
   })
 
-  it("401s the token endpoint without a cookie", async () => {
+  it("401s the user endpoint without a cookie", async () => {
     const { authServer } = await createTestServer()
-    const response = await authServer.handler(
-      request("POST", "/api/auth/token")
-    )
+    const response = await authServer.handler(request("GET", "/api/auth/user"))
 
     expect(response.status).toBe(401)
     expect(
@@ -310,7 +312,7 @@ describe("token and user endpoints", () => {
     ).toContain("Max-Age=0")
 
     const afterSignOut = await authServer.handler(
-      request("POST", "/api/auth/token", {
+      request("GET", "/api/auth/user", {
         cookies: { "auth-ts.refresh": refreshToken }
       })
     )

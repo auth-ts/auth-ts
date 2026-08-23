@@ -68,7 +68,7 @@ describe("multiAccount disabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", {
+          request("GET", "/api/auth/user", {
             cookies: {
               "auth-ts.refresh": required(
                 first.cookies["auth-ts.refresh"],
@@ -348,7 +348,7 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", {
+          request("GET", "/api/auth/user", {
             cookies: {
               "auth-ts.refresh": required(
                 first.cookies["auth-ts.refresh"],
@@ -425,7 +425,7 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", {
+          request("GET", "/api/auth/user", {
             cookies: {
               "auth-ts.refresh": required(
                 adaElsewhere.cookies["auth-ts.refresh"],
@@ -468,7 +468,7 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", {
+          request("GET", "/api/auth/user", {
             cookies: {
               "auth-ts.refresh": required(
                 graceElsewhere.cookies["auth-ts.refresh"],
@@ -503,7 +503,7 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", {
+          request("GET", "/api/auth/user", {
             cookies: {
               "auth-ts.refresh": required(
                 adaElsewhere.cookies["auth-ts.refresh"],
@@ -517,7 +517,7 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", { cookies: second.cookies })
+          request("GET", "/api/auth/user", { cookies: second.cookies })
         )
       ).status
     ).toBe(200)
@@ -547,7 +547,7 @@ describe("multiAccount enabled", () => {
     expect(
       (
         await context.authServer.handler(
-          request("POST", "/api/auth/token", { cookies: second.cookies })
+          request("GET", "/api/auth/user", { cookies: second.cookies })
         )
       ).status
     ).toBe(200)

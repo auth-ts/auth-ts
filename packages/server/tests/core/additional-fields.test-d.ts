@@ -11,7 +11,7 @@ import type {
 } from "../../src/core/auth-db"
 import type { WithUserFields } from "../../src/core/create-auth-server"
 import { createAuthServer } from "../../src/core/create-auth-server"
-import type { AuthTokenResult } from "../../src/endpoints/token"
+import type { CurrentSession } from "../../src/endpoints/session"
 import { createMemoryDb } from "../../src/lib/memory-db"
 
 // Never executed — vitest typechecks this file and runs nothing in it — so the
@@ -157,11 +157,11 @@ describe("createAuthServer infers the schema and types everything it returns", (
     expectTypeOf(user.plan).toEqualTypeOf<string | null | undefined>()
     expectTypeOf(user.seats).toEqualTypeOf<number | null | undefined>()
 
-    const token = await server.getToken({ headers: new Headers() })
-    expectTypeOf(token.user.plan).toEqualTypeOf<string | null | undefined>()
+    const read = await server.getUser({ headers: new Headers() })
+    expectTypeOf(read.user.plan).toEqualTypeOf<string | null | undefined>()
     // Everything that is not a user passes through unchanged.
-    expectTypeOf(token.session.createdAt).toEqualTypeOf<Date>()
-    expectTypeOf(token.token).toEqualTypeOf<string>()
+    expectTypeOf(read.session.createdAt).toEqualTypeOf<Date>()
+    expectTypeOf(read.token).toEqualTypeOf<string | undefined>()
   })
 
   it("refuses an adapter typed against a different schema", () => {
@@ -189,12 +189,15 @@ describe("createAuthServer infers the schema and types everything it returns", (
 
 describe("WithUserFields", () => {
   it("replaces users wherever they appear and leaves everything else alone", () => {
-    type Typed = WithUserFields<AuthTokenResult, Declared>
+    type Typed = WithUserFields<
+      { user: AuthUser; session: CurrentSession; token?: string },
+      Declared
+    >
     expectTypeOf<Typed["user"]["plan"]>().toEqualTypeOf<
       string | null | undefined
     >()
     expectTypeOf<Typed["session"]["createdAt"]>().toEqualTypeOf<Date>()
-    expectTypeOf<Typed["token"]>().toEqualTypeOf<string>()
+    expectTypeOf<Typed["token"]>().toEqualTypeOf<string | undefined>()
 
     expectTypeOf<WithUserFields<AuthUser[], Declared>>().toEqualTypeOf<
       AuthUser<Declared>[]
