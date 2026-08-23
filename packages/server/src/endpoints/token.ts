@@ -3,8 +3,11 @@ import { defineEndpoint } from "../http/define-endpoint"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { mintAccessToken } from "../session/issue-session"
 import type { HeadersInput } from "../session/resolve-session"
-import { resolveSession } from "../session/resolve-session"
-import { clearedRefreshCookies } from "../session/session-cookies"
+import { readRefreshToken, resolveSession } from "../session/resolve-session"
+import {
+  clearedRefreshCookies,
+  refreshCookies
+} from "../session/session-cookies"
 
 /** What `GET /token` and `authServer.getToken` return when somebody is signed in. */
 export interface TokenResult {
@@ -84,6 +87,25 @@ export const getToken = defineEndpoint({
       resolved.session.id
     )
 
-    return { data: { token, user: resolved.user } satisfies TokenResult }
+    const headers = new Headers()
+    const rawToken = readRefreshToken(internals, input.headers)
+    if (config.session.sliding && rawToken) {
+      // The browser deletes the cookie `ttl` after it was last *written*, not
+      // last used — without this re-send a sliding session row outlives its own
+      // cookie. Dropping the Set-Cookie (a server render cannot apply one)
+      // loses nothing: the value is unchanged and the next browser call re-ups.
+      for (const cookie of refreshCookies(internals, {
+        rawToken,
+        requestURL: input.requestURL,
+        headers: input.headers
+      })) {
+        headers.append("set-cookie", cookie)
+      }
+    }
+
+    return {
+      data: { token, user: resolved.user } satisfies TokenResult,
+      headers
+    }
   }
 })

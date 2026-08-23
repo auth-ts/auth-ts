@@ -171,6 +171,39 @@ describe("getToken as a function", () => {
     expect(sessions).toHaveLength(1)
     expect(session).not.toHaveProperty("tokenHash")
   })
+
+  it("re-sends the cookies over HTTP, so their Max-Age slides with the session", async () => {
+    const context = await createTestServer()
+    const { refreshToken } = await signIn(context)
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/token", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+    const cookies = readSetCookies(response)
+
+    expect(required(cookies.get("auth-ts.refresh"), "refresh").value).toBe(
+      refreshToken
+    )
+    expect(cookies.get("auth-ts.refresh")?.attributes).toMatch(/Max-Age/)
+    expect(required(cookies.get("auth-ts.hint"), "hint").value).toBe("in")
+  })
+
+  it("sets no cookies on success when sliding is off", async () => {
+    const context = await createTestServer({
+      session: { ttl: "30d", sliding: false }
+    })
+    const { refreshToken } = await signIn(context)
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/token", {
+        cookies: { "auth-ts.refresh": refreshToken }
+      })
+    )
+
+    expect(response.headers.getSetCookie()).toHaveLength(0)
+  })
 })
 
 describe("getSession", () => {
