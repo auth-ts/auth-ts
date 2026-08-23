@@ -3,7 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/icons"
+import { postgrest } from "../db/postgrest"
+import { connectionsQueryKey, useConnections } from "../hooks/use-connections"
 import { useCountdown } from "../hooks/use-countdown"
+import { sessionsQueryKey, useSessions } from "../hooks/use-sessions"
+import { useToken } from "../hooks/use-token"
 import { userQueryKey, useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 
@@ -20,7 +24,7 @@ const noticeClass = {
   error: "alert-error"
 }
 
-/** Profile, linked providers, devices, account switching, and deletion. */
+/** Profile, linked providers, sessions, account switching, and deletion. */
 function AccountPage() {
   const { data: user, isPending } = useUser()
   const queryClient = useQueryClient()
@@ -36,22 +40,13 @@ function AccountPage() {
   const [deletionNotice, setDeletionNotice] = useState<Notice | null>(null)
   const [deletionCooldown, startDeletionCooldown] = useCountdown()
 
-  const sessions = useQuery({
-    queryKey: ["sessions", user?.id],
-    queryFn: authClient.listSessions,
-    enabled: Boolean(user)
-  })
-  // Which entry is this device: compared by id, since the list carries no flag.
-  const currentSession = useQuery({
-    queryKey: ["session", user?.id],
-    queryFn: authClient.getSession,
-    enabled: Boolean(user)
-  })
-  const connections = useQuery({
-    queryKey: ["connections", user?.id],
-    queryFn: authClient.listConnections,
-    enabled: Boolean(user)
-  })
+  const sessions = useSessions(user?.id)
+  // Which entry is this device: the token names its own session, so no request.
+  const { data: token } = useToken()
+  const currentSessionId = token
+    ? authClient.decodeToken(token)?.claims.sid
+    : undefined
+  const connections = useConnections(user?.id)
   const accounts = useQuery({
     queryKey: ["accounts"],
     queryFn: authClient.listAccounts,
@@ -62,7 +57,10 @@ function AccountPage() {
   })
 
   const rename = useMutation({
-    mutationFn: (name: string) => authClient.updateUser({ name }),
+    // No `eq`: updateOwnUser already narrows the write to the caller's row.
+    mutationFn: async (name: string) => {
+      await postgrest.from("users").update({ name }).throwOnError()
+    },
     onSuccess: async () => {
       setDraftName(null)
       setNotice({ text: "Saved.", tone: "success" })
@@ -70,21 +68,31 @@ function AccountPage() {
     }
   })
 
+  // Another device's session is a row this user owns, so the data plane
+  // deletes it. This device's is a sign-out, because the cookie has to go too.
   const revoke = useMutation({
-    mutationFn: (id: string) => authClient.revokeSession({ id }),
+    mutationFn: async (id: string) => {
+      await postgrest.from("sessions").delete().eq("id", id).throwOnError()
+    },
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["sessions", user?.id] })
+      queryClient.invalidateQueries({ queryKey: sessionsQueryKey(user?.id) })
   })
 
+  // No userId filter: deleteOwnConnections narrows the delete to this user's
+  // rows, and a provider is linked at most once per user.
   const disconnect = useMutation({
-    mutationFn: (provider: string) => authClient.disconnect({ provider }),
+    mutationFn: async (provider: string) => {
+      await postgrest
+        .from("connections")
+        .delete()
+        .eq("provider", provider)
+        .throwOnError()
+    },
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["connections", user?.id] }),
-    onError: (error) =>
-      setNotice({
-        text: isAuthError(error) ? error.message : "Could not disconnect.",
-        tone: "error"
-      })
+      queryClient.invalidateQueries({
+        queryKey: connectionsQueryKey(user?.id)
+      }),
+    onError: () => setNotice({ text: "Could not disconnect.", tone: "error" })
   })
 
   if (isPending) {
@@ -252,7 +260,7 @@ function AccountPage() {
 
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body gap-4">
-          <h2 className="card-title">Devices</h2>
+          <h2 className="card-title">Sessions</h2>
           <ul className="list rounded-box bg-base-200">
             {(sessions.data ?? []).map((session) => (
               <li key={session.id} className="list-row items-center">
@@ -266,7 +274,7 @@ function AccountPage() {
                     >
                       {session.userAgent ?? "Unknown device"}
                     </span>
-                    {session.id === currentSession.data?.id ? (
+                    {session.id === currentSessionId ? (
                       <span className="badge badge-soft badge-success badge-sm shrink-0">
                         this device
                       </span>
@@ -276,18 +284,32 @@ function AccountPage() {
                     {session.ipAddress ?? "no ip"}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => revoke.mutate(session.id)}
-                  className="btn btn-ghost btn-sm"
-                >
-                  Revoke
-                </button>
+                {session.id === currentSessionId ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await authClient.signOut()
+                      queryClient.clear()
+                      await navigate({ to: "/login" })
+                    }}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Sign out
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => revoke.mutate(session.id)}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Revoke
+                  </button>
+                )}
               </li>
             ))}
           </ul>
           <p className="text-xs text-base-content/60">
-            Revoked devices keep working until their current access token
+            Revoked sessions keep working until their current access token
             expires — ten minutes by default.
           </p>
         </div>
@@ -326,73 +348,68 @@ function AccountPage() {
         </div>
       ) : null}
 
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body gap-4">
-          <h2 className="card-title">Sessions</h2>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={async () => {
-                // Every account in this browser — the default, as in Clerk.
-                // "Sign out this account" below is the switcher's narrower
-                // version.
-                await authClient.signOut()
-                queryClient.clear()
-                await navigate({ to: "/login" })
-              }}
-              className="btn btn-outline btn-sm"
-            >
-              Sign out
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const result = await authClient.signOut({ userId: user.id })
-                queryClient.clear()
-                if (result?.switchedTo) {
-                  const label =
-                    result.switchedTo.email ??
-                    `Guest ${result.switchedTo.id.slice(0, 8)}`
-                  setNotice({
-                    text: `Now signed in as ${label}.`,
-                    tone: "success"
-                  })
-                  await sessions.refetch()
-                } else {
-                  await navigate({ to: "/login" })
-                }
-              }}
-              className="btn btn-outline btn-sm"
-            >
-              Sign out this account
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                await authClient.signOut({ scope: "others" })
-                setNotice({
-                  text: "Signed out on your other devices.",
-                  tone: "success"
-                })
-                await sessions.refetch()
-              }}
-              className="btn btn-outline btn-sm"
-            >
-              Sign out other devices
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                await authClient.signOut({ scope: "global" })
-                queryClient.clear()
-                await navigate({ to: "/login" })
-              }}
-              className="btn btn-outline btn-sm"
-            >
-              Sign out everywhere
-            </button>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={async () => {
+            // Every account in this browser — the default, as in Clerk.
+            // "Sign out this account" below is the switcher's narrower
+            // version.
+            await authClient.signOut()
+            queryClient.clear()
+            await navigate({ to: "/login" })
+          }}
+          className="btn btn-outline btn-sm"
+        >
+          Sign out
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            const result = await authClient.signOut({ userId: user.id })
+            queryClient.clear()
+            if (result?.switchedTo) {
+              const label =
+                result.switchedTo.email ??
+                `Guest ${result.switchedTo.id.slice(0, 8)}`
+              setNotice({
+                text: `Now signed in as ${label}.`,
+                tone: "success"
+              })
+              await sessions.refetch()
+            } else {
+              await navigate({ to: "/login" })
+            }
+          }}
+          className="btn btn-outline btn-sm"
+        >
+          Sign out this account
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await authClient.signOut({ scope: "others" })
+            setNotice({
+              text: "Signed out on your other devices.",
+              tone: "success"
+            })
+            await sessions.refetch()
+          }}
+          className="btn btn-outline btn-sm"
+        >
+          Sign out other devices
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await authClient.signOut({ scope: "global" })
+            queryClient.clear()
+            await navigate({ to: "/login" })
+          }}
+          className="btn btn-outline btn-sm"
+        >
+          Sign out everywhere
+        </button>
       </div>
 
       <div className="card border border-error/30 bg-base-100 shadow-sm">
