@@ -87,7 +87,7 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
 
   return {
     getToken,
-    getUser: createGetUser(internals, getToken),
+    getUser: createGetUser(internals),
     subscribe: (listener) => internals.userStore.subscribe(listener),
     getCachedUser: () => internals.userStore.restore(),
     sendCode: createSendCode(internals),

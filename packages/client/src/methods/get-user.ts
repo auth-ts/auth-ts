@@ -25,10 +25,7 @@ import type { UserResponse } from "./get-token"
  * one that is briefly optimistic. Server failures are logged at `warn` so they
  * are not mistaken for a tunnel.
  */
-export function createGetUser(
-  internals: AuthClientInternals,
-  getToken: () => Promise<string>
-) {
+export function createGetUser(internals: AuthClientInternals) {
   return async function getUser(): Promise<AuthUser | null> {
     const restored = internals.userStore.restore()
 
