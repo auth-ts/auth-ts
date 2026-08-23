@@ -35,6 +35,54 @@ const DYNAMIC_IMPORT = /(\bimport\(\s*["'])([^"']+)(["']\s*\))/g
 
 const SPECIFIER_PATTERNS = [IMPORT_FROM, SIDE_EFFECT_IMPORT, DYNAMIC_IMPORT]
 
+/**
+ * A predicate for "this offset is code", so the rewrite leaves comments alone.
+ *
+ * A doc comment may contain an example that imports something — the testing
+ * entry's does — and an example is prose, not a specifier this build resolves.
+ * Rewriting one either fails the build over a path that was never meant to
+ * resolve, or worse, quietly pastes `.js` into documentation that a reader is
+ * meant to copy into TypeScript source.
+ */
+function codeMask(contents: string) {
+  const mask = new Uint8Array(contents.length).fill(1)
+  let index = 0
+
+  const hide = (from: number, to: number) => mask.fill(0, from, to)
+
+  while (index < contents.length) {
+    const two = contents.slice(index, index + 2)
+
+    if (two === "//") {
+      const end = contents.indexOf("\n", index)
+      const stop = end === -1 ? contents.length : end
+      hide(index, stop)
+      index = stop
+      continue
+    }
+
+    if (two === "/*") {
+      const end = contents.indexOf("*/", index + 2)
+      const stop = end === -1 ? contents.length : end + 2
+      hide(index, stop)
+      index = stop
+      continue
+    }
+
+    const character = contents[index]
+    if (character === '"' || character === "'" || character === "`") {
+      index++
+      while (index < contents.length && contents[index] !== character) {
+        index += contents[index] === "\\" ? 2 : 1
+      }
+    }
+
+    index++
+  }
+
+  return mask
+}
+
 function declarationFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
     const path = join(directory, entry)
@@ -78,9 +126,20 @@ for (const filePath of declarationFiles(distributionRoot)) {
   let updated = contents
 
   for (const pattern of SPECIFIER_PATTERNS) {
+    // Recomputed per pass: a rewrite lengthens the file, so a mask built before
+    // it would be reading the wrong offsets by the next pattern.
+    const isCode = codeMask(updated)
+
     updated = updated.replace(
       pattern,
-      (match, lead: string, specifier: string, close: string) => {
+      (
+        match,
+        lead: string,
+        specifier: string,
+        close: string,
+        offset: number
+      ) => {
+        if (!isCode[offset]) return match
         // Only relative specifiers are ours to fix. A bare `jose` is the
         // consumer's own resolution problem, and an extension is already right.
         if (!specifier.startsWith(".")) return match
