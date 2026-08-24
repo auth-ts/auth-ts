@@ -65,6 +65,18 @@ function LoginPage() {
     }
   }
 
+  const continueWithGitHub = async () => {
+    setNotice(null)
+    try {
+      await authClient.signInProvider({
+        provider: "github",
+        redirect: "/todos"
+      })
+    } catch (error) {
+      report(error)
+    }
+  }
+
   const continueAsGuest = async () => {
     setNotice(null)
     try {
@@ -168,12 +180,7 @@ function LoginPage() {
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={() =>
-                authClient.signInProvider({
-                  provider: "github",
-                  redirect: "/todos"
-                })
-              }
+              onClick={() => void continueWithGitHub()}
               className="btn btn-outline w-full"
             >
               <GitHubIcon />

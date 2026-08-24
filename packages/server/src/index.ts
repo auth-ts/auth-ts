@@ -69,7 +69,10 @@ export type {
 } from "./endpoints/sessions/$id"
 export type { SignInCodeInput } from "./endpoints/sign-in/code"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest"
-export type { SignInProviderInput } from "./endpoints/sign-in/provider/$provider"
+export type {
+  AuthorizeURLResult,
+  SignInProviderInput
+} from "./endpoints/sign-in/provider/$provider"
 export type {
   SignOutInput,
   SignOutScope

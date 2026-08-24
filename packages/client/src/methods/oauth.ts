@@ -1,3 +1,4 @@
+import type { AuthorizeURLResult } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Where to send the browser, and where to come back to. */
@@ -7,45 +8,50 @@ export interface OAuthNavigationInput {
   redirect?: string
 }
 
-/** Builds the URL for an OAuth navigation, carrying redirect and locale. */
-function buildURL(
+/**
+ * Asks the server for a provider's authorize URL and goes there.
+ *
+ * The server answers with the URL rather than a redirect, because only the
+ * caller knows how to navigate: a browser assigns `location`, and a desktop or
+ * mobile shell has to open the system browser instead of its own webview. The
+ * fetch is what sets the state cookie, so it must land before the navigation.
+ */
+async function startFlow(
   internals: AuthClientInternals,
   path: string,
-  input: OAuthNavigationInput
+  input: OAuthNavigationInput,
+  authenticated: boolean
 ) {
-  const url = new URL(
-    `${internals.config.baseURL}${internals.config.basePath}${path}/${encodeURIComponent(input.provider)}`,
-    globalThis.location?.href ?? "http://localhost"
-  )
+  const { url } = await internals.fetchJson<AuthorizeURLResult>({
+    method: "POST",
+    path: `${path}/${encodeURIComponent(input.provider)}`,
+    body: input.redirect ? { redirect: input.redirect } : {},
+    authenticated
+  })
 
-  if (input.redirect) url.searchParams.set("redirect", input.redirect)
-  // A navigation cannot carry Accept-Language, so the locale rides the URL and
-  // the server stores it in the state cookie for the callback's error pages.
-  if (internals.locale) url.searchParams.set("locale", internals.locale)
-
-  return url.toString()
+  globalThis.location.assign(url)
 }
 
 /**
- * Starts an OAuth sign-in by navigating the browser.
+ * Starts an OAuth sign-in, sending the browser to the provider.
  *
- * Not a fetch: OAuth is a redirect dance that must happen at the top level, and
- * this returns nothing because the page is on its way out. When the user comes
- * back the session cookie is already set, so the application boots, calls
- * `getUser`, and finds them signed in — the callback hands the SPA no token, and
- * the cookie is what buys the first one.
+ * Resolves only if something goes wrong before the navigation — otherwise the
+ * page is on its way out. When the user comes back the session cookie is
+ * already set, so the application boots, calls `getUser`, and finds them signed
+ * in: the callback hands the SPA no token, and the cookie is what buys the first
+ * one.
  *
  * Signing in while already signed in never links accounts. Use `connect` for that.
  */
 export function createSignInProvider(internals: AuthClientInternals) {
-  return function signInProvider(input: OAuthNavigationInput): void {
-    globalThis.location.assign(buildURL(internals, "/sign-in/provider", input))
+  return function signInProvider(input: OAuthNavigationInput): Promise<void> {
+    return startFlow(internals, "/sign-in/provider", input, false)
   }
 }
 
-/** Starts linking a provider to the currently signed-in user, by navigating. */
+/** Starts linking a provider to the currently signed-in user. */
 export function createConnect(internals: AuthClientInternals) {
-  return function connect(input: OAuthNavigationInput): void {
-    globalThis.location.assign(buildURL(internals, "/connect", input))
+  return function connect(input: OAuthNavigationInput): Promise<void> {
+    return startFlow(internals, "/connect", input, true)
   }
 }

@@ -239,9 +239,13 @@ The shape is the web `Storage` interface, so a store that already has
 protects — the keychain or keystore — because what lands in it is the session.
 
 Everything else is unchanged: `getToken()` still serves the JWT from memory for
-your data client, and the app never touches the cookie. OAuth is the exception
-for now — `signInProvider` and `connect` navigate the page, which a native app cannot do;
-deep-link flows are on the roadmap.
+your data client, and the app never touches the cookie. `signInProvider` and
+`connect` fetch the provider's authorize URL and then assign `location`, so a
+native shell can call the same endpoints and open the URL in the system browser
+instead — which is what RFC 8252 requires and what Google enforces. What is
+still missing there is the return leg: the callback arrives in the system
+browser, whose cookie jar is not the app's, so deep-link flows remain on the
+roadmap.
 
 ## Errors
 

@@ -92,6 +92,18 @@ function AccountPage() {
     onError: () => setNotice({ text: "Could not disconnect.", tone: "error" })
   })
 
+  const linkGitHub = async () => {
+    setNotice(null)
+    try {
+      await authClient.connect({ provider: "github", redirect: "/account" })
+    } catch (error) {
+      setNotice({
+        text: isAuthError(error) ? error.message : "Could not link GitHub.",
+        tone: "error"
+      })
+    }
+  }
+
   if (isPending) {
     return (
       <div className="flex justify-center py-16">
@@ -220,9 +232,7 @@ function AccountPage() {
             <h2 className="card-title">Connected providers</h2>
             <button
               type="button"
-              onClick={() =>
-                authClient.connect({ provider: "github", redirect: "/account" })
-              }
+              onClick={() => void linkGitHub()}
               className="btn btn-outline btn-sm"
             >
               <GitHubIcon />

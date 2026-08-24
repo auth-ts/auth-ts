@@ -9,6 +9,7 @@ export interface RecordedRequest {
   credentials: RequestCredentials | undefined
   acceptLanguage: string | null
   cookie: string | null
+  authorization: string | null
 }
 
 /** A queued reply, matched by method and path. */
@@ -107,7 +108,8 @@ export function fakeAuthServer(): FakeAuthServer {
         body: init?.body ? JSON.parse(init.body as string) : undefined,
         credentials: init?.credentials,
         acceptLanguage: headers.get("accept-language"),
-        cookie: headers.get("cookie")
+        cookie: headers.get("cookie"),
+        authorization: headers.get("authorization")
       })
 
       // Replies are consumed in the order they were queued; once the queue runs

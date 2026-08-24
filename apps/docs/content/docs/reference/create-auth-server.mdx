@@ -178,9 +178,14 @@ signing in and the first render cost one round trip between them rather than a
 sign-in followed by a refresh. Nothing crosses in a response header any more,
 which is also why there is nothing for CORS to expose.
 
-`GET /connect/:provider` is the one authenticated route that still accepts the
-cookie, because `location.assign` is a top-level navigation and cannot carry an
-`Authorization` header. It prefers the token when one is there.
+There is no exception to that. The OAuth routes —
+`POST /sign-in/provider/:provider` and `POST /connect/:provider` — answer with
+the provider's authorize URL rather than a 302, so the caller is making an
+ordinary request and can present a token like anything else. They have to: a
+desktop or mobile shell must open the system browser instead of its own webview,
+and it cannot read a `Location` header out of a redirect, because a
+manual-redirect fetch response is opaque. Handing back the URL is the only shape
+that serves a browser and a native app at once.
 
 The cost of trusting a token is revocation latency: a session revoked elsewhere
 keeps working until that token expires, `jwt.ttl` at the outside. That is the

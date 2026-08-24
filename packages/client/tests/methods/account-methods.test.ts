@@ -348,32 +348,47 @@ describe("sessions and accounts", () => {
 })
 
 describe("oauth navigation", () => {
-  it("builds the sign-in url with redirect and locale", () => {
+  it("asks the server where to go, then goes there", async () => {
+    // The server answers with the URL rather than a redirect, because only the
+    // caller knows how to navigate — a browser assigns location, a native shell
+    // opens the system browser. The request is also what sets the state cookie,
+    // so it has to land before the navigation.
     const assign = vi.fn()
     vi.stubGlobal("location", { href: "https://app.example.com/login", assign })
+    server.on("POST", "/api/auth/sign-in/provider/github", {
+      body: { url: "https://github.com/login/oauth/authorize?state=abc" }
+    })
 
-    createAuthClient({ locale: "de" }).signInProvider({
+    await createAuthClient({ locale: "de" }).signInProvider({
       provider: "github",
       redirect: "/dashboard"
     })
 
-    const target = new URL(assign.mock.calls[0]?.[0] as string)
-    expect(target.pathname).toBe("/api/auth/sign-in/provider/github")
-    expect(target.searchParams.get("redirect")).toBe("/dashboard")
-    expect(target.searchParams.get("locale")).toBe("de")
+    expect(server.requests[0]?.path).toBe("/api/auth/sign-in/provider/github")
+    expect(server.requests[0]?.body).toEqual({ redirect: "/dashboard" })
+    expect(server.requests[0]?.acceptLanguage).toBe("de")
+    expect(assign).toHaveBeenCalledWith(
+      "https://github.com/login/oauth/authorize?state=abc"
+    )
   })
 
-  it("builds the connect url for the current user", () => {
+  it("sends connect with the access token, since it is an ordinary request", async () => {
     const assign = vi.fn()
     vi.stubGlobal("location", {
       href: "https://app.example.com/account",
       assign
     })
+    server.on("POST", "/api/auth/connect/google", {
+      body: { url: "https://accounts.google.com/o/oauth2/v2/auth?state=abc" }
+    })
+    const client = await signedIn()
 
-    createAuthClient().connect({ provider: "google" })
+    await client.connect({ provider: "google" })
 
-    expect(new URL(assign.mock.calls[0]?.[0] as string).pathname).toBe(
-      "/api/auth/connect/google"
+    expect(server.requests.at(-1)?.path).toBe("/api/auth/connect/google")
+    expect(server.requests.at(-1)?.authorization).toBeTruthy()
+    expect(assign).toHaveBeenCalledWith(
+      "https://accounts.google.com/o/oauth2/v2/auth?state=abc"
     )
   })
 })

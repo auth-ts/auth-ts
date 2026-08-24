@@ -114,10 +114,10 @@ describe("matchRoute", () => {
     expect(
       (
         await authServer.handler(
-          request("GET", "/api/auth/sign-in/provider/github")
+          request("POST", "/api/auth/sign-in/provider/github")
         )
       ).status
-    ).toBe(302)
+    ).toBe(200)
   })
 
   it("keeps a percent-encoded slash inside one segment", async () => {

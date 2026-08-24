@@ -25,29 +25,28 @@ afterEach(() => {
 /** Runs the start endpoint and returns the state cookie the callback will need. */
 async function startSignIn(
   authServer: Awaited<ReturnType<typeof createTestServer>>["authServer"],
-  query = ""
+  body: Record<string, unknown> = {}
 ) {
   const response = await authServer.handler(
-    request("GET", `/api/auth/sign-in/provider/github${query}`)
+    request("POST", "/api/auth/sign-in/provider/github", { body })
   )
   const stateCookie = required(
     readSetCookies(response).get("auth-ts.state"),
     "state cookie"
   ).value
   const state = decodeState(stateCookie).state
+  const { url } = (await response.clone().json()) as { url: string }
 
-  return { response, stateCookie, state }
+  return { response, stateCookie, state, url }
 }
 
 describe("oauth start", () => {
   it("redirects to the provider with state and the configured redirect_uri", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
-    const { response, state } = await startSignIn(authServer)
+    const { response, state, url } = await startSignIn(authServer)
 
-    expect(response.status).toBe(302)
-    const location = new URL(
-      required(response.headers.get("location"), "location")
-    )
+    expect(response.status).toBe(200)
+    const location = new URL(url)
     expect(location.origin + location.pathname).toBe(
       "https://github.com/login/oauth/authorize"
     )
@@ -60,10 +59,8 @@ describe("oauth start", () => {
 
   it("sends a PKCE S256 challenge derived from the verifier it signed into the state", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
-    const { response, stateCookie } = await startSignIn(authServer)
-    const location = new URL(
-      required(response.headers.get("location"), "location")
-    )
+    const { stateCookie, url } = await startSignIn(authServer)
+    const location = new URL(url)
     const payload = decodeState(stateCookie)
 
     expect(payload.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/)
@@ -88,32 +85,44 @@ describe("oauth start", () => {
   it("keeps a same-origin redirect and discards anything else", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
 
-    const safe = await startSignIn(authServer, "?redirect=%2Fdashboard")
+    const safe = await startSignIn(authServer, { redirect: "/dashboard" })
     expect(decodeState(safe.stateCookie).redirect).toBe("/dashboard")
 
-    for (const hostile of [
-      "https%3A%2F%2Fevil.example",
-      "%2F%2Fevil.example"
-    ]) {
-      const blocked = await startSignIn(authServer, `?redirect=${hostile}`)
+    for (const hostile of ["https://evil.example", "//evil.example"]) {
+      const blocked = await startSignIn(authServer, { redirect: hostile })
       expect(decodeState(blocked.stateCookie).redirect).toBe("/")
     }
   })
 
-  it("answers 400, not 500, when additionalFields is not JSON", async () => {
+  it("carries declared additionalFields through the body into the state", async () => {
+    // They used to ride the query string as URL-encoded JSON, which meant a
+    // parse step of their own and a trip through access logs and history.
+    const { authServer } = await createTestServer({
+      ...OAUTH_OPTIONS,
+      user: { additionalFields: { plan: "string" } }
+    })
+
+    const { stateCookie } = await startSignIn(authServer, {
+      additionalFields: { plan: "pro" }
+    })
+
+    expect(decodeState(stateCookie).additionalFields).toEqual({ plan: "pro" })
+  })
+
+  it("refuses an undeclared additional field before any state is signed", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
 
     const response = await authServer.handler(
-      request(
-        "GET",
-        "/api/auth/sign-in/provider/github?additionalFields=%7Bnope"
-      )
+      request("POST", "/api/auth/sign-in/provider/github", {
+        body: { additionalFields: { nope: "x" } }
+      })
     )
 
     expect(response.status).toBe(400)
     expect(((await response.json()) as { code: string }).code).toBe(
       "invalidField"
     )
+    expect(readSetCookies(response).get("auth-ts.state")).toBeUndefined()
   })
 
   it("404s an unconfigured provider and every prototype key", async () => {
@@ -130,12 +139,12 @@ describe("oauth start", () => {
       "__proto__",
       "toString"
     ]) {
-      for (const path of [
-        `/api/auth/sign-in/provider/${name}`,
-        `/api/auth/callback/${name}`
-      ]) {
+      for (const [method, path] of [
+        ["POST", `/api/auth/sign-in/provider/${name}`],
+        ["GET", `/api/auth/callback/${name}`]
+      ] as const) {
         expect(
-          (await authServer.handler(request("GET", path))).status,
+          (await authServer.handler(request(method, path))).status,
           path
         ).toBe(404)
       }
@@ -156,11 +165,10 @@ describe("oauth redirect_uri origin", () => {
     options: Parameters<typeof request>[2] = {}
   ) {
     const response = await authServer.handler(
-      request("GET", "/api/auth/sign-in/provider/github", options)
+      request("POST", "/api/auth/sign-in/provider/github", options)
     )
-    const location = new URL(
-      required(response.headers.get("location"), "location")
-    )
+    const { url } = (await response.json()) as { url: string }
+    const location = new URL(url)
     return required(location.searchParams.get("redirect_uri"), "redirect_uri")
   }
 
@@ -232,11 +240,10 @@ describe("oauth redirect_uri origin", () => {
     }
 
     const start = await authServer.handler(
-      request("GET", "/api/auth/sign-in/provider/github", proxied)
+      request("POST", "/api/auth/sign-in/provider/github", proxied)
     )
-    const location = new URL(
-      required(start.headers.get("location"), "location")
-    )
+    const { url } = (await start.clone().json()) as { url: string }
+    const location = new URL(url)
     const stateCookie = required(
       readSetCookies(start).get("auth-ts.state"),
       "state cookie"
@@ -273,10 +280,9 @@ describe("oauth redirect_uri origin", () => {
 describe("oauth callback", () => {
   it("signs in, sets the session cookie, and returns to the validated path", async () => {
     const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
-    const { stateCookie, state } = await startSignIn(
-      authServer,
-      "?redirect=%2Fdashboard"
-    )
+    const { stateCookie, state } = await startSignIn(authServer, {
+      redirect: "/dashboard"
+    })
     stubGitHub({
       id: 4242,
       name: "Ada",
@@ -611,10 +617,9 @@ describe("oauth callback", () => {
     const guest = ((await guestResponse.json()) as { user: { id: string } })
       .user
 
-    const { stateCookie, state } = await startSignIn(
-      authServer,
-      `?additionalFields=${encodeURIComponent(JSON.stringify({ plan: "pro" }))}`
-    )
+    const { stateCookie, state } = await startSignIn(authServer, {
+      additionalFields: { plan: "pro" }
+    })
     stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
 
     const response = await authServer.handler(
@@ -660,7 +665,8 @@ describe("oauth callback", () => {
     const guest = ((await guestResponse.json()) as { user: { id: string } })
       .user
     const startResponse = await authServer.handler(
-      request("GET", "/api/auth/connect/github", {
+      request("POST", "/api/auth/connect/github", {
+        token: await mintToken(authServer, guestRefresh),
         cookies: { "auth-ts.refresh": guestRefresh }
       })
     )
@@ -1008,7 +1014,7 @@ describe("connect and disconnect", () => {
   it("requires a session to start a link", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
     expect(
-      (await authServer.handler(request("GET", "/api/auth/connect/github")))
+      (await authServer.handler(request("POST", "/api/auth/connect/github")))
         .status
     ).toBe(401)
   })
@@ -1019,7 +1025,9 @@ describe("connect and disconnect", () => {
     const cookies = { "auth-ts.refresh": refreshToken }
 
     const startResponse = await context.authServer.handler(
-      request("GET", "/api/auth/connect/github", { cookies })
+      request("POST", "/api/auth/connect/github", {
+        token: await mintToken(context.authServer, refreshToken)
+      })
     )
     const stateCookie = required(
       readSetCookies(startResponse).get("auth-ts.state"),
@@ -1046,31 +1054,32 @@ describe("connect and disconnect", () => {
     expect(body.map((identity) => identity.provider)).toEqual(["github"])
   })
 
-  it("starts a connect from either credential, since it is a navigation", async () => {
-    // `location.assign` carries cookies and no Authorization header, so this is
-    // the one authenticated route that cannot insist on a bearer.
+  it("insists on the access token, like every other authenticated route", async () => {
+    // It used to take the cookie, because a top-level `location.assign` carries
+    // no Authorization header. Now that it answers with a URL instead of a
+    // redirect, the caller is making an ordinary request and can present one.
     const context = await createTestServer(OAUTH_OPTIONS)
     const refreshToken = await signInWithCode(context)
-    const token = await mintToken(context.authServer, refreshToken)
+
+    const withToken = await context.authServer.handler(
+      request("POST", "/api/auth/connect/github", {
+        token: await mintToken(context.authServer, refreshToken)
+      })
+    )
+    expect(withToken.status).toBe(200)
 
     for (const options of [
       { cookies: { "auth-ts.refresh": refreshToken } },
-      { token }
+      {}
     ]) {
-      const response = await context.authServer.handler(
-        request("GET", "/api/auth/connect/github", options)
-      )
-
-      expect(response.status).toBe(302)
+      expect(
+        (
+          await context.authServer.handler(
+            request("POST", "/api/auth/connect/github", options)
+          )
+        ).status
+      ).toBe(401)
     }
-
-    expect(
-      (
-        await context.authServer.handler(
-          request("GET", "/api/auth/connect/github")
-        )
-      ).status
-    ).toBe(401)
   })
 
   it("rejects a connect callback arriving without the original session", async () => {
@@ -1078,8 +1087,8 @@ describe("connect and disconnect", () => {
     const refreshToken = await signInWithCode(context)
 
     const startResponse = await context.authServer.handler(
-      request("GET", "/api/auth/connect/github", {
-        cookies: { "auth-ts.refresh": refreshToken }
+      request("POST", "/api/auth/connect/github", {
+        token: await mintToken(context.authServer, refreshToken)
       })
     )
     const stateCookie = required(
@@ -1124,7 +1133,9 @@ describe("connect and disconnect", () => {
     const refreshToken = await signInWithCode(context)
     const cookies = { "auth-ts.refresh": refreshToken }
     const startResponse = await context.authServer.handler(
-      request("GET", "/api/auth/connect/github", { cookies })
+      request("POST", "/api/auth/connect/github", {
+        token: await mintToken(context.authServer, refreshToken)
+      })
     )
     const stateCookie = required(
       readSetCookies(startResponse).get("auth-ts.state"),
@@ -1232,7 +1243,7 @@ describe("google", () => {
     authServer: Awaited<ReturnType<typeof createTestServer>>["authServer"]
   ) {
     const response = await authServer.handler(
-      request("GET", "/api/auth/sign-in/provider/google")
+      request("POST", "/api/auth/sign-in/provider/google")
     )
     const stateCookie = required(
       readSetCookies(response).get("auth-ts.state"),
@@ -1259,11 +1270,10 @@ describe("google", () => {
   it("sends a PKCE challenge and a nonce, and requires the nonce back in the ID token", async () => {
     const { authServer } = await createTestServer(GOOGLE_OPTIONS)
     const start = await authServer.handler(
-      request("GET", "/api/auth/sign-in/provider/google")
+      request("POST", "/api/auth/sign-in/provider/google")
     )
-    const location = new URL(
-      required(start.headers.get("location"), "location")
-    )
+    const { url } = (await start.clone().json()) as { url: string }
+    const location = new URL(url)
     const stateCookie = required(
       readSetCookies(start).get("auth-ts.state"),
       "state cookie"

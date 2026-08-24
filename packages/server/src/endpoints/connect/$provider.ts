@@ -1,4 +1,4 @@
-import { notFound, unauthenticated } from "../../http/auth-api-error"
+import { notFound } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import { validateRedirect } from "../../lib/validate-redirect"
@@ -6,8 +6,11 @@ import { getCallbackURL } from "../../oauth/callback-url"
 import { getProvider } from "../../oauth/providers/get-provider"
 import { createStateCookie } from "../../oauth/state-cookie"
 import type { CallerInput } from "../../session/authenticate"
-import { resolveCallerSession } from "../../session/resolve-session"
-import type { SignInProviderInput } from "../sign-in/provider/$provider"
+import { authenticate } from "../../session/authenticate"
+import type {
+  AuthorizeURLResult,
+  SignInProviderInput
+} from "../sign-in/provider/$provider"
 
 /** Input for starting a provider link. */
 export interface ConnectProviderInput
@@ -17,6 +20,13 @@ export interface ConnectProviderInput
 /**
  * Starts linking a provider to the **current** user.
  *
+ * Answers with the authorize URL rather than a redirect, for the reason
+ * `/sign-in/provider/:provider` does — and because it is a POST it
+ * authenticates from the access token like every other authenticated endpoint.
+ * As a navigation it could not: a top-level `location.assign` carries no
+ * `Authorization` header, so this route was the one place a cookie was still a
+ * credential.
+ *
  * Requires a session up front, and records that user's id in the state so the
  * callback can insist the same person is still signed in when they come back.
  *
@@ -25,15 +35,17 @@ export interface ConnectProviderInput
  * `/sign-in/provider/:provider` would.
  */
 export const connectProvider = defineEndpoint({
-  method: "GET",
+  method: "POST",
   path: "/connect/$provider",
-  parse: ({ request, params }): ConnectProviderInput => {
-    const url = new URL(request.url)
+  parse: async ({ request, params }): Promise<ConnectProviderInput> => {
+    const body = (await request.json().catch(() => ({}))) as Omit<
+      ConnectProviderInput,
+      "provider"
+    >
 
     return {
+      ...body,
       provider: params.provider ?? "",
-      redirect: url.searchParams.get("redirect") ?? undefined,
-      locale: url.searchParams.get("locale") ?? undefined,
       headers: request.headers,
       requestURL: request.url
     }
@@ -42,10 +54,7 @@ export const connectProvider = defineEndpoint({
     const { config } = internals
     const headers = input.headers ?? new Headers()
 
-    // A top-level navigation, so there is no `Authorization` header to read
-    // and the cookie is the credential that actually arrives.
-    const caller = await resolveCallerSession(internals, input)
-    if (!caller) throw unauthenticated()
+    const caller = await authenticate(internals, input)
 
     const configured = getProvider(config.providers, input.provider)
     if (!configured) throw notFound()
@@ -64,25 +73,25 @@ export const connectProvider = defineEndpoint({
       {
         intent: "connect",
         redirect: validateRedirect(input.redirect),
-        userId: caller.user.id,
+        userId: caller.userId,
         ...(input.locale ? { locale: input.locale } : {})
       },
       secure
     )
 
     const responseHeaders = new Headers()
-    responseHeaders.set(
-      "location",
-      configured.provider.authorizeURL({
+    responseHeaders.append("set-cookie", setCookie)
+
+    const data: AuthorizeURLResult = {
+      url: configured.provider.authorizeURL({
         credentials: configured.credentials,
         redirectURI,
         state,
         codeChallenge,
         nonce
       })
-    )
-    responseHeaders.append("set-cookie", setCookie)
+    }
 
-    return { data: undefined, status: 302, headers: responseHeaders }
+    return { data, headers: responseHeaders }
   }
 })

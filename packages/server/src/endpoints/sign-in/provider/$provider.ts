@@ -1,4 +1,4 @@
-import { AuthApiError, notFound } from "../../../http/auth-api-error"
+import { notFound } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
 import { resolveLocale } from "../../../http/resolve-locale"
 import { validateAdditionalFields } from "../../../http/validate-additional-fields"
@@ -19,25 +19,20 @@ export interface SignInProviderInput {
   requestURL?: string
 }
 
-/**
- * Reads the `additionalFields` query parameter, which is JSON in a URL.
- *
- * Malformed JSON is the caller's mistake and gets a 400 that says so; left to
- * `JSON.parse` alone it surfaced as a 500, which reads as the server's fault.
- * Shape and declared-ness are checked later by `validateAdditionalFields`.
- */
-function parseAdditionalFields(raw: string) {
-  try {
-    return JSON.parse(raw) as Record<string, unknown>
-  } catch {
-    throw new AuthApiError("invalidField", 400, {
-      message: "additionalFields must be valid JSON."
-    })
-  }
+/** Where to send the browser, and the cookie that has to travel with it. */
+export interface AuthorizeURLResult {
+  url: string
 }
 
 /**
- * Starts an OAuth sign-in.
+ * Starts an OAuth sign-in by handing back the provider's authorize URL.
+ *
+ * A POST that answers with the URL rather than a redirect, because the caller
+ * has to be the one that navigates. A desktop or mobile app must open the
+ * system browser rather than its own webview — RFC 8252, and Google refuses an
+ * embedded one outright — and it cannot read a `Location` header out of a 302,
+ * since a manual-redirect fetch response is opaque. Handing over the URL is the
+ * only shape that serves both a browser and a native shell.
  *
  * The route is generic over the provider so that adding one stays configuration
  * rather than a new endpoint.
@@ -49,24 +44,27 @@ function parseAdditionalFields(raw: string) {
  * attaching a provider to whoever happened to be logged in.
  */
 export const signInProvider = defineEndpoint({
-  method: "GET",
+  method: "POST",
   path: "/sign-in/provider/$provider",
-  parse: ({ request, params, internals }): SignInProviderInput => {
-    const url = new URL(request.url)
-    const rawFields = url.searchParams.get("additionalFields")
+  parse: async ({
+    request,
+    params,
+    internals
+  }): Promise<SignInProviderInput> => {
+    const body = (await request.json().catch(() => ({}))) as Omit<
+      SignInProviderInput,
+      "provider"
+    >
 
     return {
+      ...body,
       provider: params.provider ?? "",
-      redirect: url.searchParams.get("redirect") ?? undefined,
       locale:
-        url.searchParams.get("locale") ??
+        body.locale ??
         resolveLocale(
           request.headers.get("accept-language"),
           internals.config.localization
         ),
-      additionalFields: rawFields
-        ? parseAdditionalFields(rawFields)
-        : undefined,
       headers: request.headers,
       requestURL: request.url
     }
@@ -102,17 +100,19 @@ export const signInProvider = defineEndpoint({
       secure
     )
 
-    const headers = new Headers({
-      location: configured.provider.authorizeURL({
+    const headers = new Headers()
+    headers.append("set-cookie", setCookie)
+
+    const data: AuthorizeURLResult = {
+      url: configured.provider.authorizeURL({
         credentials: configured.credentials,
         redirectURI,
         state,
         codeChallenge,
         nonce
       })
-    })
-    headers.append("set-cookie", setCookie)
+    }
 
-    return { data: undefined, status: 302, headers }
+    return { data, headers }
   }
 })
