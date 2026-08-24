@@ -56,6 +56,16 @@ export default defineConfig({
           }
         },
         {
+          // The spec as a downloadable file, written once at build time. JSON
+          // rather than a page, so it needs an explicit filename.
+          path: "/openapi.json",
+          prerender: {
+            enabled: true,
+            outputPath: "/openapi.json",
+            crawlLinks: false
+          }
+        },
+        {
           // Cloudflare Pages serves 404.html for anything that matches no file,
           // which is the only way the not-found component reaches a cold visit
           // to a dead link.

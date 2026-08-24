@@ -5,7 +5,8 @@
     "types": ["node", "vite/client"],
     "noEmit": true,
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@auth-ts/server": ["../../packages/server/src/index.ts"]
     },
     "declaration": false
   },

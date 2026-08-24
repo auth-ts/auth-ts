@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as R404RouteImport } from './routes/404'
 import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
+import { Route as OpenapiDotjsonRouteImport } from './routes/openapi[.]json'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
 
@@ -36,6 +37,11 @@ const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
   path: '/llms.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OpenapiDotjsonRoute = OpenapiDotjsonRouteImport.update({
+  id: '/openapi.json',
+  path: '/openapi.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSearchRoute = ApiSearchRouteImport.update({
   id: '/api/search',
   path: '/api/search',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof R404Route
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/openapi.json': typeof OpenapiDotjsonRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/404': typeof R404Route
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/openapi.json': typeof OpenapiDotjsonRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
 }
@@ -69,21 +77,36 @@ export interface FileRoutesById {
   '/404': typeof R404Route
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
+  '/openapi.json': typeof OpenapiDotjsonRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/404' | '/llms-full.txt' | '/llms.txt' | '/api/search' | '/docs/$'
+    | '/'
+    | '/404'
+    | '/llms-full.txt'
+    | '/llms.txt'
+    | '/openapi.json'
+    | '/api/search'
+    | '/docs/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/404' | '/llms-full.txt' | '/llms.txt' | '/api/search' | '/docs/$'
+  to:
+    | '/'
+    | '/404'
+    | '/llms-full.txt'
+    | '/llms.txt'
+    | '/openapi.json'
+    | '/api/search'
+    | '/docs/$'
   id:
     | '__root__'
     | '/'
     | '/404'
     | '/llms-full.txt'
     | '/llms.txt'
+    | '/openapi.json'
     | '/api/search'
     | '/docs/$'
   fileRoutesById: FileRoutesById
@@ -93,6 +116,7 @@ export interface RootRouteChildren {
   R404Route: typeof R404Route
   LlmsFullDottxtRoute: typeof LlmsFullDottxtRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
+  OpenapiDotjsonRoute: typeof OpenapiDotjsonRoute
   ApiSearchRoute: typeof ApiSearchRoute
   DocsSplatRoute: typeof DocsSplatRoute
 }
@@ -127,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LlmsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/openapi.json': {
+      id: '/openapi.json'
+      path: '/openapi.json'
+      fullPath: '/openapi.json'
+      preLoaderRoute: typeof OpenapiDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/search': {
       id: '/api/search'
       path: '/api/search'
@@ -149,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   R404Route: R404Route,
   LlmsFullDottxtRoute: LlmsFullDottxtRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
+  OpenapiDotjsonRoute: OpenapiDotjsonRoute,
   ApiSearchRoute: ApiSearchRoute,
   DocsSplatRoute: DocsSplatRoute,
 }
