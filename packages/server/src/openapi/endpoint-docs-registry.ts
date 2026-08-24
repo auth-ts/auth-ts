@@ -87,7 +87,7 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   getToken: "Gets a new access token, or null when nobody is signed in.",
   signInCode: "Verifies a code and starts a session.",
   signOut: "Signs out.",
-  getSession: "Gets the current session.",
+  getSession: "Gets the current user's session.",
   getUser: "Gets the current user.",
   updateUser: "Updates the current user.",
   deleteUser: "Deletes the current user.",

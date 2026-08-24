@@ -20,7 +20,7 @@ export const getSessionDocs: EndpointDocs<never> = {
 }
 
 /**
- * Gets the current session.
+ * Gets the current user's session.
  *
  * Authenticated from the access token like everything else, whose `sid` says
  * which row to read — one read of `sessions`, no write. Sessions are touched on

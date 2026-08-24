@@ -49,8 +49,6 @@ export interface SignOutInput extends CallerInput {
 
 /** How `POST /sign-out` appears in the OpenAPI document. */
 export const signOutDocs: EndpointDocs<SignOutInput> = {
-  description:
-    "Signs out this device by default. Use scope for other devices, and userId for one account.",
   tag: "Session",
   auth: "bearer",
   body: {

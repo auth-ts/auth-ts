@@ -22,7 +22,6 @@ export type SessionInfo = Omit<AuthSession, "tokenHash">
 
 /** How `GET /sessions` appears in the OpenAPI document. */
 export const listSessionsDocs: EndpointDocs<never> = {
-  description: "Newest first.",
   tag: "Session",
   auth: "bearer",
   responses: {
