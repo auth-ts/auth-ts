@@ -67,7 +67,7 @@ export interface UpdateUserInput extends CallerInput {
 /** How `POST /user` appears in the OpenAPI document. */
 export const updateUserDocs: EndpointDocs<UpdateUserInput> = {
   description:
-    "Flat body, so additional fields go at the top level. Email and phone cannot be changed here.",
+    "Additional fields go at the top level. Email and phone cannot be changed here.",
   tag: "User",
   auth: "bearer",
   additionalFields: "flat",
@@ -172,7 +172,7 @@ export interface DeleteUserInput extends CallerInput {
 /** How `DELETE /user` appears in the OpenAPI document. */
 export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
   description:
-    "Sends a code first if the session is old, then repeat the call with it. Only 204 means deleted.",
+    "An old session gets a code first — repeat the call with it. Only 204 means deleted.",
   tag: "User",
   auth: "bearer",
   body: {

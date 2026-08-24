@@ -14,8 +14,7 @@ export interface RevokeSessionInput extends CallerInput {
 
 /** How `DELETE /sessions/$id` appears in the OpenAPI document. */
 export const revokeSessionDocs: EndpointDocs<RevokeSessionInput, "id"> = {
-  description:
-    "Revoking the session you are on signs this browser out of that account. Any other accounts signed in here are untouched.",
+  description: "Revoking the session you are on signs this browser out.",
   tag: "Session",
   auth: "bearer",
   params: { id: "The session's id, as listed by `GET /sessions`." },

@@ -28,8 +28,7 @@ export interface AuthorizeURLResult {
 /** How `POST /sign-in/provider/$provider` appears in the OpenAPI document. */
 export const signInProviderDocs: EndpointDocs<SignInProviderInput, "provider"> =
   {
-    description:
-      "Navigate to the url. Do not fetch it. Signing in never links accounts \u2014 use /connect/{provider} for that.",
+    description: "Navigate to the url. Do not fetch it.",
     tag: "Sign in",
     auth: "none",
     requires: "providers",
