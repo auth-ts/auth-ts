@@ -43,7 +43,7 @@ export const listIdentitiesDocs: EndpointDocs<never> = {
   }
 }
 
-/** List connected providers. */
+/** List the connected providers. */
 export const listIdentities = defineEndpoint({
   method: "GET",
   path: "/identities",
