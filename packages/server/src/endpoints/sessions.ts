@@ -34,7 +34,7 @@ export const listSessionsDocs: EndpointDocs<never> = {
 }
 
 /**
- * List the current user's sessions.
+ * List active sessions.
  *
  * `tokenHash` never crosses to the browser — `id` is the only address a client
  * ever sees, and it is the only thing revocation needs.

@@ -13,7 +13,7 @@ import type {
   SignInProviderInput
 } from "../sign-in/provider/$provider"
 
-/** Input for starting a provider link. */
+/** Input for connecting a provider. */
 export interface ConnectProviderInput
   extends SignInProviderInput,
     CallerInput {}
@@ -53,7 +53,7 @@ export const connectProviderDocs: EndpointDocs<
 }
 
 /**
- * Link a provider.
+ * Connect a provider.
  *
  * Answers with the authorize URL rather than a redirect, for the reason
  * `/sign-in/provider/:provider` does — and because it is a POST it

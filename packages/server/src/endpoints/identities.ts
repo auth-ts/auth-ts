@@ -6,7 +6,7 @@ import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 
 /**
- * One linked provider, as shown on an account screen.
+ * One connected provider, as shown on an account screen.
  *
  * The two credentials are gone from it. They are encrypted at rest, but a
  * ciphertext on a screen is a liability with no use — the only legitimate way
@@ -36,14 +36,14 @@ export const listIdentitiesDocs: EndpointDocs<never> = {
   auth: "bearer",
   responses: {
     200: {
-      description: "The user's linked providers.",
+      description: "The user's connected providers.",
       schema: { type: "array", items: "Identity" }
     },
     401: "Unauthenticated"
   }
 }
 
-/** List linked providers. */
+/** List connected providers. */
 export const listIdentities = defineEndpoint({
   method: "GET",
   path: "/identities",

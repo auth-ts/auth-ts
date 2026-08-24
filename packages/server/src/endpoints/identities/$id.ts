@@ -4,7 +4,7 @@ import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
 
-/** Input for unlinking an identity. */
+/** Input for disconnecting a provider. */
 export interface DisconnectIdentityInput extends CallerInput {
   /** The identity's own id, from `GET /identities`. */
   id: string
@@ -21,14 +21,14 @@ export const disconnectIdentityDocs: EndpointDocs<
   auth: "bearer",
   params: { id: "The identity's id, from `GET /identities`." },
   responses: {
-    204: { description: "Unlinked." },
+    204: { description: "Disconnected." },
     401: "Unauthenticated",
     404: "NotFound"
   }
 }
 
 /**
- * Unlink a provider.
+ * Disconnect a provider.
  *
  * Addressed by identity id rather than by provider, because a user may connect
  * several accounts at the same provider — two Google addresses, a personal and
