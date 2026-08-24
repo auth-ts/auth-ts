@@ -168,6 +168,6 @@ describe("buildOpenAPIDocument, given a real config", () => {
       { name?: string }
     >
 
-    expect(schemes.refreshCookie?.name).toBe("session.refresh")
+    expect(schemes.cookieAuth?.name).toBe("session.refresh")
   })
 })

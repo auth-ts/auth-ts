@@ -26,8 +26,10 @@ const TAG_ORDER = [
   "Discovery"
 ] as const
 
-const REFRESH_COOKIE = "refreshCookie"
-const BEARER = "accessToken"
+// The names Swagger's own examples use, so a reader and a client generator
+// both meet what they expect.
+const REFRESH_COOKIE = "cookieAuth"
+const BEARER = "bearerAuth"
 
 function met(requirement: EndpointRequirement, config: AuthServerConfig) {
   if (requirement === "guest") return config.guest
