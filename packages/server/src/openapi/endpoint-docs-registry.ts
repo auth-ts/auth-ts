@@ -86,7 +86,7 @@ export const endpointDocs: {
  * source files, and no edge runtime can do that.
  */
 export const summaries: { [Name in keyof EndpointRegistry]: string } = {
-  sendSignInCode: "Send a sign-in code",
+  sendSignInCode: "Send a sign in code",
   getToken: "Get an access token",
   signInWithCode: "Sign in with a code",
   signOut: "Sign out",
@@ -94,7 +94,7 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   getUser: "Get the current user",
   updateUser: "Update the current user",
   deleteUser: "Delete the current user",
-  sendDeleteUserCode: "Send a delete-user code",
+  sendDeleteUserCode: "Send a delete user code",
   listSessions: "List the active sessions",
   revokeSession: "Revoke a session",
   listAccounts: "List the signed in accounts",

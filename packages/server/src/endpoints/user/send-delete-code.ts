@@ -29,7 +29,7 @@ export const sendDeleteUserCodeDocs: EndpointDocs<CallerInput> = {
 }
 
 /**
- * Send a delete-user code.
+ * Send a delete user code.
  *
  * The one call that puts a code in flight for `DELETE /user`. Kept apart from
  * the delete itself so retrying a failed delete can never resend one — a delete
