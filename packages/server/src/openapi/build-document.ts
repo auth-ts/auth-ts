@@ -201,7 +201,9 @@ export function buildOpenAPIDocument(
     const docs = endpointDocs[name]
     if (docs.requires && config && !met(docs.requires, config)) continue
 
-    const path = basePath + endpoint.path.replace(/\$(\w+)/g, "{$1}")
+    // Relative to the server, which already carries the mount. Repeating it
+    // here would make every resolved URL double it.
+    const path = endpoint.path.replace(/\$(\w+)/g, "{$1}")
     paths[path] ??= {}
     paths[path][endpoint.method.toLowerCase()] = operation(
       name,

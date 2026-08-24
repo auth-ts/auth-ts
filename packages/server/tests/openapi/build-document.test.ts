@@ -32,7 +32,7 @@ describe("buildOpenAPIDocument", () => {
     for (const [name, endpoint] of Object.entries(endpointRegistry) as Array<
       [string, AnyEndpoint]
     >) {
-      const path = `/api/auth${endpoint.path.replace(/\$(\w+)/g, "{$1}")}`
+      const path = endpoint.path.replace(/\$(\w+)/g, "{$1}")
       const item = reference.paths[path] as Record<
         string,
         { operationId: string }
@@ -57,6 +57,18 @@ describe("buildOpenAPIDocument", () => {
 
       expect(documented.sort()).toEqual(declared.sort())
     }
+  })
+
+  it("keeps the mount out of the paths", async () => {
+    // `servers` already carries it. A path that repeats it resolves to
+    // /api/auth/api/auth/session, which is what a playground actually sends.
+    const { authServer } = await createTestServer({ basePath: "/auth" })
+    const document = buildOpenAPIDocument(authServer.config)
+
+    expect(document.servers[0]?.url.endsWith("/auth")).toBe(true)
+    expect(
+      Object.keys(document.paths).filter((path) => path.startsWith("/auth/"))
+    ).toEqual([])
   })
 
   it("resolves every $ref it emits", () => {
@@ -106,10 +118,10 @@ describe("buildOpenAPIDocument, given a real config", () => {
     const present = operations(document)
 
     expect(present.length).toBeLessThan(operations(reference).length)
-    expect(document.paths).not.toHaveProperty("/api/auth/sign-in/guest")
-    expect(document.paths).not.toHaveProperty("/api/auth/accounts")
-    expect(document.paths).not.toHaveProperty("/api/auth/connect/{provider}")
-    expect(document.paths).toHaveProperty("/api/auth/send-code")
+    expect(document.paths).not.toHaveProperty("/sign-in/guest")
+    expect(document.paths).not.toHaveProperty("/accounts")
+    expect(document.paths).not.toHaveProperty("/connect/{provider}")
+    expect(document.paths).toHaveProperty("/send-code")
   })
 
   it("narrows {provider} to the providers actually configured", async () => {
@@ -121,7 +133,7 @@ describe("buildOpenAPIDocument, given a real config", () => {
     })
 
     const document = buildOpenAPIDocument(authServer.config)
-    const item = document.paths["/api/auth/sign-in/provider/{provider}"] as
+    const item = document.paths["/sign-in/provider/{provider}"] as
       | Record<
           string,
           { parameters: Array<{ name: string; schema: { enum?: string[] } }> }

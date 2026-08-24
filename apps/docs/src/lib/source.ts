@@ -4,7 +4,7 @@ import { icons } from "lucide-react"
 import { createElement } from "react"
 import { OpenAPIIcon } from "~/components/openapi-icon"
 import { docs } from "../../.source/server"
-import { mountPath, openapi, operationOrder } from "./openapi"
+import { openapi, operationOrder } from "./openapi"
 
 /** The documentation tree, loaded from `content/docs` and the API reference. */
 const RANKS = new Map(operationOrder.map((entry) => [entry.id, entry]))
@@ -52,6 +52,7 @@ export const source = loader({
       // in a sidebar and repeats what the page already says. The route is the
       // thing a reader is scanning for, so it is the title; the summary moves
       // to the description, and the method badge is rendered alongside.
+      // Paths are relative to the server, so they need no trimming.
       toPages(builder) {
         for (const operation of builder.extract().operations) {
           const resolved = builder.fromExtractedOperation(operation)
@@ -65,9 +66,7 @@ export const source = loader({
             info: {
               // Shown without the mount: every route shares that prefix, and a
               // sidebar truncates the tail, which is the part that differs.
-              title: operation.path.startsWith(mountPath)
-                ? operation.path.slice(mountPath.length)
-                : operation.path,
+              title: operation.path,
               description: resolved.operation.summary,
               deprecated: resolved.operation.deprecated
             }
