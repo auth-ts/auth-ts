@@ -78,32 +78,33 @@ export const endpointDocs: {
 /**
  * Each operation's one-line summary.
  *
- * The first line of the endpoint's own doc comment, which a test asserts. It is
- * copied rather than read because reading it means reading source files, and no
- * edge runtime can do that.
+ * Imperative and without a full stop, because it is a label in a sidebar rather
+ * than a sentence. That is why it is written here instead of taken from the
+ * endpoint's doc comment, which is prose for someone reading the TypeScript and
+ * is third-person by that convention.
  */
 export const summaries: { [Name in keyof EndpointRegistry]: string } = {
-  sendCode: "Sends a sign-in code",
-  getToken: "Gets a new access token, or null when nobody is signed in",
-  signInCode: "Verifies a code and starts a session",
-  signOut: "Signs out",
-  getSession: "Gets the current user's session",
-  getUser: "Gets the current user",
-  updateUser: "Updates the current user",
-  deleteUser: "Deletes the current user",
-  listSessions: "Lists the current user's sessions",
-  revokeSession: "Revokes a session",
-  listAccounts: "Lists the accounts signed in to this browser",
-  switchAccount: "Switches to another signed-in account",
-  signInGuest: "Signs in as a guest",
-  signInProvider: "Starts an OAuth sign-in",
-  callbackProvider: "Finishes an OAuth flow",
-  connectProvider: "Starts linking a provider",
-  listIdentities: "Lists the current user's linked providers",
-  disconnectIdentity: "Unlinks a connected provider",
-  getProviderToken: "Gets a provider access token",
-  getJwks: "Gets the public key set",
-  getDiscovery: "Gets the OIDC discovery document",
-  getOpenAPIDocument: "Gets the OpenAPI document",
-  getReference: "Gets the browsable API reference"
+  sendCode: "Send a sign-in code",
+  getToken: "Get a new access token, or null when nobody is signed in",
+  signInCode: "Verify a code and start a session",
+  signOut: "Sign out",
+  getSession: "Get the current user's session",
+  getUser: "Get the current user",
+  updateUser: "Update the current user",
+  deleteUser: "Delete the current user",
+  listSessions: "List the current user's sessions",
+  revokeSession: "Revoke a session",
+  listAccounts: "List the accounts signed in to this browser",
+  switchAccount: "Switch to another signed-in account",
+  signInGuest: "Sign in as a guest",
+  signInProvider: "Start an OAuth sign-in",
+  callbackProvider: "Finish an OAuth flow",
+  connectProvider: "Start linking a provider",
+  listIdentities: "List the current user's linked providers",
+  disconnectIdentity: "Unlink a connected provider",
+  getProviderToken: "Get a provider access token",
+  getJwks: "Get the public key set",
+  getDiscovery: "Get the OIDC discovery document",
+  getOpenAPIDocument: "Get the OpenAPI document",
+  getReference: "Get the browsable API reference"
 }
