@@ -42,8 +42,8 @@ function originOf(url: string) {
  * `X-Forwarded-Host`. A page cannot forge that header — it is not
  * CORS-safelisted, so setting it forces a preflight this check would refuse —
  * and a client that can set it directly is not a browser and carries no cookie.
- * `baseURL` is allowed whenever one is configured, and `cors.origin` because it
- * is, by configuration, the one other origin this server serves.
+ * `baseURL` is allowed whenever one is configured, and every entry in
+ * `trustedOrigins` because that option exists to say so.
  */
 function allowedOrigins(config: AuthServerConfig, request: Request) {
   const allowed = new Set<string>()
@@ -55,10 +55,10 @@ function allowedOrigins(config: AuthServerConfig, request: Request) {
     const base = originOf(config.baseURL)
     if (base) allowed.add(base)
   }
-  if (config.cors) {
-    allowed.add(config.cors.origin)
-    const cors = originOf(config.cors.origin)
-    if (cors) allowed.add(cors)
+  for (const trusted of config.trustedOrigins) {
+    allowed.add(trusted)
+    const parsed = originOf(trusted)
+    if (parsed) allowed.add(parsed)
   }
   return allowed
 }
@@ -78,14 +78,15 @@ function allowedOrigins(config: AuthServerConfig, request: Request) {
  * `POST` with `Origin` (`Referer` is consulted when a privacy setting has
  * stripped it), and one that is not this server's own — as the runtime sees it
  * or as a proxy forwarded it — nor its `baseURL`, nor its configured
- * `cors.origin`, is refused. A request with neither header passes:
+ * `trustedOrigins`, is refused. A request with neither header passes:
  * its absence means a non-browser client, which holds no cookie and so cannot
  * be made to act on someone's behalf. That is the one way this check fails open.
  *
  * **A body must be JSON.** A page cannot send `application/json` cross-origin
- * without a preflight, and the preflight approves only `cors.origin` — so this
- * is enforced by the browser itself, before any header reaches the server, and
- * holds even when `Origin` has been stripped. It costs nothing: the client and
+ * without a preflight, so a browser stops most of these before any header
+ * reaches the server. That is a bonus rather than the guarantee — whoever
+ * answers the preflight is the application's business, so this check does not
+ * depend on it and runs on every request regardless. It costs nothing: the client and
  * any JSON caller already send it. Bodiless requests are untouched, because
  * they have no content type to check and nothing dangerous to carry.
  *

@@ -1,5 +1,4 @@
 import type { AuthServerInternals } from "../core/auth-server-internals"
-import { applyCorsHeaders, preflightResponse } from "./apply-cors"
 import { AuthApiError, isAuthApiError } from "./auth-api-error"
 import { assertAllowedOrigin } from "./check-origin"
 import type { AnyEndpoint } from "./define-endpoint"
@@ -15,15 +14,19 @@ export type AuthHandler = (request: Request) => Promise<Response>
  * Turns an endpoint declaration into an HTTP handler.
  *
  * The one piece of middleware in the package, and the only place HTTP meets the
- * logic. Before: answer a CORS preflight, refuse a method the endpoint does
- * not declare, and refuse a state-changing request from an origin this server
- * does not serve. After: attach CORS headers, and serialize a thrown
- * {@link AuthApiError} into the standard envelope in the request's locale.
+ * logic. Before: refuse a method the endpoint does not declare, and refuse a
+ * state-changing request from an origin this server does not serve. After:
+ * serialize a thrown {@link AuthApiError} into the standard envelope in the
+ * request's locale.
+ *
+ * No CORS headers and no preflight: those belong to whatever already answers
+ * them for the rest of the application, and an auth mount that carved its own
+ * exception out of that policy would be the surprising thing.
  *
  * The method check has to live here and not only in the router: a consumer who
- * mounts `authServer.handlers.getToken` on their own route may hand it any method
- * their framework lets through, and without CORS configured an `OPTIONS` would
- * otherwise fall straight into `parse` and `run`.
+ * mounts `authServer.handlers.getToken` on their own route may hand it any
+ * method their framework lets through, and an `OPTIONS` would otherwise fall
+ * straight into `parse` and `run`.
  *
  * There is no chain and no plugin system. Everything it does is unconditional or
  * driven by configuration, so reading this function tells you everything that
@@ -59,11 +62,6 @@ export async function handleRequest(
 ): Promise<Response> {
   const { config } = internals
 
-  if (request.method === "OPTIONS") {
-    const preflight = preflightResponse(config.cors)
-    if (preflight) return preflight
-  }
-
   const locale = resolveLocale(
     request.headers.get("accept-language"),
     config.localization
@@ -80,7 +78,7 @@ export async function handleRequest(
       : undefined
     const result = await endpoint.run(internals, input as never)
 
-    const headers = responseHeaders(internals, result.headers)
+    const headers = responseHeaders(result.headers)
     const status = result.status ?? 200
 
     if (result.body !== undefined) {
@@ -105,8 +103,8 @@ export async function handleRequest(
  * cookie-authenticated GET, which is exactly what a shared cache would serve to
  * the next person. An endpoint that sets its own policy — `jwks` — keeps it.
  */
-function responseHeaders(internals: AuthServerInternals, init?: Headers) {
-  const headers = applyCorsHeaders(new Headers(init), internals.config.cors)
+function responseHeaders(init?: Headers) {
+  const headers = new Headers(init)
   if (!headers.has("cache-control")) headers.set("cache-control", "no-store")
 
   return headers
@@ -119,7 +117,7 @@ function toErrorResponse(
   locale: string
 ) {
   const { config } = internals
-  const headers = responseHeaders(internals)
+  const headers = responseHeaders()
 
   if (isAuthApiError(error)) {
     const message = getErrorMessage(error.code, locale, config.localization, {

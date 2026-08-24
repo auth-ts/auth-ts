@@ -64,11 +64,11 @@ describe("issueSession", () => {
 
   it("scopes the hint to the shared domain only when a cross-origin app is configured", async () => {
     const cross = await createTestInternals({
-      cors: { origin: "https://app.example.com" }
+      trustedOrigins: ["https://app.example.com"]
     })
     const issuedCross = await issueSession(cross.internals, {
       user: await insertUser(cross.db, { email: "ada@example.com" }),
-      headers: new Headers(),
+      headers: new Headers({ origin: "https://app.example.com" }),
       requestURL: "https://api.example.com/api/auth/sign-in/code"
     })
 
@@ -80,11 +80,11 @@ describe("issueSession", () => {
     // A public suffix would be refused by the browser anyway; a single shared
     // label is never a domain a cookie may claim.
     const tld = await createTestInternals({
-      cors: { origin: "https://app.example" }
+      trustedOrigins: ["https://app.example"]
     })
     const issuedTld = await issueSession(tld.internals, {
       user: await insertUser(tld.db, { email: "ada@example.com" }),
-      headers: new Headers(),
+      headers: new Headers({ origin: "https://app.example" }),
       requestURL: "https://api.other.example/api/auth/sign-in/code"
     })
 

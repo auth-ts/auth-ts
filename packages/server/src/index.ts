@@ -31,7 +31,6 @@ export type { AuthServerConfig } from "./core/auth-server-config"
 export type {
   AuthServerOptions,
   CookieOptions,
-  CorsOptions,
   EmailOptions,
   JwksOptions,
   JwtOptions,

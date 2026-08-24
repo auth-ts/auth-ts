@@ -20,10 +20,10 @@ export interface SessionCookieContext {
 /**
  * The domain the hint cookie is scoped to, or `undefined` for host-only.
  *
- * Only a configured `cors` produces one. That option names the single other
- * origin this server serves, so it is also the only statement that the app and
- * the auth server sit on different hosts — the case where a host-only hint
- * would be written on the auth host and never seen by the app.
+ * Only a trusted origin on another host produces one. It is taken from the
+ * request rather than the configuration because `trustedOrigins` may name
+ * several, and the one asking is the one whose host has to be able to read the
+ * hint. A host-only hint would be written on the auth host and never seen there.
  *
  * The domain is the longest suffix of labels the two hosts share. A suffix that
  * is a public suffix — `vercel.app`, `github.io` — is rejected by the browser
@@ -34,15 +34,17 @@ export function hintCookieDomain(
   internals: AuthServerInternals,
   { requestURL, headers }: SessionCookieContext
 ) {
-  const { cors } = internals.config
-  if (!cors) return undefined
+  const origin = headers?.get("origin")
+  if (!origin || !internals.config.trustedOrigins.includes(origin)) {
+    return undefined
+  }
 
   let serverHost: string
   let appHost: string
   try {
     serverHost = new URL(getBaseURL(internals.config, requestURL, headers))
       .hostname
-    appHost = new URL(cors.origin).hostname
+    appHost = new URL(origin).hostname
   } catch (error) {
     // An origin this server cannot parse is a configuration problem for the
     // endpoints that build URLs from it to report, not for a cookie to throw on.
@@ -105,8 +107,9 @@ export function refreshCookies(
 /**
  * The `Set-Cookie` values that retire a session.
  *
- * Under `cors` the hint is written `out` rather than cleared. A cross-origin
- * deployment cannot tell a hint that was never delivered from one that says no,
+ * With `trustedOrigins` set the hint is written `out` rather than cleared. A
+ * cross-origin deployment cannot tell a hint that was never delivered from one
+ * that says no,
  * so it treats a missing hint as "ask" — and only an explicit `out` buys the
  * silence this exists for.
  */
@@ -120,7 +123,7 @@ export function clearedRefreshCookies(
 
   return [
     clearCookie(config.cookie.name, config.cookie.path, secure),
-    config.cors
+    config.trustedOrigins.length > 0
       ? serializeHintCookie({
           value: "out",
           maxAge: config.session.ttl,

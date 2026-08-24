@@ -248,7 +248,7 @@ describe("origin check", () => {
     ).toBe(403)
   })
 
-  it("allows its own origin, a configured baseURL, and the cors origin", async () => {
+  it("allows its own origin, a configured baseURL, and a trusted origin", async () => {
     const sameOrigin = await createTestServer({ guest: true })
     expect(
       (
@@ -279,7 +279,7 @@ describe("origin check", () => {
 
     const crossOrigin = await createTestServer({
       guest: true,
-      cors: { origin: "https://spa.example.com" }
+      trustedOrigins: ["https://spa.example.com"]
     })
     expect(
       (
@@ -382,97 +382,6 @@ describe("origin check", () => {
       (await authServer.handler(request("POST", "/api/auth/sign-in/guest")))
         .status
     ).toBe(200)
-  })
-})
-
-describe("cors", () => {
-  it("adds no CORS headers and does not answer preflights when unset", async () => {
-    const { authServer } = await createTestServer({
-      jwks: { json: { keys: [] } }
-    })
-
-    const response = await authServer.handler(request("GET", "/api/auth/jwks"))
-    expect(response.headers.get("access-control-allow-origin")).toBeNull()
-
-    const preflight = await authServer.handler(
-      request("OPTIONS", "/api/auth/user")
-    )
-    expect(preflight.status).not.toBe(204)
-
-    // And on a directly mounted handler an OPTIONS is a method mismatch, not a
-    // request that reaches the endpoint's logic.
-    const direct = await authServer.handlers.getSession(
-      request("OPTIONS", "/api/auth/session")
-    )
-    expect(direct.status).toBe(405)
-  })
-
-  it("answers preflights and echoes an explicit origin, never a wildcard", async () => {
-    const { authServer } = await createTestServer({
-      cors: { origin: "https://app.example.com" },
-      jwks: { json: { keys: [] } }
-    })
-
-    const preflight = await authServer.handler(
-      request("OPTIONS", "/api/auth/user")
-    )
-    expect(preflight.status).toBe(204)
-    expect(preflight.headers.get("access-control-allow-origin")).toBe(
-      "https://app.example.com"
-    )
-    expect(preflight.headers.get("access-control-allow-credentials")).toBe(
-      "true"
-    )
-    expect(preflight.headers.get("access-control-allow-methods")).toContain(
-      "POST"
-    )
-    expect(preflight.headers.get("access-control-allow-methods")).toContain(
-      "DELETE"
-    )
-
-    const response = await authServer.handler(request("GET", "/api/auth/jwks"))
-    expect(response.headers.get("access-control-allow-origin")).toBe(
-      "https://app.example.com"
-    )
-    expect(response.headers.get("access-control-allow-origin")).not.toBe("*")
-
-    // Nothing to expose: tokens cross in bodies, so a cross-origin client
-    // needs no special header access to read one.
-    expect(response.headers.get("access-control-expose-headers")).toBeNull()
-  })
-
-  it("keeps CORS headers on error responses too", async () => {
-    const { authServer } = await createTestServer({
-      cors: { origin: "https://app.example.com" },
-      jwks: { json: { keys: [] } }
-    })
-    const response = await authServer.handler(request("GET", "/api/auth/user"))
-
-    expect(response.status).toBe(401)
-    expect(response.headers.get("access-control-allow-origin")).toBe(
-      "https://app.example.com"
-    )
-  })
-
-  it("appends origin to Vary rather than clobbering what is already there", async () => {
-    const { authServer } = await createTestServer({
-      cors: { origin: "https://app.example.com" },
-      jwks: { json: { keys: [] } }
-    })
-    const response = await authServer.handler(request("GET", "/api/auth/jwks"))
-    expect(response.headers.get("vary")).toBe("origin")
-
-    const { applyCorsHeaders } = await import("../../src/http/apply-cors")
-    const headers = applyCorsHeaders(new Headers({ vary: "accept-encoding" }), {
-      origin: "https://app.example.com"
-    })
-    expect(headers.get("vary")).toBe("accept-encoding, origin")
-    // Idempotent: a second application does not list it twice.
-    expect(
-      applyCorsHeaders(headers, { origin: "https://app.example.com" }).get(
-        "vary"
-      )
-    ).toBe("accept-encoding, origin")
   })
 })
 

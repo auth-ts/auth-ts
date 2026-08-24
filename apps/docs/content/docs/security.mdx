@@ -132,8 +132,8 @@ cookie it shadows. It exists so a signed-out visitor costs no request: the
 client reads it before asking `/token`, and a browser that has never signed in
 skips the exchange entirely. It carries no credential and grants nothing —
 whoever can read it can already see the signed-out page it produces. It is the
-only cookie here that may carry a `Domain`, and only when `cors` is configured,
-because a cross-origin app cannot otherwise see it.
+only cookie here that may carry a `Domain`, and only for a request from a
+trusted origin on another host, because that app cannot otherwise see it.
 
 **State-changing requests are checked against their `Origin`.** CORS headers
 decide who may *read* a response, not who may *send* a request: a `POST` with a
@@ -143,18 +143,19 @@ browser that does not enforce it — able to sign the user out, sign them into
 someone else's account, or have a guest's session merged into an attacker's. So
 every non-`GET` request that carries an `Origin` (or, failing that, a `Referer`)
 must name the server's own origin — as the runtime sees it, or as a proxy
-forwarded it — its `baseURL`, or its `cors.origin`; anything else is refused
+forwarded it — its `baseURL`, or one of its `trustedOrigins`; anything else is refused
 with **403 `forbiddenOrigin`** before the body is parsed. A request with neither
 header is a non-browser client, which holds no cookie and cannot be made to act
 for anyone.
 
 **Request bodies must be `application/json`**, or the answer is **415
 `unsupportedMediaType`**. This is the second, independent layer: a page cannot
-send that content type cross-origin without a preflight, and the preflight
-approves only `cors.origin` — so the browser enforces it before any header
-reaches the server, including when a privacy extension has stripped `Origin`.
-The client already sends it; bodiless requests such as `GET /session` are
-untouched.
+send that content type cross-origin without a preflight, so a browser stops most
+of these before any header reaches the server. That is a bonus and not the
+guarantee — whoever answers the preflight is your application's business — so
+the check runs on every request regardless, including when a privacy extension
+has stripped `Origin`. The client already sends it; bodiless requests such as
+`GET /session` are untouched.
 
 **`GET /token` is the one route a cookie alone authenticates**, and being a
 bodiless `GET` it is exempt from both layers above. That is safe for the reason
@@ -186,6 +187,87 @@ it is not.
 
 Codes carry a purpose. A sign-in code cannot authorize a deletion, and a deletion
 code cannot sign anyone in.
+
+## Cross-origin
+
+When the application and the auth server share an origin — the usual case, and
+what the reference application does — there is nothing to configure here.
+
+When they do not, name the application:
+
+```ts
+createAuthServer({
+  // ...
+  trustedOrigins: ["https://app.example.com"]
+})
+```
+
+That grants trust: an origin listed there may make state-changing requests, and
+is the one whose host the sign-in hint can be scoped to. It sends no CORS
+headers.
+
+**CORS is yours.** This library does not set `Access-Control-*` on any response
+and does not answer `OPTIONS`. That is deliberate: an application with one CORS
+policy across its API should not have to carve an exception out of it for this
+mount, and two things both claiming to own the policy is worse than either
+owning it. Configure it wherever you already do.
+
+<Callout type="warn">
+  Whatever answers the preflight has to allow credentials, or the browser
+  withholds the session cookie and `GET /token` answers `null` however the
+  server is configured. It also has to allow the `authorization` and
+  `content-type` headers, or every authenticated route fails its preflight.
+</Callout>
+
+On TanStack Start, the auth mount is an ordinary server route, so CORS goes in
+`src/start.ts` alongside anything else that wraps a request:
+
+```ts title="src/start.ts"
+import { createMiddleware, createStart } from "@tanstack/react-start"
+
+const ALLOWED = new Set(["https://app.example.com"])
+
+export const startInstance = createStart(() => ({
+  requestMiddleware: [
+    createMiddleware().server(async ({ next, request }) => {
+      const origin = request.headers.get("origin")
+      const allowed = origin && ALLOWED.has(origin)
+
+      if (request.method === "OPTIONS" && allowed) {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "access-control-allow-origin": origin,
+            "access-control-allow-credentials": "true",
+            "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+            "access-control-allow-headers": "content-type, authorization",
+            "access-control-max-age": "600"
+          }
+        })
+      }
+
+      const result = await next()
+      if (allowed) {
+        result.response.headers.set("access-control-allow-origin", origin)
+        result.response.headers.set("access-control-allow-credentials", "true")
+        result.response.headers.append("vary", "origin")
+      }
+      return result
+    })
+  ]
+}))
+```
+
+Echo the origin rather than sending `*`: a wildcard is refused by browsers
+alongside `Allow-Credentials`, correctly, since it would let any site read a
+credentialed response.
+
+<Callout>
+  Vite answers preflights itself in `dev` and `preview`, permissively for any
+  localhost origin and without `Allow-Credentials`. That shadows whatever you
+  write, so set `server.cors` and `preview.cors` to `false` and let your own
+  handling run in every environment.
+</Callout>
 
 ## Deploying
 

@@ -15,12 +15,11 @@ export const authServer = createAuthServer({
   guest: true,
   multiAccount: true,
   openapi: true,
-  // The docs site runs on another port, so its API playground is cross-origin
-  // and the browser withholds the refresh cookie unless the origin is allowed
-  // by name. Without this `GET /token` there always answers null. Development
-  // only: this is also the one other origin allowed to change state.
+  // Allowed to make state-changing requests. CORS headers are not this
+  // server's business — see `src/start.ts`, which answers them for the whole
+  // application. Development only: the docs site's API playground.
   ...(process.env.NODE_ENV === "development"
-    ? { cors: { origin: "http://localhost:3001" } }
+    ? { trustedOrigins: ["http://localhost:3001"] }
     : {}),
   providers: {
     github: {

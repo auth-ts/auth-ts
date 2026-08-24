@@ -474,12 +474,15 @@ describe("GET /token", () => {
     // Cross-origin, a hint that never arrived is indistinguishable from one
     // that says no — so the refusal has to be stated, not implied by absence.
     const { authServer } = await createTestServer({
-      cors: { origin: "https://app.example.com" }
+      trustedOrigins: ["https://app.example.com"]
     })
 
     const response = await authServer.handler(
       request("GET", "/api/auth/token", {
-        origin: "https://api.example.com"
+        // Served from the auth host, asked for by the app: the hint has to be
+        // readable where it was asked from, which names the shared domain.
+        origin: "https://api.example.com",
+        headers: { origin: "https://app.example.com" }
       })
     )
     const hint = required(readSetCookies(response).get("auth-ts.hint"), "hint")

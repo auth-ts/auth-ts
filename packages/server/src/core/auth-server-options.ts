@@ -245,16 +245,6 @@ export interface RateLimitOptions {
   sendCodeCooldown?: Duration
 }
 
-/** Cross-origin access, for a client configured with a different `baseURL`. */
-export interface CorsOptions {
-  /**
-   * The exact allowed origin. Never `*`, because these responses carry
-   * credentials. It is also the one origin besides the server's own that may
-   * make state-changing requests — see the origin check in `createHandler`.
-   */
-  origin: string
-}
-
 /**
  * Options accepted by `createAuthServer`.
  *
@@ -364,8 +354,21 @@ export interface AuthServerOptions<
    * your platform controls.
    */
   ipAddress?: IpAddressOptions
-  /** Cross-origin access, needed when the client is configured with a different `baseURL`. */
-  cors?: CorsOptions
+  /**
+   * Origins besides this server's own that may make state-changing requests.
+   *
+   * Needed when the application is on a different origin from the auth server.
+   * Exact origins — `https://app.example.com` — and never `*`: an origin listed
+   * here can act with the user's cookie, which is the thing the check exists to
+   * stop.
+   *
+   * This grants trust; it does not send CORS headers. Those are the
+   * application's to send, from wherever it already handles them, and letting
+   * something else answer the preflight is fine. The two are separate on
+   * purpose: an application with one CORS policy across its whole API should
+   * not have to carve an exception out of it for this mount.
+   */
+  trustedOrigins?: string[]
   /**
    * Serves `GET {basePath}/openapi.json` and a browsable `GET {basePath}/reference`.
    *

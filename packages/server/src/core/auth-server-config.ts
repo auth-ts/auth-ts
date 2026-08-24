@@ -9,7 +9,6 @@ import { parseDuration } from "../lib/parse-duration"
 import type { AdditionalFieldsSchema, AuthDB, AuthTable } from "./auth-db"
 import type {
   AuthServerOptions,
-  CorsOptions,
   EmailOptions,
   JwksOptions,
   JwtOptions,
@@ -26,7 +25,7 @@ import type {
  *
  * Options are what you pass; this is what resolving them produces. The
  * difference is the point of having two types: every optional field here is
- * optional because it is genuinely absent from the deployment — no `cors`, no
+ * optional because it is genuinely absent from the deployment — no
  * `baseURL` — never because a default has not been applied yet. Exposed as
  * `authServer.config`, and carried on the internals as `config`, so nothing
  * downstream of construction ever re-derives a default or re-checks a value.
@@ -60,7 +59,7 @@ export interface AuthServerConfig {
   multiAccount: boolean
   localization?: LocalizationOptions
   ipAddress: IpAddressConfig
-  cors?: CorsOptions
+  trustedOrigins: string[]
   openapi: boolean
   logLevel: LogLevel
   logger?: Logger
@@ -396,7 +395,7 @@ export function resolveAuthServerConfig(
     multiAccount: options.multiAccount ?? false,
     ...(options.localization ? { localization: options.localization } : {}),
     ipAddress: requireIpAddress(options.ipAddress),
-    ...(options.cors ? { cors: options.cors } : {}),
+    trustedOrigins: options.trustedOrigins ?? [],
     openapi: options.openapi ?? false,
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {}),
