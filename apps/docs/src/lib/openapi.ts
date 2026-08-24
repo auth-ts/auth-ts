@@ -14,6 +14,15 @@ export function apiDocument() {
 }
 
 /**
+ * The path every route is mounted under, from the canonical document.
+ *
+ * Read from {@link apiDocument} and never from the rendered copy: that one's
+ * server is whatever the playground was pointed at, which is not a prefix of
+ * anything.
+ */
+export const mountPath = apiDocument().servers[0]?.url ?? ""
+
+/**
  * The same document, with the server the playground should send to.
  *
  * Upstream takes the playground's target from `servers`, and exposes no way to
