@@ -1,44 +1,54 @@
-import type { Node } from "fumadocs-core/page-tree"
+import type { Folder, Node } from "fumadocs-core/page-tree"
 import { loader } from "fumadocs-core/source"
 import { icons } from "lucide-react"
 import { createElement } from "react"
 import { OpenAPIIcon } from "~/components/openapi-icon"
 import { docs } from "../../.source/server"
-import { openapi, operationOrder } from "./openapi"
+import { openapi, routeSegments, tagOrder, tagSlug } from "./openapi"
 
-/** The documentation tree, loaded from `content/docs` and the API reference. */
-const RANKS = new Map(operationOrder.map((entry) => [entry.id, entry]))
+const BASE_DIR = "open-api"
+const TAG_BY_SLUG = new Map(tagOrder.map((tag) => [tagSlug(tag), tag]))
 
-function operationId(node: Node) {
-  return node.type === "page" ? (node.url.split("/").pop() ?? "") : ""
+function rankOf(node: Node) {
+  const slug =
+    node.type === "folder" ? node.$ref?.folder.split("/").pop() : undefined
+  const tag = slug ? TAG_BY_SLUG.get(slug) : undefined
+
+  return tag ? tagOrder.indexOf(tag) : Number.MAX_SAFE_INTEGER
+}
+
+/** Every page beneath a node, however many folder levels it takes to reach one. */
+function leaves(node: Node): Node[] {
+  return node.type === "folder" ? node.children.flatMap(leaves) : [node]
 }
 
 /**
- * Orders the generated routes and heads each run with its tag.
+ * Titles the OpenAPI root and its tag folders, and orders both by tag.
  *
- * The tree arrives sorted by file name, which is the operation id, so the
- * routes read as scattered. Separators are inserted rather than folders so the
- * URLs stay flat.
+ * The URL nests one level per path segment below the tag, method included, so
+ * it reads the way the rendered reference's own anchors do. Those levels are
+ * flattened back out of the sidebar here, so a tag's entry is a flat list
+ * rather than a fold for every method and every path segment to sit behind.
  */
-function groupByTag(children: Node[]) {
-  const ordered = [...children].sort(
-    (left, right) =>
-      (RANKS.get(operationId(left))?.rank ?? Number.MAX_SAFE_INTEGER) -
-      (RANKS.get(operationId(right))?.rank ?? Number.MAX_SAFE_INTEGER)
-  )
-
-  const grouped: Node[] = []
-  let heading: string | undefined
-  for (const child of ordered) {
-    const tag = RANKS.get(operationId(child))?.tag
-    if (tag && tag !== heading) {
-      heading = tag
-      grouped.push({ type: "separator", name: tag })
+function openAPIFolder(node: Folder, folderPath: string) {
+  if (folderPath === BASE_DIR) {
+    return {
+      ...node,
+      name: "OpenAPI",
+      icon: createElement(OpenAPIIcon, { className: "size-4" }),
+      children: [...node.children].sort(
+        (left, right) => rankOf(left) - rankOf(right)
+      )
     }
-    grouped.push(child)
   }
 
-  return grouped
+  const segments = folderPath.split("/")
+  if (segments.length !== 2 || segments[0] !== BASE_DIR) return node
+
+  const tag = TAG_BY_SLUG.get(segments[1] ?? "")
+  if (!tag) return node
+
+  return { ...node, name: tag, children: node.children.flatMap(leaves) }
 }
 
 export const source = loader({
@@ -46,26 +56,33 @@ export const source = loader({
   source: {
     docs: docs.toFumadocsSource(),
     openapi: await openapi.staticSource({
-      baseDir: "api",
+      baseDir: BASE_DIR,
       per: "custom",
       // The default titles each page by its summary, which reads as a sentence
       // in a sidebar and repeats what the page already says. The route is the
       // thing a reader is scanning for, so it is the title; the summary moves
       // to the description, and the method badge is rendered alongside.
-      // Paths are relative to the server, so they need no trimming.
+      // One folder per tag, and the file itself named after the method and
+      // route — the same shape the rendered reference's own anchors use.
       toPages(builder) {
         for (const operation of builder.extract().operations) {
           const resolved = builder.fromExtractedOperation(operation)
           if (!resolved) continue
 
+          const tag = resolved.operation.tags?.[0] ?? "Untagged"
+          const method = operation.method.toLowerCase()
+          const segments = [
+            tagSlug(tag),
+            method,
+            ...routeSegments(operation.path)
+          ]
+
           builder.create({
             type: "operation",
             schemaId: builder.id,
             item: operation,
-            path: `${resolved.operation.operationId ?? operation.path}.mdx`,
+            path: `${segments.join("/")}.mdx`,
             info: {
-              // Shown without the mount: every route shares that prefix, and a
-              // sidebar truncates the tail, which is the part that differs.
               title: operation.path,
               description: resolved.operation.summary,
               deprecated: resolved.operation.deprecated
@@ -77,20 +94,7 @@ export const source = loader({
   },
   plugins: [openapi.loaderPlugin()],
   pageTree: {
-    transformers: [
-      {
-        folder(node, folderPath) {
-          if (folderPath !== "api") return node
-
-          return {
-            ...node,
-            name: "OpenAPI",
-            icon: createElement(OpenAPIIcon, { className: "size-4" }),
-            children: groupByTag(node.children)
-          }
-        }
-      }
-    ]
+    transformers: [{ folder: openAPIFolder }]
   },
   /**
    * Resolves the `icon` name a page's frontmatter or a folder's `meta.json`

@@ -45,35 +45,19 @@ const input = {
  */
 export const openapi = createOpenAPI({ input })
 
-/**
- * Where each operation belongs in the sidebar, and under which heading.
- *
- * The generated tree sorts by file name, which is the operation id — so routes
- * that belong together end up scattered. Ordering by tag, then by route, puts
- * every sign-in path in one run and every session path in the next.
- */
-export const operationOrder = (() => {
-  const built = buildOpenAPIDocument()
-  const tags = built.tags.map((tag) => tag.name)
+/** The document's tags, in the order it declares them. */
+export const tagOrder = apiDocument().tags.map((tag) => tag.name)
 
-  const operations = Object.entries(built.paths)
-    .flatMap(([path, item]) =>
-      Object.entries(item).map(([method, operation]) => ({
-        path,
-        method,
-        ...(operation as { operationId: string; tags: string[] })
-      }))
-    )
-    .sort(
-      (left, right) =>
-        tags.indexOf(left.tags[0] ?? "") - tags.indexOf(right.tags[0] ?? "") ||
-        left.path.localeCompare(right.path) ||
-        left.method.localeCompare(right.method)
-    )
+/** A tag as a folder segment, e.g. `"Sign in"` -> `"sign-in"`. */
+export function tagSlug(tag: string) {
+  return tag.toLowerCase().replace(/\s+/g, "-")
+}
 
-  return operations.map((operation, rank) => ({
-    id: operation.operationId,
-    tag: operation.tags[0] ?? "",
-    rank
-  }))
-})()
+/** A route's segments as URL levels, e.g. `"/sessions/{id}"` -> `["sessions", "id"]`. */
+export function routeSegments(path: string) {
+  // A literal brace 404s once encoded.
+  return path
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => segment.replace(/[{}]/g, "").replace(/^\.+/, ""))
+}
