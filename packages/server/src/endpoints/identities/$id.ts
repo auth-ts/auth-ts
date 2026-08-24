@@ -16,7 +16,7 @@ export const disconnectIdentityDocs: EndpointDocs<
   "id"
 > = {
   description:
-    "Addressed by identity id, since one provider can be linked twice.",
+    "Addressed by identity id, since one provider can be connected twice.",
   tag: "Identities",
   auth: "bearer",
   params: { id: "The identity's id, from `GET /identities`." },

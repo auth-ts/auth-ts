@@ -24,7 +24,7 @@ export const connectProviderDocs: EndpointDocs<
   "provider"
 > = {
   description:
-    "Links to the current user, unlike sign-in. Navigate to the url.",
+    "Connects to the current user, unlike sign-in. Navigate to the url.",
   tag: "Identities",
   auth: "bearer",
   requires: "providers",

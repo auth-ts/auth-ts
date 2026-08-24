@@ -29,8 +29,7 @@ export interface TokenInput extends HeadersInput {
 
 /** How `GET /token` appears in the OpenAPI document. */
 export const getTokenDocs: EndpointDocs<TokenInput> = {
-  description:
-    "Returns null with a 200 when nobody is signed in, not a 401. Reads the refresh cookie and ignores the Authorization header.",
+  description: "Answers 200 with null when nobody is signed in.",
   tag: "Session",
   auth: "cookie",
   responses: {
