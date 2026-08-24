@@ -11,11 +11,10 @@ export default defineConfig({
     tanstackStart(),
     react()
   ],
-  server: {
-    port: 3000,
-    // Vite answers the preflight itself and omits Allow-Credentials, so a
-    // cross-origin request carrying a cookie fails before reaching the auth
-    // handler. Off, so `authServer.handler` answers OPTIONS as it is written to.
-    cors: false
-  }
+  // Vite answers CORS preflights itself, permissively for any localhost origin
+  // and without Allow-Credentials, which shadows the auth handler and makes dev
+  // disagree with production. Off in both servers, so `authServer.handler`
+  // answers OPTIONS everywhere.
+  server: { port: 3000, cors: false },
+  preview: { cors: false }
 })
