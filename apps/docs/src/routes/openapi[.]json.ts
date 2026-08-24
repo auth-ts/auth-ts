@@ -1,5 +1,5 @@
-import { buildOpenAPIDocument } from "@auth-ts/server"
 import { createFileRoute } from "@tanstack/react-router"
+import { apiDocument } from "~/lib/openapi"
 
 /**
  * The spec as a file, for anything that takes a URL.
@@ -10,7 +10,7 @@ import { createFileRoute } from "@tanstack/react-router"
 export const Route = createFileRoute("/openapi.json")({
   server: {
     handlers: {
-      GET: () => Response.json(buildOpenAPIDocument())
+      GET: () => Response.json(apiDocument())
     }
   }
 })
