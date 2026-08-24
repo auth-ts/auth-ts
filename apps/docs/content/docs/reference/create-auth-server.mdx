@@ -255,3 +255,9 @@ machine where you want to try them. Nothing is invented in production.
 Every duration uses one format — `"10m"`, `"30d"`, `"60s"` — and one parser, so
 `jwt.ttl` and a rate-limit window cannot disagree about what `"1h"` means. Months
 are unsupported because their length is ambiguous.
+
+## OpenAPI
+
+`openapi: true` serves `GET {basePath}/openapi.json` and a browsable
+`GET {basePath}/reference`, both describing this server's own configuration.
+Off by default. See [the OpenAPI guide](/docs/guides/openapi).
