@@ -56,6 +56,23 @@ export type ComponentResponseName =
   | "MethodNotAllowed"
   | "InternalError"
 
+/**
+ * `T` without its index signature, if it has one.
+ *
+ * An open body — `POST /user` takes the fields core owns and the consumer's
+ * declared ones at the same level — is `[field: string]: unknown`, which makes
+ * every key assignable and so enforces nothing. Dropping it leaves exactly the
+ * fields that are knowable here; the declared ones are the consumer's, and the
+ * builder adds them from config.
+ */
+export type DeclaredFields<T> = {
+  [K in keyof T as string extends K
+    ? never
+    : number extends K
+      ? never
+      : K]: T[K]
+}
+
 type RequiredKeys<T> = {
   [K in keyof T]-?: Record<string, never> extends Pick<T, K> ? never : K
 }[keyof T]

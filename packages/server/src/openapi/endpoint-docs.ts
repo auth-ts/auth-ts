@@ -1,6 +1,7 @@
 import type {
   ComponentName,
   ComponentResponseName,
+  DeclaredFields,
   JsonSchema,
   ObjectSchemaFor
 } from "./json-schema"
@@ -64,9 +65,11 @@ export interface EndpointDocs<
   query?: Record<string, JsonSchema>
   /** Where the consumer's declared `user.additionalFields` land in the body. */
   additionalFields?: "nested" | "flat"
+  // Stripped before the omit, not after: `Omit` collapses an index signature
+  // over the declared keys and would leave nothing to enforce.
   body?: ObjectSchemaFor<
     Omit<
-      Input,
+      DeclaredFields<Input>,
       PathParam | "headers" | "token" | "requestURL" | "additionalFields"
     >
   >
