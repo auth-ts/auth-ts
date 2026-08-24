@@ -102,7 +102,7 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   connectProvider: "Connect a provider",
   listIdentities: "List connected providers",
   disconnectIdentity: "Disconnect a provider",
-  getProviderToken: "Get a provider access token",
+  getProviderToken: "Get an access token for a provider",
   getJwks: "Get the public key set",
   getDiscovery: "Get the OIDC discovery document",
   getOpenAPIDocument: "Get the OpenAPI document",

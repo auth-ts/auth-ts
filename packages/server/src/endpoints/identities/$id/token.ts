@@ -51,7 +51,7 @@ export const getProviderTokenDocs: EndpointDocs<GetProviderTokenInput, "id"> = {
 }
 
 /**
- * Get a provider access token.
+ * Get an access token for a provider.
  *
  * This is what makes a connection worth keeping: the application calls Google
  * or GitHub as the user, for as long as the grant lives, without sending them
