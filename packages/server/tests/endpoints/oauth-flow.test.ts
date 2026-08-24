@@ -983,7 +983,7 @@ describe("oauth callback", () => {
     expect(db.users()).toHaveLength(1)
     // Merge semantics: the code user gains a name and picture, no second account.
     expect(db.users()[0]?.name).toBe("Ada")
-    expect(db.users()[0]?.imageURL).toBe("https://img.example/a.png")
+    expect(db.users()[0]?.image).toBe("https://img.example/a.png")
   })
 })
 
@@ -1341,7 +1341,7 @@ describe("google", () => {
     expect(db.users()[0]).toMatchObject({
       email: "ada@example.com",
       name: "Ada",
-      imageURL: "https://lh3.example/ada"
+      image: "https://lh3.example/ada"
     })
   })
 

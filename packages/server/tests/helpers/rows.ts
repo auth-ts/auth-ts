@@ -19,7 +19,7 @@ export async function insertUser(
       email: null,
       phoneNumber: null,
       name: null,
-      imageURL: null,
+      image: null,
       primaryUserId: null,
       type: "user",
       createdAt: new Date(),

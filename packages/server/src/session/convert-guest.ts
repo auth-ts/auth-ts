@@ -9,7 +9,7 @@ export interface GuestIdentity {
   email?: string
   phoneNumber?: string
   name?: string
-  imageURL?: string
+  image?: string
   /**
    * Validated sign-up fields from the request.
    *
@@ -77,7 +77,7 @@ export async function convertGuest(
     email: identity.email,
     phoneNumber: identity.phoneNumber,
     name: identity.name,
-    imageURL: identity.imageURL,
+    image: identity.image,
     ...identity.additionalFields
   })
   internals.log.info("guest upgraded in place, keeping its id and its rows")

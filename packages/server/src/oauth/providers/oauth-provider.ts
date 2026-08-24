@@ -45,7 +45,7 @@ export interface ProviderIdentity {
    */
   email?: string
   name?: string
-  imageURL?: string
+  image?: string
   /**
    * The grant itself, when the provider issued one worth keeping.
    *

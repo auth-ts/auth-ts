@@ -141,7 +141,7 @@ export const google: OAuthProvider = {
       ...(email ? { label: email.toLowerCase() } : {}),
       ...(email ? { email: email.toLowerCase() } : {}),
       ...(claims.name ? { name: claims.name } : {}),
-      ...(claims.picture ? { imageURL: claims.picture } : {}),
+      ...(claims.picture ? { image: claims.picture } : {}),
       tokens: readTokens(token)
     }
   },

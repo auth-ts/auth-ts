@@ -24,7 +24,7 @@ export const users = pgTable.withRLS(
     email: text("email").unique(),
     phoneNumber: text("phoneNumber").unique(),
     name: text("name"),
-    imageURL: text("imageURL"),
+    image: text("image"),
     type: text("type").$type<UserType>().notNull().default("user"),
     primaryUserId: uuid("primaryUserId").references(
       (): AnyPgColumn => users.id,

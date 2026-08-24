@@ -58,7 +58,13 @@ export interface CoreUserFields {
   /** Null for guests; unique when present. E.164. */
   phoneNumber?: string | null
   name?: string | null
-  imageURL?: string | null
+  /**
+   * Whatever your application stores to render a person: an `https` URL, a
+   * `data:` URI, a key into your own object storage. Named for the value rather
+   * than a format, because the library never reads it — a provider writes one
+   * on first sign-in and the account screen writes it after that.
+   */
+  image?: string | null
   type: UserType
   /**
    * Set on a **guest** row when its sign-in resolved to an existing account —

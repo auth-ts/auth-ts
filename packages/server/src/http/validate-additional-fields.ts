@@ -9,7 +9,7 @@ export type AdditionalFieldValues = Record<string, string | number | boolean>
  * Rejects a schema that redeclares a field core owns.
  *
  * Runs at construction, so a colliding declaration is a startup failure rather
- * than a field that silently stops working. `name` and `imageURL` are included
+ * than a field that silently stops working. `name` and `image` are included
  * because `POST /user` takes a flat body and two fields with one name cannot both
  * win.
  *

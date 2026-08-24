@@ -90,14 +90,14 @@ export async function resolveOAuthUser(
         await convertGuest(internals, guest, {
           email: identity.email,
           ...(identity.name ? { name: identity.name } : {}),
-          ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
+          ...(identity.image ? { image: identity.image } : {}),
           additionalFields
         })
       ).user
     : await findOrCreateUser(internals, {
         identifier: { kind: "email", value: identity.email },
         ...(identity.name ? { name: identity.name } : {}),
-        ...(identity.imageURL ? { imageURL: identity.imageURL } : {}),
+        ...(identity.image ? { image: identity.image } : {}),
         additionalFields
       })
 

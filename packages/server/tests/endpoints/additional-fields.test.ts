@@ -198,7 +198,7 @@ describe("additionalFields on sign-up", () => {
 })
 
 describe("additionalFields on update", () => {
-  it("accepts declared fields flat, beside name and imageURL", async () => {
+  it("accepts declared fields flat, beside name and image", async () => {
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
     const { token } = (await signInResponse.json()) as { token: string }

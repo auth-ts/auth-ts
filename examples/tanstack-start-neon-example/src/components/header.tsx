@@ -37,10 +37,10 @@ export function Header() {
         <div className="navbar-end">
           {user ? (
             <Link to="/account" className="btn btn-ghost gap-2 px-2">
-              {user.imageURL ? (
+              {user.image ? (
                 <div className="avatar">
                   <div className="w-8 rounded-full">
-                    <img src={user.imageURL} alt="" />
+                    <img src={user.image} alt="" />
                   </div>
                 </div>
               ) : (

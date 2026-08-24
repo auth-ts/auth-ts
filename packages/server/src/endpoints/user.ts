@@ -47,7 +47,7 @@ export const getUser = defineEndpoint({
  */
 export interface UpdateUserInput extends CallerInput {
   name?: string
-  imageURL?: string
+  image?: string
   [field: string]: unknown
 }
 
@@ -74,10 +74,10 @@ export const updateUser = defineEndpoint({
   run: async (internals, input: UpdateUserInput) => {
     const caller = await authenticate(internals, input)
 
-    const { headers: _headers, token: _token, name, imageURL, ...rest } = input
+    const { headers: _headers, token: _token, name, image, ...rest } = input
     for (const [field, value] of [
       ["name", name],
-      ["imageURL", imageURL]
+      ["image", image]
     ] as const) {
       if (value !== undefined && typeof value !== "string") {
         throw new AuthApiError("invalidField", 400, {
@@ -110,7 +110,7 @@ export const updateUser = defineEndpoint({
     // than about protecting the database.
     if (
       name === undefined &&
-      imageURL === undefined &&
+      image === undefined &&
       Object.keys(additionalFields).length === 0
     ) {
       throw new AuthApiError("invalidField", 400, {
@@ -123,7 +123,7 @@ export const updateUser = defineEndpoint({
 
     const user = await updateUserFields(internals, current, {
       name,
-      imageURL,
+      image,
       ...additionalFields
     })
 

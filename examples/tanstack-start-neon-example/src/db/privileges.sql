@@ -25,4 +25,4 @@ grant select (
 ) on table "identities" to authenticated;
 
 revoke update on table "users" from authenticated;
-grant update ("name", "imageURL", "updatedAt") on table "users" to authenticated;
+grant update ("name", "image", "updatedAt") on table "users" to authenticated;

@@ -15,7 +15,7 @@ export interface UserIdentifier {
 export interface FindOrCreateUserInput {
   identifier: UserIdentifier
   name?: string
-  imageURL?: string
+  image?: string
   /** Validated sign-up fields. Applied on create only — see below. */
   additionalFields?: AdditionalFieldValues
 }
@@ -31,7 +31,7 @@ export interface FindOrCreateUserInput {
  *   administrator every time they logged in.
  * - **Declared fields are insert-only.** They are sign-up fields; applying them
  *   on every sign-in would make the sign-in body a mass-assignment vector.
- * - **Only `name` and `imageURL` move on a returning sign-in**, and only when
+ * - **Only `name` and `image` move on a returning sign-in**, and only when
  *   the provider actually sent them. A verification code carries neither, so that path
  *   writes nothing at all rather than issuing an empty update.
  *
@@ -44,23 +44,23 @@ export async function findOrCreateUser(
   internals: AuthServerInternals,
   input: FindOrCreateUserInput
 ): Promise<AuthUser> {
-  const { identifier, name, imageURL, additionalFields } = input
+  const { identifier, name, image, additionalFields } = input
 
   const existing = await selectOne(internals, "users", {
     [identifier.kind]: identifier.value
   })
-  if (existing) return updateUser(internals, existing, { name, imageURL })
+  if (existing) return updateUser(internals, existing, { name, image })
 
   return insertRow(internals, "users", {
     email: null,
     phoneNumber: null,
     name: null,
-    imageURL: null,
+    image: null,
     primaryUserId: null,
     ...additionalFields,
     [identifier.kind]: identifier.value,
     ...(name === undefined ? {} : { name }),
-    ...(imageURL === undefined ? {} : { imageURL }),
+    ...(image === undefined ? {} : { image }),
     type: "user"
   })
 }

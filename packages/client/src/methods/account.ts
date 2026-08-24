@@ -9,7 +9,7 @@ import { AuthError } from "../lib/auth-error"
 /** The flat body accepted by profile updates. */
 export type UpdateUserInput = {
   name?: string
-  imageURL?: string
+  image?: string
 } & Record<string, string | number | boolean | undefined>
 
 /** Updates the signed-in user and returns the row as stored. */

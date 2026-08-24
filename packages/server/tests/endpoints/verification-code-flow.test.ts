@@ -269,7 +269,7 @@ describe("token and user endpoints", () => {
     await authServer.handler(
       request("POST", "/api/auth/user", {
         token,
-        body: { name: "Ada", imageURL: "https://img.example/a.png" }
+        body: { name: "Ada", image: "https://img.example/a.png" }
       })
     )
     await authServer.handler(
@@ -278,10 +278,10 @@ describe("token and user endpoints", () => {
     const read = await authServer.handler(
       request("GET", "/api/auth/user", { token })
     )
-    const body = (await read.json()) as { name: string; imageURL: string }
+    const body = (await read.json()) as { name: string; image: string }
 
     expect(body.name).toBe("Ada L")
-    expect(body.imageURL).toBe("https://img.example/a.png")
+    expect(body.image).toBe("https://img.example/a.png")
 
     for (const rejected of [
       { email: "new@example.com" },

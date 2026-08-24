@@ -52,7 +52,7 @@ const person = (fields: Record<string, unknown> = {}) => ({
   email: null,
   phoneNumber: null,
   name: null,
-  imageURL: null,
+  image: null,
   primaryUserId: null,
   type: "user" as const,
   ...fields

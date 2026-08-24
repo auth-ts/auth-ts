@@ -121,7 +121,7 @@ export const github: OAuthProvider = {
       label: profile.login,
       ...(verified ? { email: verified.email.toLowerCase() } : {}),
       ...(profile.name ? { name: profile.name } : { name: profile.login }),
-      ...(profile.avatar_url ? { imageURL: profile.avatar_url } : {}),
+      ...(profile.avatar_url ? { image: profile.avatar_url } : {}),
       tokens: readTokens(token)
     }
   },

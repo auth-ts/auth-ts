@@ -72,7 +72,7 @@ export const signInGuest = defineEndpoint({
       email: null,
       phoneNumber: null,
       name: null,
-      imageURL: null,
+      image: null,
       primaryUserId: null,
       ...additionalFields,
       type: "guest"

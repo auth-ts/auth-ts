@@ -166,7 +166,7 @@ describe("construction failures", () => {
       "type",
       "id",
       "name",
-      "imageURL",
+      "image",
       "primaryUserId",
       "phoneNumber"
     ]) {

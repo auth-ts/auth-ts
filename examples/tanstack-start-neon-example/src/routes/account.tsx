@@ -175,10 +175,10 @@ function AccountPage() {
   return (
     <section className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        {user.imageURL ? (
+        {user.image ? (
           <div className="avatar">
             <div className="w-14 rounded-full">
-              <img src={user.imageURL} alt="" />
+              <img src={user.image} alt="" />
             </div>
           </div>
         ) : null}

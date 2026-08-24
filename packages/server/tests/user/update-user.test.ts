@@ -18,15 +18,15 @@ describe("updateUser", () => {
     const { internals, db } = await createTestInternals()
     const user = await insertUser(db, {
       email: "ada@example.com",
-      imageURL: "https://img.example/a.png"
+      image: "https://img.example/a.png"
     })
 
     const updated = await updateUser(internals, user, {
       name: "Ada",
-      imageURL: undefined
+      image: undefined
     })
 
-    expect(updated.imageURL).toBe("https://img.example/a.png")
+    expect(updated.image).toBe("https://img.example/a.png")
   })
 
   it("writes nothing when every field was undefined", async () => {
@@ -38,7 +38,7 @@ describe("updateUser", () => {
 
     const unchanged = await updateUser(internals, user, {
       name: undefined,
-      imageURL: undefined
+      image: undefined
     })
 
     expect(update).not.toHaveBeenCalled()

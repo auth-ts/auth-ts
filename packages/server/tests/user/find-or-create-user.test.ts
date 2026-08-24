@@ -40,18 +40,18 @@ describe("findOrCreateUser", () => {
     expect(update).not.toHaveBeenCalled()
   })
 
-  it("moves name and imageURL on a returning sign-in when the provider sent them", async () => {
+  it("moves name and image on a returning sign-in when the provider sent them", async () => {
     const { internals } = await createTestInternals()
     await findOrCreateUser(internals, { identifier: ada, name: "Ada" })
 
     const updated = await findOrCreateUser(internals, {
       identifier: ada,
       name: "Ada Lovelace",
-      imageURL: "https://img.example/a.png"
+      image: "https://img.example/a.png"
     })
 
     expect(updated.name).toBe("Ada Lovelace")
-    expect(updated.imageURL).toBe("https://img.example/a.png")
+    expect(updated.image).toBe("https://img.example/a.png")
   })
 
   it("never rewrites type, so signing in cannot demote an administrator", async () => {
