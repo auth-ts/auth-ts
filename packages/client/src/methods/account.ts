@@ -1,8 +1,4 @@
-import type {
-  AuthUser,
-  RevokeSessionResult,
-  SessionInfo
-} from "@auth-ts/server"
+import type { AuthUser, SessionInfo } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
 
@@ -34,10 +30,9 @@ export interface SignOutInput {
   /**
    * Which of this browser's accounts to sign out, under `multiAccount`.
    *
-   * Omit it — the default, as in Clerk — and every account signed in here
-   * goes. Name one and only that account goes: the active one, in which case
-   * the server promotes the next parked account, or a parked one, which leaves
-   * the active session untouched.
+   * Omit it and every account signed in here goes. Name one and only that
+   * account goes, whether it is the active one or a parked one; the rest stay
+   * signed in.
    */
   userId?: string
 }
@@ -46,22 +41,16 @@ export interface SignOutInput {
  * Signs out.
  *
  * `"others"` deliberately clears nothing locally — it is the "sign out my other
- * devices" button, and this device is meant to survive it. The other two scopes
- * clear the token and the user mirror; when the account signed out was the
- * active one and another is parked, the server promotes it and the caches are
- * primed with that user instead of emptied.
+ * devices" button, and this device is meant to survive it.
  *
- * A session that is already gone resolves to `null` rather than throwing: the
- * caller asked to end up signed out, and they are.
+ * A session that is already gone resolves rather than throwing: the caller
+ * asked to end up signed out, and they are.
  */
 export function createSignOut(internals: AuthClientInternals) {
-  return async function signOut(
-    input: SignOutInput = {}
-  ): Promise<{ switchedTo: AuthUser } | null> {
+  return async function signOut(input: SignOutInput = {}): Promise<void> {
     const scope = input.scope ?? "local"
-    let result: { switchedTo?: AuthUser; token?: string } | undefined
     try {
-      result = await internals.fetchJson({
+      await internals.fetchJson({
         method: "POST",
         path: "/sign-out",
         body: { scope, ...(input.userId ? { userId: input.userId } : {}) },
@@ -73,25 +62,9 @@ export function createSignOut(internals: AuthClientInternals) {
       if (!(error instanceof AuthError && error.code === "unauthenticated")) {
         throw error
       }
-      internals.tokenStore.clear()
-
-      return null
     }
 
-    if (scope === "others") return null
-
-    // Signing out of the active account under `multiAccount` promotes a parked
-    // one and hands back its token; only a sign-out with nothing to promote
-    // leaves the browser with no token at all.
-    if (result?.switchedTo && result.token) {
-      internals.tokenStore.set(result.token)
-
-      return { switchedTo: result.switchedTo }
-    }
-
-    internals.tokenStore.clear()
-
-    return null
+    if (scope !== "others") internals.tokenStore.clear()
   }
 }
 
@@ -169,30 +142,15 @@ export interface RevokeSessionInput {
 
 /**
  * Revokes one session by id.
- *
- * Revoking the current one is a local sign-out, so the caches are cleared to
- * match — the server has already cleared the cookie, and says in the response
- * that it did, so there is no need to list the sessions first to find out.
  */
 export function createRevokeSession(internals: AuthClientInternals) {
   return async function revokeSession(
     input: RevokeSessionInput
   ): Promise<void> {
-    const result = await internals.fetchJson<RevokeSessionResult | undefined>({
+    await internals.fetchJson<undefined>({
       method: "DELETE",
       path: `/sessions/${encodeURIComponent(input.id)}`,
       authenticated: true
     })
-
-    if (!result?.current) return
-
-    // Revoking the current session under `multiAccount` moves the browser to a
-    // parked account, and that account's token comes back with it.
-    if (result.token) {
-      internals.tokenStore.set(result.token)
-      return
-    }
-
-    internals.tokenStore.clear()
   }
 }

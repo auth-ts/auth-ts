@@ -15,8 +15,6 @@ import {
 } from "../session/accounts-cookie"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
-import { mintAccessToken } from "../session/issue-session"
-import { promoteNextAccount } from "../session/promote-account"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
 import { clearedRefreshCookies } from "../session/session-cookies"
 
@@ -68,16 +66,7 @@ export const signOutDocs: EndpointDocs<SignOutInput> = {
     }
   },
   responses: {
-    200: {
-      description:
-        "Signing out promoted another account parked in this browser.",
-      setsCookie: "refresh",
-      schema: "SignOutResult"
-    },
-    204: {
-      description: "Signed out, with no account left to promote.",
-      setsCookie: "cleared"
-    },
+    204: { description: "Signed out.", setsCookie: "cleared" },
     401: "Unauthenticated",
     404: "NotFound"
   }
@@ -186,23 +175,9 @@ export const signOut = defineEndpoint({
       return { data: undefined, status: 204, headers: responseHeaders }
     }
 
-    const promoted = await promoteNextAccount(internals, remaining, context)
-    if (promoted) {
-      // The browser is now acting as someone else, so it gets that account's
-      // token. Signing out without a promotion returns none: handing over a
-      // fresh credential on the way out would be perverse.
-      const token = await mintAccessToken(
-        internals,
-        promoted.user,
-        promoted.session.id
-      )
-
-      return {
-        data: { switchedTo: promoted.user, token },
-        headers: promoted.headers
-      }
-    }
-
+    // The active account is out. Its cookie goes; the accounts still parked
+    // here keep theirs, and none of them is promoted into the empty slot —
+    // choosing one is the application's call, not this endpoint's.
     const responseHeaders = new Headers()
     for (const cookie of clearedRefreshCookies(internals, context)) {
       responseHeaders.append("set-cookie", cookie)
@@ -210,7 +185,15 @@ export const signOut = defineEndpoint({
     if (config.multiAccount) {
       responseHeaders.append(
         "set-cookie",
-        clearCookie(config.cookie.accountsName, config.cookie.path, secure)
+        remaining.length > 0
+          ? serializeCookie({
+              name: config.cookie.accountsName,
+              value: serializeAccounts(parkedTokens(remaining)),
+              path: config.cookie.path,
+              maxAge: config.session.ttl,
+              secure
+            })
+          : clearCookie(config.cookie.accountsName, config.cookie.path, secure)
       )
     }
 

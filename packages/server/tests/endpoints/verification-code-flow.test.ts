@@ -445,7 +445,7 @@ describe("jwks and discovery", () => {
 })
 
 describe("GET /token", () => {
-  it("answers null and retires the cookies a stranger presented", async () => {
+  it("answers null and retires the credential a stranger presented", async () => {
     const { authServer } = await createTestServer({ multiAccount: true })
 
     const response = await authServer.handler(
@@ -459,14 +459,15 @@ describe("GET /token", () => {
     // an answer may carry the cookies that stop it being asked again.
     expect(response.status).toBe(200)
     expect(await response.json()).toBeNull()
-    for (const name of ["auth-ts.refresh", "auth-ts.refresh.accounts"]) {
-      expect(required(cookies.get(name), name).attributes).toContain(
-        "Max-Age=0"
-      )
-    }
+    expect(
+      required(cookies.get("auth-ts.refresh"), "refresh").attributes
+    ).toContain("Max-Age=0")
     expect(required(cookies.get("auth-ts.hint"), "hint").attributes).toContain(
       "Max-Age=0"
     )
+    // The accounts cookie is not this endpoint's to retire: the sessions it
+    // lists are live, and none of them is what was just refused.
+    expect(cookies.get("auth-ts.refresh.accounts")).toBeUndefined()
   })
 
   it("says out rather than nothing when the app is on another origin", async () => {

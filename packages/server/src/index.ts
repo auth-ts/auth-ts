@@ -63,10 +63,7 @@ export type {
 export type { SendCodeInput } from "./endpoints/send-code"
 export type { CurrentSession } from "./endpoints/session"
 export type { SessionInfo } from "./endpoints/sessions"
-export type {
-  RevokeSessionInput,
-  RevokeSessionResult
-} from "./endpoints/sessions/$id"
+export type { RevokeSessionInput } from "./endpoints/sessions/$id"
 export type { SignInCodeInput } from "./endpoints/sign-in/code"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest"
 export type {

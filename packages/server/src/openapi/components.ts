@@ -2,7 +2,6 @@ import type { CoreUserFields } from "../core/auth-db"
 import type { IdentityInfo } from "../endpoints/identities"
 import type { ProviderTokenResult } from "../endpoints/identities/$id/token"
 import type { SessionInfo } from "../endpoints/sessions"
-import type { RevokeSessionResult } from "../endpoints/sessions/$id"
 import type { TokenResult } from "../endpoints/token"
 import type { AuthErrorBody } from "../http/error-response"
 import type {
@@ -100,19 +99,6 @@ const tokenResult: ObjectSchemaFor<TokenResult> = {
   required: ["token", "user"]
 }
 
-const revokeSessionResult: ObjectSchemaFor<RevokeSessionResult> = {
-  type: "object",
-  properties: {
-    current: {
-      type: "boolean",
-      description: "Whether the revoked session was the one making the request."
-    },
-    switchedTo: "User",
-    token: { type: "string" }
-  },
-  required: ["current"]
-}
-
 /**
  * Every value `code` can take, for the schema's enum.
  *
@@ -172,12 +158,6 @@ export const componentSchemas: Record<ComponentName, JsonSchema> = {
   Identity: identity,
   Account: user,
   TokenResult: tokenResult,
-  RevokeSessionResult: revokeSessionResult,
-  SignOutResult: {
-    type: "object",
-    properties: { switchedTo: "User", token: { type: "string" } },
-    description: "Only sent when signing out promoted another parked account."
-  },
   ProviderToken: providerToken,
   AuthorizeURL: {
     type: "object",

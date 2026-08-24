@@ -212,20 +212,18 @@ describe("signOut", () => {
     })
   })
 
-  it("adopts the promoted account when the server switches to one", async () => {
+  it("clears the token, since signing out is what was asked for", async () => {
     server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("POST", "/api/auth/sign-out", {
-      body: { switchedTo: other, token: fakeAccessToken() }
-    })
+    server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
     await client.signInCode({ email: "ada@example.com", code: "123456" })
 
-    const result = await client.signOut()
+    await client.signOut()
 
-    expect(result?.switchedTo.email).toBe("grace@example.com")
+    expect(server.requests.at(-1)?.path).toBe("/api/auth/sign-out")
   })
 })
 

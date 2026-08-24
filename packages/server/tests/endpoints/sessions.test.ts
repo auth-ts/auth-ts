@@ -53,7 +53,7 @@ async function currentSessionId(
 }
 
 describe("DELETE /sessions/:id", () => {
-  it("revokes another device and says it was not the current session", async () => {
+  it("revokes another device without touching this one", async () => {
     const context = await createTestServer()
     const phone = await signIn(context, "ada@example.com")
     const laptop = await signIn(context, "ada@example.com")
@@ -71,8 +71,7 @@ describe("DELETE /sessions/:id", () => {
       })
     )
 
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ current: false })
+    expect(response.status).toBe(204)
     expect(readSetCookies(response).size).toBe(0)
     expect(
       (
@@ -84,9 +83,7 @@ describe("DELETE /sessions/:id", () => {
     expect(await listSessions(context, laptop)).toHaveLength(1)
   })
 
-  it("revokes the current session as a local sign-out, clearing the cookie and saying so", async () => {
-    // The client used to list every session first just to learn whether it
-    // was revoking itself. The server knows, so it says.
+  it("revokes the current session as a local sign-out, clearing the cookie", async () => {
     const context = await createTestServer()
     const cookies = await signIn(context, "ada@example.com")
     const current = { id: await currentSessionId(context, cookies) }
@@ -99,8 +96,7 @@ describe("DELETE /sessions/:id", () => {
       )
     )
 
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ current: true })
+    expect(response.status).toBe(204)
     expect(
       required(readSetCookies(response).get("auth-ts.refresh"), "refresh")
         .attributes

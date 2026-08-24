@@ -67,7 +67,7 @@ truth to keep in step.
 Two places, both a body. `GET /token` exchanges the refresh cookie for one — or
 answers `null` with a 200, because nobody signed in is an answer — and
 a sign-in returns one with the user it signed in — verification code, guest,
-account switch, and the sign-out that promotes a parked account. Nothing arrives
+and account switch. Nothing arrives
 in a response header, so there is nothing for a framework's response plumbing to
 lose and nothing for CORS to expose.
 

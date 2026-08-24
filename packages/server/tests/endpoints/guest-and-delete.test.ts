@@ -203,7 +203,7 @@ describe("guest reaping", () => {
       })
     )
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(204)
     expect(context.db.users()).toHaveLength(0)
   })
 

@@ -376,20 +376,9 @@ function AccountPage() {
         <button
           type="button"
           onClick={async () => {
-            const result = await authClient.signOut({ userId: user.id })
+            await authClient.signOut({ userId: user.id })
             queryClient.clear()
-            if (result?.switchedTo) {
-              const label =
-                result.switchedTo.email ??
-                `Guest ${result.switchedTo.id.slice(0, 8)}`
-              setNotice({
-                text: `Now signed in as ${label}.`,
-                tone: "success"
-              })
-              await sessions.refetch()
-            } else {
-              await navigate({ to: "/login" })
-            }
+            await navigate({ to: "/login" })
           }}
           className="btn btn-outline btn-sm"
         >

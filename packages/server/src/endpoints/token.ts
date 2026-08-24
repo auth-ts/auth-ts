@@ -1,6 +1,5 @@
 import type { AuthUser } from "../core/auth-db"
 import { defineEndpoint } from "../http/define-endpoint"
-import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import { mintAccessToken } from "../session/issue-session"
 import type { HeadersInput } from "../session/resolve-session"
@@ -83,16 +82,6 @@ export const getToken = defineEndpoint({
       const headers = new Headers()
       for (const cookie of clearedRefreshCookies(internals, input)) {
         headers.append("set-cookie", cookie)
-      }
-      if (config.multiAccount) {
-        headers.append(
-          "set-cookie",
-          clearCookie(
-            config.cookie.accountsName,
-            config.cookie.path,
-            shouldUseSecureCookies(input.requestURL)
-          )
-        )
       }
 
       return { data: null, headers }

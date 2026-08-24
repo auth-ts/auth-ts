@@ -387,7 +387,7 @@ describe("multiAccount enabled", () => {
     ).toBe(401)
   })
 
-  it("signs out the named account and promotes the next", async () => {
+  it("signs out the named account and leaves the others parked", async () => {
     const context = await createTestServer(options)
     const first = await signIn(context, "ada@example.com")
     const second = await signIn(context, "grace@example.com", first.cookies)
@@ -403,33 +403,21 @@ describe("multiAccount enabled", () => {
         token: await tokenFor(context, second.cookies)
       })
     )
-    const body = (await response.json()) as {
-      switchedTo: { email: string }
-      token: string
-    }
 
-    expect(response.status).toBe(200)
-    expect(body.switchedTo.email).toBe("ada@example.com")
+    expect(response.status).toBe(204)
     expect(context.db.sessions()).toHaveLength(1)
 
-    const promoted = readSetCookies(response)
+    // Nothing is promoted: the browser holds no active account, and Ada's
+    // session is still live and still parked, waiting to be switched to.
+    const cookies = readSetCookies(response)
     expect(
-      required(promoted.get("auth-ts.refresh.accounts"), "accounts").value
-    ).toBe("[]")
-    const whoami = await context.authServer.handler(
-      request("GET", "/api/auth/user", {
-        cookies: {
-          "auth-ts.refresh": required(
-            promoted.get("auth-ts.refresh"),
-            "refresh"
-          ).value
-        },
-        token: body.token
-      })
-    )
-    expect(((await whoami.json()) as { email: string }).email).toBe(
-      "ada@example.com"
-    )
+      required(cookies.get("auth-ts.refresh"), "refresh").attributes
+    ).toContain("Max-Age=0")
+    expect(
+      JSON.parse(
+        required(cookies.get("auth-ts.refresh.accounts"), "accounts").value
+      )
+    ).toHaveLength(1)
   })
 
   it("reaches every parked account's other devices under scope: global", async () => {
@@ -467,7 +455,7 @@ describe("multiAccount enabled", () => {
     ).toBe(401)
   })
 
-  it("promotes the next account after a global sign-out of the current one", async () => {
+  it("ends the named account everywhere and leaves the others parked", async () => {
     const context = await createTestServer(options)
     const graceElsewhere = await signIn(context, "grace@example.com")
     const first = await signIn(context, "ada@example.com")
@@ -484,11 +472,16 @@ describe("multiAccount enabled", () => {
         token: await tokenFor(context, second.cookies)
       })
     )
-    const body = (await response.json()) as { switchedTo: { email: string } }
-
-    expect(response.status).toBe(200)
-    expect(body.switchedTo.email).toBe("ada@example.com")
-    // Grace is gone everywhere, Ada is untouched.
+    expect(response.status).toBe(204)
+    // Grace is gone everywhere, Ada is untouched and still parked.
+    expect(
+      JSON.parse(
+        required(
+          readSetCookies(response).get("auth-ts.refresh.accounts"),
+          "accounts"
+        ).value
+      )
+    ).toHaveLength(1)
     const remaining = context.db.sessions()
     const ada = await selectRow(context.db, "users", {
       email: "ada@example.com"
@@ -611,10 +604,7 @@ describe("multiAccount enabled", () => {
     expect(context.db.sessions()).toHaveLength(2)
   })
 
-  it("moves to the next account when the current session is revoked from the devices list", async () => {
-    // Revoking the session you are using is a local sign-out. Clearing the
-    // cookie without promoting would leave the browser signed out while its
-    // accounts cookie still listed live sessions it could no longer reach.
+  it("revokes the current session without disturbing the parked accounts", async () => {
     const context = await createTestServer(options)
     const first = await signIn(context, "ada@example.com")
     const second = await signIn(context, "grace@example.com", first.cookies)
@@ -634,14 +624,16 @@ describe("multiAccount enabled", () => {
         token: await tokenFor(context, second.cookies)
       })
     )
-    const body = (await response.json()) as {
-      current: boolean
-      switchedTo?: { email: string }
-    }
+    expect(response.status).toBe(204)
 
-    expect(body.current).toBe(true)
-    expect(body.switchedTo?.email).toBe("ada@example.com")
-    expect(readSetCookies(response).get("auth-ts.refresh")).toBeTruthy()
+    // The refresh cookie goes; nothing is promoted into the empty slot, and
+    // Ada stays parked and signed in.
+    const cookies = readSetCookies(response)
+    expect(
+      required(cookies.get("auth-ts.refresh"), "refresh").attributes
+    ).toContain("Max-Age=0")
+    expect(cookies.get("auth-ts.refresh.accounts")).toBeUndefined()
+    expect(context.db.sessions()).toHaveLength(1)
   })
 
   it("clears both cookies when the last account signs out", async () => {

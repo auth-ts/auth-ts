@@ -38,8 +38,6 @@ export type ComponentName =
   | "Identity"
   | "Account"
   | "TokenResult"
-  | "RevokeSessionResult"
-  | "SignOutResult"
   | "AuthorizeURL"
   | "ProviderToken"
   | "AuthError"
