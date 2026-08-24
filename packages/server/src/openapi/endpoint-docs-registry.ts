@@ -78,10 +78,10 @@ export const endpointDocs: {
 /**
  * Each operation's one-line summary.
  *
- * Imperative and without a full stop, because it is a label in a sidebar rather
- * than a sentence. That is why it is written here instead of taken from the
- * endpoint's doc comment, which is prose for someone reading the TypeScript and
- * is third-person by that convention.
+ * The first line of the endpoint's own doc comment, less its full stop — a
+ * summary is a label in a sidebar rather than a sentence. A test holds the two
+ * together. It is copied rather than read because reading it means reading
+ * source files, and no edge runtime can do that.
  */
 export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   sendCode: "Send a sign-in code",

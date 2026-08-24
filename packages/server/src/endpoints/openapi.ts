@@ -3,7 +3,7 @@ import { defineEndpoint } from "../http/define-endpoint"
 import { buildOpenAPIDocument } from "../openapi/build-document"
 
 /**
- * Gets the OpenAPI document.
+ * Get the OpenAPI document.
  *
  * Off unless `openapi` is set. The document is not secret, but it does name the
  * providers this deployment configured and the additional fields it declares,

@@ -28,7 +28,7 @@ export const getUserDocs: EndpointDocs<never> = {
 }
 
 /**
- * Gets the current user.
+ * Get the current user.
  *
  * One read of `users` and nothing else: the token names the caller, so there is
  * no session to resolve. A caller without a live token gets a 401 and goes to
@@ -83,7 +83,7 @@ export const updateUserDocs: EndpointDocs<UpdateUserInput> = {
 }
 
 /**
- * Updates the current user.
+ * Update the current user.
  *
  * `email` and `phoneNumber` are rejected rather than updated. An identifier is
  * the anchor every sign-in resolves to, so changing one re-keys the account —
@@ -192,7 +192,7 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
 }
 
 /**
- * Deletes the current user.
+ * Delete the current user.
  *
  * Two phases, in one endpoint. A session that authenticated recently deletes
  * immediately; an older one is challenged with a code first.

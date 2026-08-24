@@ -17,7 +17,7 @@ export const getJwksDocs: EndpointDocs<never> = {
 }
 
 /**
- * Gets the public key set.
+ * Get the public key set.
  *
  * Normally there is nothing to serve: the JWKS is a static file in the
  * application's public folder, written by `bun x @auth-ts/cli keygen`, and the

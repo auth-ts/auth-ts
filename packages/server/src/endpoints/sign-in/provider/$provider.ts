@@ -64,7 +64,7 @@ export const signInProviderDocs: EndpointDocs<SignInProviderInput, "provider"> =
   }
 
 /**
- * Starts an OAuth sign-in.
+ * Start an OAuth sign-in.
  *
  * A POST that answers with the URL rather than a redirect, because the caller
  * has to be the one that navigates. A desktop or mobile app must open the

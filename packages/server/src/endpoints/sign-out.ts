@@ -73,7 +73,7 @@ export const signOutDocs: EndpointDocs<SignOutInput> = {
 }
 
 /**
- * Signs out.
+ * Sign out.
  *
  * Two axes, which compose: `scope` says how far each affected account is signed
  * out — this device, other devices, everywhere — and `account` says whether that

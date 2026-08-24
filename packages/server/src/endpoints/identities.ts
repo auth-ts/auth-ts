@@ -43,7 +43,7 @@ export const listIdentitiesDocs: EndpointDocs<never> = {
   }
 }
 
-/** Lists the current user's linked providers. */
+/** List the current user's linked providers. */
 export const listIdentities = defineEndpoint({
   method: "GET",
   path: "/identities",

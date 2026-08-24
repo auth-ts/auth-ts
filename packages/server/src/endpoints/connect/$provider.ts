@@ -53,7 +53,7 @@ export const connectProviderDocs: EndpointDocs<
 }
 
 /**
- * Starts linking a provider.
+ * Start linking a provider.
  *
  * Answers with the authorize URL rather than a redirect, for the reason
  * `/sign-in/provider/:provider` does — and because it is a POST it

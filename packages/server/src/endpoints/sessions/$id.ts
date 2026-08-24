@@ -27,7 +27,7 @@ export const revokeSessionDocs: EndpointDocs<RevokeSessionInput, "id"> = {
 }
 
 /**
- * Revokes a session.
+ * Revoke a session.
  *
  * Ownership is enforced inside the delete query rather than by comparing ids
  * first: the `where` names both `id` and `userId`, so revoking someone else's

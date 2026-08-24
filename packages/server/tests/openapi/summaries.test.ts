@@ -41,9 +41,17 @@ describe("openapi summaries", () => {
     )
   })
 
+  it("repeats the summary each endpoint already documents", () => {
+    // The doc comment ends its first sentence; a summary is a label in a UI and
+    // does not. That full stop is the only difference allowed between them.
+    const drifted = Object.entries(summaries).filter(
+      ([name, summary]) => documented[name]?.replace(/\.$/, "") !== summary
+    )
+
+    expect(drifted).toEqual([])
+  })
+
   it("writes summaries as labels, not sentences", () => {
-    // Imperative and unpunctuated is the convention for an operation summary.
-    // Mood is not checkable; the shape around it is.
     const wrong = Object.entries(summaries).filter(
       ([, summary]) =>
         summary.length === 0 ||

@@ -28,7 +28,7 @@ export const disconnectIdentityDocs: EndpointDocs<
 }
 
 /**
- * Unlinks a connected provider.
+ * Unlink a connected provider.
  *
  * Addressed by identity id rather than by provider, because a user may connect
  * several accounts at the same provider — two Google addresses, a personal and

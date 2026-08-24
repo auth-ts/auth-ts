@@ -47,7 +47,7 @@ export const sendCodeDocs: EndpointDocs<SendCodeInput> = {
 }
 
 /**
- * Sends a sign-in code.
+ * Send a sign-in code.
  *
  * Always answers 200, even for an address that has never been seen. The user is
  * created when the code is verified, not here, so there is genuinely nothing to

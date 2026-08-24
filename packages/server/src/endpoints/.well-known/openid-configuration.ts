@@ -15,7 +15,7 @@ export const getDiscoveryDocs: EndpointDocs<never> = {
 }
 
 /**
- * Gets the OIDC discovery document.
+ * Get the OIDC discovery document.
  *
  * This exists for one reason: Supabase's third-party auth takes an *issuer* URL
  * and discovers the keys itself, so a bare JWKS URL is not enough. This library

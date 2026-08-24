@@ -6,7 +6,7 @@ import { defineEndpoint } from "../http/define-endpoint"
 const SCALAR = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.36.2"
 
 /**
- * Gets the browsable API reference.
+ * Get the browsable API reference.
  *
  * A CDN script tag rather than a bundled viewer, which is what keeps this
  * dependency-free. Gated on `openapi` alongside the document it reads.

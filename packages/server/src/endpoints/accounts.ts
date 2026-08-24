@@ -47,7 +47,7 @@ export const listAccountsDocs: EndpointDocs<ListAccountsInput> = {
 }
 
 /**
- * Lists the accounts signed in to this browser.
+ * List the accounts signed in to this browser.
  *
  * The account switcher. Parked tokens whose sessions have died are pruned from
  * the cookie in the same response, so a revoked device stops appearing here
