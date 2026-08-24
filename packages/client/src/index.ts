@@ -28,4 +28,4 @@ export type {
   SignInCodeInput,
   SignInGuestInput,
   SignInResult
-} from "./methods/sign-in-with-code"
+} from "./methods/sign-in"

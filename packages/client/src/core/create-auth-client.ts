@@ -22,7 +22,7 @@ import {
   createSendCode,
   createSignInCode,
   createSignInGuest
-} from "../methods/sign-in-with-code"
+} from "../methods/sign-in"
 import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
 
