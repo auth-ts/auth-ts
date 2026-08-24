@@ -4,7 +4,7 @@ import type { AuthClientInternals } from "../core/auth-client-internals"
 /** Where to send the browser, and where to come back to. */
 export interface OAuthNavigationInput {
   provider: string
-  /** Same-origin path to return to after the flow. Anything else is ignored server-side. */
+  /** Same-origin path to return to after the flow; anything else falls back to `/`. */
   redirect?: string
 }
 
@@ -41,7 +41,7 @@ async function startFlow(
  * in: the callback hands the SPA no token, and the cookie is what buys the first
  * one.
  *
- * Signing in while already signed in never links accounts. Use `connect` for that.
+ * Signing in while already signed in never links accounts. Use `connectProvider` for that.
  */
 export function createSignInProvider(internals: AuthClientInternals) {
   return function signInProvider(input: OAuthNavigationInput): Promise<void> {
@@ -50,8 +50,8 @@ export function createSignInProvider(internals: AuthClientInternals) {
 }
 
 /** Starts linking a provider to the currently signed-in user. */
-export function createConnect(internals: AuthClientInternals) {
-  return function connect(input: OAuthNavigationInput): Promise<void> {
+export function createConnectProvider(internals: AuthClientInternals) {
+  return function connectProvider(input: OAuthNavigationInput): Promise<void> {
     return startFlow(internals, "/connect", input, true)
   }
 }

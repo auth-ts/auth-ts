@@ -7,6 +7,7 @@ import { validateRedirect } from "../../../lib/validate-redirect"
 import { getCallbackURL } from "../../../oauth/callback-url"
 import { getProvider } from "../../../oauth/providers/get-provider"
 import { createStateCookie } from "../../../oauth/state-cookie"
+import type { EndpointDocs } from "../../../openapi/endpoint-docs"
 
 /** Input for starting an OAuth sign-in. */
 export interface SignInProviderInput {
@@ -23,6 +24,44 @@ export interface SignInProviderInput {
 export interface AuthorizeURLResult {
   url: string
 }
+
+/** How `POST /sign-in/provider/$provider` appears in the OpenAPI document. */
+export const signInProviderDocs: EndpointDocs<SignInProviderInput, "provider"> =
+  {
+    description:
+      "Answers with the authorize URL rather than redirecting, because the caller has to be the one that navigates and a native shell cannot read a `Location` out of an opaque redirect. Navigate to `url`; do not fetch it. The `Set-Cookie` here must travel with that navigation. Signing in never links accounts \u2014 that is `POST /connect/{provider}`.",
+    tag: "Sign in",
+    auth: "none",
+    requires: "providers",
+    additionalFields: "nested",
+    params: {
+      provider: "The provider to sign in with. Must be one you configured."
+    },
+    body: {
+      type: "object",
+      properties: {
+        redirect: {
+          type: "string",
+          description:
+            "Same-origin path to return to; anything else falls back to `/`."
+        },
+        locale: {
+          type: "string",
+          description:
+            "Overrides the locale otherwise resolved from `Accept-Language`."
+        }
+      }
+    },
+    responses: {
+      200: {
+        description: "The authorize URL to navigate to.",
+        setsCookie: "state",
+        schema: "AuthorizeURL"
+      },
+      400: "InvalidField",
+      404: "NotFound"
+    }
+  }
 
 /**
  * Starts an OAuth sign-in by handing back the provider's authorize URL.

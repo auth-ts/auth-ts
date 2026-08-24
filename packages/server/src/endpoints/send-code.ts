@@ -1,5 +1,6 @@
 import { defineEndpoint } from "../http/define-endpoint"
 import { resolveLocale } from "../http/resolve-locale"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { IdentifierBody } from "../verification-code/resolve-code-identifier"
 import { resolveCodeIdentifier } from "../verification-code/resolve-code-identifier"
 import { sendVerificationCode } from "../verification-code/send-verification-code"
@@ -9,6 +10,41 @@ export interface SendCodeInput extends IdentifierBody {
   /** Pre-resolved locale and headers, filled in from the request when over HTTP. */
   locale?: string
   headers?: Headers
+}
+
+/** How `POST /send-code` appears in the OpenAPI document. */
+export const sendCodeDocs: EndpointDocs<SendCodeInput> = {
+  description:
+    "Send exactly one of `email` or `phoneNumber`. The channel you pass selects the sender, and a channel this server has no sender for is refused rather than silently dropped.",
+  tag: "Sign in",
+  auth: "none",
+  body: {
+    type: "object",
+    properties: {
+      email: { type: "string", format: "email" },
+      phoneNumber: {
+        type: "string",
+        description: "E.164, e.g. `+15551234567`."
+      },
+      locale: {
+        type: "string",
+        description:
+          "Overrides the locale otherwise resolved from `Accept-Language`."
+      }
+    }
+  },
+  responses: {
+    200: {
+      description: "Accepted for delivery.",
+      schema: {
+        type: "object",
+        properties: { sent: { type: "boolean" } },
+        required: ["sent"]
+      }
+    },
+    400: "InvalidField",
+    429: "RateLimited"
+  }
 }
 
 /**

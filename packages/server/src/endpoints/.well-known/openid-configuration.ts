@@ -1,5 +1,18 @@
 import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
+
+/** How `GET /.well-known/openid-configuration` appears in the OpenAPI document. */
+export const getDiscoveryDocs: EndpointDocs<never> = {
+  description:
+    "Exists so a verifier that takes an issuer URL can find the keys itself. This library is not an OAuth authorization server and issues no OAuth flows \u2014 the document carries just enough to locate the key set, and `issuer` matches the `iss` claim on every token exactly.",
+  tag: "Discovery",
+  auth: "none",
+  requires: "baseURL",
+  responses: {
+    200: { description: "The discovery document.", schema: { type: "object" } }
+  }
+}
 
 /**
  * The minimal OIDC discovery document.

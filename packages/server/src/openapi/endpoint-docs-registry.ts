@@ -1,0 +1,116 @@
+import type { EndpointRegistry } from "../core/endpoint-registry"
+import { getDiscoveryDocs } from "../endpoints/.well-known/openid-configuration"
+import { listAccountsDocs } from "../endpoints/accounts"
+import { switchAccountDocs } from "../endpoints/accounts/switch"
+import { callbackProviderDocs } from "../endpoints/callback/$provider"
+import { connectProviderDocs } from "../endpoints/connect/$provider"
+import { listIdentitiesDocs } from "../endpoints/identities"
+import { disconnectIdentityDocs } from "../endpoints/identities/$id"
+import { getProviderTokenDocs } from "../endpoints/identities/$id/token"
+import { getJwksDocs } from "../endpoints/jwks"
+import { sendCodeDocs } from "../endpoints/send-code"
+import { getSessionDocs } from "../endpoints/session"
+import { listSessionsDocs } from "../endpoints/sessions"
+import { revokeSessionDocs } from "../endpoints/sessions/$id"
+import { signInCodeDocs } from "../endpoints/sign-in/code"
+import { signInGuestDocs } from "../endpoints/sign-in/guest"
+import { signInProviderDocs } from "../endpoints/sign-in/provider/$provider"
+import { signOutDocs } from "../endpoints/sign-out"
+import { getTokenDocs } from "../endpoints/token"
+import { deleteUserDocs, getUserDocs, updateUserDocs } from "../endpoints/user"
+import type { AnyEndpointDocs } from "./endpoint-docs"
+
+// Declared here rather than beside their endpoints: both serve this document,
+// so a docs const in their own file would close an import cycle.
+const getOpenAPIDocumentDocs: AnyEndpointDocs = {
+  description:
+    "This document. Reflects the configuration it is served from, so the providers and additional fields it names are the ones this deployment actually has.",
+  tag: "Discovery",
+  auth: "none",
+  responses: {
+    200: { description: "The OpenAPI document.", schema: { type: "object" } }
+  }
+}
+
+const getReferenceDocs: AnyEndpointDocs = {
+  description:
+    "A browsable rendering of the OpenAPI document, for people rather than tools.",
+  tag: "Discovery",
+  auth: "none",
+  responses: {
+    200: { description: "The reference page.", contentType: "text/html" }
+  }
+}
+
+/**
+ * Each endpoint's OpenAPI metadata, keyed the way the registry is.
+ *
+ * A separate table rather than a field on the endpoint, so the metadata is a
+ * distinct export a bundler can drop for consumers who never serve the
+ * document. It still lives beside `run`, in the endpoint's own file. The mapped
+ * type is what makes a forgotten endpoint a build error rather than a gap.
+ */
+export const endpointDocs: {
+  [Name in keyof EndpointRegistry]: AnyEndpointDocs
+} = {
+  sendCode: sendCodeDocs,
+  getToken: getTokenDocs,
+  signInCode: signInCodeDocs,
+  signOut: signOutDocs,
+  getSession: getSessionDocs,
+  getUser: getUserDocs,
+  updateUser: updateUserDocs,
+  deleteUser: deleteUserDocs,
+  listSessions: listSessionsDocs,
+  revokeSession: revokeSessionDocs,
+  listAccounts: listAccountsDocs,
+  switchAccount: switchAccountDocs,
+  signInGuest: signInGuestDocs,
+  signInProvider: signInProviderDocs,
+  callbackProvider: callbackProviderDocs,
+  connectProvider: connectProviderDocs,
+  listIdentities: listIdentitiesDocs,
+  disconnectIdentity: disconnectIdentityDocs,
+  getProviderToken: getProviderTokenDocs,
+  getJwks: getJwksDocs,
+  getDiscovery: getDiscoveryDocs,
+  getOpenAPIDocument: getOpenAPIDocumentDocs,
+  getReference: getReferenceDocs
+}
+
+/**
+ * Each operation's one-line summary.
+ *
+ * The first line of the endpoint's own doc comment, which a test asserts. It is
+ * copied rather than read because reading it means reading source files, and no
+ * edge runtime can do that.
+ */
+export const summaries: { [Name in keyof EndpointRegistry]: string } = {
+  sendCode: "Sends a sign-in code.",
+  getToken:
+    "Exchanges the refresh cookie for an access token, or answers `null`.",
+  signInCode: "Verifies a code and starts a session.",
+  signOut: "Ends sessions.",
+  getSession: "The session the caller is acting from.",
+  getUser: "Reads the signed-in user.",
+  updateUser:
+    "Updates the fields core owns, plus any declared additional fields.",
+  deleteUser: "Deletes the signed-in account.",
+  listSessions: "Lists the signed-in user's sessions.",
+  revokeSession: "Revokes one of the signed-in user's sessions.",
+  listAccounts: "Lists every user signed in to this browser.",
+  switchAccount: "Makes one of this browser's parked accounts the active one.",
+  signInGuest: "Signs in an anonymous user.",
+  signInProvider:
+    "Starts an OAuth sign-in by handing back the provider's authorize URL.",
+  callbackProvider: "Finishes an OAuth flow, for both sign-in and linking.",
+  connectProvider: "Starts linking a provider to the **current** user.",
+  listIdentities: "Lists the signed-in user's linked providers.",
+  disconnectIdentity: "Unlinks one connected account from the signed-in user.",
+  getProviderToken:
+    "Returns a usable access token for one connected account, refreshing it first if the stored one is spent.",
+  getJwks: "Serves the configured public key set.",
+  getDiscovery: "The minimal OIDC discovery document.",
+  getOpenAPIDocument: "Serves this server's OpenAPI document.",
+  getReference: "Serves a browsable reference for this server's API."
+}

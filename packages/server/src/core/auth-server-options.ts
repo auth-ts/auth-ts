@@ -366,6 +366,15 @@ export interface AuthServerOptions<
   ipAddress?: IpAddressOptions
   /** Cross-origin access, needed when the client is configured with a different `baseURL`. */
   cors?: CorsOptions
+  /**
+   * Serves `GET {basePath}/openapi.json` and a browsable `GET {basePath}/reference`.
+   *
+   * Off by default. The document names the providers you configured and the
+   * additional fields you declared, so publishing it is a decision rather than
+   * something to remember to turn off.
+   * @default false
+   */
+  openapi?: boolean
   /** @default "warn" */
   logLevel?: LogLevel
   /** Log sink override, e.g. pino. Defaults to `console`. */

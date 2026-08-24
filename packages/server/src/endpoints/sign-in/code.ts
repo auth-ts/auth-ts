@@ -2,6 +2,7 @@ import { AuthApiError } from "../../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { convertGuest } from "../../session/convert-guest"
 import { issueSession } from "../../session/issue-session"
 import { resolveCallerSession } from "../../session/resolve-session"
@@ -17,6 +18,33 @@ export interface SignInCodeInput extends IdentifierBody {
   additionalFields?: Record<string, unknown>
   headers?: Headers
   requestURL?: string
+}
+
+/** How `POST /sign-in/code` appears in the OpenAPI document. */
+export const signInCodeDocs: EndpointDocs<SignInCodeInput> = {
+  description:
+    "Send the same identifier the code went to, plus the code. A 400 here does not spend the code, so a typo in `additionalFields` is safe to retry. `additionalFields` applies only when this call creates the user.",
+  tag: "Sign in",
+  auth: "none",
+  additionalFields: "nested",
+  body: {
+    type: "object",
+    properties: {
+      email: { type: "string", format: "email" },
+      phoneNumber: { type: "string", description: "E.164." },
+      code: { type: "string" }
+    },
+    required: ["code"]
+  },
+  responses: {
+    200: {
+      description: "Signed in.",
+      setsCookie: "refresh",
+      schema: "TokenResult"
+    },
+    400: "InvalidField",
+    429: "RateLimited"
+  }
 }
 
 /**

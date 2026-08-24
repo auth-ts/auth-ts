@@ -5,6 +5,7 @@ import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { sha256Hex } from "../../lib/hash"
 import { insertRow } from "../../lib/insert-row"
 import { selectOne } from "../../lib/select-one"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { issueSession } from "../../session/issue-session"
 import { readRefreshToken } from "../../session/resolve-session"
 
@@ -13,6 +14,26 @@ export interface SignInGuestInput {
   additionalFields?: Record<string, unknown>
   headers?: Headers
   requestURL?: string
+}
+
+/** How `POST /sign-in/guest` appears in the OpenAPI document. */
+export const signInGuestDocs: EndpointDocs<SignInGuestInput> = {
+  description:
+    "Creates an anonymous user and signs it in. A browser already holding a live session is refused: a guest parked behind a real account is a row nothing will ever convert.",
+  tag: "Sign in",
+  auth: "none",
+  requires: "guest",
+  additionalFields: "nested",
+  body: { type: "object", properties: {} },
+  responses: {
+    200: {
+      description: "Signed in as a new guest.",
+      setsCookie: "refresh",
+      schema: "TokenResult"
+    },
+    409: "Conflict",
+    429: "RateLimited"
+  }
 }
 
 /**

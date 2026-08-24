@@ -1,5 +1,6 @@
 import type { AuthSession } from "../core/auth-db"
 import { defineEndpoint } from "../http/define-endpoint"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 import { listUserSessions } from "../session/list-user-sessions"
@@ -19,6 +20,21 @@ import { listUserSessions } from "../session/list-user-sessions"
  */
 export type SessionInfo = Omit<AuthSession, "tokenHash">
 
+/** How `GET /sessions` appears in the OpenAPI document. */
+export const listSessionsDocs: EndpointDocs<never> = {
+  description:
+    "Newest first, one page. `tokenHash` never crosses to the browser; `id` is the only address a client sees, and the only thing revocation needs. Compare each `id` against `GET /session` to mark the current device.",
+  tag: "Session",
+  auth: "bearer",
+  responses: {
+    200: {
+      description: "The user's live sessions.",
+      schema: { type: "array", items: "Session" }
+    },
+    401: "Unauthenticated"
+  }
+}
+
 /**
  * Lists the signed-in user's sessions.
  *
@@ -30,9 +46,9 @@ export type SessionInfo = Omit<AuthSession, "tokenHash">
  * raw token is something application code never handles — and, once
  * `cookie.path` is narrowed to the auth mount, cannot even see.
  *
- * Newest first, capped at {@link SESSION_PAGE_SIZE}. A person with more live
- * sessions than that has a device list nobody scrolls and a problem this screen
- * is not going to solve.
+ * Newest first, capped at the page size {@link listUserSessions} reads. A person
+ * with more live sessions than that has a device list nobody scrolls and a
+ * problem this screen is not going to solve.
  */
 export const listSessions = defineEndpoint({
   method: "GET",

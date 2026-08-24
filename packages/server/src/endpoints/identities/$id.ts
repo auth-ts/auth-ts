@@ -1,5 +1,6 @@
 import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
 
@@ -7,6 +8,23 @@ import { authenticate } from "../../session/authenticate"
 export interface DisconnectIdentityInput extends CallerInput {
   /** The identity's own id, from `GET /identities`. */
   id: string
+}
+
+/** How `DELETE /identities/$id` appears in the OpenAPI document. */
+export const disconnectIdentityDocs: EndpointDocs<
+  DisconnectIdentityInput,
+  "id"
+> = {
+  description:
+    'Addressed by identity id rather than by provider, because a user may connect several accounts at the same provider and "disconnect Google" would take all of them. The stored provider tokens go with the row; nothing is revoked at the provider, which is the user\'s to do from their own account screen.',
+  tag: "Identities",
+  auth: "bearer",
+  params: { id: "The identity's id, from `GET /identities`." },
+  responses: {
+    204: { description: "Unlinked." },
+    401: "Unauthenticated",
+    404: "NotFound"
+  }
 }
 
 /**

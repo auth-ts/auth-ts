@@ -2,11 +2,24 @@ import type { AuthSession } from "../core/auth-db"
 import { unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import { selectOne } from "../lib/select-one"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 
 /** The caller's own session — the row, less the hash. */
 export type CurrentSession = Omit<AuthSession, "tokenHash">
+
+/** How `GET /session` appears in the OpenAPI document. */
+export const getSessionDocs: EndpointDocs<never> = {
+  description:
+    "One read of `sessions`, no write. Its `id` is how a device list tells which entry is this device.",
+  tag: "Session",
+  auth: "bearer",
+  responses: {
+    200: { description: "The caller's own session.", schema: "Session" },
+    401: "Unauthenticated"
+  }
+}
 
 /**
  * The session the caller is acting from.

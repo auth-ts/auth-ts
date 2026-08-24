@@ -2,6 +2,7 @@ import type { AuthUser } from "../../core/auth-db"
 import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { reapGuests } from "../../lib/sweep-expired"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import {
   pruneDeadAccounts,
   readAccountsCookie
@@ -37,6 +38,24 @@ export interface RevokeSessionResult {
   switchedTo?: AuthUser
   /** That account's access token, present whenever `switchedTo` is. */
   token?: string
+}
+
+/** How `DELETE /sessions/$id` appears in the OpenAPI document. */
+export const revokeSessionDocs: EndpointDocs<RevokeSessionInput, "id"> = {
+  description:
+    "Revoking a session that is not yours answers 404 rather than succeeding. Revoking the one making the request clears the refresh cookie, and under `multiAccount` promotes the next account parked in this browser \u2014 `switchedTo` and `token` are present only then.",
+  tag: "Session",
+  auth: "bearer",
+  params: { id: "The session's id, as listed by `GET /sessions`." },
+  responses: {
+    200: {
+      description: "Revoked.",
+      setsCookie: "refresh",
+      schema: "RevokeSessionResult"
+    },
+    401: "Unauthenticated",
+    404: "NotFound"
+  }
 }
 
 /**

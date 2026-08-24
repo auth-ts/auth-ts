@@ -8,6 +8,7 @@ import { encryptTokens } from "../../../oauth/link-identity"
 import { getProvider } from "../../../oauth/providers/get-provider"
 import type { ProviderTokens } from "../../../oauth/providers/oauth-provider"
 import { PROVIDER_DEADLINE_MS } from "../../../oauth/providers/provider-response"
+import type { EndpointDocs } from "../../../openapi/endpoint-docs"
 import type { CallerInput } from "../../../session/authenticate"
 import { authenticate } from "../../../session/authenticate"
 
@@ -33,6 +34,20 @@ export interface ProviderTokenResult {
   expiresAt: Date | null
   /** The scopes actually granted, space-delimited. */
   scope: string | null
+}
+
+/** How `GET /identities/$id/token` appears in the OpenAPI document. */
+export const getProviderTokenDocs: EndpointDocs<GetProviderTokenInput, "id"> = {
+  description:
+    "Call a provider as the user for as long as the grant lives, without another consent screen. The durable half of the grant never leaves the server \u2014 only this short-lived token does, which is short enough to hand a browser for a direct CORS call. A grant that can no longer produce a token answers `providerReconnectRequired`; only reconnecting fixes it.",
+  tag: "Identities",
+  auth: "bearer",
+  params: { id: "The identity's id, from `GET /identities`." },
+  responses: {
+    200: { description: "A live access token.", schema: "ProviderToken" },
+    401: "Unauthenticated",
+    404: "NotFound"
+  }
 }
 
 /**

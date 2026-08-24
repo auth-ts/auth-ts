@@ -1,6 +1,7 @@
 import type { AuthIdentity } from "../core/auth-db"
 import { defineEndpoint } from "../http/define-endpoint"
 import { IDENTITY_PAGE_SIZE } from "../oauth/link-identity"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 
@@ -26,6 +27,21 @@ export type IdentityInfo = Omit<
   AuthIdentity,
   "accessTokenEncrypted" | "refreshTokenEncrypted" | "accessTokenExpiresAt"
 >
+
+/** How `GET /identities` appears in the OpenAPI document. */
+export const listIdentitiesDocs: EndpointDocs<never> = {
+  description:
+    "Both stored provider credentials are stripped: a ciphertext on a screen is a liability with no use. `GET /identities/{id}/token` is the only way to reach a provider's API, and it reports its own expiry.",
+  tag: "Identities",
+  auth: "bearer",
+  responses: {
+    200: {
+      description: "The user's linked providers.",
+      schema: { type: "array", items: "Identity" }
+    },
+    401: "Unauthenticated"
+  }
+}
 
 /** Lists the signed-in user's linked providers. */
 export const listIdentities = defineEndpoint({

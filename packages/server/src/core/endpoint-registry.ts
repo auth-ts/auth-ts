@@ -7,6 +7,8 @@ import { listIdentities } from "../endpoints/identities"
 import { disconnectIdentity } from "../endpoints/identities/$id"
 import { getProviderToken } from "../endpoints/identities/$id/token"
 import { getJwks } from "../endpoints/jwks"
+import { getOpenAPIDocument } from "../endpoints/openapi"
+import { getReference } from "../endpoints/reference"
 import { sendCode } from "../endpoints/send-code"
 import { getSession } from "../endpoints/session"
 import { listSessions } from "../endpoints/sessions"
@@ -50,7 +52,9 @@ export const endpointRegistry = {
   disconnectIdentity,
   getProviderToken,
   getJwks,
-  getDiscovery
+  getDiscovery,
+  getOpenAPIDocument,
+  getReference
 } as const
 
 /** The registry's shape, used to type the derived surfaces. */

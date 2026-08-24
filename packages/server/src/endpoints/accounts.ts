@@ -6,6 +6,7 @@ import {
   serializeCookie,
   shouldUseSecureCookies
 } from "../lib/serialize-cookie"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import {
   parkedTokens,
   pruneDeadAccounts,
@@ -26,6 +27,23 @@ export type AccountInfo = AuthUser
 /** Input for listing accounts. */
 export interface ListAccountsInput extends CallerInput {
   requestURL?: string
+}
+
+/** How `GET /accounts` appears in the OpenAPI document. */
+export const listAccountsDocs: EndpointDocs<ListAccountsInput> = {
+  description:
+    "The account switcher. Parked tokens whose sessions have died are pruned in the same response, so a revoked device stops appearing immediately. Note the three: `/sessions` is one user's devices, `/accounts` is one browser's users, `/identities` is one user's linked providers.",
+  tag: "Accounts",
+  auth: "bearer",
+  requires: "multiAccount",
+  responses: {
+    200: {
+      description: "Every user signed in to this browser.",
+      setsCookie: "accounts",
+      schema: { type: "array", items: "Account" }
+    },
+    401: "Unauthenticated"
+  }
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   serializeCookie,
   shouldUseSecureCookies
 } from "../../lib/serialize-cookie"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import {
   demoteActive,
   parkedTokens,
@@ -23,6 +24,34 @@ import { refreshCookies } from "../../session/session-cookies"
 export interface SwitchAccountInput extends CallerInput {
   userId: string
   requestURL?: string
+}
+
+/** How `POST /accounts/switch` appears in the OpenAPI document. */
+export const switchAccountDocs: EndpointDocs<SwitchAccountInput> = {
+  description:
+    "Nothing is re-authenticated, and nothing needs to be: holding the parked refresh token is the same proof as holding the active one. Only which cookie holds which token changes, so neither becomes readable by JavaScript during the swap.",
+  tag: "Accounts",
+  auth: "bearer",
+  requires: "multiAccount",
+  body: {
+    type: "object",
+    properties: {
+      userId: {
+        type: "string",
+        description: "The account to make active, from `GET /accounts`."
+      }
+    },
+    required: ["userId"]
+  },
+  responses: {
+    200: {
+      description: "Switched. The new active account and its token.",
+      setsCookie: "refresh",
+      schema: "TokenResult"
+    },
+    401: "Unauthenticated",
+    404: "NotFound"
+  }
 }
 
 /**

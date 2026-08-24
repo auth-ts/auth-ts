@@ -95,7 +95,10 @@ function AccountPage() {
   const linkGitHub = async () => {
     setNotice(null)
     try {
-      await authClient.connect({ provider: "github", redirect: "/account" })
+      await authClient.connectProvider({
+        provider: "github",
+        redirect: "/account"
+      })
     } catch (error) {
       setNotice({
         text: isAuthError(error) ? error.message : "Could not link GitHub.",

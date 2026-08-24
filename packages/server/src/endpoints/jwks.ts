@@ -1,5 +1,21 @@
 import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
+
+/** How `GET /jwks` appears in the OpenAPI document. */
+export const getJwksDocs: EndpointDocs<never> = {
+  description:
+    "Only present when `jwks.json` is configured. Normally the key set is a static file in the application's public folder and the verifier is pointed straight at it; this route is for a runtime with no public folder. The one response here a cache may keep.",
+  tag: "Discovery",
+  auth: "none",
+  requires: "jwks",
+  responses: {
+    200: {
+      description: "The public key set, as given.",
+      schema: { type: "object" }
+    }
+  }
+}
 
 /**
  * Serves the configured public key set.

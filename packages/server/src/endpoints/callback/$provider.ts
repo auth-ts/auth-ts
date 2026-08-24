@@ -14,6 +14,7 @@ import type { ProviderIdentity } from "../../oauth/providers/oauth-provider"
 import { PROVIDER_DEADLINE_MS } from "../../oauth/providers/provider-response"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user"
 import { clearStateCookie, readStateCookie } from "../../oauth/state-cookie"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { issueSession } from "../../session/issue-session"
 import type { ResolvedSession } from "../../session/resolve-session"
 import { resolveCallerSession } from "../../session/resolve-session"
@@ -27,6 +28,40 @@ export interface CallbackProviderInput {
   providerError: string | null
   headers: Headers
   requestURL: string
+}
+
+/** How `GET /callback/$provider` appears in the OpenAPI document. */
+export const callbackProviderDocs: EndpointDocs<
+  CallbackProviderInput,
+  "provider"
+> = {
+  description:
+    "The provider redirects a browser here; nothing calls it directly. Serves both sign-in and linking, decided by the `intent` in the state cookie. Failures render a page rather than JSON, because whoever hit this is looking at the response.",
+  tag: "Sign in",
+  auth: "none",
+  requires: "providers",
+  params: { provider: "The provider the flow started with." },
+  query: {
+    code: { type: "string", description: "The provider's authorization code." },
+    state: { type: "string", description: "Must match the state cookie." },
+    error: {
+      type: "string",
+      description:
+        "Set when the provider reported a failure, e.g. the user cancelled."
+    }
+  },
+  responses: {
+    302: {
+      description:
+        "Signed in or linked. Redirects to the `redirect` recorded at the start.",
+      setsCookie: "refresh",
+      redirect: true
+    },
+    401: {
+      description: "The flow failed. Renders the localized reason as a page.",
+      contentType: "text/html"
+    }
+  }
 }
 
 /**

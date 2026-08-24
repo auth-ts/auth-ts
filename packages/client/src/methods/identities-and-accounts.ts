@@ -18,8 +18,8 @@ export function createListIdentities(internals: AuthClientInternals) {
 }
 
 /** Input for unlinking one connected account. */
-export interface DisconnectInput {
-  /** The identity's `id`, from {@link createListIdentities}. */
+export interface DisconnectIdentityInput {
+  /** The identity's `id`, from `authClient.listIdentities`. */
   id: string
 }
 
@@ -29,8 +29,10 @@ export interface DisconnectInput {
  * By identity, not by provider: someone may have two Google accounts connected,
  * and disconnecting "Google" would take both.
  */
-export function createDisconnect(internals: AuthClientInternals) {
-  return async function disconnect(input: DisconnectInput): Promise<void> {
+export function createDisconnectIdentity(internals: AuthClientInternals) {
+  return async function disconnectIdentity(
+    input: DisconnectIdentityInput
+  ): Promise<void> {
     await internals.fetchJson({
       method: "DELETE",
       path: `/identities/${encodeURIComponent(input.id)}`,
@@ -41,7 +43,7 @@ export function createDisconnect(internals: AuthClientInternals) {
 
 /** Input for reading a connected account's access token. */
 export interface GetProviderTokenInput {
-  /** The identity's `id`, from {@link createListIdentities}. */
+  /** The identity's `id`, from `authClient.listIdentities`. */
   id: string
 }
 
@@ -57,7 +59,7 @@ export interface GetProviderTokenInput {
  *
  * @throws {AuthError} `providerReconnectRequired` when the grant is gone —
  * revoked at the provider, expired, or never durable. Send them through
- * `connect` again.
+ * `connectProvider` again.
  */
 export function createGetProviderToken(internals: AuthClientInternals) {
   return async function getProviderToken(

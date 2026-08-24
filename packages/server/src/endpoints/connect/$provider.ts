@@ -5,6 +5,7 @@ import { validateRedirect } from "../../lib/validate-redirect"
 import { getCallbackURL } from "../../oauth/callback-url"
 import { getProvider } from "../../oauth/providers/get-provider"
 import { createStateCookie } from "../../oauth/state-cookie"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
 import type {
@@ -16,6 +17,40 @@ import type {
 export interface ConnectProviderInput
   extends SignInProviderInput,
     CallerInput {}
+
+/** How `POST /connect/$provider` appears in the OpenAPI document. */
+export const connectProviderDocs: EndpointDocs<
+  ConnectProviderInput,
+  "provider"
+> = {
+  description:
+    "Links a provider to the **current** user, unlike `/sign-in/provider/{provider}`. A POST so it authenticates from the access token like everything else \u2014 a top-level navigation carries no `Authorization` header, which would have left a cookie as the credential. Navigate to `url`; do not fetch it.",
+  tag: "Identities",
+  auth: "bearer",
+  requires: "providers",
+  params: { provider: "The provider to link. Must be one you configured." },
+  body: {
+    type: "object",
+    properties: {
+      redirect: {
+        type: "string",
+        description:
+          "Same-origin path to return to; anything else falls back to `/`."
+      },
+      locale: { type: "string" }
+    }
+  },
+  responses: {
+    200: {
+      description: "The authorize URL to navigate to.",
+      setsCookie: "state",
+      schema: "AuthorizeURL"
+    },
+    401: "Unauthenticated",
+    404: "NotFound",
+    409: "Conflict"
+  }
+}
 
 /**
  * Starts linking a provider to the **current** user.

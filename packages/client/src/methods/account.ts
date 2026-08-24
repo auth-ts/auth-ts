@@ -139,7 +139,7 @@ export function createDeleteUser(internals: AuthClientInternals) {
   }
 }
 
-/** `SessionInfo` as JSON delivers it: dates arrive as ISO strings. */
+/** {@link SessionInfo} as JSON delivers it, before the dates are revived. */
 type SessionInfoWire = Omit<SessionInfo, "createdAt" | "expiresAt"> & {
   createdAt: string
   expiresAt: string
@@ -154,8 +154,6 @@ export function createListSessions(internals: AuthClientInternals) {
       authenticated: true
     })
 
-    // Revived here so `SessionInfo` means the same thing on both sides: the
-    // server type promises `Date`, and JSON cannot keep that promise on its own.
     return sessions.map((session) => ({
       ...session,
       createdAt: new Date(session.createdAt),

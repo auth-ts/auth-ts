@@ -18,7 +18,7 @@ export type {
 } from "./methods/account"
 export type { GetTokenOptions } from "./methods/get-token"
 export type {
-  DisconnectInput,
+  DisconnectIdentityInput,
   GetProviderTokenInput,
   SwitchAccountInput
 } from "./methods/identities-and-accounts"

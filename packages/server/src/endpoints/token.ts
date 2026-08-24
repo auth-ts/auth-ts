@@ -1,6 +1,7 @@
 import type { AuthUser } from "../core/auth-db"
 import { defineEndpoint } from "../http/define-endpoint"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import { mintAccessToken } from "../session/issue-session"
 import type { HeadersInput } from "../session/resolve-session"
 import { readRefreshToken, resolveSession } from "../session/resolve-session"
@@ -25,6 +26,22 @@ export interface TokenResult {
 /** The request, plus its URL — read to scope the cookies this endpoint retires. */
 export interface TokenInput extends HeadersInput {
   requestURL?: string
+}
+
+/** How `GET /token` appears in the OpenAPI document. */
+export const getTokenDocs: EndpointDocs<TokenInput> = {
+  description:
+    "The only endpoint that reads the refresh cookie, and the only one that writes a session. No session is `null` with a 200, not a 401 \u2014 a client deciding what to render is not in a failure state. An `Authorization` header is ignored here. The refresh token is not rotated, so concurrent tabs cannot race each other.",
+  tag: "Session",
+  auth: "cookie",
+  responses: {
+    200: {
+      description:
+        "The access token and its user, or `null` when nobody is signed in.",
+      setsCookie: "refresh",
+      schema: "TokenResult"
+    }
+  }
 }
 
 /**

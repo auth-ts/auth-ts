@@ -11,13 +11,13 @@ import type { GetTokenOptions } from "../methods/get-token"
 import { createGetToken } from "../methods/get-token"
 import { createGetUser } from "../methods/get-user"
 import {
-  createDisconnect,
+  createDisconnectIdentity,
   createGetProviderToken,
   createListAccounts,
   createListIdentities,
   createSwitchAccount
 } from "../methods/identities-and-accounts"
-import { createConnect, createSignInProvider } from "../methods/oauth"
+import { createConnectProvider, createSignInProvider } from "../methods/oauth"
 import {
   createSendCode,
   createSignInCode,
@@ -58,9 +58,9 @@ export interface AuthClient {
   signInCode: ReturnType<typeof createSignInCode>
   signInGuest: ReturnType<typeof createSignInGuest>
   signInProvider: ReturnType<typeof createSignInProvider>
-  connect: ReturnType<typeof createConnect>
+  connectProvider: ReturnType<typeof createConnectProvider>
   listIdentities: ReturnType<typeof createListIdentities>
-  disconnect: ReturnType<typeof createDisconnect>
+  disconnectIdentity: ReturnType<typeof createDisconnectIdentity>
   getProviderToken: ReturnType<typeof createGetProviderToken>
   listSessions: ReturnType<typeof createListSessions>
   revokeSession: ReturnType<typeof createRevokeSession>
@@ -107,9 +107,9 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     signInCode: createSignInCode(internals),
     signInGuest: createSignInGuest(internals),
     signInProvider: createSignInProvider(internals),
-    connect: createConnect(internals),
+    connectProvider: createConnectProvider(internals),
     listIdentities: createListIdentities(internals),
-    disconnect: createDisconnect(internals),
+    disconnectIdentity: createDisconnectIdentity(internals),
     getProviderToken: createGetProviderToken(internals),
     listSessions: createListSessions(internals),
     revokeSession: createRevokeSession(internals),

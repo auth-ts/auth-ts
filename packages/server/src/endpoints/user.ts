@@ -5,6 +5,7 @@ import { validateAdditionalFields } from "../http/validate-additional-fields"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 import { clearedRefreshCookies } from "../session/session-cookies"
@@ -13,6 +14,18 @@ import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
 import { consumeVerificationCode } from "../verification-code/consume-verification-code"
 import { sendVerificationCode } from "../verification-code/send-verification-code"
+
+/** How `GET /user` appears in the OpenAPI document. */
+export const getUserDocs: EndpointDocs<never> = {
+  description:
+    "One read of `users`. A client that is refreshing anyway never needs this \u2014 `GET /token` returns the user alongside the token.",
+  tag: "User",
+  auth: "bearer",
+  responses: {
+    200: { description: "The signed-in user.", schema: "User" },
+    401: "Unauthenticated"
+  }
+}
 
 /**
  * Reads the signed-in user.
@@ -49,6 +62,24 @@ export interface UpdateUserInput extends CallerInput {
   name?: string
   image?: string
   [field: string]: unknown
+}
+
+/** How `POST /user` appears in the OpenAPI document. */
+export const updateUserDocs: EndpointDocs<UpdateUserInput> = {
+  description:
+    "A flat body: the whole payload is user fields, so declared additional fields go at the top level rather than nested. `email` and `phoneNumber` are rejected rather than updated \u2014 changing an identifier re-keys the account, which is a ceremony with a code verified at the new address. `type` and `id` are rejected outright.",
+  tag: "User",
+  auth: "bearer",
+  additionalFields: "flat",
+  body: {
+    type: "object",
+    properties: { name: { type: "string" }, image: { type: "string" } }
+  },
+  responses: {
+    200: { description: "The updated user.", schema: "User" },
+    400: "InvalidField",
+    401: "Unauthenticated"
+  }
 }
 
 /**
@@ -136,6 +167,28 @@ export interface DeleteUserInput extends CallerInput {
   /** The confirmation code, when a challenge was issued. */
   code?: string
   requestURL?: string
+}
+
+/** How `DELETE /user` appears in the OpenAPI document. */
+export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
+  description:
+    "Two phases in one endpoint. A session that authenticated recently deletes immediately; an older one is challenged and must repeat the call with `code`. The challenge answers 403, never 202: 204 is the only success shape, so a client treating any 2xx as done cannot tell someone their account is gone while it is not.",
+  tag: "User",
+  auth: "bearer",
+  body: {
+    type: "object",
+    properties: {
+      code: {
+        type: "string",
+        description: "The confirmation code, when one was issued."
+      }
+    }
+  },
+  responses: {
+    204: { description: "Deleted.", setsCookie: "cleared" },
+    401: "Unauthenticated",
+    403: "Forbidden"
+  }
 }
 
 /**

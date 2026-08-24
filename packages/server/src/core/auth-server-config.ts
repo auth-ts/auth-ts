@@ -61,6 +61,7 @@ export interface AuthServerConfig {
   localization?: LocalizationOptions
   ipAddress: IpAddressConfig
   cors?: CorsOptions
+  openapi: boolean
   logLevel: LogLevel
   logger?: Logger
   waitUntil?: (promise: Promise<unknown>) => void
@@ -396,6 +397,7 @@ export function resolveAuthServerConfig(
     ...(options.localization ? { localization: options.localization } : {}),
     ipAddress: requireIpAddress(options.ipAddress),
     ...(options.cors ? { cors: options.cors } : {}),
+    openapi: options.openapi ?? false,
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {}),
     ...(options.waitUntil ? { waitUntil: options.waitUntil } : {})

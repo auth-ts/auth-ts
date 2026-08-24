@@ -372,7 +372,7 @@ describe("oauth navigation", () => {
     )
   })
 
-  it("sends connect with the access token, since it is an ordinary request", async () => {
+  it("sends connectProvider with the access token, since it is an ordinary request", async () => {
     const assign = vi.fn()
     vi.stubGlobal("location", {
       href: "https://app.example.com/account",
@@ -383,7 +383,7 @@ describe("oauth navigation", () => {
     })
     const client = await signedIn()
 
-    await client.connect({ provider: "google" })
+    await client.connectProvider({ provider: "google" })
 
     expect(server.requests.at(-1)?.path).toBe("/api/auth/connect/google")
     expect(server.requests.at(-1)?.authorization).toBeTruthy()
@@ -394,7 +394,7 @@ describe("oauth navigation", () => {
 })
 
 describe("connected accounts", () => {
-  it("addresses the token and the disconnect by identity id", async () => {
+  it("addresses the token and the disconnectIdentity by identity id", async () => {
     // Not by provider: two accounts at one provider is the case that breaks.
     server.on("GET", "/api/auth/identities/identity-1/token", {
       body: { token: "provider-token", expiresAt: null, scope: "repo" }
@@ -405,7 +405,7 @@ describe("connected accounts", () => {
     const grant = await client.getProviderToken({ id: "identity-1" })
     expect(grant.token).toBe("provider-token")
 
-    await client.disconnect({ id: "identity-1" })
+    await client.disconnectIdentity({ id: "identity-1" })
     expect(server.requests.at(-1)?.path).toBe("/api/auth/identities/identity-1")
   })
 

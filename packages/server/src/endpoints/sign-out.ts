@@ -6,6 +6,7 @@ import {
   shouldUseSecureCookies
 } from "../lib/serialize-cookie"
 import { reapGuests } from "../lib/sweep-expired"
+import type { EndpointDocs } from "../openapi/endpoint-docs"
 import {
   parkedTokens,
   pruneDeadAccounts,
@@ -44,6 +45,44 @@ export interface SignOutInput extends CallerInput {
    */
   userId?: string
   requestURL?: string
+}
+
+/** How `POST /sign-out` appears in the OpenAPI document. */
+export const signOutDocs: EndpointDocs<SignOutInput> = {
+  description:
+    'Two axes that compose: `scope` is how far each affected account is signed out, `userId` is whether that applies to one account or every account parked in this browser. Revoked devices keep working until their access token expires, so "everywhere" means within `jwt.ttl`.',
+  tag: "Session",
+  auth: "bearer",
+  body: {
+    type: "object",
+    properties: {
+      scope: {
+        type: "string",
+        enum: ["local", "others", "global"],
+        description:
+          "This device, other devices, or everywhere. Defaults to `local`."
+      },
+      userId: {
+        type: "string",
+        description:
+          "Under `multiAccount`, the one account to sign out. Omit it and every account signed in here goes."
+      }
+    }
+  },
+  responses: {
+    200: {
+      description:
+        "Signing out promoted another account parked in this browser.",
+      setsCookie: "refresh",
+      schema: "SignOutResult"
+    },
+    204: {
+      description: "Signed out, with no account left to promote.",
+      setsCookie: "cleared"
+    },
+    401: "Unauthenticated",
+    404: "NotFound"
+  }
 }
 
 /**
