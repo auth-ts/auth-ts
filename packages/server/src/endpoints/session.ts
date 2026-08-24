@@ -11,7 +11,6 @@ export type CurrentSession = Omit<AuthSession, "tokenHash">
 
 /** How `GET /session` appears in the OpenAPI document. */
 export const getSessionDocs: EndpointDocs<never> = {
-  description: "Its id tells you which entry in /sessions is this device.",
   tag: "Session",
   auth: "bearer",
   responses: {

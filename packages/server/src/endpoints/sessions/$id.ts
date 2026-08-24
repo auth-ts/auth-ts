@@ -42,7 +42,8 @@ export interface RevokeSessionResult {
 
 /** How `DELETE /sessions/$id` appears in the OpenAPI document. */
 export const revokeSessionDocs: EndpointDocs<RevokeSessionInput, "id"> = {
-  description: "Revoking the current session signs this device out.",
+  description:
+    "Under multiAccount, revoking the current session switches to the next account signed in here rather than signing out.",
   tag: "Session",
   auth: "bearer",
   params: { id: "The session's id, as listed by `GET /sessions`." },
