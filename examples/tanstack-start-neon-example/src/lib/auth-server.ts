@@ -14,6 +14,7 @@ export const authServer = createAuthServer({
   },
   guest: true,
   multiAccount: true,
+  openapi: true,
   providers: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID as string,
