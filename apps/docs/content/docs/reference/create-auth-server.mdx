@@ -173,7 +173,7 @@ times, and sign four tokens it then threw away. One exchange plus four token
 reads costs one session write and no signatures.
 
 Sign-ins hand back a token in the body alongside the user — verification code,
-guest, account switch, and the sign-out that promotes a parked account — so
+guest, and account switch — so
 signing in and the first render cost one round trip between them rather than a
 sign-in followed by a refresh. Nothing crosses in a response header any more,
 which is also why there is nothing for CORS to expose.
