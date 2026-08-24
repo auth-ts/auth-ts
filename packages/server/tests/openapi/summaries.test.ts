@@ -49,6 +49,18 @@ describe("openapi summaries", () => {
     expect(drifted).toEqual([])
   })
 
+  it("keeps summaries plain, since they render where markdown does not", () => {
+    // The summary becomes the page title's subtitle, the `<meta>` description,
+    // and the sidebar tooltip — all plain text. Emphasis or code spans arrive
+    // there as literal asterisks and backticks. The description is markdown;
+    // this is not.
+    const marked = Object.entries(summaries).filter(([, summary]) =>
+      /\*\*|`|\[.*\]\(/.test(summary)
+    )
+
+    expect(marked).toEqual([])
+  })
+
   it("declares its metadata beside the endpoint it describes", () => {
     const orphaned = Object.keys(endpointRegistry).filter(
       (name) =>

@@ -88,7 +88,7 @@ export const endpointDocs: {
 export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   sendCode: "Sends a sign-in code.",
   getToken:
-    "Exchanges the refresh cookie for an access token, or answers `null`.",
+    "Exchanges the refresh cookie for an access token, or answers null.",
   signInCode: "Verifies a code and starts a session.",
   signOut: "Ends sessions.",
   getSession: "The session the caller is acting from.",
@@ -104,7 +104,7 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   signInProvider:
     "Starts an OAuth sign-in by handing back the provider's authorize URL.",
   callbackProvider: "Finishes an OAuth flow, for both sign-in and linking.",
-  connectProvider: "Starts linking a provider to the **current** user.",
+  connectProvider: "Starts linking a provider to the current user.",
   listIdentities: "Lists the signed-in user's linked providers.",
   disconnectIdentity: "Unlinks one connected account from the signed-in user.",
   getProviderToken:

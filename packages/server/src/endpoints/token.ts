@@ -45,7 +45,7 @@ export const getTokenDocs: EndpointDocs<TokenInput> = {
 }
 
 /**
- * Exchanges the refresh cookie for an access token, or answers `null`.
+ * Exchanges the refresh cookie for an access token, or answers null.
  *
  * The only endpoint that authenticates from the cookie, and therefore the only
  * one that touches a session: every other endpoint reads the token this

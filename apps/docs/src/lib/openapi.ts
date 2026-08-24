@@ -18,3 +18,36 @@ const input = {
  * than one deployment's — every feature on, every provider offered.
  */
 export const openapi = createOpenAPI({ input })
+
+/**
+ * Where each operation belongs in the sidebar, and under which heading.
+ *
+ * The generated tree sorts by file name, which is the operation id — so routes
+ * that belong together end up scattered. Ordering by tag, then by route, puts
+ * every sign-in path in one run and every session path in the next.
+ */
+export const operationOrder = (() => {
+  const document = buildOpenAPIDocument()
+  const tags = document.tags.map((tag) => tag.name)
+
+  const operations = Object.entries(document.paths)
+    .flatMap(([path, item]) =>
+      Object.entries(item).map(([method, operation]) => ({
+        path,
+        method,
+        ...(operation as { operationId: string; tags: string[] })
+      }))
+    )
+    .sort(
+      (left, right) =>
+        tags.indexOf(left.tags[0] ?? "") - tags.indexOf(right.tags[0] ?? "") ||
+        left.path.localeCompare(right.path) ||
+        left.method.localeCompare(right.method)
+    )
+
+  return operations.map((operation, rank) => ({
+    id: operation.operationId,
+    tag: operation.tags[0] ?? "",
+    rank
+  }))
+})()
