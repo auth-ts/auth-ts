@@ -13,10 +13,10 @@ Construction performs no network request and touches no storage, so importing th
 module is free and safe during server-side rendering. Everything reconciles on
 the first read.
 
-Every method here has an identically named callable on the server, and both are
-named after their route — `signInCode` is `POST /sign-in/code` either way. Moving
-a call between a loader and a component is changing `authServer` to `authClient`
-and nothing else.
+Every method here has an identically named callable on the server —
+`signInWithCode` dispatches `POST /sign-in/code` on both `authClient` and
+`authServer`. Moving a call between a loader and a component is changing
+`authServer` to `authClient` and nothing else.
 
 <auto-type-table path="../../../../../packages/client/src/core/auth-client-options.ts" name="AuthClientOptions" />
 
@@ -202,7 +202,7 @@ Anything that changes who is signed in has to invalidate that key, because
 nothing else will:
 
 ```tsx
-await authClient.signInCode({ email, code })
+await authClient.signInWithCode({ email, code })
 await refetch()          // or queryClient.invalidateQueries(...)
 
 await authClient.signOut()
@@ -239,7 +239,7 @@ The shape is the web `Storage` interface, so a store that already has
 protects — the keychain or keystore — because what lands in it is the session.
 
 Everything else is unchanged: `getToken()` still serves the JWT from memory for
-your data client, and the app never touches the cookie. `signInProvider` and
+your data client, and the app never touches the cookie. `signInWithProvider` and
 `connectProvider` fetch the provider's authorize URL and then assign `location`, so a
 native shell can call the same endpoints and open the URL in the system browser
 instead — which is what RFC 8252 requires and what Google enforces. What is
@@ -256,7 +256,7 @@ never on the message — messages are localized and free to change.
 import { isAuthError } from "@auth-ts/client"
 
 try {
-  await authClient.sendCode({ email })
+  await authClient.sendSignInCode({ email })
 } catch (error) {
   if (isAuthError(error) && error.code === "cooldown") {
     // error.retryAfter is in seconds. Render a countdown; "try again later"

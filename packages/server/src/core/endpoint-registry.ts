@@ -9,16 +9,17 @@ import { getProviderToken } from "../endpoints/identities/$id/token"
 import { getJwks } from "../endpoints/jwks"
 import { getOpenAPIDocument } from "../endpoints/openapi"
 import { getReference } from "../endpoints/reference"
-import { sendCode } from "../endpoints/send-code"
 import { getSession } from "../endpoints/session"
 import { listSessions } from "../endpoints/sessions"
 import { revokeSession } from "../endpoints/sessions/$id"
-import { signInCode } from "../endpoints/sign-in/code"
-import { signInGuest } from "../endpoints/sign-in/guest"
-import { signInProvider } from "../endpoints/sign-in/provider/$provider"
+import { signInWithCode } from "../endpoints/sign-in/code"
+import { signInAsGuest } from "../endpoints/sign-in/guest"
+import { signInWithProvider } from "../endpoints/sign-in/provider/$provider"
+import { sendSignInCode } from "../endpoints/sign-in/send-code"
 import { signOut } from "../endpoints/sign-out"
 import { getToken } from "../endpoints/token"
 import { deleteUser, getUser, updateUser } from "../endpoints/user"
+import { sendDeleteUserCode } from "../endpoints/user/send-delete-code"
 
 /**
  * Every endpoint, keyed by the name it is exposed under.
@@ -32,20 +33,21 @@ import { deleteUser, getUser, updateUser } from "../endpoints/user"
  * `connectProvider` and reading either one tells you the other.
  */
 export const endpointRegistry = {
-  sendCode,
+  sendSignInCode,
   getToken,
-  signInCode,
+  signInWithCode,
   signOut,
   getSession,
   getUser,
   updateUser,
   deleteUser,
+  sendDeleteUserCode,
   listSessions,
   revokeSession,
   listAccounts,
   switchAccount,
-  signInGuest,
-  signInProvider,
+  signInAsGuest,
+  signInWithProvider,
   callbackProvider,
   connectProvider,
   listIdentities,

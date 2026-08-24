@@ -11,7 +11,7 @@ describe("matchRoute", () => {
 
     // Unauthenticated is fine here — what matters is that none of these 404.
     const probes: Array<[string, string]> = [
-      ["POST", "/api/auth/send-code"],
+      ["POST", "/api/auth/sign-in/send-code"],
       ["GET", "/api/auth/token"],
       ["POST", "/api/auth/sign-in/code"],
       ["POST", "/api/auth/user"],
@@ -19,6 +19,7 @@ describe("matchRoute", () => {
       ["GET", "/api/auth/user"],
       ["POST", "/api/auth/user"],
       ["DELETE", "/api/auth/user"],
+      ["POST", "/api/auth/user/send-delete-code"],
       ["GET", "/api/auth/sessions"],
       ["DELETE", "/api/auth/sessions/abc"],
       ["POST", "/api/auth/sign-in/guest"],
@@ -44,7 +45,7 @@ describe("matchRoute", () => {
   it("answers 405 for a known path with the wrong method, not 404", async () => {
     const { authServer } = await createTestServer()
     const response = await authServer.handler(
-      request("GET", "/api/auth/send-code")
+      request("GET", "/api/auth/sign-in/send-code")
     )
 
     expect(response.status).toBe(405)
@@ -57,8 +58,8 @@ describe("matchRoute", () => {
     // The router is not in front of `authServer.handlers.*`, so the handler has
     // to enforce its own method. Without this a GET fell into `parse` and `run`.
     const { authServer } = await createTestServer()
-    const response = await authServer.handlers.sendCode(
-      request("GET", "/api/auth/send-code")
+    const response = await authServer.handlers.sendSignInCode(
+      request("GET", "/api/auth/sign-in/send-code")
     )
 
     expect(response.status).toBe(405)

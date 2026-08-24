@@ -160,7 +160,7 @@ describe("guest reaping", () => {
 
     // Convert, so the very same session now belongs to a real user.
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
         cookies
       })
@@ -248,7 +248,7 @@ describe("guest conversion", () => {
     const cookies = { "auth-ts.refresh": refreshToken }
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
         cookies
       })
@@ -292,7 +292,7 @@ describe("guest conversion", () => {
     const { user: guest, token } = await signInGuest(context)
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -317,7 +317,7 @@ describe("guest conversion", () => {
     const second = await signInGuest(context)
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -359,7 +359,7 @@ describe("guest conversion", () => {
     const cookies = { "auth-ts.refresh": refreshToken }
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
         cookies
       })
@@ -396,7 +396,7 @@ describe("guest conversion", () => {
   it("never converts a real user — signing in again just replaces the session", async () => {
     const context = await createTestServer()
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -416,7 +416,7 @@ describe("guest conversion", () => {
     }
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "grace@example.com" },
         cookies
       })
@@ -445,7 +445,7 @@ describe("account deletion", () => {
     context: Awaited<ReturnType<typeof createTestServer>>
   ) => {
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -498,7 +498,7 @@ describe("account deletion", () => {
 
     // An outstanding code, sent and never verified.
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
         cookies
       })
@@ -563,11 +563,12 @@ describe("account deletion", () => {
     expect(await selectRow(context.db, "users", { id: ada.id })).toBeNull()
   })
 
-  it("challenges a stale session with a code and answers 403, never a 2xx", async () => {
+  it("refuses a stale session outright, never a 2xx and never a side effect", async () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "0s" }
     })
     const { refreshToken, token } = await signIn(context)
+    const before = context.sentCodes.length
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
@@ -577,11 +578,11 @@ describe("account deletion", () => {
     )
 
     expect(response.status).toBe(403)
-    expect(((await response.json()) as { code: string }).code).toBe("codeSent")
-    expect(context.db.users()).toHaveLength(1)
-    expect(required(context.sentCodes.at(-1), "code").purpose).toBe(
-      "deleteUser"
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "staleSession"
     )
+    expect(context.db.users()).toHaveLength(1)
+    expect(context.sentCodes.length).toBe(before)
   })
 
   it("treats a zero-length freshness window as always requiring a code", async () => {
@@ -653,20 +654,24 @@ describe("account deletion", () => {
     }
   })
 
-  it("completes deletion with the emailed code", async () => {
+  it("completes deletion with a code from send-delete-code", async () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "0s" }
     })
     const { refreshToken, token } = await signIn(context)
     const cookies = { "auth-ts.refresh": refreshToken }
 
-    await context.authServer.handler(
-      request("DELETE", "/api/auth/user", { cookies, token })
+    const sent = await context.authServer.handler(
+      request("POST", "/api/auth/user/send-delete-code", { cookies, token })
     )
+    expect(sent.status).toBe(200)
     const deletionCode = required(
       context.sentCodes.at(-1),
       "deletion code"
     ).code
+    expect(required(context.sentCodes.at(-1), "deletion code").purpose).toBe(
+      "deleteUser"
+    )
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
@@ -689,7 +694,7 @@ describe("account deletion", () => {
 
     // A fresh sign-in code for the same address must not authorize deletion.
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
         cookies
       })
@@ -709,11 +714,11 @@ describe("account deletion", () => {
     expect(context.db.users()).toHaveLength(1)
   })
 
-  it("rate limits repeated bare deletes rather than sending a storm of email", async () => {
+  it("rate limits repeated calls to send-delete-code rather than a storm of email", async () => {
     vi.useFakeTimers()
     // Pinned to the start of a window: the limiter's windows are aligned to the
     // clock rather than started by the first request, so a run that straddled a
-    // boundary would hand the fourth delete a fresh allowance.
+    // boundary would hand the fourth call a fresh allowance.
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
     try {
       const context = await createTestServer({
@@ -725,13 +730,16 @@ describe("account deletion", () => {
 
       for (let attempt = 0; attempt < 3; attempt++) {
         await context.authServer.handler(
-          request("DELETE", "/api/auth/user", { cookies, token })
+          request("POST", "/api/auth/user/send-delete-code", {
+            cookies,
+            token
+          })
         )
         vi.advanceTimersByTime(61_000)
       }
 
       const limited = await context.authServer.handler(
-        request("DELETE", "/api/auth/user", { cookies, token })
+        request("POST", "/api/auth/user/send-delete-code", { cookies, token })
       )
 
       expect(limited.status).toBe(429)

@@ -42,7 +42,7 @@ function LoginPage() {
   const requestCode = async () => {
     setNotice(null)
     try {
-      await authClient.sendCode({ email })
+      await authClient.sendSignInCode({ email })
       setStage("code")
       setNotice({
         text: "Check the server console for your code.",
@@ -56,7 +56,7 @@ function LoginPage() {
   const submitCode = async () => {
     setNotice(null)
     try {
-      await authClient.signInCode({ email, code })
+      await authClient.signInWithCode({ email, code })
       // Nothing pushes the new session into the cache, so ask for it.
       await refetchToken()
       await navigate({ to: "/todos" })
@@ -68,7 +68,7 @@ function LoginPage() {
   const continueWithGitHub = async () => {
     setNotice(null)
     try {
-      await authClient.signInProvider({
+      await authClient.signInWithProvider({
         provider: "github",
         redirect: "/todos"
       })
@@ -80,7 +80,7 @@ function LoginPage() {
   const continueAsGuest = async () => {
     setNotice(null)
     try {
-      await authClient.signInGuest()
+      await authClient.signInAsGuest()
       await refetchToken()
       await navigate({ to: "/todos" })
     } catch (error) {

@@ -312,7 +312,7 @@ describe("GET /identities/:id/token", () => {
     const { identity } = await signInWithGitHub(context, GRANT)
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "grace@example.com" }
       })
     )

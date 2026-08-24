@@ -322,7 +322,7 @@ server change. What remains is the OAuth half:
 - **Deep-link redirects.** `validateRedirect` and the origin check admit only
   same-origin paths and http(s) origins. A native flow needs `myapp://…` as an
   allowed post-OAuth redirect and as an acceptable (or absent) `Origin`, behind
-  a new option naming the trusted schemes. `signInProvider` and `connect` on the client
+  a new option naming the trusted schemes. `signInWithProvider` and `connect` on the client
   navigate with `location.assign`; native needs the URL to hand to the system
   browser instead.
 - **ID-token sign-in.** Sign in with Apple and Google on a device is the native

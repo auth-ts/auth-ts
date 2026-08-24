@@ -143,8 +143,10 @@ function AccountPage() {
       )
 
       // Two-phase deletion reports the challenge as a value, because it is an
-      // expected branch of a working flow rather than a failure.
-      if (result.status === "codeRequired") {
+      // expected branch of a working flow rather than a failure. Deletion never
+      // sends a code itself, so a stale session asks for one explicitly.
+      if (result.status === "staleSession") {
+        await authClient.sendDeleteUserCode()
         setDeletionCode("")
         setDeletionNotice({
           text: "For your security, enter the code we just sent.",
@@ -156,8 +158,8 @@ function AccountPage() {
       queryClient.clear()
       await navigate({ to: "/login" })
     } catch (error) {
-      // Confirming with no code re-sends one, which inside the send cooldown
-      // answers `cooldown` with a retryAfter; the button counts it down.
+      // Sending the code, or confirming inside its cooldown, both answer
+      // `cooldown` with a retryAfter; the button counts it down.
       if (isAuthError(error) && error.retryAfter) {
         startDeletionCooldown(error.retryAfter)
       }

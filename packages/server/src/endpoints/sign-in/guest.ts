@@ -17,7 +17,7 @@ export interface SignInGuestInput {
 }
 
 /** How `POST /sign-in/guest` appears in the OpenAPI document. */
-export const signInGuestDocs: EndpointDocs<SignInGuestInput> = {
+export const signInAsGuestDocs: EndpointDocs<SignInGuestInput> = {
   description: "Fails if this browser is already signed in.",
   tag: "Sign in",
   auth: "none",
@@ -47,7 +47,7 @@ export const signInGuestDocs: EndpointDocs<SignInGuestInput> = {
  * asks. Worth telling users: a guest who loses the cookie loses the account,
  * until they connect a provider or verify an identifier.
  */
-export const signInGuest = defineEndpoint({
+export const signInAsGuest = defineEndpoint({
   method: "POST",
   path: "/sign-in/guest",
   parse: async ({ request }): Promise<SignInGuestInput> => {

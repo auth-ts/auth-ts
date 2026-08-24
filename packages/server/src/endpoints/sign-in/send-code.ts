@@ -1,19 +1,19 @@
-import { defineEndpoint } from "../http/define-endpoint"
-import { resolveLocale } from "../http/resolve-locale"
-import type { EndpointDocs } from "../openapi/endpoint-docs"
-import type { IdentifierBody } from "../verification-code/resolve-code-identifier"
-import { resolveCodeIdentifier } from "../verification-code/resolve-code-identifier"
-import { sendVerificationCode } from "../verification-code/send-verification-code"
+import { defineEndpoint } from "../../http/define-endpoint"
+import { resolveLocale } from "../../http/resolve-locale"
+import type { EndpointDocs } from "../../openapi/endpoint-docs"
+import type { IdentifierBody } from "../../verification-code/resolve-code-identifier"
+import { resolveCodeIdentifier } from "../../verification-code/resolve-code-identifier"
+import { sendVerificationCode } from "../../verification-code/send-verification-code"
 
-/** Body accepted by `POST /send-code`: exactly one identifier. */
-export interface SendCodeInput extends IdentifierBody {
+/** Body accepted by `POST /sign-in/send-code`: exactly one identifier. */
+export interface SendSignInCodeInput extends IdentifierBody {
   /** Pre-resolved locale and headers, filled in from the request when over HTTP. */
   locale?: string
   headers?: Headers
 }
 
-/** How `POST /send-code` appears in the OpenAPI document. */
-export const sendCodeDocs: EndpointDocs<SendCodeInput> = {
+/** How `POST /sign-in/send-code` appears in the OpenAPI document. */
+export const sendSignInCodeDocs: EndpointDocs<SendSignInCodeInput> = {
   description: "Send either an email or a phone number, not both.",
   tag: "Sign in",
   auth: "none",
@@ -54,10 +54,10 @@ export const sendCodeDocs: EndpointDocs<SendCodeInput> = {
  * enumerate — a different status for unknown addresses would turn this endpoint
  * into a "does this person have an account" oracle.
  */
-export const sendCode = defineEndpoint({
+export const sendSignInCode = defineEndpoint({
   method: "POST",
-  path: "/send-code",
-  parse: async ({ request, internals }): Promise<SendCodeInput> => {
+  path: "/sign-in/send-code",
+  parse: async ({ request, internals }): Promise<SendSignInCodeInput> => {
     const body = (await request.json().catch(() => ({}))) as IdentifierBody
 
     return {
@@ -69,7 +69,7 @@ export const sendCode = defineEndpoint({
       headers: request.headers
     }
   },
-  run: async (internals, input: SendCodeInput) => {
+  run: async (internals, input: SendSignInCodeInput) => {
     const identifier = resolveCodeIdentifier(internals, input)
 
     await sendVerificationCode(internals, {

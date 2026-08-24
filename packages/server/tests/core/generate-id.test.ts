@@ -39,7 +39,7 @@ describe("generateId", () => {
     })
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )

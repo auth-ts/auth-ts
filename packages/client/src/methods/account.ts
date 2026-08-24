@@ -70,8 +70,8 @@ export function createSignOut(internals: AuthClientInternals) {
 
 /** What a deletion attempt resolved to. */
 export interface DeleteUserResult {
-  /** `"codeRequired"` means a confirmation code was sent — prompt for it and call again. */
-  status: "deleted" | "codeRequired"
+  /** `"staleSession"` means call `sendDeleteUserCode` and retry with the code it sends. */
+  status: "deleted" | "staleSession"
 }
 
 /** Input for account deletion. */
@@ -83,9 +83,10 @@ export interface DeleteUserInput {
  * Deletes the account, in one or two steps.
  *
  * A recently authenticated session deletes immediately; an older one gets a
- * `"codeRequired"` result, at which point you collect the emailed code and call
- * again with it. The two-step case is reported as a value rather than an error
- * because it is an expected branch of a working flow, not a failure.
+ * `"staleSession"` result, at which point you call `sendDeleteUserCode()` and
+ * retry with the code it sends. The two-step case is reported as a value rather
+ * than an error because it is an expected branch of a working flow, not a
+ * failure.
  *
  * @throws {AuthError} For a wrong code, or when a guest has no way to receive one.
  */
@@ -101,14 +102,33 @@ export function createDeleteUser(internals: AuthClientInternals) {
         authenticated: true
       })
     } catch (error) {
-      if (error instanceof AuthError && error.code === "codeSent")
-        return { status: "codeRequired" }
+      if (error instanceof AuthError && error.code === "staleSession")
+        return { status: "staleSession" }
       throw error
     }
 
     internals.tokenStore.clear()
 
     return { status: "deleted" }
+  }
+}
+
+/**
+ * Sends the code that confirms account deletion.
+ *
+ * Goes to whichever address is already on the account — there is nothing to
+ * choose, so there is nothing to pass.
+ *
+ * @throws {AuthError} `cooldown` or `rateLimited`, or `guestCannotReceiveCode`
+ * for a guest with no email or phone number on file.
+ */
+export function createSendDeleteUserCode(internals: AuthClientInternals) {
+  return async function sendDeleteUserCode(): Promise<void> {
+    await internals.fetchJson({
+      method: "POST",
+      path: "/user/send-delete-code",
+      authenticated: true
+    })
   }
 }
 

@@ -8,7 +8,7 @@ describe("verification code sign-in over HTTP", () => {
     const { authServer, sentCodes, db } = await createTestServer()
 
     const sendResponse = await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "Ada@Example.com" }
       })
     )
@@ -43,7 +43,7 @@ describe("verification code sign-in over HTTP", () => {
     const { authServer, db } = await createTestServer()
 
     const response = await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "stranger@example.com" }
       })
     )
@@ -55,7 +55,7 @@ describe("verification code sign-in over HTTP", () => {
   it("rejects a wrong code with the standard envelope", async () => {
     const { authServer, sentCodes } = await createTestServer()
     await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -85,13 +85,13 @@ describe("verification code sign-in over HTTP", () => {
   it("returns 429 with Retry-After and a cooldown code on a rapid resend", async () => {
     const { authServer, sentCodes } = await createTestServer()
     await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
 
     const response = await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -118,13 +118,13 @@ describe("verification code sign-in over HTTP", () => {
       }
     })
     await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
 
     const response = await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
         headers: { "accept-language": "de-AT,de;q=0.9" }
       })
@@ -144,7 +144,7 @@ describe("verification code sign-in over HTTP", () => {
     })
 
     await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
         headers: { "accept-language": "de" }
       })
@@ -158,7 +158,7 @@ describe("token and user endpoints", () => {
   const signIn = async () => {
     const context = await createTestServer()
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -417,7 +417,7 @@ describe("jwks and discovery", () => {
     expect(body.issuer).toBe("https://app.example.com/api/auth")
 
     await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -496,7 +496,7 @@ describe("GET /token", () => {
     const { authServer, sentCodes, db } = await createTestServer()
 
     await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -539,7 +539,7 @@ describe("where a token comes from", () => {
   const signedIn = async () => {
     const context = await createTestServer()
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )

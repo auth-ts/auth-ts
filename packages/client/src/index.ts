@@ -24,7 +24,7 @@ export type {
 } from "./methods/identities-and-accounts"
 export type { OAuthNavigationInput } from "./methods/oauth"
 export type {
-  SendCodeInput,
+  SendSignInCodeInput,
   SignInCodeInput,
   SignInGuestInput,
   SignInResult

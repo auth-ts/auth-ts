@@ -2,12 +2,12 @@ import type { AuthUser } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Exactly one identifier: whichever you pass selects the channel. */
-export type SendCodeInput =
+export type SendSignInCodeInput =
   | { email: string; phoneNumber?: never }
   | { phoneNumber: string; email?: never }
 
 /** The identifier, the code, and any declared sign-up fields. */
-export type SignInCodeInput = SendCodeInput & {
+export type SignInCodeInput = SendSignInCodeInput & {
   code: string
   /** Applied only if this verification creates the account. */
   additionalFields?: Record<string, string | number | boolean>
@@ -30,11 +30,13 @@ export interface SignInResult {
  * Render the countdown rather than only disabling the button; "try again later"
  * with no number is the most annoying error message in software.
  */
-export function createSendCode(internals: AuthClientInternals) {
-  return async function sendCode(input: SendCodeInput): Promise<void> {
+export function createSendSignInCode(internals: AuthClientInternals) {
+  return async function sendSignInCode(
+    input: SendSignInCodeInput
+  ): Promise<void> {
     await internals.fetchJson({
       method: "POST",
-      path: "/send-code",
+      path: "/sign-in/send-code",
       body: input
     })
   }
@@ -47,8 +49,8 @@ export function createSendCode(internals: AuthClientInternals) {
  * sign-in and the first render cost one round trip between them rather than a
  * sign-in followed by a refresh.
  */
-export function createSignInCode(internals: AuthClientInternals) {
-  return async function signInCode(
+export function createSignInWithCode(internals: AuthClientInternals) {
+  return async function signInWithCode(
     input: SignInCodeInput
   ): Promise<SignInResult> {
     const result = await internals.fetchJson<SignInResult>({
@@ -74,8 +76,8 @@ export interface SignInGuestInput {
  * in every way that matters — they own rows, they have a session — which is what
  * lets them keep everything when they later add an email or connect a provider.
  */
-export function createSignInGuest(internals: AuthClientInternals) {
-  return async function signInGuest(
+export function createSignInAsGuest(internals: AuthClientInternals) {
+  return async function signInAsGuest(
     input: SignInGuestInput = {}
   ): Promise<SignInResult> {
     const result = await internals.fetchJson<SignInResult>({

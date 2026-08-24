@@ -43,8 +43,10 @@ async function startFlow(
  *
  * Signing in while already signed in never links accounts. Use `connectProvider` for that.
  */
-export function createSignInProvider(internals: AuthClientInternals) {
-  return function signInProvider(input: OAuthNavigationInput): Promise<void> {
+export function createSignInWithProvider(internals: AuthClientInternals) {
+  return function signInWithProvider(
+    input: OAuthNavigationInput
+  ): Promise<void> {
     return startFlow(internals, "/sign-in/provider", input, false)
   }
 }

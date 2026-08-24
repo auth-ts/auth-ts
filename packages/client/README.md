@@ -12,8 +12,8 @@ import { createAuthClient } from "@auth-ts/client"
 
 export const authClient = createAuthClient()
 
-await authClient.sendCode({ email })
-await authClient.signInCode({ email, code })
+await authClient.sendSignInCode({ email })
+await authClient.signInWithCode({ email, code })
 
 // Refreshes only when needed; concurrent callers share one request.
 const token = await authClient.getToken()

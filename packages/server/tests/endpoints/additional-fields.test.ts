@@ -22,7 +22,7 @@ async function verifyWith(
   additionalFields?: Record<string, unknown>
 ) {
   await context.authServer.handler(
-    request("POST", "/api/auth/send-code", { body: { email } })
+    request("POST", "/api/auth/sign-in/send-code", { body: { email } })
   )
 
   return context.authServer.handler(
@@ -140,7 +140,7 @@ describe("additionalFields on sign-up", () => {
       .user.id
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -177,7 +177,7 @@ describe("additionalFields on sign-up", () => {
     }
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )

@@ -1,6 +1,5 @@
 import { AuthApiError, unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
-import { resolveLocale } from "../http/resolve-locale"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
@@ -13,7 +12,6 @@ import { clearedRefreshCookies } from "../session/session-cookies"
 import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
 import { consumeVerificationCode } from "../verification-code/consume-verification-code"
-import { sendVerificationCode } from "../verification-code/send-verification-code"
 
 /** How `GET /user` appears in the OpenAPI document. */
 export const getUserDocs: EndpointDocs<never> = {
@@ -187,7 +185,8 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
   responses: {
     204: { description: "Deleted.", setsCookie: "cleared" },
     401: "Unauthenticated",
-    403: "Forbidden"
+    403: "StaleSession",
+    409: "GuestCannotReceiveCode"
   }
 }
 
@@ -195,16 +194,17 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
  * Delete the current user.
  *
  * Two phases, in one endpoint. A session that authenticated recently deletes
- * immediately; an older one is challenged with a code first.
+ * immediately; an older one must call `POST /user/send-delete-code` first and
+ * retry with the code it sends.
  *
  * The challenge deliberately answers 403 rather than 202: **204 must be the only
  * success shape**, or a client that treats any 2xx as done will clear its state
  * and tell the user their account is gone while it very much is not.
  *
- * The deletion code shares an identifier with sign-in codes, so a stranger
- * spamming `/send-code` at this address keeps the challenge inside the send
- * cooldown. Bounded nuisance, not a bypass: the purpose is checked on verify,
- * so a sign-in code never authorizes a deletion.
+ * This endpoint never sends anything itself — a stale session refuses outright,
+ * with no side effect, so retrying a failed delete cannot fire a storm of codes.
+ * The purpose is checked on verify, so a sign-in code never authorizes a
+ * deletion.
  */
 export const deleteUser = defineEndpoint({
   method: "DELETE",
@@ -268,25 +268,11 @@ export const deleteUser = defineEndpoint({
       return finishDeletion()
     }
 
-    // Stale session: prove it is still the account holder before destroying data.
-    const identifier = user.email
-      ? ({ kind: "email", value: user.email } as const)
-      : user.phoneNumber
-        ? ({ kind: "phoneNumber", value: user.phoneNumber } as const)
-        : null
+    // A guest with no identifier still can't be challenged at all.
+    if (!user.email && !user.phoneNumber) {
+      throw new AuthApiError("guestCannotReceiveCode", 409)
+    }
 
-    if (!identifier) throw new AuthApiError("guestCannotReceiveCode", 409)
-
-    await sendVerificationCode(internals, {
-      identifier,
-      purpose: "deleteUser",
-      locale: resolveLocale(
-        headers.get("accept-language"),
-        config.localization
-      ),
-      headers
-    })
-
-    throw new AuthApiError("codeSent", 403)
+    throw new AuthApiError("staleSession", 403)
   }
 })

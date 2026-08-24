@@ -21,7 +21,7 @@ export const authServer = createAuthServer({
 You get the same endpoints three ways, derived from one registry so they cannot
 disagree: callable directly from your backend (`authServer.getToken({ headers })`),
 as one catch-all handler (`authServer.handler`), or as individual handlers
-(`authServer.handlers.sendCode`).
+(`authServer.handlers.sendSignInCode`).
 
 Check your own four functions against the contract — point it at the database
 you actually use, since each check cleans up after itself:

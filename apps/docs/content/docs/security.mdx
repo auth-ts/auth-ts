@@ -26,9 +26,14 @@ so a resend cannot widen the set of values an attacker may guess. No slow hashin
 only slow down honest sign-ins.
 
 Sign-in codes and account-deletion codes share an identifier, so a stranger
-spamming `/send-code` at your address keeps you inside the send cooldown for the
-deletion challenge too. Purposes are checked on verify, so a sign-in code can
-never authorize a deletion — this is a bounded nuisance, not a bypass.
+spamming `/sign-in/send-code` at your address keeps you inside the send cooldown
+for `/user/send-delete-code` too. Purposes are checked on verify, so a sign-in
+code can never authorize a deletion — this is a bounded nuisance, not a bypass.
+
+`DELETE /user` never sends a code itself. A stale session refuses outright, with
+no side effect, so retrying a failed delete cannot fire a storm of email —
+`/user/send-delete-code` is the one call that puts a code in flight, and it needs
+the caller's own bearer token.
 
 A code whose delivery fails is rolled back rather than left live, so a sender
 outage does not start the cooldown against the person who never received it.
@@ -47,8 +52,9 @@ read-modify-written, so no request can be lost — but the count is not exact
 either: requests that are genuinely simultaneous can each read a number below
 the cap before the others land. The overshoot is bounded by that one burst and
 cannot be repeated. If you want exactness, enforce it at your edge on
-`/send-code` and `/sign-in/code` and set `rateLimit: false`; the five-guess cap
-on each code is keyed on the code rather than the caller and stays on regardless.
+`/sign-in/send-code` and `/sign-in/code` and set `rateLimit: false`; the
+five-guess cap on each code is keyed on the code rather than the caller and
+stays on regardless.
 
 Scope is authentication abuse only — email flooding and credential guessing. It
 is not a general API limiter; that belongs in infrastructure in front of

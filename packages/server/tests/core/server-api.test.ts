@@ -8,7 +8,7 @@ type TestContext = Awaited<ReturnType<typeof createTestServer>>
 
 async function signIn(context: TestContext) {
   await context.authServer.handler(
-    request("POST", "/api/auth/send-code", {
+    request("POST", "/api/auth/sign-in/send-code", {
       body: { email: "ada@example.com" }
     })
   )
@@ -329,7 +329,7 @@ describe("callables and handlers agree", () => {
     const jwks = { keys: [{ kty: "RSA", kid: "k1", n: "AQ", e: "AQAB" }] }
     const context = await createTestServer({ jwks: { json: jwks } })
 
-    await context.authServer.sendCode({ email: "ada@example.com" })
+    await context.authServer.sendSignInCode({ email: "ada@example.com" })
     expect(required(context.sentCodes.at(-1), "code").destination).toBe(
       "ada@example.com"
     )

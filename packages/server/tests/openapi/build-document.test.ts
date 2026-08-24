@@ -121,7 +121,7 @@ describe("buildOpenAPIDocument, given a real config", () => {
     expect(document.paths).not.toHaveProperty("/sign-in/guest")
     expect(document.paths).not.toHaveProperty("/accounts")
     expect(document.paths).not.toHaveProperty("/connect/{provider}")
-    expect(document.paths).toHaveProperty("/send-code")
+    expect(document.paths).toHaveProperty("/sign-in/send-code")
   })
 
   it("narrows {provider} to the providers actually configured", async () => {

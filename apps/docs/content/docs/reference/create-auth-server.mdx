@@ -82,7 +82,7 @@ const session = await authServer.getToken({ headers }) // null when nobody is
 authServer.handler(request)
 
 // 3. Individual handlers, if you prefer explicit routes.
-authServer.handlers.sendCode(request)
+authServer.handlers.sendSignInCode(request)
 ```
 
 Plus the JWT-plane functions:

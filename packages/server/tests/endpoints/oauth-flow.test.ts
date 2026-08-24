@@ -953,7 +953,7 @@ describe("oauth callback", () => {
   it("links a verified email to an account that already signed up with a code", async () => {
     const { authServer, db, sentCodes } = await createTestServer(OAUTH_OPTIONS)
     await authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -992,7 +992,7 @@ describe("connect and disconnect", () => {
     context: Awaited<ReturnType<typeof createTestServer>>
   ) => {
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )

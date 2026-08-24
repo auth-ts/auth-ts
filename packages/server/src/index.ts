@@ -59,7 +59,6 @@ export type {
   GetProviderTokenInput,
   ProviderTokenResult
 } from "./endpoints/identities/$id/token"
-export type { SendCodeInput } from "./endpoints/send-code"
 export type { CurrentSession } from "./endpoints/session"
 export type { SessionInfo } from "./endpoints/sessions"
 export type { RevokeSessionInput } from "./endpoints/sessions/$id"
@@ -69,6 +68,7 @@ export type {
   AuthorizeURLResult,
   SignInProviderInput
 } from "./endpoints/sign-in/provider/$provider"
+export type { SendSignInCodeInput } from "./endpoints/sign-in/send-code"
 export type {
   SignOutInput,
   SignOutScope

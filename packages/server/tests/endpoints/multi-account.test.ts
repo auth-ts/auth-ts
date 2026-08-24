@@ -23,7 +23,7 @@ async function signIn(
   cookies: Record<string, string> = {}
 ) {
   await context.authServer.handler(
-    request("POST", "/api/auth/send-code", { body: { email }, cookies })
+    request("POST", "/api/auth/sign-in/send-code", { body: { email }, cookies })
   )
   const response = await context.authServer.handler(
     request("POST", "/api/auth/sign-in/code", {

@@ -58,7 +58,7 @@ describe("cookieStorage", () => {
     server.on("GET", "/api/auth/session", { body: { id: "session-1" } })
     const client = createAuthClient({ cookieStorage: storage })
 
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
     await client.getSession()
 
     expect(server.requests[0]?.credentials).toBe("omit")

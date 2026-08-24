@@ -8,7 +8,7 @@ type TestContext = Awaited<ReturnType<typeof createTestServer>>
 /** Signs an address in from a fresh browser and returns its refresh cookie. */
 async function signIn(context: TestContext, email: string) {
   await context.authServer.handler(
-    request("POST", "/api/auth/send-code", { body: { email } })
+    request("POST", "/api/auth/sign-in/send-code", { body: { email } })
   )
   const response = await context.authServer.handler(
     request("POST", "/api/auth/sign-in/code", {

@@ -21,7 +21,7 @@ export interface SignInCodeInput extends IdentifierBody {
 }
 
 /** How `POST /sign-in/code` appears in the OpenAPI document. */
-export const signInCodeDocs: EndpointDocs<SignInCodeInput> = {
+export const signInWithCodeDocs: EndpointDocs<SignInCodeInput> = {
   description: "A failed request does not use up the code.",
   tag: "Sign in",
   auth: "none",
@@ -50,13 +50,13 @@ export const signInCodeDocs: EndpointDocs<SignInCodeInput> = {
  * Sign in with a code.
  *
  * Creating the user happens here rather than at send time, which is what makes
- * `send-code` safe to answer identically for everyone.
+ * `sign-in/send-code` safe to answer identically for everyone.
  *
  * If the caller is currently a guest, this completes their conversion — either
  * upgrading the guest row in place or attaching it to the account that already
  * owns the identifier.
  */
-export const signInCode = defineEndpoint({
+export const signInWithCode = defineEndpoint({
   method: "POST",
   path: "/sign-in/code",
   parse: async ({ request }): Promise<SignInCodeInput> => {

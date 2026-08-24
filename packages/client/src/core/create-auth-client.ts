@@ -3,6 +3,7 @@ import {
   createDeleteUser,
   createListSessions,
   createRevokeSession,
+  createSendDeleteUserCode,
   createSignOut,
   createUpdateUser
 } from "../methods/account"
@@ -17,11 +18,14 @@ import {
   createListIdentities,
   createSwitchAccount
 } from "../methods/identities-and-accounts"
-import { createConnectProvider, createSignInProvider } from "../methods/oauth"
 import {
-  createSendCode,
-  createSignInCode,
-  createSignInGuest
+  createConnectProvider,
+  createSignInWithProvider
+} from "../methods/oauth"
+import {
+  createSendSignInCode,
+  createSignInAsGuest,
+  createSignInWithCode
 } from "../methods/sign-in"
 import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
@@ -54,10 +58,10 @@ export interface AuthClient {
   getUser: ReturnType<typeof createGetUser>
   /** The session this browser is on, confirming it is live and keeping it that way. */
   getSession: ReturnType<typeof createGetSession>
-  sendCode: ReturnType<typeof createSendCode>
-  signInCode: ReturnType<typeof createSignInCode>
-  signInGuest: ReturnType<typeof createSignInGuest>
-  signInProvider: ReturnType<typeof createSignInProvider>
+  sendSignInCode: ReturnType<typeof createSendSignInCode>
+  signInWithCode: ReturnType<typeof createSignInWithCode>
+  signInAsGuest: ReturnType<typeof createSignInAsGuest>
+  signInWithProvider: ReturnType<typeof createSignInWithProvider>
   connectProvider: ReturnType<typeof createConnectProvider>
   listIdentities: ReturnType<typeof createListIdentities>
   disconnectIdentity: ReturnType<typeof createDisconnectIdentity>
@@ -68,6 +72,7 @@ export interface AuthClient {
   switchAccount: ReturnType<typeof createSwitchAccount>
   updateUser: ReturnType<typeof createUpdateUser>
   deleteUser: ReturnType<typeof createDeleteUser>
+  sendDeleteUserCode: ReturnType<typeof createSendDeleteUserCode>
   signOut: ReturnType<typeof createSignOut>
   /** Changes the locale sent on subsequent requests. */
   setLocale: (locale: string | undefined) => void
@@ -103,10 +108,10 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     getToken,
     getUser: createGetUser(internals, refresh),
     getSession: createGetSession(internals),
-    sendCode: createSendCode(internals),
-    signInCode: createSignInCode(internals),
-    signInGuest: createSignInGuest(internals),
-    signInProvider: createSignInProvider(internals),
+    sendSignInCode: createSendSignInCode(internals),
+    signInWithCode: createSignInWithCode(internals),
+    signInAsGuest: createSignInAsGuest(internals),
+    signInWithProvider: createSignInWithProvider(internals),
     connectProvider: createConnectProvider(internals),
     listIdentities: createListIdentities(internals),
     disconnectIdentity: createDisconnectIdentity(internals),
@@ -117,6 +122,7 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     switchAccount: createSwitchAccount(internals),
     updateUser: createUpdateUser(internals),
     deleteUser: createDeleteUser(internals),
+    sendDeleteUserCode: createSendDeleteUserCode(internals),
     signOut: createSignOut(internals),
     setLocale: (locale) => {
       internals.locale = locale

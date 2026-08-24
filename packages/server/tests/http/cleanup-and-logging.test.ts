@@ -21,7 +21,7 @@ describe("sweeping", () => {
   type TestContext = Awaited<ReturnType<typeof createTestServer>>
 
   const sendCode = (email = "ada@example.com") =>
-    request("POST", "/api/auth/send-code", { body: { email } })
+    request("POST", "/api/auth/sign-in/send-code", { body: { email } })
 
   const signIn = async (context: TestContext, email = "ada@example.com") => {
     await context.authServer.handler(sendCode(email))
@@ -119,7 +119,7 @@ describe("logging redaction", () => {
     const context = await createTestServer({ guest: true, logLevel: "debug" })
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -165,12 +165,12 @@ describe("logging redaction", () => {
     const context = await createTestServer({ logLevel: "info" })
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -184,7 +184,7 @@ describe("logging redaction", () => {
     const context = await createTestServer({ logLevel: "silent" })
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
@@ -199,12 +199,12 @@ describe("logging redaction", () => {
     const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {})
 
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
     await context.authServer.handler(
-      request("POST", "/api/auth/send-code", {
+      request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )

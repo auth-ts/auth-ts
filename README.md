@@ -68,8 +68,8 @@ import { createAuthClient } from "@auth-ts/client"
 
 export const authClient = createAuthClient()
 
-await authClient.sendCode({ email })
-await authClient.signInCode({ email, code })
+await authClient.sendSignInCode({ email })
+await authClient.signInWithCode({ email, code })
 
 // Hand this to your PostgREST client.
 const token = await authClient.getToken()

@@ -19,7 +19,7 @@ const signedIn = async () => {
     token: fakeAccessToken()
   })
   const client = createAuthClient()
-  await client.signInCode({ email: "ada@example.com", code: "123456" })
+  await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
   return client
 }
@@ -33,7 +33,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe("signInCode", () => {
+describe("signInWithCode", () => {
   it("primes the token and user without a second round-trip", async () => {
     server.on("POST", "/api/auth/sign-in/code", {
       body: { user },
@@ -41,7 +41,7 @@ describe("signInCode", () => {
     })
     const client = createAuthClient()
 
-    const result = await client.signInCode({
+    const result = await client.signInWithCode({
       email: "ada@example.com",
       code: "123456"
     })
@@ -52,20 +52,20 @@ describe("signInCode", () => {
   })
 })
 
-describe("sendCode", () => {
+describe("sendSignInCode", () => {
   it("passes the identifier through and reports a cooldown with its countdown", async () => {
-    server.on("POST", "/api/auth/send-code", { body: { sent: true } })
-    server.on("POST", "/api/auth/send-code", {
+    server.on("POST", "/api/auth/sign-in/send-code", { body: { sent: true } })
+    server.on("POST", "/api/auth/sign-in/send-code", {
       status: 429,
       body: { code: "cooldown", message: "Wait 60 seconds.", retryAfter: 60 }
     })
     const client = createAuthClient()
 
-    await client.sendCode({ email: "ada@example.com" })
+    await client.sendSignInCode({ email: "ada@example.com" })
     expect(server.requests[0]?.body).toEqual({ email: "ada@example.com" })
 
     await expect(
-      client.sendCode({ email: "ada@example.com" })
+      client.sendSignInCode({ email: "ada@example.com" })
     ).rejects.toMatchObject({
       code: "cooldown",
       retryAfter: 60
@@ -73,14 +73,14 @@ describe("sendCode", () => {
   })
 
   it("throws a real Error, carrying name and the server's message", async () => {
-    server.on("POST", "/api/auth/send-code", {
+    server.on("POST", "/api/auth/sign-in/send-code", {
       status: 429,
       body: { code: "cooldown", message: "Wait 60 seconds.", retryAfter: 60 }
     })
     const client = createAuthClient()
 
     const thrown = await client
-      .sendCode({ email: "ada@example.com" })
+      .sendSignInCode({ email: "ada@example.com" })
       .then(() => null)
       .catch((error: unknown) => error)
 
@@ -123,7 +123,7 @@ describe("sendCode", () => {
   })
 })
 
-describe("signInGuest", () => {
+describe("signInAsGuest", () => {
   it("throws the error body's fields when the browser is already signed in", async () => {
     const wireBody = {
       name: "AuthError",
@@ -137,7 +137,7 @@ describe("signInGuest", () => {
     const client = createAuthClient()
 
     const thrown = await client
-      .signInGuest()
+      .signInAsGuest()
       .then(() => null)
       .catch((error: unknown) => error)
 
@@ -172,7 +172,7 @@ describe("signOut", () => {
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
     await client.signOut()
 
@@ -187,7 +187,7 @@ describe("signOut", () => {
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
     await client.signOut({ scope: "others" })
   })
@@ -219,7 +219,7 @@ describe("signOut", () => {
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
     await client.signOut()
 
@@ -228,14 +228,17 @@ describe("signOut", () => {
 })
 
 describe("deleteUser", () => {
-  it("reports the code challenge as a value, not an error", async () => {
+  it("reports a stale session as a value, not an error", async () => {
     server.on("DELETE", "/api/auth/user", {
       status: 403,
-      body: { code: "codeSent", message: "Confirm with the code we sent." }
+      body: {
+        code: "staleSession",
+        message: "Please sign in again to continue."
+      }
     })
     const client = await signedIn()
 
-    expect(await client.deleteUser()).toEqual({ status: "codeRequired" })
+    expect(await client.deleteUser()).toEqual({ status: "staleSession" })
   })
 
   it("clears everything once the account is gone", async () => {
@@ -291,7 +294,7 @@ describe("sessions and accounts", () => {
     })
 
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
     const sessions = await client.listSessions()
     expect(sessions).toHaveLength(2)
@@ -319,7 +322,7 @@ describe("sessions and accounts", () => {
     })
 
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
     await client.revokeSession({ id: "a" })
   })
 
@@ -335,7 +338,7 @@ describe("sessions and accounts", () => {
     })
 
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
     const result = await client.switchAccount({ userId: "user-2" })
 
@@ -357,7 +360,7 @@ describe("oauth navigation", () => {
       body: { url: "https://github.com/login/oauth/authorize?state=abc" }
     })
 
-    await createAuthClient({ locale: "de" }).signInProvider({
+    await createAuthClient({ locale: "de" }).signInWithProvider({
       provider: "github",
       redirect: "/dashboard"
     })
@@ -426,27 +429,29 @@ describe("connected accounts", () => {
 
 describe("locale", () => {
   it("sends Accept-Language and updates it at runtime", async () => {
-    server.on("POST", "/api/auth/send-code", { body: { sent: true } })
+    server.on("POST", "/api/auth/sign-in/send-code", { body: { sent: true } })
     const client = createAuthClient({ locale: "de" })
 
-    await client.sendCode({ email: "ada@example.com" })
+    await client.sendSignInCode({ email: "ada@example.com" })
     expect(server.requests[0]?.acceptLanguage).toBe("de")
 
     client.setLocale("fr")
-    await client.sendCode({ email: "ada@example.com" })
+    await client.sendSignInCode({ email: "ada@example.com" })
     expect(server.requests[1]?.acceptLanguage).toBe("fr")
   })
 })
 
 describe("baseURL", () => {
   it("targets a different origin when configured", async () => {
-    server.on("POST", "/api/auth/send-code", { body: { sent: true } })
+    server.on("POST", "/api/auth/sign-in/send-code", { body: { sent: true } })
 
-    await createAuthClient({ baseURL: "https://auth.example.com" }).sendCode({
+    await createAuthClient({
+      baseURL: "https://auth.example.com"
+    }).sendSignInCode({
       email: "ada@example.com"
     })
 
-    expect(server.requests[0]?.path).toBe("/api/auth/send-code")
+    expect(server.requests[0]?.path).toBe("/api/auth/sign-in/send-code")
     expect(server.requests[0]?.credentials).toBe("include")
   })
 })

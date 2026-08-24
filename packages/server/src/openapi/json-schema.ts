@@ -50,7 +50,9 @@ export type ComponentResponseName =
   | "InvalidField"
   | "RateLimited"
   | "Forbidden"
+  | "StaleSession"
   | "Conflict"
+  | "GuestCannotReceiveCode"
   | "MethodNotAllowed"
   | "InternalError"
 

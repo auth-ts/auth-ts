@@ -345,7 +345,7 @@ describe("a refused token", () => {
       token: fakeAccessToken()
     })
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
     expect(await client.listSessions()).toEqual([])
     expect(
@@ -365,7 +365,7 @@ describe("a refused token", () => {
     server.on("GET", "/api/auth/sessions", refused)
     server.on("GET", "/api/auth/token", refused)
     const client = createAuthClient()
-    await client.signInCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
     await expect(client.listSessions()).rejects.toMatchObject({
       code: "unauthenticated"

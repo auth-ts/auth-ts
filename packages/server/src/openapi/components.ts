@@ -198,11 +198,15 @@ export const componentResponses: Record<
     ),
     headers: { "Retry-After": { schema: { type: "integer" } } }
   } as ReturnType<typeof failure>,
-  Forbidden: failure(
-    "The origin is not one this server serves, or the action needs a fresher session."
+  Forbidden: failure("The origin is not one this server serves."),
+  StaleSession: failure(
+    "The session is too old for this action without re-proving identity."
   ),
   Conflict: failure(
     "That provider identity is already linked to a different user."
+  ),
+  GuestCannotReceiveCode: failure(
+    "The account has no email or phone number to send a code to."
   ),
   MethodNotAllowed: failure("The method is not allowed for this path."),
   InternalError: failure(

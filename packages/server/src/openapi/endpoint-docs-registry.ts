@@ -8,16 +8,17 @@ import { listIdentitiesDocs } from "../endpoints/identities"
 import { disconnectIdentityDocs } from "../endpoints/identities/$id"
 import { getProviderTokenDocs } from "../endpoints/identities/$id/token"
 import { getJwksDocs } from "../endpoints/jwks"
-import { sendCodeDocs } from "../endpoints/send-code"
 import { getSessionDocs } from "../endpoints/session"
 import { listSessionsDocs } from "../endpoints/sessions"
 import { revokeSessionDocs } from "../endpoints/sessions/$id"
-import { signInCodeDocs } from "../endpoints/sign-in/code"
-import { signInGuestDocs } from "../endpoints/sign-in/guest"
-import { signInProviderDocs } from "../endpoints/sign-in/provider/$provider"
+import { signInWithCodeDocs } from "../endpoints/sign-in/code"
+import { signInAsGuestDocs } from "../endpoints/sign-in/guest"
+import { signInWithProviderDocs } from "../endpoints/sign-in/provider/$provider"
+import { sendSignInCodeDocs } from "../endpoints/sign-in/send-code"
 import { signOutDocs } from "../endpoints/sign-out"
 import { getTokenDocs } from "../endpoints/token"
 import { deleteUserDocs, getUserDocs, updateUserDocs } from "../endpoints/user"
+import { sendDeleteUserCodeDocs } from "../endpoints/user/send-delete-code"
 import type { AnyEndpointDocs } from "./endpoint-docs"
 
 // Declared here rather than beside their endpoints: both serve this document,
@@ -50,20 +51,21 @@ const getReferenceDocs: AnyEndpointDocs = {
 export const endpointDocs: {
   [Name in keyof EndpointRegistry]: AnyEndpointDocs
 } = {
-  sendCode: sendCodeDocs,
+  sendSignInCode: sendSignInCodeDocs,
   getToken: getTokenDocs,
-  signInCode: signInCodeDocs,
+  signInWithCode: signInWithCodeDocs,
   signOut: signOutDocs,
   getSession: getSessionDocs,
   getUser: getUserDocs,
   updateUser: updateUserDocs,
   deleteUser: deleteUserDocs,
+  sendDeleteUserCode: sendDeleteUserCodeDocs,
   listSessions: listSessionsDocs,
   revokeSession: revokeSessionDocs,
   listAccounts: listAccountsDocs,
   switchAccount: switchAccountDocs,
-  signInGuest: signInGuestDocs,
-  signInProvider: signInProviderDocs,
+  signInAsGuest: signInAsGuestDocs,
+  signInWithProvider: signInWithProviderDocs,
   callbackProvider: callbackProviderDocs,
   connectProvider: connectProviderDocs,
   listIdentities: listIdentitiesDocs,
@@ -84,20 +86,21 @@ export const endpointDocs: {
  * source files, and no edge runtime can do that.
  */
 export const summaries: { [Name in keyof EndpointRegistry]: string } = {
-  sendCode: "Send a sign-in code",
+  sendSignInCode: "Send a sign-in code",
   getToken: "Get an access token",
-  signInCode: "Sign in with a code",
+  signInWithCode: "Sign in with a code",
   signOut: "Sign out",
   getSession: "Get the current session",
   getUser: "Get the current user",
   updateUser: "Update the current user",
   deleteUser: "Delete the current user",
+  sendDeleteUserCode: "Send a delete-user code",
   listSessions: "List the active sessions",
   revokeSession: "Revoke a session",
   listAccounts: "List the signed in accounts",
   switchAccount: "Switch to another signed in account",
-  signInGuest: "Sign in as a guest",
-  signInProvider: "Sign in with a provider",
+  signInAsGuest: "Sign in as a guest",
+  signInWithProvider: "Sign in with a provider",
   callbackProvider: "Provider callback",
   connectProvider: "Connect a provider",
   listIdentities: "List the connected providers",
