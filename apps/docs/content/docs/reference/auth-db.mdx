@@ -46,9 +46,13 @@ the browser. Rotating `secret` makes them unreadable, which surfaces as
 "reconnect this account" and never as a wrong token sent to a provider.
 
 **`createdAt` and `updatedAt` are written by core**, on every insert and on
-every update it makes. Your columns need no default and no trigger: the values
-come from the server that served the request, so they mean the same thing
-whichever database is underneath. A store that sets its own is overruled.
+every update it makes, so nothing is required of your columns for the library's
+own writes to be stamped correctly.
+
+Defaults and triggers are yours to add, and a trigger wins where you have one —
+it runs after the value core sent. Add one when something other than the
+library writes the table: a browser reaching your data plane directly is not a
+path core is on, and only the database can stamp those rows.
 
 **The unique constraints are a requirement, not hygiene.** The library reads
 before it writes — that is what a generic contract can express — so two first
