@@ -16,7 +16,7 @@ export const disconnectIdentityDocs: EndpointDocs<
   "id"
 > = {
   description:
-    'Addressed by identity id rather than by provider, because a user may connect several accounts at the same provider and "disconnect Google" would take all of them. The stored provider tokens go with the row; nothing is revoked at the provider, which is the user\'s to do from their own account screen.',
+    "Addressed by identity id, since one provider can be linked twice.",
   tag: "Identities",
   auth: "bearer",
   params: { id: "The identity's id, from `GET /identities`." },
@@ -28,7 +28,7 @@ export const disconnectIdentityDocs: EndpointDocs<
 }
 
 /**
- * Unlinks one connected account from the signed-in user.
+ * Unlinks a connected provider.
  *
  * Addressed by identity id rather than by provider, because a user may connect
  * several accounts at the same provider — two Google addresses, a personal and

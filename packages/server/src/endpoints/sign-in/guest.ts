@@ -18,8 +18,7 @@ export interface SignInGuestInput {
 
 /** How `POST /sign-in/guest` appears in the OpenAPI document. */
 export const signInGuestDocs: EndpointDocs<SignInGuestInput> = {
-  description:
-    "Creates an anonymous user and signs it in. A browser already holding a live session is refused: a guest parked behind a real account is a row nothing will ever convert.",
+  description: "Fails if this browser is already signed in.",
   tag: "Sign in",
   auth: "none",
   requires: "guest",
@@ -37,7 +36,7 @@ export const signInGuestDocs: EndpointDocs<SignInGuestInput> = {
 }
 
 /**
- * Signs in an anonymous user.
+ * Signs in as a guest.
  *
  * A guest is a full user — real id, real session, real rows under row-level
  * security — which is what makes conversion later a rename rather than a

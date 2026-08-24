@@ -18,7 +18,7 @@ import { sendVerificationCode } from "../verification-code/send-verification-cod
 /** How `GET /user` appears in the OpenAPI document. */
 export const getUserDocs: EndpointDocs<never> = {
   description:
-    "One read of `users`. A client that is refreshing anyway never needs this \u2014 `GET /token` returns the user alongside the token.",
+    "Skip this if you already call /token, which returns the user too.",
   tag: "User",
   auth: "bearer",
   responses: {
@@ -28,7 +28,7 @@ export const getUserDocs: EndpointDocs<never> = {
 }
 
 /**
- * Reads the signed-in user.
+ * Gets the current user.
  *
  * One read of `users` and nothing else: the token names the caller, so there is
  * no session to resolve. A caller without a live token gets a 401 and goes to
@@ -67,7 +67,7 @@ export interface UpdateUserInput extends CallerInput {
 /** How `POST /user` appears in the OpenAPI document. */
 export const updateUserDocs: EndpointDocs<UpdateUserInput> = {
   description:
-    "A flat body: the whole payload is user fields, so declared additional fields go at the top level rather than nested. `email` and `phoneNumber` are rejected rather than updated \u2014 changing an identifier re-keys the account, which is a ceremony with a code verified at the new address. `type` and `id` are rejected outright.",
+    "Flat body, so additional fields go at the top level. Email and phone cannot be changed here.",
   tag: "User",
   auth: "bearer",
   additionalFields: "flat",
@@ -83,7 +83,7 @@ export const updateUserDocs: EndpointDocs<UpdateUserInput> = {
 }
 
 /**
- * Updates the fields core owns, plus any declared additional fields.
+ * Updates the current user.
  *
  * `email` and `phoneNumber` are rejected rather than updated. An identifier is
  * the anchor every sign-in resolves to, so changing one re-keys the account —
@@ -172,7 +172,7 @@ export interface DeleteUserInput extends CallerInput {
 /** How `DELETE /user` appears in the OpenAPI document. */
 export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
   description:
-    "Two phases in one endpoint. A session that authenticated recently deletes immediately; an older one is challenged and must repeat the call with `code`. The challenge answers 403, never 202: 204 is the only success shape, so a client treating any 2xx as done cannot tell someone their account is gone while it is not.",
+    "Sends a code first if the session is old, then repeat the call with it. Only 204 means deleted.",
   tag: "User",
   auth: "bearer",
   body: {
@@ -192,7 +192,7 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
 }
 
 /**
- * Deletes the signed-in account.
+ * Deletes the current user.
  *
  * Two phases, in one endpoint. A session that authenticated recently deletes
  * immediately; an older one is challenged with a code first.

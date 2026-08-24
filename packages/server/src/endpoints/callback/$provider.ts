@@ -35,8 +35,7 @@ export const callbackProviderDocs: EndpointDocs<
   CallbackProviderInput,
   "provider"
 > = {
-  description:
-    "The provider redirects a browser here; nothing calls it directly. Serves both sign-in and linking, decided by the `intent` in the state cookie. Failures render a page rather than JSON, because whoever hit this is looking at the response.",
+  description: "The provider redirects here. Not called directly.",
   tag: "Sign in",
   auth: "none",
   requires: "providers",
@@ -65,7 +64,7 @@ export const callbackProviderDocs: EndpointDocs<
 }
 
 /**
- * Finishes an OAuth flow, for both sign-in and linking.
+ * Finishes an OAuth flow.
  *
  * One callback serves both because the provider only ever gets one redirect URI.
  * The `intent` recorded in the state cookie decides what happens here, which is

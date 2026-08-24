@@ -28,8 +28,6 @@ export interface SwitchAccountInput extends CallerInput {
 
 /** How `POST /accounts/switch` appears in the OpenAPI document. */
 export const switchAccountDocs: EndpointDocs<SwitchAccountInput> = {
-  description:
-    "Nothing is re-authenticated, and nothing needs to be: holding the parked refresh token is the same proof as holding the active one. Only which cookie holds which token changes, so neither becomes readable by JavaScript during the swap.",
   tag: "Accounts",
   auth: "bearer",
   requires: "multiAccount",
@@ -55,7 +53,7 @@ export const switchAccountDocs: EndpointDocs<SwitchAccountInput> = {
 }
 
 /**
- * Makes one of this browser's parked accounts the active one.
+ * Switches to another signed-in account.
  *
  * Nothing is re-authenticated, and nothing needs to be: possession of the parked
  * refresh token is exactly the same proof as possession of the active one. All

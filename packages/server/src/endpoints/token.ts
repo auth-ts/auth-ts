@@ -31,7 +31,7 @@ export interface TokenInput extends HeadersInput {
 /** How `GET /token` appears in the OpenAPI document. */
 export const getTokenDocs: EndpointDocs<TokenInput> = {
   description:
-    "The only endpoint that reads the refresh cookie, and the only one that writes a session. No session is `null` with a 200, not a 401 \u2014 a client deciding what to render is not in a failure state. An `Authorization` header is ignored here. The refresh token is not rotated, so concurrent tabs cannot race each other.",
+    "Returns null with a 200 when nobody is signed in, not a 401. Reads the refresh cookie and ignores the Authorization header.",
   tag: "Session",
   auth: "cookie",
   responses: {
@@ -45,7 +45,7 @@ export const getTokenDocs: EndpointDocs<TokenInput> = {
 }
 
 /**
- * Exchanges the refresh cookie for an access token, or answers null.
+ * Gets a new access token, or null when nobody is signed in.
  *
  * The only endpoint that authenticates from the cookie, and therefore the only
  * one that touches a session: every other endpoint reads the token this

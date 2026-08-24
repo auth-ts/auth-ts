@@ -14,8 +14,7 @@ export interface SendCodeInput extends IdentifierBody {
 
 /** How `POST /send-code` appears in the OpenAPI document. */
 export const sendCodeDocs: EndpointDocs<SendCodeInput> = {
-  description:
-    "Send exactly one of `email` or `phoneNumber`. The channel you pass selects the sender, and a channel this server has no sender for is refused rather than silently dropped.",
+  description: "Send either an email or a phone number, not both.",
   tag: "Sign in",
   auth: "none",
   body: {

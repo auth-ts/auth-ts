@@ -4,8 +4,7 @@ import type { EndpointDocs } from "../openapi/endpoint-docs"
 
 /** How `GET /jwks` appears in the OpenAPI document. */
 export const getJwksDocs: EndpointDocs<never> = {
-  description:
-    "Only present when `jwks.json` is configured. Normally the key set is a static file in the application's public folder and the verifier is pointed straight at it; this route is for a runtime with no public folder. The one response here a cache may keep.",
+  description: "Only served when jwks.json is configured.",
   tag: "Discovery",
   auth: "none",
   requires: "jwks",
@@ -18,7 +17,7 @@ export const getJwksDocs: EndpointDocs<never> = {
 }
 
 /**
- * Serves the configured public key set.
+ * Gets the public key set.
  *
  * Normally there is nothing to serve: the JWKS is a static file in the
  * application's public folder, written by `bun x @auth-ts/cli keygen`, and the

@@ -55,8 +55,12 @@ export interface EndpointDocs<
   Input,
   PathParam extends keyof Input & string = never
 > {
-  /** What an HTTP caller needs that the TypeScript doc comment does not cover. */
-  description: string
+  /**
+   * What an HTTP caller needs that the summary and the schemas do not already
+   * say. Omitted when there is nothing — a paraphrase of the endpoint's own doc
+   * comment is worse than one line, because it reads as a second answer.
+   */
+  description?: string
   tag: EndpointTag
   auth: EndpointAuth
   requires?: EndpointRequirement
@@ -85,7 +89,7 @@ export interface EndpointDocs<
  * single type argument makes every concrete `EndpointDocs` assignable.
  */
 export interface AnyEndpointDocs {
-  description: string
+  description?: string
   tag: EndpointTag
   auth: EndpointAuth
   requires?: EndpointRequirement

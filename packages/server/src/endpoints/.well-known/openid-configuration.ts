@@ -5,7 +5,7 @@ import type { EndpointDocs } from "../../openapi/endpoint-docs"
 /** How `GET /.well-known/openid-configuration` appears in the OpenAPI document. */
 export const getDiscoveryDocs: EndpointDocs<never> = {
   description:
-    "Exists so a verifier that takes an issuer URL can find the keys itself. This library is not an OAuth authorization server and issues no OAuth flows \u2014 the document carries just enough to locate the key set, and `issuer` matches the `iss` claim on every token exactly.",
+    "For verifiers that take an issuer URL and find the keys themselves.",
   tag: "Discovery",
   auth: "none",
   requires: "baseURL",
@@ -15,7 +15,7 @@ export const getDiscoveryDocs: EndpointDocs<never> = {
 }
 
 /**
- * The minimal OIDC discovery document.
+ * Gets the OIDC discovery document.
  *
  * This exists for one reason: Supabase's third-party auth takes an *issuer* URL
  * and discovers the keys itself, so a bare JWKS URL is not enough. This library

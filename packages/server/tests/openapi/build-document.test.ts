@@ -81,16 +81,16 @@ describe("buildOpenAPIDocument", () => {
     expect(schemas.AuthError?.properties.code?.enum).toEqual(ERROR_CODES)
   })
 
-  it("gives every operation a summary and a description", () => {
-    const thin = Object.entries(reference.paths).flatMap(([path, item]) =>
-      Object.entries(
-        item as Record<string, { summary?: string; description?: string }>
-      )
-        .filter(([, operation]) => !operation.summary || !operation.description)
+  it("gives every operation a summary", () => {
+    // A description is optional on purpose: where the summary and the schemas
+    // already say it, a paraphrase reads as a second, competing answer.
+    const unnamed = Object.entries(reference.paths).flatMap(([path, item]) =>
+      Object.entries(item as Record<string, { summary?: string }>)
+        .filter(([, operation]) => !operation.summary)
         .map(([method]) => `${method.toUpperCase()} ${path}`)
     )
 
-    expect(thin).toEqual([])
+    expect(unnamed).toEqual([])
   })
 })
 

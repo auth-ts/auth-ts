@@ -29,7 +29,7 @@ export interface AuthorizeURLResult {
 export const signInProviderDocs: EndpointDocs<SignInProviderInput, "provider"> =
   {
     description:
-      "Answers with the authorize URL rather than redirecting, because the caller has to be the one that navigates and a native shell cannot read a `Location` out of an opaque redirect. Navigate to `url`; do not fetch it. The `Set-Cookie` here must travel with that navigation. Signing in never links accounts \u2014 that is `POST /connect/{provider}`.",
+      "Navigate to the url. Do not fetch it. Signing in never links accounts \u2014 use /connect/{provider} for that.",
     tag: "Sign in",
     auth: "none",
     requires: "providers",
@@ -64,7 +64,7 @@ export const signInProviderDocs: EndpointDocs<SignInProviderInput, "provider"> =
   }
 
 /**
- * Starts an OAuth sign-in by handing back the provider's authorize URL.
+ * Starts an OAuth sign-in.
  *
  * A POST that answers with the URL rather than a redirect, because the caller
  * has to be the one that navigates. A desktop or mobile app must open the

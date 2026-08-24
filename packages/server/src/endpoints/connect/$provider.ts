@@ -24,7 +24,7 @@ export const connectProviderDocs: EndpointDocs<
   "provider"
 > = {
   description:
-    "Links a provider to the **current** user, unlike `/sign-in/provider/{provider}`. A POST so it authenticates from the access token like everything else \u2014 a top-level navigation carries no `Authorization` header, which would have left a cookie as the credential. Navigate to `url`; do not fetch it.",
+    "Links to the current user, unlike sign-in. Navigate to the url.",
   tag: "Identities",
   auth: "bearer",
   requires: "providers",
@@ -53,7 +53,7 @@ export const connectProviderDocs: EndpointDocs<
 }
 
 /**
- * Starts linking a provider to the current user.
+ * Starts linking a provider.
  *
  * Answers with the authorize URL rather than a redirect, for the reason
  * `/sign-in/provider/:provider` does — and because it is a POST it

@@ -32,7 +32,7 @@ export interface ListAccountsInput extends CallerInput {
 /** How `GET /accounts` appears in the OpenAPI document. */
 export const listAccountsDocs: EndpointDocs<ListAccountsInput> = {
   description:
-    "The account switcher. Parked tokens whose sessions have died are pruned in the same response, so a revoked device stops appearing immediately. Note the three: `/sessions` is one user's devices, `/accounts` is one browser's users, `/identities` is one user's linked providers.",
+    "/sessions is one user's devices, /accounts is this browser's users, /identities is one user's providers.",
   tag: "Accounts",
   auth: "bearer",
   requires: "multiAccount",
@@ -47,7 +47,7 @@ export const listAccountsDocs: EndpointDocs<ListAccountsInput> = {
 }
 
 /**
- * Lists every user signed in to this browser.
+ * Lists the accounts signed in to this browser.
  *
  * The account switcher. Parked tokens whose sessions have died are pruned from
  * the cookie in the same response, so a revoked device stops appearing here

@@ -22,8 +22,7 @@ export interface SignInCodeInput extends IdentifierBody {
 
 /** How `POST /sign-in/code` appears in the OpenAPI document. */
 export const signInCodeDocs: EndpointDocs<SignInCodeInput> = {
-  description:
-    "Send the same identifier the code went to, plus the code. A 400 here does not spend the code, so a typo in `additionalFields` is safe to retry. `additionalFields` applies only when this call creates the user.",
+  description: "A failed request does not use up the code.",
   tag: "Sign in",
   auth: "none",
   additionalFields: "nested",

@@ -23,7 +23,7 @@ export type SessionInfo = Omit<AuthSession, "tokenHash">
 /** How `GET /sessions` appears in the OpenAPI document. */
 export const listSessionsDocs: EndpointDocs<never> = {
   description:
-    "Newest first, one page. `tokenHash` never crosses to the browser; `id` is the only address a client sees, and the only thing revocation needs. Compare each `id` against `GET /session` to mark the current device.",
+    "Newest first. Match the ids against /session to find the current device.",
   tag: "Session",
   auth: "bearer",
   responses: {
@@ -36,7 +36,7 @@ export const listSessionsDocs: EndpointDocs<never> = {
 }
 
 /**
- * Lists the signed-in user's sessions.
+ * Lists the current user's sessions.
  *
  * `tokenHash` never crosses to the browser — `id` is the only address a client
  * ever sees, and it is the only thing revocation needs.

@@ -50,7 +50,7 @@ export interface SignOutInput extends CallerInput {
 /** How `POST /sign-out` appears in the OpenAPI document. */
 export const signOutDocs: EndpointDocs<SignOutInput> = {
   description:
-    'Two axes that compose: `scope` is how far each affected account is signed out, `userId` is whether that applies to one account or every account parked in this browser. Revoked devices keep working until their access token expires, so "everywhere" means within `jwt.ttl`.',
+    "Signs out this device by default. Use scope for other devices, and userId for one account.",
   tag: "Session",
   auth: "bearer",
   body: {
@@ -86,7 +86,7 @@ export const signOutDocs: EndpointDocs<SignOutInput> = {
 }
 
 /**
- * Ends sessions.
+ * Signs out.
  *
  * Two axes, which compose: `scope` says how far each affected account is signed
  * out — this device, other devices, everywhere — and `account` says whether that

@@ -31,7 +31,7 @@ export type IdentityInfo = Omit<
 /** How `GET /identities` appears in the OpenAPI document. */
 export const listIdentitiesDocs: EndpointDocs<never> = {
   description:
-    "Both stored provider credentials are stripped: a ciphertext on a screen is a liability with no use. `GET /identities/{id}/token` is the only way to reach a provider's API, and it reports its own expiry.",
+    "Provider tokens are not included. Use /identities/{id}/token for those.",
   tag: "Identities",
   auth: "bearer",
   responses: {
@@ -43,7 +43,7 @@ export const listIdentitiesDocs: EndpointDocs<never> = {
   }
 }
 
-/** Lists the signed-in user's linked providers. */
+/** Lists the current user's linked providers. */
 export const listIdentities = defineEndpoint({
   method: "GET",
   path: "/identities",

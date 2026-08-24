@@ -23,8 +23,7 @@ import type { AnyEndpointDocs } from "./endpoint-docs"
 // Declared here rather than beside their endpoints: both serve this document,
 // so a docs const in their own file would close an import cycle.
 const getOpenAPIDocumentDocs: AnyEndpointDocs = {
-  description:
-    "This document. Reflects the configuration it is served from, so the providers and additional fields it names are the ones this deployment actually has.",
+  description: "Matches this server's own configuration.",
   tag: "Discovery",
   auth: "none",
   responses: {
@@ -33,8 +32,6 @@ const getOpenAPIDocumentDocs: AnyEndpointDocs = {
 }
 
 const getReferenceDocs: AnyEndpointDocs = {
-  description:
-    "A browsable rendering of the OpenAPI document, for people rather than tools.",
   tag: "Discovery",
   auth: "none",
   responses: {
@@ -87,30 +84,26 @@ export const endpointDocs: {
  */
 export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   sendCode: "Sends a sign-in code.",
-  getToken:
-    "Exchanges the refresh cookie for an access token, or answers null.",
+  getToken: "Gets a new access token, or null when nobody is signed in.",
   signInCode: "Verifies a code and starts a session.",
-  signOut: "Ends sessions.",
-  getSession: "The session the caller is acting from.",
-  getUser: "Reads the signed-in user.",
-  updateUser:
-    "Updates the fields core owns, plus any declared additional fields.",
-  deleteUser: "Deletes the signed-in account.",
-  listSessions: "Lists the signed-in user's sessions.",
-  revokeSession: "Revokes one of the signed-in user's sessions.",
-  listAccounts: "Lists every user signed in to this browser.",
-  switchAccount: "Makes one of this browser's parked accounts the active one.",
-  signInGuest: "Signs in an anonymous user.",
-  signInProvider:
-    "Starts an OAuth sign-in by handing back the provider's authorize URL.",
-  callbackProvider: "Finishes an OAuth flow, for both sign-in and linking.",
-  connectProvider: "Starts linking a provider to the current user.",
-  listIdentities: "Lists the signed-in user's linked providers.",
-  disconnectIdentity: "Unlinks one connected account from the signed-in user.",
-  getProviderToken:
-    "Returns a usable access token for one connected account, refreshing it first if the stored one is spent.",
-  getJwks: "Serves the configured public key set.",
-  getDiscovery: "The minimal OIDC discovery document.",
-  getOpenAPIDocument: "Serves this server's OpenAPI document.",
-  getReference: "Serves a browsable reference for this server's API."
+  signOut: "Signs out.",
+  getSession: "Gets the current session.",
+  getUser: "Gets the current user.",
+  updateUser: "Updates the current user.",
+  deleteUser: "Deletes the current user.",
+  listSessions: "Lists the current user's sessions.",
+  revokeSession: "Revokes a session.",
+  listAccounts: "Lists the accounts signed in to this browser.",
+  switchAccount: "Switches to another signed-in account.",
+  signInGuest: "Signs in as a guest.",
+  signInProvider: "Starts an OAuth sign-in.",
+  callbackProvider: "Finishes an OAuth flow.",
+  connectProvider: "Starts linking a provider.",
+  listIdentities: "Lists the current user's linked providers.",
+  disconnectIdentity: "Unlinks a connected provider.",
+  getProviderToken: "Gets a provider access token.",
+  getJwks: "Gets the public key set.",
+  getDiscovery: "Gets the OIDC discovery document.",
+  getOpenAPIDocument: "Gets the OpenAPI document.",
+  getReference: "Gets the browsable API reference."
 }

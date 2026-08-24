@@ -39,7 +39,7 @@ export interface ProviderTokenResult {
 /** How `GET /identities/$id/token` appears in the OpenAPI document. */
 export const getProviderTokenDocs: EndpointDocs<GetProviderTokenInput, "id"> = {
   description:
-    "Call a provider as the user for as long as the grant lives, without another consent screen. The durable half of the grant never leaves the server \u2014 only this short-lived token does, which is short enough to hand a browser for a direct CORS call. A grant that can no longer produce a token answers `providerReconnectRequired`; only reconnecting fixes it.",
+    "Refreshes the token if needed. Reconnect the provider if it answers providerReconnectRequired.",
   tag: "Identities",
   auth: "bearer",
   params: { id: "The identity's id, from `GET /identities`." },
@@ -51,8 +51,7 @@ export const getProviderTokenDocs: EndpointDocs<GetProviderTokenInput, "id"> = {
 }
 
 /**
- * Returns a usable access token for one connected account, refreshing it first
- * if the stored one is spent.
+ * Gets a provider access token.
  *
  * This is what makes a connection worth keeping: the application calls Google
  * or GitHub as the user, for as long as the grant lives, without sending them

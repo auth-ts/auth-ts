@@ -11,8 +11,6 @@ export type CurrentSession = Omit<AuthSession, "tokenHash">
 
 /** How `GET /session` appears in the OpenAPI document. */
 export const getSessionDocs: EndpointDocs<never> = {
-  description:
-    "One read of `sessions`, no write. Its `id` is how a device list tells which entry is this device.",
   tag: "Session",
   auth: "bearer",
   responses: {
@@ -22,7 +20,7 @@ export const getSessionDocs: EndpointDocs<never> = {
 }
 
 /**
- * The session the caller is acting from.
+ * Gets the current session.
  *
  * Authenticated from the access token like everything else, whose `sid` says
  * which row to read — one read of `sessions`, no write. Sessions are touched on

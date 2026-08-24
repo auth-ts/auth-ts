@@ -42,8 +42,7 @@ export interface RevokeSessionResult {
 
 /** How `DELETE /sessions/$id` appears in the OpenAPI document. */
 export const revokeSessionDocs: EndpointDocs<RevokeSessionInput, "id"> = {
-  description:
-    "Revoking a session that is not yours answers 404 rather than succeeding. Revoking the one making the request clears the refresh cookie, and under `multiAccount` promotes the next account parked in this browser \u2014 `switchedTo` and `token` are present only then.",
+  description: "Revoking the current session signs this device out.",
   tag: "Session",
   auth: "bearer",
   params: { id: "The session's id, as listed by `GET /sessions`." },
@@ -59,7 +58,7 @@ export const revokeSessionDocs: EndpointDocs<RevokeSessionInput, "id"> = {
 }
 
 /**
- * Revokes one of the signed-in user's sessions.
+ * Revokes a session.
  *
  * Ownership is enforced inside the delete query rather than by comparing ids
  * first: the `where` names both `id` and `userId`, so revoking someone else's
