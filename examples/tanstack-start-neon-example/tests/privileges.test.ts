@@ -125,11 +125,20 @@ describe("privileges.sql", () => {
 
       const withheld = WITHHELD[table] ?? []
       expect(granted).toEqual(all.filter((name) => !withheld.includes(name)))
-      // The list is only meaningful if those columns are really there — a
-      // renamed column would otherwise pass by being absent from both sides.
       expect(all).toEqual(expect.arrayContaining(withheld))
     }
   )
+
+  it("enables row level security on every table", async () => {
+    // ALTER DEFAULT PRIVILEGES grants CRUD to new tables.
+    const unprotected = await client.query<{ relname: string }>(
+      `select relname from pg_class
+        where relnamespace = 'public'::regnamespace
+          and relkind = 'r' and not relrowsecurity`
+    )
+
+    expect(unprotected.rows.map((row) => row.relname)).toEqual([])
+  })
 
   it.each(SERVER_ONLY)(
     "denies every row and write of %s under policy-less RLS",
