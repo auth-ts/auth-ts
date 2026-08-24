@@ -106,18 +106,5 @@ export type {
 export type { OAuthStatePayload, StateCookie } from "./oauth/state-cookie"
 export type { OpenAPIDocument } from "./openapi/build-document"
 export { buildOpenAPIDocument } from "./openapi/build-document"
-export type {
-  EndpointAuth,
-  EndpointDocs,
-  EndpointRequirement,
-  EndpointResponse,
-  EndpointTag
-} from "./openapi/endpoint-docs"
-export type {
-  ComponentName,
-  ComponentResponseName,
-  JsonSchema,
-  ObjectSchemaFor
-} from "./openapi/json-schema"
 export type { GuestConversion, GuestIdentity } from "./session/convert-guest"
 export type { HeadersInput } from "./session/resolve-session"
