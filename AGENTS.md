@@ -3,6 +3,9 @@
 - Never add "what" comments or restate obvious code logic.
 - Do not reference the chat history, fixes, or prior iterations in the code.
 - Only document "why" a non-obvious workaround or platform constraint exists.
+- Short sentences. RFC 2119 keywords for obligations. Commit = imperative
+  subject; body only for a fact the diff cannot show. Comments only where code
+  needs clarification — never narration.
 
 # Package manager
 
