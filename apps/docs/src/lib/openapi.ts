@@ -3,27 +3,39 @@ import type { OpenAPIOptions } from "fumadocs-openapi/server"
 import { createOpenAPI } from "fumadocs-openapi/server"
 
 /**
- * A server the playground can actually reach, if one is configured.
+ * The document, exactly as the package builds it.
  *
- * Unset, the document carries a relative path and the playground is off: this
- * site documents the library rather than any deployment, so there would be
- * nothing behind the button. Point it at a demo, or at your own server while
- * working on the docs, and it becomes live — that server has to allow this
- * origin, and anything authenticating from the refresh cookie still needs the
- * two to be same-origin.
+ * What `/openapi.json` serves. It describes the library rather than any
+ * deployment, so its server stays relative no matter what the playground is
+ * pointed at.
  */
-export const apiURL = import.meta.env.VITE_DOCS_API_URL as string | undefined
-
-/** The document this site serves and renders, pointed at {@link apiURL} if set. */
 export function apiDocument() {
+  return buildOpenAPIDocument()
+}
+
+/**
+ * The same document, with the server the playground should send to.
+ *
+ * Upstream takes the playground's target from `servers`, and exposes no way to
+ * set one without the other — so this copy exists only to carry it, and never
+ * reaches `/openapi.json`. Nothing else reads it: the route heading and the
+ * request samples are generated from the path, not from this.
+ */
+function renderedDocument() {
+  const playgroundURL = import.meta.env.VITE_PLAYGROUND_API_URL as
+    | string
+    | undefined
   const built = buildOpenAPIDocument()
-  return apiURL ? { ...built, servers: [{ url: apiURL }] } : built
+
+  return playgroundURL ? { ...built, servers: [{ url: playgroundURL }] } : built
 }
 
 // The seam between our document type and the far stricter one upstream models.
 // The shapes agree; the types do not track each other, and upstream does not
 // export the one it wants.
-const input = { "auth-ts": apiDocument } as unknown as OpenAPIOptions["input"]
+const input = {
+  "auth-ts": renderedDocument
+} as unknown as OpenAPIOptions["input"]
 
 /**
  * The API reference, built from the package source at build time.
