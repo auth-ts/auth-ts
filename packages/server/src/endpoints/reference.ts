@@ -24,7 +24,21 @@ export const getReference = defineEndpoint({
     return {
       data: undefined,
       headers: new Headers({ "content-type": "text/html; charset=utf-8" }),
-      body: `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API reference</title><script id="api-reference" data-url="${specURL}"></script><script src="${SCALAR}"></script>`
+      // The scripts sit inside an explicit body. Left to float, they parse into
+      // the head and run while `document.body` is still null, which the viewer
+      // mounts into — a blank page and three null dereferences in the console.
+      body: `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API reference</title>
+</head>
+<body>
+<script id="api-reference" data-url="${specURL}"></script>
+<script src="${SCALAR}"></script>
+</body>
+</html>`
     }
   }
 })
