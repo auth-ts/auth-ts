@@ -120,7 +120,7 @@ describe("buildOpenAPIDocument, given a real config", () => {
     expect(present.length).toBeLessThan(operations(reference).length)
     expect(document.paths).not.toHaveProperty("/sign-in/guest")
     expect(document.paths).not.toHaveProperty("/accounts")
-    expect(document.paths).not.toHaveProperty("/connect/{provider}")
+    expect(document.paths).not.toHaveProperty("/identities/connect/{provider}")
     expect(document.paths).toHaveProperty("/sign-in/send-code")
   })
 

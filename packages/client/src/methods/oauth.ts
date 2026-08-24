@@ -54,6 +54,6 @@ export function createSignInWithProvider(internals: AuthClientInternals) {
 /** Starts linking a provider to the currently signed-in user. */
 export function createConnectProvider(internals: AuthClientInternals) {
   return function connectProvider(input: OAuthNavigationInput): Promise<void> {
-    return startFlow(internals, "/connect", input, true)
+    return startFlow(internals, "/identities/connect", input, true)
   }
 }

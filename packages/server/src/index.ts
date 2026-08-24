@@ -52,13 +52,13 @@ export { createAuthServer } from "./core/create-auth-server"
 export type { AccountInfo, ListAccountsInput } from "./endpoints/accounts"
 export type { SwitchAccountInput } from "./endpoints/accounts/switch"
 export type { CallbackProviderInput } from "./endpoints/callback/$provider"
-export type { ConnectProviderInput } from "./endpoints/connect/$provider"
 export type { IdentityInfo } from "./endpoints/identities"
 export type { DisconnectIdentityInput } from "./endpoints/identities/$id"
 export type {
   GetProviderTokenInput,
   ProviderTokenResult
 } from "./endpoints/identities/$id/token"
+export type { ConnectProviderInput } from "./endpoints/identities/connect/$provider"
 export type { CurrentSession } from "./endpoints/session"
 export type { SessionInfo } from "./endpoints/sessions"
 export type { RevokeSessionInput } from "./endpoints/sessions/$id"

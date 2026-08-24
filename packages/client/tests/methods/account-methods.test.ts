@@ -379,14 +379,16 @@ describe("oauth navigation", () => {
       href: "https://app.example.com/account",
       assign
     })
-    server.on("POST", "/api/auth/connect/google", {
+    server.on("POST", "/api/auth/identities/connect/google", {
       body: { url: "https://accounts.google.com/o/oauth2/v2/auth?state=abc" }
     })
     const client = await signedIn()
 
     await client.connectProvider({ provider: "google" })
 
-    expect(server.requests.at(-1)?.path).toBe("/api/auth/connect/google")
+    expect(server.requests.at(-1)?.path).toBe(
+      "/api/auth/identities/connect/google"
+    )
     expect(server.requests.at(-1)?.authorization).toBeTruthy()
     expect(assign).toHaveBeenCalledWith(
       "https://accounts.google.com/o/oauth2/v2/auth?state=abc"

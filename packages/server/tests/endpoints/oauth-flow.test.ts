@@ -665,7 +665,7 @@ describe("oauth callback", () => {
     const guest = ((await guestResponse.json()) as { user: { id: string } })
       .user
     const startResponse = await authServer.handler(
-      request("POST", "/api/auth/connect/github", {
+      request("POST", "/api/auth/identities/connect/github", {
         token: await mintToken(authServer, guestRefresh),
         cookies: { "auth-ts.refresh": guestRefresh }
       })
@@ -1014,8 +1014,11 @@ describe("connect and disconnect", () => {
   it("requires a session to start a link", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
     expect(
-      (await authServer.handler(request("POST", "/api/auth/connect/github")))
-        .status
+      (
+        await authServer.handler(
+          request("POST", "/api/auth/identities/connect/github")
+        )
+      ).status
     ).toBe(401)
   })
 
@@ -1025,7 +1028,7 @@ describe("connect and disconnect", () => {
     const cookies = { "auth-ts.refresh": refreshToken }
 
     const startResponse = await context.authServer.handler(
-      request("POST", "/api/auth/connect/github", {
+      request("POST", "/api/auth/identities/connect/github", {
         token: await mintToken(context.authServer, refreshToken)
       })
     )
@@ -1062,7 +1065,7 @@ describe("connect and disconnect", () => {
     const refreshToken = await signInWithCode(context)
 
     const withToken = await context.authServer.handler(
-      request("POST", "/api/auth/connect/github", {
+      request("POST", "/api/auth/identities/connect/github", {
         token: await mintToken(context.authServer, refreshToken)
       })
     )
@@ -1075,7 +1078,7 @@ describe("connect and disconnect", () => {
       expect(
         (
           await context.authServer.handler(
-            request("POST", "/api/auth/connect/github", options)
+            request("POST", "/api/auth/identities/connect/github", options)
           )
         ).status
       ).toBe(401)
@@ -1087,7 +1090,7 @@ describe("connect and disconnect", () => {
     const refreshToken = await signInWithCode(context)
 
     const startResponse = await context.authServer.handler(
-      request("POST", "/api/auth/connect/github", {
+      request("POST", "/api/auth/identities/connect/github", {
         token: await mintToken(context.authServer, refreshToken)
       })
     )
@@ -1133,7 +1136,7 @@ describe("connect and disconnect", () => {
     const refreshToken = await signInWithCode(context)
     const cookies = { "auth-ts.refresh": refreshToken }
     const startResponse = await context.authServer.handler(
-      request("POST", "/api/auth/connect/github", {
+      request("POST", "/api/auth/identities/connect/github", {
         token: await mintToken(context.authServer, refreshToken)
       })
     )

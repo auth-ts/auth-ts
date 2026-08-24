@@ -103,7 +103,7 @@ export async function resolveSession(
  * links to. A live token names the session outright, and reading that row costs
  * no write. Anything else — no token, a spent one, or one naming a session
  * since revoked — falls through to the cookie, which is what makes this work
- * for `/connect/:provider` and the OAuth callback, both of which arrive as
+ * for `/identities/connect/:provider` and the OAuth callback, both of which arrive as
  * top-level navigations that can carry no `Authorization` header.
  *
  * The expiry check has to be here as well as in `slideSession`: `selectOne` by

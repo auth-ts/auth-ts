@@ -79,7 +79,7 @@ export const signInWithProviderDocs: EndpointDocs<
  *
  * Signing in while already signed in never links accounts — it either appends
  * another account or replaces the current one, depending on `multiAccount`.
- * Linking is what `/connect` is for, and the two are kept apart by the `intent`
+ * Linking is what `/identities/connect` is for, and the two are kept apart by the `intent`
  * recorded in the state cookie. Anything else would mean a stray sign-in silently
  * attaching a provider to whoever happened to be logged in.
  */

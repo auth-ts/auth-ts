@@ -179,7 +179,7 @@ sign-in followed by a refresh. Nothing crosses in a response header any more,
 which is also why there is nothing for CORS to expose.
 
 There is no exception to that. The OAuth routes —
-`POST /sign-in/provider/:provider` and `POST /connect/:provider` — answer with
+`POST /sign-in/provider/:provider` and `POST /identities/connect/:provider` — answer with
 the provider's authorize URL rather than a 302, so the caller is making an
 ordinary request and can present a token like anything else. They have to: a
 desktop or mobile shell must open the system browser instead of its own webview,

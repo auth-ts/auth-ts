@@ -1,24 +1,24 @@
-import { notFound } from "../../http/auth-api-error"
-import { defineEndpoint } from "../../http/define-endpoint"
-import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
-import { validateRedirect } from "../../lib/validate-redirect"
-import { getCallbackURL } from "../../oauth/callback-url"
-import { getProvider } from "../../oauth/providers/get-provider"
-import { createStateCookie } from "../../oauth/state-cookie"
-import type { EndpointDocs } from "../../openapi/endpoint-docs"
-import type { CallerInput } from "../../session/authenticate"
-import { authenticate } from "../../session/authenticate"
+import { notFound } from "../../../http/auth-api-error"
+import { defineEndpoint } from "../../../http/define-endpoint"
+import { shouldUseSecureCookies } from "../../../lib/serialize-cookie"
+import { validateRedirect } from "../../../lib/validate-redirect"
+import { getCallbackURL } from "../../../oauth/callback-url"
+import { getProvider } from "../../../oauth/providers/get-provider"
+import { createStateCookie } from "../../../oauth/state-cookie"
+import type { EndpointDocs } from "../../../openapi/endpoint-docs"
+import type { CallerInput } from "../../../session/authenticate"
+import { authenticate } from "../../../session/authenticate"
 import type {
   AuthorizeURLResult,
   SignInProviderInput
-} from "../sign-in/provider/$provider"
+} from "../../sign-in/provider/$provider"
 
 /** Input for connecting a provider. */
 export interface ConnectProviderInput
   extends SignInProviderInput,
     CallerInput {}
 
-/** How `POST /connect/$provider` appears in the OpenAPI document. */
+/** How `POST /identities/connect/$provider` appears in the OpenAPI document. */
 export const connectProviderDocs: EndpointDocs<
   ConnectProviderInput,
   "provider"
@@ -71,7 +71,7 @@ export const connectProviderDocs: EndpointDocs<
  */
 export const connectProvider = defineEndpoint({
   method: "POST",
-  path: "/connect/$provider",
+  path: "/identities/connect/$provider",
   parse: async ({ request, params }): Promise<ConnectProviderInput> => {
     const body = (await request.json().catch(() => ({}))) as Omit<
       ConnectProviderInput,
