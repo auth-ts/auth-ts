@@ -64,7 +64,7 @@ export const callbackProviderDocs: EndpointDocs<
 }
 
 /**
- * Finish an OAuth flow.
+ * Provider callback.
  *
  * One callback serves both because the provider only ever gets one redirect URI.
  * The `intent` recorded in the state cookie decides what happens here, which is

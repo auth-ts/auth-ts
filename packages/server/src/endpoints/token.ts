@@ -44,7 +44,7 @@ export const getTokenDocs: EndpointDocs<TokenInput> = {
 }
 
 /**
- * Get a new access token, or null when nobody is signed in.
+ * Get an access token.
  *
  * The only endpoint that authenticates from the cookie, and therefore the only
  * one that touches a session: every other endpoint reads the token this

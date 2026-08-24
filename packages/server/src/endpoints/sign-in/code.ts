@@ -47,7 +47,7 @@ export const signInCodeDocs: EndpointDocs<SignInCodeInput> = {
 }
 
 /**
- * Verify a code and start a session.
+ * Sign in with a code.
  *
  * Creating the user happens here rather than at send time, which is what makes
  * `send-code` safe to answer identically for everyone.

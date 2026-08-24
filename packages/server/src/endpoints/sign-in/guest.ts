@@ -36,7 +36,7 @@ export const signInGuestDocs: EndpointDocs<SignInGuestInput> = {
 }
 
 /**
- * Sign in as a guest.
+ * Sign in as guest.
  *
  * A guest is a full user — real id, real session, real rows under row-level
  * security — which is what makes conversion later a rename rather than a

@@ -53,7 +53,7 @@ export const switchAccountDocs: EndpointDocs<SwitchAccountInput> = {
 }
 
 /**
- * Switch to another signed-in account.
+ * Switch account.
  *
  * Nothing is re-authenticated, and nothing needs to be: possession of the parked
  * refresh token is exactly the same proof as possession of the active one. All
