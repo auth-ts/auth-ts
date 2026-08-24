@@ -42,8 +42,10 @@ describe("openapi summaries", () => {
   })
 
   it("repeats the summary each endpoint already documents", () => {
+    // The doc comment ends its first sentence; a summary is a label in a UI and
+    // does not. That full stop is the only difference allowed between them.
     const drifted = Object.entries(summaries).filter(
-      ([name, summary]) => documented[name] !== summary
+      ([name, summary]) => documented[name]?.replace(/\.$/, "") !== summary
     )
 
     expect(drifted).toEqual([])
