@@ -14,8 +14,10 @@ import {
   uuid
 } from "drizzle-orm/pg-core"
 
+// `cast(... as uuid)` rather than `::uuid`: the same expression is a column
+// default below, and Postgres rejects the operator form there.
 const authUuid = (userIdColumn: AnyPgColumn) =>
-  sql`(select (auth.user_id())::uuid = ${userIdColumn})`
+  sql`(select cast(auth.user_id() as uuid) = ${userIdColumn})`
 
 export const users = pgTable.withRLS(
   "users",
@@ -26,6 +28,10 @@ export const users = pgTable.withRLS(
     name: text("name"),
     image: text("image"),
     type: text("type").$type<UserType>().notNull().default("user"),
+    // Cascading is deliberate, and cuts against core's own reaping rule: the
+    // sweep spares a guest whose pointer is set, because the application still
+    // owes it a migration. Deleting the account it was merged into ends that —
+    // the data was headed nowhere, and "delete my account" should take it.
     primaryUserId: uuid("primaryUserId").references(
       (): AnyPgColumn => users.id,
       {
@@ -41,6 +47,10 @@ export const users = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
+    // Core reads this column pinned alongside `id`, so the index is for the
+    // foreign key: without it every account deletion scans the table to find
+    // the guests that reference it.
+    index("usersPrimaryUserIdIndex").on(table.primaryUserId),
     pgPolicy("selectOwnUser", {
       for: "select",
       to: authenticatedRole,
@@ -208,6 +218,9 @@ export const todos = pgTable.withRLS(
       .$onUpdate(() => new Date())
   },
   (table) => [
+    // manageOwnTodos filters on userId for every row of every query, so this is
+    // the one index the application cannot do without.
+    index("todosUserIdIndex").on(table.userId),
     pgPolicy("manageOwnTodos", {
       for: "all",
       to: authenticatedRole,
