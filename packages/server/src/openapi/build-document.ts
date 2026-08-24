@@ -27,7 +27,7 @@ const TAG_ORDER = [
 ] as const
 
 const REFRESH_COOKIE = "refreshCookie"
-const BEARER = "bearerAuth"
+const BEARER = "accessToken"
 
 function met(requirement: EndpointRequirement, config: AuthServerConfig) {
   if (requirement === "guest") return config.guest
