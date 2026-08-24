@@ -1,3 +1,9 @@
+## Coding Rules
+- Default to writing exactly ZERO comments.
+- Never add "what" comments or restate obvious code logic.
+- Do not reference the chat history, fixes, or prior iterations in the code.
+- Only document "why" a non-obvious workaround or platform constraint exists.
+
 # Package manager
 
 **bun.** Never `npm`, `yarn`, or `pnpm` — the Nx guidance below uses `pnpm nx`

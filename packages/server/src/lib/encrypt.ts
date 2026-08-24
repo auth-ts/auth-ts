@@ -29,10 +29,6 @@ function encryptionKey(secret: string) {
         ["deriveKey"]
       )
 
-      // The info string separates this key from anything else the same secret
-      // ever derives, so a future use cannot decrypt provider tokens by
-      // accident. No salt: the secret is already high-entropy, which is the
-      // condition under which HKDF permits omitting one.
       return crypto.subtle.deriveKey(
         {
           name: "HKDF",
@@ -47,7 +43,6 @@ function encryptionKey(secret: string) {
       )
     })()
     keys.set(secret, key)
-    // A failed derivation must not be cached as a permanently rejected promise.
     key.catch(() => keys.delete(secret))
   }
   return key

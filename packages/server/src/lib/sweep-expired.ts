@@ -93,8 +93,6 @@ async function reapOrphanedGuests(
     })
     if (!guest) continue
 
-    // Any remaining session — live or merely unswept — postpones the reap; the
-    // sweep that removes the last one re-surfaces this guest as a candidate.
     const remaining = await selectOne(internals, "sessions", { userId })
     if (remaining) continue
 

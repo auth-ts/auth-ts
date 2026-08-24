@@ -59,8 +59,6 @@ export const getProviderToken = defineEndpoint({
   run: async (internals, input: GetProviderTokenInput) => {
     const caller = await authenticate(internals, input)
 
-    // Ownership is part of the query, so another user's identity matches
-    // nothing and the empty result is the 404.
     const identity = await selectOne(internals, "identities", {
       id: input.id,
       userId: caller.userId
@@ -115,9 +113,6 @@ async function refreshProviderToken(
       )
     : null
 
-  // Nothing to refresh with, nothing that knows how, or a refresh token whose
-  // own lifetime has run out. All three end the same way for the caller, and
-  // only reconnecting fixes any of them.
   if (
     !configured?.provider.refreshAccessToken ||
     !refreshToken ||
@@ -135,9 +130,6 @@ async function refreshProviderToken(
       signal: AbortSignal.timeout(PROVIDER_DEADLINE_MS)
     })
   } catch (error) {
-    // A grant the provider has forgotten is never coming back, so the columns
-    // claiming otherwise are cleared: the account screen then says "reconnect"
-    // instead of offering a connection that fails on every use.
     if (
       error instanceof AuthApiError &&
       error.code === "providerReconnectRequired"
@@ -165,10 +157,6 @@ async function refreshProviderToken(
     throw new AuthApiError("providerReconnectRequired", 403)
   }
 
-  // Written back before it is returned, so the next caller pays nothing. Two
-  // refreshes racing both write, and last writer wins — harmless where the
-  // refresh token is stable, and where a provider rotates it the loser's copy
-  // is spent, which surfaces as one reconnect rather than silent breakage.
   await internals.db.update({
     table: "identities",
     where: { id: identity.id },
