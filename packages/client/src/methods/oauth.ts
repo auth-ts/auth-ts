@@ -39,7 +39,7 @@ function buildURL(
  */
 export function createSignInProvider(internals: AuthClientInternals) {
   return function signInProvider(input: OAuthNavigationInput): void {
-    globalThis.location.assign(buildURL(internals, "/sign-in", input))
+    globalThis.location.assign(buildURL(internals, "/sign-in/provider", input))
   }
 }
 

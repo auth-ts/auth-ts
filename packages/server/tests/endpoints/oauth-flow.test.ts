@@ -28,7 +28,7 @@ async function startSignIn(
   query = ""
 ) {
   const response = await authServer.handler(
-    request("GET", `/api/auth/sign-in/github${query}`)
+    request("GET", `/api/auth/sign-in/provider/github${query}`)
   )
   const stateCookie = required(
     readSetCookies(response).get("auth-ts.state"),
@@ -104,7 +104,10 @@ describe("oauth start", () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
 
     const response = await authServer.handler(
-      request("GET", "/api/auth/sign-in/github?additionalFields=%7Bnope")
+      request(
+        "GET",
+        "/api/auth/sign-in/provider/github?additionalFields=%7Bnope"
+      )
     )
 
     expect(response.status).toBe(400)
@@ -113,24 +116,27 @@ describe("oauth start", () => {
     )
   })
 
-  it("404s an unconfigured provider, the reserved guest name, and prototype keys", async () => {
+  it("404s an unconfigured provider and every prototype key", async () => {
+    // `guest` is in the list because it is no longer special: providers live
+    // under /sign-in/provider/:provider, so nothing they could be called
+    // shadows a literal route, and this 404 is the ordinary "not configured".
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
 
     for (const name of [
       "google",
       "guest",
+      "code",
       "constructor",
       "__proto__",
       "toString"
     ]) {
-      for (const route of ["sign-in", "callback"]) {
+      for (const path of [
+        `/api/auth/sign-in/provider/${name}`,
+        `/api/auth/callback/${name}`
+      ]) {
         expect(
-          (
-            await authServer.handler(
-              request("GET", `/api/auth/${route}/${name}`)
-            )
-          ).status,
-          `${route}/${name}`
+          (await authServer.handler(request("GET", path))).status,
+          path
         ).toBe(404)
       }
     }
@@ -150,7 +156,7 @@ describe("oauth redirect_uri origin", () => {
     options: Parameters<typeof request>[2] = {}
   ) {
     const response = await authServer.handler(
-      request("GET", "/api/auth/sign-in/github", options)
+      request("GET", "/api/auth/sign-in/provider/github", options)
     )
     const location = new URL(
       required(response.headers.get("location"), "location")
@@ -226,7 +232,7 @@ describe("oauth redirect_uri origin", () => {
     }
 
     const start = await authServer.handler(
-      request("GET", "/api/auth/sign-in/github", proxied)
+      request("GET", "/api/auth/sign-in/provider/github", proxied)
     )
     const location = new URL(
       required(start.headers.get("location"), "location")
@@ -737,7 +743,7 @@ describe("oauth callback", () => {
   it("revalidates additionalFields from the state cookie instead of trusting them", async () => {
     // The signature proves the payload came from this server, not that the
     // fields are still declared. Any path that signs a payload without running
-    // /sign-in/:provider's validation would ride an undeclared column into user
+    // /sign-in/provider/:provider's validation would ride an undeclared column into user
     // creation, so the callback checks again where the write happens.
     const { authServer, db } = await createTestServer({
       ...OAUTH_OPTIONS,
@@ -1226,7 +1232,7 @@ describe("google", () => {
     authServer: Awaited<ReturnType<typeof createTestServer>>["authServer"]
   ) {
     const response = await authServer.handler(
-      request("GET", "/api/auth/sign-in/google")
+      request("GET", "/api/auth/sign-in/provider/google")
     )
     const stateCookie = required(
       readSetCookies(response).get("auth-ts.state"),
@@ -1253,7 +1259,7 @@ describe("google", () => {
   it("sends a PKCE challenge and a nonce, and requires the nonce back in the ID token", async () => {
     const { authServer } = await createTestServer(GOOGLE_OPTIONS)
     const start = await authServer.handler(
-      request("GET", "/api/auth/sign-in/google")
+      request("GET", "/api/auth/sign-in/provider/google")
     )
     const location = new URL(
       required(start.headers.get("location"), "location")

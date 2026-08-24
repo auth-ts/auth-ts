@@ -7,7 +7,7 @@ import { getProvider } from "../../oauth/providers/get-provider"
 import { createStateCookie } from "../../oauth/state-cookie"
 import type { CallerInput } from "../../session/authenticate"
 import { resolveCallerSession } from "../../session/resolve-session"
-import type { SignInProviderInput } from "../sign-in/$provider"
+import type { SignInProviderInput } from "../sign-in/provider/$provider"
 
 /** Input for starting a provider link. */
 export interface ConnectProviderInput
@@ -22,7 +22,7 @@ export interface ConnectProviderInput
  *
  * For a guest this is a sign-in wearing a different URL: there is no account to
  * link to yet, so the callback upgrades or merges them exactly as
- * `/sign-in/:provider` would.
+ * `/sign-in/provider/:provider` would.
  */
 export const connectProvider = defineEndpoint({
   method: "GET",

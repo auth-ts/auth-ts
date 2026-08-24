@@ -31,7 +31,7 @@ async function signInWithGitHub(
   identity: Parameters<typeof stubGitHub>[0]
 ) {
   const startResponse = await context.authServer.handler(
-    request("GET", "/api/auth/sign-in/github")
+    request("GET", "/api/auth/sign-in/provider/github")
   )
   const stateCookie = required(
     readSetCookies(startResponse).get("auth-ts.state"),

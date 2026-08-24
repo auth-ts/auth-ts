@@ -67,9 +67,9 @@ export type {
   RevokeSessionInput,
   RevokeSessionResult
 } from "./endpoints/sessions/$id"
-export type { SignInProviderInput } from "./endpoints/sign-in/$provider"
 export type { SignInCodeInput } from "./endpoints/sign-in/code"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest"
+export type { SignInProviderInput } from "./endpoints/sign-in/provider/$provider"
 export type {
   SignOutInput,
   SignOutScope

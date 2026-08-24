@@ -136,7 +136,7 @@ export const callbackProvider = defineEndpoint({
     // Linking only means linking for a real user. A guest who "connects" a
     // provider is really signing in: the identity decides whether they upgrade
     // in place or merge into the account it already belongs to, and they get a
-    // session for the result — exactly what `/sign-in/:provider` would do.
+    // session for the result — exactly what `/sign-in/provider/:provider` would do.
     if (payload.intent === "connect" && active?.user.type !== "guest") {
       return connectIdentity(
         internals,

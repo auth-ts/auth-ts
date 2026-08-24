@@ -9,26 +9,23 @@ import type { OAuthProvider } from "./oauth-provider"
 const PROVIDERS: Record<string, OAuthProvider> = { github, google }
 
 /**
- * Names that can never be a provider.
- *
- * `guest` is a literal path under `/sign-in`, so a provider by that name would
- * shadow it.
- */
-export const RESERVED_PROVIDER_NAMES = ["guest", "code"]
-
-/**
  * Looks up a configured provider by the name in the URL.
+ *
+ * No name is reserved. Every credential type sits at its own literal path —
+ * `/sign-in/code`, `/sign-in/guest` — while providers live one level down under
+ * `/sign-in/provider/:provider`, so a provider called `guest` collides with
+ * nothing. A blacklist would only be a rule someone has to remember the next
+ * time a literal path is added.
  *
  * Returns nothing for a provider that exists in code but has no credentials, so
  * an unconfigured provider is indistinguishable from one that was never
  * implemented — both are simply not there.
  *
  * Own properties only: the name is a URL segment, and plain bracket access would
- * let `/sign-in/constructor` resolve `Object` from the prototype chain on both
- * records and answer 500 instead of 404.
+ * let `/sign-in/provider/constructor` resolve `Object` from the prototype chain
+ * on both records and answer 500 instead of 404.
  */
 export function getProvider(providers: ProvidersOptions, name: string) {
-  if (RESERVED_PROVIDER_NAMES.includes(name)) return undefined
   if (!Object.hasOwn(PROVIDERS, name) || !Object.hasOwn(providers, name)) {
     return undefined
   }

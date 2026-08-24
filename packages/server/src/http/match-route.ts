@@ -13,7 +13,7 @@ export interface RouteMatch {
 interface CompiledRoute {
   endpoint: AnyEndpoint
   segments: string[]
-  /** Literal routes are tried first, so `/sign-in/guest` beats `/sign-in/$provider`. */
+  /** Literal routes are tried first, so `/identities//token` beats `/identities/`. */
   isDynamic: boolean
 }
 

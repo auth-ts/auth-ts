@@ -1,12 +1,12 @@
-import { AuthApiError, notFound } from "../../http/auth-api-error"
-import { defineEndpoint } from "../../http/define-endpoint"
-import { resolveLocale } from "../../http/resolve-locale"
-import { validateAdditionalFields } from "../../http/validate-additional-fields"
-import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
-import { validateRedirect } from "../../lib/validate-redirect"
-import { getCallbackURL } from "../../oauth/callback-url"
-import { getProvider } from "../../oauth/providers/get-provider"
-import { createStateCookie } from "../../oauth/state-cookie"
+import { AuthApiError, notFound } from "../../../http/auth-api-error"
+import { defineEndpoint } from "../../../http/define-endpoint"
+import { resolveLocale } from "../../../http/resolve-locale"
+import { validateAdditionalFields } from "../../../http/validate-additional-fields"
+import { shouldUseSecureCookies } from "../../../lib/serialize-cookie"
+import { validateRedirect } from "../../../lib/validate-redirect"
+import { getCallbackURL } from "../../../oauth/callback-url"
+import { getProvider } from "../../../oauth/providers/get-provider"
+import { createStateCookie } from "../../../oauth/state-cookie"
 
 /** Input for starting an OAuth sign-in. */
 export interface SignInProviderInput {
@@ -50,7 +50,7 @@ function parseAdditionalFields(raw: string) {
  */
 export const signInProvider = defineEndpoint({
   method: "GET",
-  path: "/sign-in/$provider",
+  path: "/sign-in/provider/$provider",
   parse: ({ request, params, internals }): SignInProviderInput => {
     const url = new URL(request.url)
     const rawFields = url.searchParams.get("additionalFields")

@@ -90,23 +90,34 @@ describe("matchRoute", () => {
     ).toBe(404)
   })
 
-  it("prefers the literal sign-in/guest route over the dynamic provider route", async () => {
+  it("keeps a provider name from ever shadowing a literal sign-in route", async () => {
+    // Providers sit one level down, under /sign-in/provider/:provider, so a
+    // provider called `guest` or `code` reaches its own path and the literal
+    // routes keep theirs. That is what replaced the reserved-names list: a
+    // collision that cannot be expressed rather than one that is forbidden.
     const { authServer } = await createTestServer({
       guest: true,
       baseURL: "https://app.example.com",
       providers: { github: { clientId: "id", clientSecret: "secret" } }
     })
 
-    // POST reaches the guest endpoint; GET reaches the provider route, which has
-    // no provider called "guest" and so 404s rather than starting a flow.
     expect(
       (await authServer.handler(request("POST", "/api/auth/sign-in/guest")))
         .status
     ).toBe(200)
+    // The literal path answers only its own method; nothing dynamic is mounted
+    // beside it to pick the request up.
     expect(
       (await authServer.handler(request("GET", "/api/auth/sign-in/guest")))
         .status
-    ).toBe(404)
+    ).toBe(405)
+    expect(
+      (
+        await authServer.handler(
+          request("GET", "/api/auth/sign-in/provider/github")
+        )
+      ).status
+    ).toBe(302)
   })
 
   it("keeps a percent-encoded slash inside one segment", async () => {

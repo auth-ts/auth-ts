@@ -358,7 +358,7 @@ describe("oauth navigation", () => {
     })
 
     const target = new URL(assign.mock.calls[0]?.[0] as string)
-    expect(target.pathname).toBe("/api/auth/sign-in/github")
+    expect(target.pathname).toBe("/api/auth/sign-in/provider/github")
     expect(target.searchParams.get("redirect")).toBe("/dashboard")
     expect(target.searchParams.get("locale")).toBe("de")
   })
