@@ -86,9 +86,9 @@ index, because the missing constraint only shows under a race.
 
 ## The rules
 
-- **`where` is column/value pairs, all of which must match.** A plain value
-  compares for equality. A `{ lt }`, a `{ gt }`, or both compares for order,
-  with exclusive bounds:
+- **`where` is column/value pairs, all of which must match.** Every column
+  compares for equality, with one exception: `expiresAt` also takes a `{ lt }`,
+  a `{ gt }`, or both, with exclusive bounds.
 
   ```ts
   where: { tokenHash, expiresAt: { gt: new Date() } }
@@ -102,11 +102,12 @@ index, because the missing constraint only shows under a race.
     typeof value === "object" && value !== null && !(value instanceof Date)
   ```
 
-  That is the whole operator surface: no `OR`, no `in`, no negation. Order
-  exists because a live session is one whose expiry is still ahead, and asking
-  that in the same statement that touches the row is what makes resolving a
-  session a single round trip — instead of reading to find out whether it may
-  write, then writing.
+  That is the whole operator surface: no `OR`, no `in`, no negation. The
+  exception exists because a live session is one whose expiry is still ahead,
+  and asking that in the same statement that touches the row is what makes
+  resolving a session a single round trip — instead of reading to find out
+  whether it may write, then writing. The type confines it to `expiresAt`, so
+  that is the only column your implementation has to handle both ways.
 
   A `null` value means the column stores null — `IS NULL` in SQL, never
   `= NULL`, which matches nothing. Every nullable column the library names can
@@ -374,7 +375,7 @@ what it removed. Neither is observable against a mock, because a mock agrees
 with whatever you assumed.
 
 The checks cover `insert` returning the stored row with its id, `where` matching
-by equality and by range, `update` returning what it changed, equality `where`
+by equality and by an expiry range, `update` returning what it changed, equality `where`
 on one column and on several, `limit`, `orderBy` in both directions,
 `update` applying only what it was given, `delete` returning what it removed and
 matching on every column, a duplicate insert being refused for each unique set

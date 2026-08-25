@@ -4,7 +4,6 @@ import type {
   AuthDB,
   AuthInsert,
   AuthOrderBy,
-  AuthRange,
   AuthRow,
   AuthSession,
   AuthUser,
@@ -87,20 +86,32 @@ describe("the table types the four functions take", () => {
   type Numeric = { plan: "number" }
 
   const usersWhere = (where: AuthWhere<Numeric, "users">) => where
+  const sessionsWhere = (where: AuthWhere<Numeric, "sessions">) => where
   const usersOrder = (orderBy: AuthOrderBy<Declared, "users">) => orderBy
 
   it("queries a declared field at its declared type", () => {
     expectTypeOf(usersWhere({ plan: 3 }).plan).toEqualTypeOf<
-      number | null | undefined | AuthRange<number | null | undefined>
+      number | null | undefined
     >()
-    // Core fields query the same way, and take a range where order applies.
+    // Core fields query the same way.
     usersWhere({ email: "ada@example.com", type: "guest" })
-    usersWhere({ createdAt: { gt: new Date() } })
 
     // @ts-expect-error plan is declared a number, so a string cannot match it
     usersWhere({ plan: "pro" })
     // @ts-expect-error nothing declares `tier`, so nothing can query it
     usersWhere({ tier: 1 })
+  })
+
+  it("takes a range on expiresAt, and on nothing else", () => {
+    expectTypeOf(
+      sessionsWhere({ expiresAt: { gt: new Date() } })
+    ).toEqualTypeOf<AuthWhere<Numeric, "sessions">>()
+    sessionsWhere({ expiresAt: new Date() })
+
+    // @ts-expect-error createdAt compares for equality, like every other column
+    sessionsWhere({ createdAt: { gt: new Date() } })
+    // @ts-expect-error a declared field is not an expiry either
+    usersWhere({ plan: { gt: 3 } })
   })
 
   it("orders by a declared column, in a named direction", () => {

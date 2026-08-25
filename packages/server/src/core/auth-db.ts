@@ -249,10 +249,14 @@ export type AuthRow<
 > = AuthTables<S>[T]
 
 /**
- * `{ lt }`, `{ gt }`, or both — an open range on one column.
+ * `{ lt }`, `{ gt }`, or both — an open range on `expiresAt`, and nowhere else.
  *
  * The only comparison the contract has, and it exists because expiry is the one
  * question core cannot ask with equality. Both bounds are exclusive.
+ *
+ * Confined to `expiresAt` by {@link AuthWhere} rather than offered on every
+ * column, so an implementation has one column to think about instead of the
+ * whole row: a `where` on anything else is equality, always.
  */
 export interface AuthRange<V> {
   lt?: V
@@ -262,22 +266,23 @@ export interface AuthRange<V> {
 /**
  * A query: column/value pairs, **all** of which must match.
  *
- * A plain value compares for equality. An {@link AuthRange} compares for order,
- * which is what lets core find a live session — `expiresAt` greater than now —
- * in the same statement that updates it, rather than reading first to find out
- * whether it may write.
+ * Every column compares for equality, except `expiresAt`, which also accepts an
+ * {@link AuthRange}. That one exception is what lets core find a live session —
+ * expiry still ahead — in the same statement that updates it, rather than
+ * reading first to find out whether it may write.
  *
- * Telling them apart is one check, and the shape is chosen so it stays one: a
- * range is a non-null object that is not a `Date`. Every value core compares
- * for order is a `Date`, so an implementation reads
+ * Telling the two apart is one check, and the shape is chosen so it stays one:
+ * a range is a non-null object that is not a `Date`. So an implementation reads
  * `value instanceof Date || typeof value !== "object"` as "equality" and
- * everything else as a range.
+ * everything else as a range, and only ever sees the second case on `expiresAt`.
  */
 export type AuthWhere<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
 > = {
-  [K in keyof AuthRow<S, T>]?: AuthRow<S, T>[K] | AuthRange<AuthRow<S, T>[K]>
+  [K in keyof AuthRow<S, T>]?: K extends "expiresAt"
+    ? AuthRow<S, T>[K] | AuthRange<AuthRow<S, T>[K]>
+    : AuthRow<S, T>[K]
 }
 
 /** Sort direction, per {@link AuthOrderBy}. */
