@@ -49,10 +49,7 @@ export type {
   AuthServer
 } from "./core/create-auth-server"
 export { createAuthServer } from "./core/create-auth-server"
-export type { AccountInfo, ListAccountsInput } from "./endpoints/accounts"
-export type { SwitchAccountInput } from "./endpoints/accounts/switch"
 export type { CallbackProviderInput } from "./endpoints/callback/$provider"
-export type { IdentityInfo } from "./endpoints/identities"
 export type { DisconnectIdentityInput } from "./endpoints/identities/$id"
 export type {
   GetProviderTokenInput,
@@ -75,6 +72,7 @@ export type {
 } from "./endpoints/sign-out"
 export type { TokenInput, TokenResult } from "./endpoints/token"
 export type { DeleteUserInput, UpdateUserInput } from "./endpoints/user"
+export type { SwitchUserInput } from "./endpoints/users/switch"
 export { AuthApiError } from "./http/auth-api-error"
 export { AuthConfigError } from "./http/auth-config-error"
 export type { AuthHandler } from "./http/create-handler"

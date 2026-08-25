@@ -42,7 +42,7 @@ const baseOptions = () => ({
   db: createMemoryDb(),
   email: { sendCode: () => {} },
   jwt: { privateKey: keys.privateKeyPem },
-  secret: "server-secret"
+  secret: "server-secret-long-enough-to-pass-the-floor"
 })
 
 describe("construction failures", () => {
@@ -71,6 +71,14 @@ describe("construction failures", () => {
     expect(() =>
       createAuthServer({ ...baseOptions(), secret: keys.privateKeyPem })
     ).toThrow(/must not be the JWT signing key/)
+  })
+
+  it("refuses a secret short enough to guess offline", () => {
+    // Every OAuth sign-in hands the browser an HMAC of a known message under
+    // this key, so a short one is attacked offline rather than online.
+    expect(() =>
+      createAuthServer({ ...baseOptions(), secret: "hunter2" })
+    ).toThrow(/at least 32 characters/)
   })
 
   it("refuses jwks.json that is not a parsed key set", () => {
@@ -451,7 +459,7 @@ describe("resolved defaults", () => {
     expect(config.cookie.name).toBe("auth-ts.refresh")
     expect(config.cookie.path).toBe("/")
     expect(config.user.deleteFreshWindow).toBe("15m")
-    expect(config.multiAccount).toBe(false)
+    expect(config.multiUser).toBe(false)
     expect(config.guest).toBe(false)
     expect(config.logLevel).toBe("warn")
   })
@@ -518,12 +526,12 @@ describe("resolved defaults", () => {
   it("reads secrets from the environment when not supplied", () => {
     const { jwt: _jwt, secret: _secret, ...fromEnvironment } = baseOptions()
     process.env.JWT_PRIVATE_KEY = keys.privateKeyPem
-    process.env.AUTH_SECRET = "environment-secret"
+    process.env.AUTH_SECRET = "environment-secret-long-enough-to-pass"
 
     // Cleanup belongs to afterEach, so a failure here cannot leave the variables
     // set for whatever runs next.
     expect(createAuthServer(fromEnvironment).config.secret).toBe(
-      "environment-secret"
+      "environment-secret-long-enough-to-pass"
     )
   })
 

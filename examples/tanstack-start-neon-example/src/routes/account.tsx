@@ -47,11 +47,11 @@ function AccountPage() {
     ? authClient.decodeToken(token)?.claims.sid
     : undefined
   const identities = useIdentities(user?.id)
-  const accounts = useQuery({
-    queryKey: ["accounts"],
-    queryFn: authClient.listAccounts,
+  const users = useQuery({
+    queryKey: ["users"],
+    queryFn: authClient.listUsers,
     enabled: Boolean(user),
-    // 404 means multiAccount is off on the server; that is a configuration
+    // 404 means multiUser is off on the server; that is a configuration
     // answer, not a failure worth retrying.
     retry: false
   })
@@ -327,24 +327,24 @@ function AccountPage() {
         </div>
       </div>
 
-      {accounts.data && accounts.data.length > 1 ? (
+      {users.data && users.data.length > 1 ? (
         <div className="card bg-base-100 shadow-sm">
           <div className="card-body gap-4">
-            <h2 className="card-title">Switch account</h2>
+            <h2 className="card-title">Switch user</h2>
             <ul className="list rounded-box bg-base-200">
-              {accounts.data.map((account) => (
-                <li key={account.id} className="list-row items-center">
+              {users.data.map((signedIn) => (
+                <li key={signedIn.id} className="list-row items-center">
                   <span className="list-col-grow text-sm">
-                    {account.email ?? `Guest ${account.id.slice(0, 8)}`}
+                    {signedIn.email ?? `Guest ${signedIn.id.slice(0, 8)}`}
                   </span>
-                  {account.id === user.id ? (
+                  {signedIn.id === user.id ? (
                     <span className="badge badge-soft badge-sm">current</span>
                   ) : (
                     <button
                       type="button"
                       onClick={async () => {
-                        await authClient.switchAccount({
-                          userId: account.id
+                        await authClient.switchUser({
+                          userId: signedIn.id
                         })
                         queryClient.clear()
                       }}

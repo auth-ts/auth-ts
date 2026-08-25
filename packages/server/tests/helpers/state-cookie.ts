@@ -3,7 +3,7 @@ import type { OAuthStatePayload } from "../../src/oauth/state-cookie"
 import { signStatePayload } from "../../src/oauth/state-cookie"
 
 /** The secret `createTestServer` configures, so tests can mint valid cookies. */
-export const TEST_SERVER_SECRET = "test-server-secret"
+export const TEST_SERVER_SECRET = "test-server-secret-long-enough-to-pass"
 
 /** Reads the payload out of a state cookie without checking its signature. */
 export function decodeState(value: string) {

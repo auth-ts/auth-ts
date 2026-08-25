@@ -48,7 +48,8 @@ export interface AuthServerConfig {
   cookie: {
     name: string
     path: string
-    accountsName: string
+    /** Set only for a cross-subdomain deployment; see {@link CookieOptions.hintDomain}. */
+    hintDomain?: string
     stateName: string
   }
   user: {
@@ -56,7 +57,7 @@ export interface AuthServerConfig {
     deleteFreshWindow: Duration
   }
   rateLimit: Required<RateLimitOptions> | false
-  multiAccount: boolean
+  multiUser: boolean
   localization?: LocalizationOptions
   ipAddress: IpAddressConfig
   trustedOrigins: string[]
@@ -297,6 +298,9 @@ function resolveRateLimit(
   return merged
 }
 
+/** The shortest secret that is not a guess. `keygen` emits 43 base64url characters. */
+const MINIMUM_SECRET_LENGTH = 32
+
 /**
  * Applies defaults, reads secrets from the environment, and validates.
  *
@@ -344,6 +348,16 @@ export function resolveAuthServerConfig(
       "secret must not be the JWT signing key. They have different blast radiuses and are rotated independently."
     )
   }
+  // Length, because entropy is not measurable from here — a 32-character
+  // passphrase is weaker than 32 random bytes and both pass. What this catches
+  // is the hand-written secret, which is the one that gets guessed: every OAuth
+  // sign-in hands the browser an HMAC of a known message under this key, so a
+  // short one is brute-forced offline rather than online.
+  if (secret.length < MINIMUM_SECRET_LENGTH) {
+    throw new AuthConfigError(
+      `secret must be at least ${MINIMUM_SECRET_LENGTH} characters. It keys the verification-code HMAC, the provider-token encryption, and the OAuth state cookie — \`bun x @auth-ts/cli keygen\` generates one.`
+    )
+  }
 
   const baseURL = options.baseURL?.replace(/\/+$/, "")
 
@@ -353,7 +367,6 @@ export function resolveAuthServerConfig(
   const rateLimit =
     options.rateLimit === false ? false : resolveRateLimit(options.rateLimit)
 
-  // Resolved once: `accountsName` is derived from it, and the two must agree.
   const cookieName = options.cookie?.name ?? "auth-ts.refresh"
 
   return {
@@ -381,7 +394,9 @@ export function resolveAuthServerConfig(
     cookie: {
       name: cookieName,
       path: options.cookie?.path ?? "/",
-      accountsName: `${cookieName}.accounts`,
+      ...(options.cookie?.hintDomain
+        ? { hintDomain: options.cookie.hintDomain }
+        : {}),
       stateName: "auth-ts.state"
     },
     user: {
@@ -392,7 +407,7 @@ export function resolveAuthServerConfig(
       )
     },
     rateLimit,
-    multiAccount: options.multiAccount ?? false,
+    multiUser: options.multiUser ?? false,
     ...(options.localization ? { localization: options.localization } : {}),
     ipAddress: requireIpAddress(options.ipAddress),
     trustedOrigins: options.trustedOrigins ?? [],

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import {
+  readRefreshCookie,
+  refreshCookieFor,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 
 const options = {
@@ -131,10 +135,9 @@ describe("additionalFields on sign-up", () => {
       request("POST", "/api/auth/sign-in/guest")
     )
     const cookies = {
-      "auth-ts.refresh": required(
-        readSetCookies(guestResponse).get("auth-ts.refresh"),
-        "refresh"
-      ).value
+      ...refreshCookieFor(
+        required(readRefreshCookie(guestResponse), "refresh").value
+      )
     }
     const guestId = ((await guestResponse.json()) as { user: { id: string } })
       .user.id
@@ -170,10 +173,9 @@ describe("additionalFields on sign-up", () => {
       request("POST", "/api/auth/sign-in/guest")
     )
     const cookies = {
-      "auth-ts.refresh": required(
-        readSetCookies(guestResponse).get("auth-ts.refresh"),
-        "refresh"
-      ).value
+      ...refreshCookieFor(
+        required(readRefreshCookie(guestResponse), "refresh").value
+      )
     }
 
     await context.authServer.handler(

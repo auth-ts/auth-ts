@@ -197,12 +197,12 @@ export function createAuthServer<
     },
     decodeToken,
     getProviderRefreshToken: async (identityId) => {
-      const identity = await selectOne(internals, "identities", {
-        id: identityId
+      const secrets = await selectOne(internals, "identitySecrets", {
+        identityId
       })
 
-      return identity?.refreshTokenEncrypted
-        ? decryptSecret(resolved.secret, identity.refreshTokenEncrypted)
+      return secrets?.refreshTokenEncrypted
+        ? decryptSecret(resolved.secret, secrets.refreshTokenEncrypted)
         : null
     }
   }

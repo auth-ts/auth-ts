@@ -70,5 +70,5 @@ A guest's session is their only credential, so a guest with no sessions is
 unreachable forever — and the library deletes them on that signal: sign-out,
 revocation, or the sweep that collects their expired session. A merged guest
 whose pointer your application has not migrated yet is spared. Guests also
-never coexist with real accounts in one browser: `sign-in/guest` answers 409
-while any session is live, and a guest cannot switch accounts — they convert.
+never coexist with real users in one browser: `sign-in/guest` answers 409
+while any session is live, and a guest cannot switch users — they convert.

@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { decryptSecret, encryptSecret } from "../../src/lib/encrypt"
 import { createTestServer } from "../helpers/create-test-server"
-import { mintToken, readSetCookies, request } from "../helpers/request"
+import {
+  mintToken,
+  readRefreshCookie,
+  readSetCookies,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 import { selectRow } from "../helpers/rows"
 import { decodeState } from "../helpers/state-cookie"
@@ -9,7 +14,7 @@ import { stubGitHub } from "../helpers/stub-provider-network"
 
 const OAUTH_OPTIONS = {
   baseURL: "https://app.example.com",
-  secret: "test-server-secret",
+  secret: "test-server-secret-long-enough-to-pass",
   providers: {
     github: { clientId: "client-id", clientSecret: "client-secret" }
   }
@@ -48,15 +53,19 @@ async function signInWithGitHub(
   vi.restoreAllMocks()
 
   const refreshToken = required(
-    readSetCookies(callbackResponse).get("auth-ts.refresh"),
+    readRefreshCookie(callbackResponse),
     "refresh"
   ).value
   const stored = required(
     await selectRow(context.db, "identities", { provider: "github" }),
     "identity"
   )
+  const secrets = required(
+    await selectRow(context.db, "identitySecrets", { identityId: stored.id }),
+    "identity secrets"
+  )
 
-  return { refreshToken, identity: stored }
+  return { refreshToken, identity: stored, secrets }
 }
 
 const GRANT = {
@@ -73,11 +82,11 @@ const GRANT = {
 describe("storing a provider grant", () => {
   it("keeps the tokens encrypted, never as the provider sent them", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)
-    const { identity } = await signInWithGitHub(context, GRANT)
+    const { identity, secrets } = await signInWithGitHub(context, GRANT)
 
     for (const column of [
-      identity.accessTokenEncrypted,
-      identity.refreshTokenEncrypted
+      secrets.accessTokenEncrypted,
+      secrets.refreshTokenEncrypted
     ]) {
       expect(column).toMatch(/^v1\./)
     }
@@ -87,23 +96,23 @@ describe("storing a provider grant", () => {
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(identity.accessTokenEncrypted, "access token")
+        required(secrets.accessTokenEncrypted, "access token")
       )
     ).toBe("provider-access-token")
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(identity.refreshTokenEncrypted, "refresh token")
+        required(secrets.refreshTokenEncrypted, "refresh token")
       )
     ).toBe("provider-refresh-token")
   })
 
   it("records the granted scope and the expiry, which are not secrets", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)
-    const { identity } = await signInWithGitHub(context, GRANT)
+    const { identity, secrets } = await signInWithGitHub(context, GRANT)
 
     expect(identity.scope).toBe("read:user user:email repo")
-    expect(identity.accessTokenExpiresAt?.getTime()).toBeGreaterThan(Date.now())
+    expect(secrets.accessTokenExpiresAt?.getTime()).toBeGreaterThan(Date.now())
   })
 
   it("refreshes the stored grant on a later sign-in, label unchanged", async () => {
@@ -119,13 +128,13 @@ describe("storing a provider grant", () => {
     })
 
     expect(second.identity.id).toBe(first.identity.id)
-    expect(second.identity.accessTokenEncrypted).not.toBe(
-      first.identity.accessTokenEncrypted
+    expect(second.secrets.accessTokenEncrypted).not.toBe(
+      first.secrets.accessTokenEncrypted
     )
     expect(
       await decryptSecret(
         context.authServer.config.secret,
-        required(second.identity.accessTokenEncrypted, "access token")
+        required(second.secrets.accessTokenEncrypted, "access token")
       )
     ).toBe("second-access-token")
   })
@@ -199,7 +208,9 @@ describe("GET /identities/:id/token", () => {
 
     expect(body.token).toBe("refreshed-access-token")
     const stored = required(
-      await selectRow(context.db, "identities", { id: identity.id }),
+      await selectRow(context.db, "identitySecrets", {
+        identityId: identity.id
+      }),
       "identity"
     )
     expect(
@@ -228,7 +239,9 @@ describe("GET /identities/:id/token", () => {
     await tokenRequest(context, refreshToken, identity.id)
 
     const stored = required(
-      await selectRow(context.db, "identities", { id: identity.id }),
+      await selectRow(context.db, "identitySecrets", {
+        identityId: identity.id
+      }),
       "identity"
     )
     expect(
@@ -254,15 +267,19 @@ describe("GET /identities/:id/token", () => {
     expect(((await response.json()) as { code: string }).code).toBe(
       "providerReconnectRequired"
     )
+    // The identity stays — the account is still linked — but every trace of a
+    // grant it no longer has goes, ciphertext row included.
+    expect(
+      await selectRow(context.db, "identitySecrets", {
+        identityId: identity.id
+      })
+    ).toBeNull()
     const stored = required(
       await selectRow(context.db, "identities", { id: identity.id }),
       "identity"
     )
-    // The row stays — the account is still linked — but it stops claiming a
-    // grant it does not have.
-    expect(stored.accessTokenEncrypted).toBeNull()
-    expect(stored.refreshTokenEncrypted).toBeNull()
     expect(stored.scope).toBeNull()
+    expect(stored.refreshTokenExpiresAt).toBeNull()
   })
 
   it("asks for a reconnect when there was never a refresh token", async () => {
@@ -275,8 +292,8 @@ describe("GET /identities/:id/token", () => {
       token: "provider-access-token"
     })
     await context.db.update({
-      table: "identities",
-      where: { id: identity.id },
+      table: "identitySecrets",
+      where: { identityId: identity.id },
       values: { accessTokenEncrypted: null }
     })
 
@@ -289,8 +306,8 @@ describe("GET /identities/:id/token", () => {
     const context = await createTestServer(OAUTH_OPTIONS)
     const { refreshToken, identity } = await signInWithGitHub(context, GRANT)
     await context.db.update({
-      table: "identities",
-      where: { id: identity.id },
+      table: "identitySecrets",
+      where: { identityId: identity.id },
       values: {
         accessTokenEncrypted: await encryptSecret(
           "some-other-secret",

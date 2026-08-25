@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { mintToken, readSetCookies, request } from "../helpers/request"
+import {
+  mintToken,
+  readRefreshCookie,
+  refreshCookieFor,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
@@ -12,10 +17,7 @@ async function signInGuest(
   const response = await context.authServer.handler(
     request("POST", "/api/auth/sign-in/guest")
   )
-  const refreshToken = required(
-    readSetCookies(response).get("auth-ts.refresh"),
-    "refresh"
-  ).value
+  const refreshToken = required(readRefreshCookie(response), "refresh").value
   const body = (await response.json()) as {
     user: { id: string; type: string }
     token: string
@@ -43,7 +45,7 @@ describe("guest sign-in", () => {
 
     const whoami = await context.authServer.handler(
       request("GET", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -82,14 +84,14 @@ describe("guest sign-in", () => {
   })
 })
 
-describe("guests and multiAccount never mix", () => {
+describe("guests and multiUser never mix", () => {
   it("refuses a guest sign-in while the browser is signed in", async () => {
     const context = await createTestServer(guestOptions)
     const { refreshToken } = await signInGuest(context)
 
     const refused = await context.authServer.handler(
       request("POST", "/api/auth/sign-in/guest", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
 
@@ -110,7 +112,7 @@ describe("guests and multiAccount never mix", () => {
 
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-in/guest", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
 
@@ -121,13 +123,13 @@ describe("guests and multiAccount never mix", () => {
     // No refusal code exists for this on purpose: sign-in/guest refusing a
     // signed-in browser means a guest can never hold parked accounts, so the
     // switch's own target lookup already answers.
-    const context = await createTestServer({ guest: true, multiAccount: true })
+    const context = await createTestServer({ guest: true, multiUser: true })
     const { token, refreshToken } = await signInGuest(context)
 
     const refused = await context.authServer.handler(
-      request("POST", "/api/auth/accounts/switch", {
+      request("POST", "/api/auth/users/switch", {
         body: { userId: "anyone" },
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -143,7 +145,7 @@ describe("guest reaping", () => {
 
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -156,7 +158,7 @@ describe("guest reaping", () => {
   it("signing out keeps a real user's row", async () => {
     const context = await createTestServer(guestOptions)
     const { refreshToken } = await signInGuest(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     // Convert, so the very same session now belongs to a real user.
     await context.authServer.handler(
@@ -175,14 +177,11 @@ describe("guest reaping", () => {
       })
     )
     const { token } = (await verified.json()) as { token: string }
-    const converted = required(
-      readSetCookies(verified).get("auth-ts.refresh"),
-      "refresh"
-    ).value
+    const converted = required(readRefreshCookie(verified), "refresh").value
 
     await context.authServer.handler(
       request("POST", "/api/auth/sign-out", {
-        cookies: { "auth-ts.refresh": converted },
+        cookies: refreshCookieFor(converted),
         token
       })
     )
@@ -198,7 +197,7 @@ describe("guest reaping", () => {
 
     const response = await context.authServer.handler(
       request("DELETE", `/api/auth/sessions/${sessionId}`, {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -245,7 +244,7 @@ describe("guest conversion", () => {
   it("upgrades the guest in place when the identifier is new, keeping every row they own", async () => {
     const context = await createTestServer(guestOptions)
     const { refreshToken, user: guest } = await signInGuest(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     await context.authServer.handler(
       request("POST", "/api/auth/sign-in/send-code", {
@@ -337,7 +336,7 @@ describe("guest conversion", () => {
     const response = await context.authServer.handler(
       request("POST", "/api/auth/sign-in/code", {
         token,
-        cookies: { "auth-ts.refresh": second.refreshToken },
+        cookies: refreshCookieFor(second.refreshToken),
         body: {
           email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
@@ -356,7 +355,7 @@ describe("guest conversion", () => {
     })
 
     const { refreshToken, user: guest } = await signInGuest(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     await context.authServer.handler(
       request("POST", "/api/auth/sign-in/send-code", {
@@ -409,10 +408,7 @@ describe("guest conversion", () => {
       })
     )
     const cookies = {
-      "auth-ts.refresh": required(
-        readSetCookies(first).get("auth-ts.refresh"),
-        "refresh"
-      ).value
+      ...refreshCookieFor(required(readRefreshCookie(first), "refresh").value)
     }
 
     await context.authServer.handler(
@@ -461,10 +457,7 @@ describe("account deletion", () => {
     const { token } = (await response.json()) as { token: string }
 
     return {
-      refreshToken: required(
-        readSetCookies(response).get("auth-ts.refresh"),
-        "refresh"
-      ).value,
+      refreshToken: required(readRefreshCookie(response), "refresh").value,
       token
     }
   }
@@ -475,7 +468,7 @@ describe("account deletion", () => {
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -484,8 +477,7 @@ describe("account deletion", () => {
     expect(context.db.users()).toHaveLength(0)
     expect(context.db.sessions()).toHaveLength(0)
     expect(
-      required(readSetCookies(response).get("auth-ts.refresh"), "cleared")
-        .attributes
+      required(readRefreshCookie(response), "cleared").attributes
     ).toContain("Max-Age=0")
   })
 
@@ -494,7 +486,7 @@ describe("account deletion", () => {
     // and a code left behind would sign the address's next owner into nothing.
     const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     // An outstanding code, sent and never verified.
     await context.authServer.handler(
@@ -548,7 +540,7 @@ describe("account deletion", () => {
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -572,7 +564,7 @@ describe("account deletion", () => {
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -597,7 +589,7 @@ describe("account deletion", () => {
 
       const response = await context.authServer.handler(
         request("DELETE", "/api/auth/user", {
-          cookies: { "auth-ts.refresh": refreshToken },
+          cookies: refreshCookieFor(refreshToken),
           token
         })
       )
@@ -659,7 +651,7 @@ describe("account deletion", () => {
       user: { deleteFreshWindow: "0s" }
     })
     const { refreshToken, token } = await signIn(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     const sent = await context.authServer.handler(
       request("POST", "/api/auth/user/send-delete-code", { cookies, token })
@@ -690,7 +682,7 @@ describe("account deletion", () => {
       user: { deleteFreshWindow: "0s" }
     })
     const { refreshToken, token } = await signIn(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     // A fresh sign-in code for the same address must not authorize deletion.
     await context.authServer.handler(
@@ -725,7 +717,7 @@ describe("account deletion", () => {
         user: { deleteFreshWindow: "0s" }
       })
       const { refreshToken, token } = await signIn(context)
-      const cookies = { "auth-ts.refresh": refreshToken }
+      const cookies = refreshCookieFor(refreshToken)
       const before = context.sentCodes.length
 
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -758,7 +750,7 @@ describe("account deletion", () => {
 
     const response = await context.authServer.handler(
       request("DELETE", "/api/auth/user", {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )

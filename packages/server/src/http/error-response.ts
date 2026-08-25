@@ -36,7 +36,7 @@ export type AuthErrorCode =
   | "guestCannotReceiveCode"
   /**
    * A guest sign-in was attempted from a browser that is signed in. Guests
-   * need a signed-out browser — under `multiAccount` more sign-ins are
+   * need a signed-out browser — under `multiUser` more sign-ins are
    * welcome, so the refusal is about the guest, not about being signed in.
    */
   | "guestRequiresSignOut"

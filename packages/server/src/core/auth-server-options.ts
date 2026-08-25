@@ -177,6 +177,25 @@ export interface CookieOptions {
    * this buys is exposure hygiene, and it costs you server-side session reads.
    */
   path?: string
+  /**
+   * The domain the readable hint cookie is scoped to. Host-only by default.
+   *
+   * Set it only for a cross-subdomain deployment — auth on `api.example.com`,
+   * the app on `app.example.com` — where a host-only hint is written on the
+   * auth host and never seen on the app's. Give the registrable domain the two
+   * share, `"example.com"`, with no leading dot.
+   *
+   * Stated rather than derived, because deriving it means guessing where the
+   * registrable domain ends, and a guess that lands on a public suffix —
+   * `vercel.app`, `github.io` — is refused by the browser rather than by this
+   * library. The hint then never arrives, and the only symptom is a wasted
+   * request per page load. Naming it is the difference between a wrong value
+   * failing loudly and a guess failing silently.
+   *
+   * The refresh cookies stay host-only regardless: this is the one cookie here
+   * that is not a credential.
+   */
+  hintDomain?: string
 }
 
 /** User-record behaviour. */
@@ -335,13 +354,13 @@ export interface AuthServerOptions<
    */
   rateLimit?: RateLimitOptions | false
   /**
-   * Google-style account switching: several users signed in to one browser.
+   * Google-style switching: several users signed in to one browser.
    *
-   * Named for what it multiplies — accounts per browser. Sessions per user are
+   * Named for what it multiplies — users per browser. Sessions per user are
    * already plural; that is the devices list.
    * @default false
    */
-  multiAccount?: boolean
+  multiUser?: boolean
   /** Server-side localization of error messages. Codes stay stable; only messages translate. */
   localization?: LocalizationOptions
   /**

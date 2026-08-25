@@ -10,8 +10,8 @@ import { listUserSessions } from "../session/list-user-sessions"
  *
  * `updatedAt` is when the session was last used, which is what a device list is
  * usually asked to show. Which of them is the current one is the caller's own
- * comparison — `GET /user` and `GET /session` both hand back the session making
- * the request, so its `id` is already in hand.
+ * comparison — the access token's `sid` claim names the session it was minted
+ * from, so its `id` is already in hand.
  *
  * The dates are `Date` on both sides of the wire: JSON carries them as ISO
  * strings, and `@auth-ts/client` revives them, so application code never has to
@@ -37,12 +37,8 @@ export const listSessionsDocs: EndpointDocs<never> = {
  * List the active sessions.
  *
  * `tokenHash` never crosses to the browser — `id` is the only address a client
- * ever sees, and it is the only thing revocation needs.
- *
- * This lives in core rather than in application code because marking the
- * current session means hashing the raw refresh token and comparing, and the
- * raw token is something application code never handles — and, once
- * `cookie.path` is narrowed to the auth mount, cannot even see.
+ * ever sees, and it is the only thing revocation needs. Which entry is this
+ * device is the caller's comparison: the access token's `sid` names it.
  *
  * Newest first, capped at the page size {@link listUserSessions} reads. A person
  * with more live sessions than that has a device list nobody scrolls and a

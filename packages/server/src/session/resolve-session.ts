@@ -3,8 +3,10 @@ import type { AuthServerInternals } from "../core/auth-server-internals"
 import { sha256Hex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"
 import { selectOne } from "../lib/select-one"
+import { HINT_COOKIE_NAME } from "../lib/serialize-cookie"
 import type { CallerInput } from "./authenticate"
 import { verifyBearer } from "./authenticate"
+import { readRefreshCookies } from "./session-cookies"
 import { slideSession } from "./slide-session"
 
 /**
@@ -28,12 +30,30 @@ export interface ResolvedSession {
   tokenHash: string
 }
 
-/** Reads the refresh token from the cookie — the only place it ever travels. */
+/**
+ * Reads one user's refresh token from the cookies — the only place it travels.
+ *
+ * Without a `userId` the hint decides, since it names whoever was made active
+ * last. That keeps the hot path at one cookie read and one session read no
+ * matter how many users are signed in here. A hint pointing at a cookie this
+ * browser does not hold falls back to any it does, which is what makes a
+ * script-rewritten hint a no-op rather than a way to look signed out.
+ */
 export function readRefreshToken(
   internals: AuthServerInternals,
-  headers: Headers
+  headers: Headers,
+  userId?: string
 ) {
-  return readCookie(headers, internals.config.cookie.name)
+  const presented = readRefreshCookies(internals, headers)
+  if (userId !== undefined) return presented.get(userId)
+
+  const hinted = readCookie(headers, HINT_COOKIE_NAME)
+  if (hinted) {
+    const token = presented.get(hinted)
+    if (token) return token
+  }
+
+  return presented.values().next().value
 }
 
 /**
@@ -52,9 +72,10 @@ export function readRefreshToken(
  */
 export async function resolveSessionRow(
   internals: AuthServerInternals,
-  headers: Headers
+  headers: Headers,
+  userId?: string
 ): Promise<Omit<ResolvedSession, "user"> | null> {
-  const rawToken = readRefreshToken(internals, headers)
+  const rawToken = readRefreshToken(internals, headers, userId)
   if (!rawToken) {
     internals.log.debug("no refresh credential on request")
     return null
@@ -77,9 +98,10 @@ export async function resolveSessionRow(
  */
 export async function resolveSession(
   internals: AuthServerInternals,
-  headers: Headers
+  headers: Headers,
+  userId?: string
 ): Promise<ResolvedSession | null> {
-  const resolved = await resolveSessionRow(internals, headers)
+  const resolved = await resolveSessionRow(internals, headers, userId)
   if (!resolved) return null
 
   const user = await selectOne(internals, "users", {

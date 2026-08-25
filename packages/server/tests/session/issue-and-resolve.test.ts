@@ -6,15 +6,23 @@ import {
   resolveSession
 } from "../../src/session/resolve-session"
 import { createTestInternals } from "../helpers/create-test-internals"
-import { readSetCookies } from "../helpers/request"
+import {
+  readRefreshCookie,
+  readSetCookies,
+  refreshCookie,
+  refreshEntryOf
+} from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
 const REQUEST_URL = "https://app.example.com/api/auth/sign-in/code"
 
 const refreshTokenOf = (issued: { headers: Headers }) =>
-  required(readSetCookies(issued).get("auth-ts.refresh"), "refresh cookie")
-    .value
+  required(readRefreshCookie(issued), "refresh cookie").value
+
+/** The cookie header a browser holding this issued session would send back. */
+const cookieHeaderOf = (issued: { headers: Headers; user: { id: string } }) =>
+  `${refreshCookie(issued.user.id)}=${refreshTokenOf(issued)}`
 
 describe("issueSession", () => {
   it("sets a cookie with every security attribute and no Domain", async () => {
@@ -26,7 +34,7 @@ describe("issueSession", () => {
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
-    const cookie = readSetCookies(issued).get("auth-ts.refresh")
+    const cookie = readRefreshCookie(issued)
 
     expect(cookie?.attributes).toContain("HttpOnly")
     expect(cookie?.attributes).toContain("SameSite=Lax")
@@ -48,23 +56,22 @@ describe("issueSession", () => {
     const cookies = readSetCookies(issued)
     const hint = required(cookies.get("auth-ts.hint"), "hint cookie")
 
-    expect(hint.value).toBe("in")
+    expect(hint.value).toBe(issued.user.id)
     // The one cookie script may read, because it is the one that is not a
     // credential — and useless if a page cannot see it.
     expect(hint.attributes).not.toContain("HttpOnly")
     expect(hint.attributes).toContain("Path=/")
     expect(hint.attributes.toLowerCase()).not.toContain("domain")
     expect(hint.attributes).toContain(
-      required(
-        cookies.get("auth-ts.refresh"),
-        "refresh cookie"
-      ).attributes.match(/Max-Age=\d+/)?.[0]
+      required(refreshEntryOf(cookies), "refresh cookie").attributes.match(
+        /Max-Age=\d+/
+      )?.[0]
     )
   })
 
-  it("scopes the hint to the shared domain only when a cross-origin app is configured", async () => {
+  it("scopes the hint to the domain configured, and to none by default", async () => {
     const cross = await createTestInternals({
-      trustedOrigins: ["https://app.example.com"]
+      cookie: { hintDomain: "example.com" }
     })
     const issuedCross = await issueSession(cross.internals, {
       user: await insertUser(cross.db, { email: "ada@example.com" }),
@@ -77,20 +84,19 @@ describe("issueSession", () => {
         .attributes
     ).toContain("Domain=example.com")
 
-    // A public suffix would be refused by the browser anyway; a single shared
-    // label is never a domain a cookie may claim.
-    const tld = await createTestInternals({
-      trustedOrigins: ["https://app.example"]
-    })
-    const issuedTld = await issueSession(tld.internals, {
-      user: await insertUser(tld.db, { email: "ada@example.com" }),
-      headers: new Headers({ origin: "https://app.example" }),
-      requestURL: "https://api.other.example/api/auth/sign-in/code"
+    // Stated or host-only. Nothing is derived from the request, so a public
+    // suffix like `vercel.app` cannot be guessed into a cookie the browser
+    // silently refuses.
+    const hostOnly = await createTestInternals({})
+    const issuedHostOnly = await issueSession(hostOnly.internals, {
+      user: await insertUser(hostOnly.db, { email: "ada@example.com" }),
+      headers: new Headers({ origin: "https://app.example.com" }),
+      requestURL: "https://api.example.com/api/auth/sign-in/code"
     })
 
     expect(
       required(
-        readSetCookies(issuedTld).get("auth-ts.hint"),
+        readSetCookies(issuedHostOnly).get("auth-ts.hint"),
         "hint"
       ).attributes.toLowerCase()
     ).not.toContain("domain")
@@ -141,9 +147,7 @@ describe("issueSession", () => {
       requestURL: "http://localhost:3000/api/auth/sign-in/code"
     })
 
-    expect(
-      readSetCookies(issued).get("auth-ts.refresh")?.attributes
-    ).not.toContain("Secure")
+    expect(readRefreshCookie(issued)?.attributes).not.toContain("Secure")
   })
 
   it("mints an access token that verifies and carries sub, type, and role", async () => {
@@ -194,7 +198,7 @@ describe("issueSession", () => {
     expect(claims).not.toHaveProperty("primaryUserId")
   })
 
-  it("writes no accounts cookie when multiAccount is off", async () => {
+  it("writes no accounts cookie when multiUser is off", async () => {
     const { internals, db } = await createTestInternals()
     const user = await insertUser(db, { email: "ada@example.com" })
 
@@ -219,7 +223,7 @@ describe("resolveSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
+      cookie: cookieHeaderOf(issued)
     })
     const resolved = await resolveSession(internals, headers)
 
@@ -263,7 +267,7 @@ describe("resolveSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
+      cookie: cookieHeaderOf(issued)
     })
     expect(await resolveSession(internals, headers)).toBeNull()
   })
@@ -287,7 +291,7 @@ describe("resolveSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
+      cookie: cookieHeaderOf(issued)
     })
     expect(await resolveSession(internals, headers)).toBeNull()
   })
@@ -315,7 +319,7 @@ describe("resolveSession", () => {
 
     const resolved = await resolveSession(
       internals,
-      new Headers({ cookie: `auth-ts.refresh=${refreshTokenOf(issued)}` })
+      new Headers({ cookie: cookieHeaderOf(issued) })
     )
 
     expect(resolved).toBeNull()
@@ -342,7 +346,7 @@ describe("resolveSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
+      cookie: cookieHeaderOf(issued)
     })
     expect(await resolveSession(internals, headers)).toBeNull()
   })
@@ -364,7 +368,7 @@ describe("resolveCallerSession", () => {
       user,
       token: issued.token,
       cookie: new Headers({
-        cookie: `auth-ts.refresh=${refreshTokenOf(issued)}`
+        cookie: cookieHeaderOf(issued)
       })
     }
   }
@@ -395,7 +399,7 @@ describe("resolveCallerSession", () => {
     })
 
     const headers = new Headers({
-      cookie: `auth-ts.refresh=${refreshTokenOf(reissued)}`,
+      cookie: cookieHeaderOf(reissued),
       authorization: `Bearer ${token}`
     })
     const resolved = await resolveCallerSession(internals, { headers })

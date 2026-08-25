@@ -13,7 +13,7 @@ export const authServer = createAuthServer({
     }
   },
   guest: true,
-  multiAccount: true,
+  multiUser: true,
   openapi: true,
   // Allowed to make state-changing requests. CORS headers are not this
   // server's business — see `src/start.ts`, which answers them for the whole

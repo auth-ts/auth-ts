@@ -67,7 +67,7 @@ Passing `auth.config` is what makes it yours rather than the library's:
 - **Your base path.** Every path is prefixed with it, and `servers` carries your
   `baseURL`.
 - **Only the routes you have.** A deployment without `guest` has no
-  `/sign-in/guest`; without `multiAccount`, no `/accounts`; without providers,
+  `/sign-in/guest`; without `multiUser`, no `/users`; without providers,
   none of the OAuth routes. They are absent rather than documented-and-404.
 - **Only the providers you configured.** `{provider}` is an enum of exactly the
   ones you wired up, so the playground cannot offer a provider that would 404.

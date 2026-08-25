@@ -70,7 +70,7 @@ export async function createTestInternals(
       }
     },
     jwt: { privateKey: privateKeyPem },
-    secret: "test-server-secret",
+    secret: "test-server-secret-long-enough-to-pass",
     logLevel: overrides.logLevel ?? "debug",
     logger: (level, message, data) => {
       logCalls.push({ level, message, ...(data ? { data } : {}) })

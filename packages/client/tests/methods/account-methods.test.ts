@@ -332,7 +332,7 @@ describe("sessions and accounts", () => {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("POST", "/api/auth/accounts/switch", {
+    server.on("POST", "/api/auth/users/switch", {
       body: { user: other },
       token: switched
     })
@@ -340,7 +340,7 @@ describe("sessions and accounts", () => {
     const client = createAuthClient()
     await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
-    const result = await client.switchAccount({ userId: "user-2" })
+    const result = await client.switchUser({ userId: "user-2" })
 
     expect(result.email).toBe("grace@example.com")
     // The switch primes the token, so nothing refreshes afterwards.

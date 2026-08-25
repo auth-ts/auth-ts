@@ -267,11 +267,30 @@ discovery-driven code flow, `sub` as the provider account id — is configuratio
 only. The generic `:provider` routes guarantee no new endpoints and no breaking
 change, so this is the cheap half and the obvious next provider feature.
 
-**Being** an identity provider — an authorize endpoint, a code grant, a client
-registry — is a v2-scale subsystem. Worth naming because it is the real answer to
-multi-domain single sign-on: each domain keeps its own first-party session and
-the central domain is an IdP reached by top-level redirect, never by shared
-cookies. Until then, the centre can be any existing provider.
+**Being** an identity provider is its own section below.
+
+### Being an identity provider
+
+An authorize endpoint, a code grant, and a client registry — a v2-scale
+subsystem, and one feature answering three asks at once: single sign-on across
+your own domains, third-party "sign in with us", and the cross-domain
+deployment the *Known constraints* section says a reverse proxy is the fix for
+today.
+
+The shape is settled even though none of it is built. Each domain keeps its own
+first-party session; the centre is reached by top-level redirect, never by a
+shared cookie. That is what makes it work where cookies cannot: the browser
+travels to the auth origin, which reads its **own** `HttpOnly` cookie, and
+bounces back with a code the application exchanges for tokens. OpenAuth
+implements exactly this shape, `httpOnly` session cookie included.
+
+The session core needs nothing new — `resolveSession` is what `/authorize`
+would authenticate against, and `signToken` already accepts a caller-supplied
+`aud` and `iss` for client-scoped tokens. What it needs is storage for clients,
+authorization codes, and grants, and those belong in a contract of their own
+rather than widening the five tables every consumer already implements.
+
+Until then, the centre can be any existing provider.
 
 ### Revoking a grant at the provider on disconnect
 
@@ -377,10 +396,17 @@ through `DELETE /sessions/:id`. Only the rotate-on-every-refresh pattern is excl
 The cookie is `HttpOnly`, host-only, and never crosses an origin, so rotation
 mostly defends against theft requiring a compromise that defeats rotation anyway.
 What it reliably causes is a race between concurrent tabs, where the second
-presents a token the first has already spent.
+presents a token the first has already spent — and a race the server-rendered
+case cannot even resolve, since a rotated token has to be written back on a
+response and frameworks do not always permit that where the session is read.
 
 If you store the refresh token outside an `HttpOnly` cookie, rotation and reuse
 detection become mandatory — which is precisely why that mode is unsupported.
+GoTrue is the worked example of the other path: rotation on by default, a
+parent/revoked chain per token, and a configurable reuse interval to survive
+the concurrent case. That is a coherent design, and the opposite one from this.
+The combination to avoid is half of each — a token a script can read that never
+rotates.
 
 ### Password authentication
 
@@ -431,7 +457,14 @@ for revocation speed.
 
 **Cross-domain deployment is deliberately limited.** Same origin needs no
 configuration. A different subdomain of the same registrable domain works with
-`baseURL` and `cors.origin`. A genuinely foreign domain never receives the
-cookie, because `SameSite=Lax` does not send cross-site and `SameSite=None`
-reopens CSRF while dying to cookie partitioning. The fix is a reverse proxy that
-puts the auth mount back on the application's own origin.
+`baseURL`, `cors.origin`, and `cookie.hintDomain` — the last one names the
+domain the readable hint is scoped to. It is stated rather than derived: working
+it out from the request means guessing where the registrable domain ends, and a
+guess landing on a public suffix like `vercel.app` is refused by the browser
+rather than by this library, so the hint silently never arrives.
+
+A genuinely foreign domain never receives the cookie at all, because
+`SameSite=Lax` does not send cross-site and `SameSite=None` reopens CSRF while
+dying to cookie partitioning. The fix is a reverse proxy that puts the auth
+mount back on the application's own origin — or, eventually, the identity
+provider below, which solves it with a redirect rather than a shared cookie.

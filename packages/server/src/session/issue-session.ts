@@ -5,20 +5,13 @@ import { randomBytesBase64url } from "../lib/generate-random"
 import { sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
-import {
-  serializeCookie,
-  shouldUseSecureCookies
-} from "../lib/serialize-cookie"
+import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { sweepExpired } from "../lib/sweep-expired"
 import {
-  demoteActive,
-  parkedTokens,
-  pruneDeadAccounts,
-  readAccountsCookie,
-  serializeAccounts
-} from "./accounts-cookie"
-import { readRefreshToken } from "./resolve-session"
-import { refreshCookies } from "./session-cookies"
+  readRefreshCookies,
+  refreshCookieName,
+  refreshCookies
+} from "./session-cookies"
 import { sessionStamp } from "./slide-session"
 
 /** What issuing a session produced. */
@@ -43,16 +36,10 @@ export interface IssueSessionInput {
   /**
    * Token hash of a session this one supersedes.
    *
-   * That session is deleted rather than left live, and under `multiAccount` it
-   * is not parked either. Used when a guest completes a sign-in: whether they
-   * were upgraded in place or merged into an existing account, the anonymous
-   * session has served its purpose, and a stranded guest in the account
-   * switcher — or a still-valid refresh token for one — helps nobody.
-   *
-   * Without `multiAccount` this is also implied: whatever session the request
-   * presented is replaced by the one being issued, because the browser is
-   * about to overwrite its cookie with the new token and a row nothing can
-   * reach any more is a live credential nobody can see to revoke.
+   * That session is deleted rather than left live. Used when a guest completes
+   * a sign-in: whether they were upgraded in place or merged into an existing
+   * user, the anonymous session has served its purpose, and a stranded guest in
+   * the switcher — or a still-valid refresh token for one — helps nobody.
    */
   replaces?: string
 }
@@ -88,65 +75,46 @@ export async function issueSession(
     sweepExpired(internals, "sessions")
   ])
 
-  // Without multiAccount a sign-in replaces rather than appends: the session
-  // the request presented is about to become unreachable from this browser,
-  // so it is deleted rather than left to run out its month-long lifetime
-  // somewhere nobody can revoke it. Under multiAccount it is parked below.
-  const presented = readRefreshToken(internals, headers)
-  const superseded =
-    replaces ??
-    (!config.multiAccount && presented ? await sha256Hex(presented) : undefined)
-
+  // A cookie about to be overwritten leaves its session unreachable from this
+  // browser, so it is deleted rather than left to run out a month-long lifetime
+  // somewhere nobody can revoke it. Without multiUser that is every session the
+  // browser presented; with it, only this user's own previous one.
+  const presented = readRefreshCookies(internals, headers)
+  const stranded = [...presented].filter(
+    ([userId]) => !config.multiUser || userId === user.id
+  )
+  const superseded = new Set(
+    await Promise.all(stranded.map(([, token]) => sha256Hex(token)))
+  )
+  if (replaces) superseded.add(replaces)
   // Only once the replacement exists: if creating it had failed, the caller
   // would still hold a working session rather than none.
-  if (superseded && superseded !== tokenHash) {
-    await internals.db.delete({
-      table: "sessions",
-      where: { tokenHash: superseded }
-    })
-    internals.log.debug("superseded session deleted")
+  superseded.delete(tokenHash)
+
+  for (const hash of superseded) {
+    await internals.db.delete({ table: "sessions", where: { tokenHash: hash } })
   }
+  if (superseded.size > 0) internals.log.debug("superseded sessions deleted")
 
   const responseHeaders = new Headers()
   const token = await mintAccessToken(internals, user, session.id)
   internals.log.debug("session issued", { userType: user.type })
 
   const secure = shouldUseSecureCookies(requestURL)
+  for (const [userId] of stranded) {
+    if (userId === user.id) continue
+    responseHeaders.append(
+      "set-cookie",
+      clearCookie(refreshCookieName(config, userId), config.cookie.path, secure)
+    )
+  }
   for (const cookie of refreshCookies(internals, {
     rawToken,
+    userId: user.id,
     requestURL,
     headers
   })) {
     responseHeaders.append("set-cookie", cookie)
-  }
-
-  if (config.multiAccount) {
-    // Sign-ins append rather than replace: the previous active session moves to
-    // the parked list so the user can switch back to it.
-    const parked = parkedTokens(
-      await pruneDeadAccounts(internals, readAccountsCookie(internals, headers))
-    )
-    // A superseded session is gone, not parked; anything else the browser had
-    // active is demoted as usual.
-    const presentedWasSuperseded =
-      presented !== undefined &&
-      replaces !== undefined &&
-      (await sha256Hex(presented)) === replaces
-    const nextParked =
-      presented && !presentedWasSuperseded
-        ? await demoteActive(internals, parked, presented)
-        : parked
-
-    responseHeaders.append(
-      "set-cookie",
-      serializeCookie({
-        name: config.cookie.accountsName,
-        value: serializeAccounts(nextParked),
-        path: config.cookie.path,
-        maxAge: config.session.ttl,
-        secure
-      })
-    )
   }
 
   return { token, user, headers: responseHeaders }

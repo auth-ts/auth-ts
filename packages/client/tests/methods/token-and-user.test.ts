@@ -273,6 +273,18 @@ describe("the session hint", () => {
     expect(server.requests).toHaveLength(0)
   })
 
+  it("reads a user id as a live session and asks", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    setSessionHint(user.id)
+    const client = createAuthClient()
+
+    expect(await client.getToken()).toBeTruthy()
+    expect(server.requests).toHaveLength(1)
+  })
+
   it("believes an explicit out the same way", async () => {
     setSessionHint("out")
     const client = createAuthClient()

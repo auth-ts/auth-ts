@@ -92,6 +92,8 @@ export const sessions = pgTable.withRLS(
   ]
 )
 
+// No policy, and never one: there is no userId to scope it by, so any readable
+// policy would expose every address signing in.
 export const verifications = pgTable.withRLS(
   "verifications",
   {
@@ -121,6 +123,7 @@ export const verifications = pgTable.withRLS(
   ]
 )
 
+// No policy, and never one: `key` embeds an email, phone, or IP address.
 export const attempts = pgTable.withRLS(
   "attempts",
   {
@@ -151,11 +154,6 @@ export const identities = pgTable.withRLS(
     provider: text("provider").notNull(),
     providerUserId: text("providerUserId").notNull(),
     label: text("label"),
-    accessTokenEncrypted: text("accessTokenEncrypted"),
-    accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
-      withTimezone: true
-    }),
-    refreshTokenEncrypted: text("refreshTokenEncrypted"),
     refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
       withTimezone: true
     }),
@@ -185,6 +183,30 @@ export const identities = pgTable.withRLS(
       using: authUuid(table.userId)
     })
   ]
+)
+
+// No policy, so nothing but the owner reads it. Never add one.
+export const identitySecrets = pgTable.withRLS(
+  "identitySecrets",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    identityId: uuid("identityId")
+      .notNull()
+      .references(() => identities.id, { onDelete: "cascade" }),
+    accessTokenEncrypted: text("accessTokenEncrypted"),
+    accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
+      withTimezone: true
+    }),
+    refreshTokenEncrypted: text("refreshTokenEncrypted"),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date())
+  },
+  (table) => [uniqueIndex("identitySecretsIdentityIndex").on(table.identityId)]
 )
 
 export const todos = pgTable.withRLS(

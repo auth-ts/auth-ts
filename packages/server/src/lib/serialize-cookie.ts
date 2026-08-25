@@ -60,12 +60,16 @@ export function serializeCookie(cookie: CookieAttributes) {
 export const HINT_COOKIE_NAME = "auth-ts.hint"
 
 /**
- * What the hint says: a session exists here, or one demonstrably does not.
+ * What the hint says: the active user's id, or `"out"` for demonstrably nobody.
+ *
+ * Carrying the id rather than `"in"` is what lets a browser know *which*
+ * refresh cookie to spend without reading every one of them, and lets a
+ * server-rendered page know who to render as before it resolves anything.
  *
  * `"out"` is only written where the hint may be delivered cross-origin, since
  * that is the only deployment where a missing hint is ambiguous.
  */
-export type HintValue = "in" | "out"
+export type HintValue = string
 
 /** Where a hint cookie applies, which is all that setting and clearing it share. */
 export interface HintCookieScope {
@@ -87,11 +91,13 @@ export interface HintCookieAttributes extends HintCookieScope {
  *
  * The one cookie in this library that script may read and that may carry a
  * `Domain`, because it is the one cookie that is not a credential: its entire
- * contents are `in` or `out`. It exists so a signed-out visitor costs no
+ * contents are a user id or `out`. It exists so a signed-out visitor costs no
  * request, which means a browser has to be able to read it, and a cross-origin
- * app has to be able to receive it. The refresh token stays `HttpOnly` and
+ * app has to be able to receive it. The refresh tokens stay `HttpOnly` and
  * host-only, and learning that a browser once signed in is not a capability —
- * whoever can read this can already see the interface it produces.
+ * whoever can read this can already see the interface it produces. A script
+ * that rewrites it only chooses which already-held cookie the server spends,
+ * which is what `POST /users/switch` offers it anyway.
  *
  * `Path` is always `/`, never `cookie.path`: `document.cookie` only exposes
  * cookies whose path covers the current page, and a hint scoped to the auth

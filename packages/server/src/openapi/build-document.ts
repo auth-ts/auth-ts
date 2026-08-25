@@ -21,7 +21,7 @@ const TAG_ORDER = [
   "Sign in",
   "Session",
   "User",
-  "Accounts",
+  "Users",
   "Identities",
   "Discovery"
 ] as const
@@ -33,7 +33,7 @@ const BEARER = "bearerAuth"
 
 function met(requirement: EndpointRequirement, config: AuthServerConfig) {
   if (requirement === "guest") return config.guest
-  if (requirement === "multiAccount") return config.multiAccount
+  if (requirement === "multiUser") return config.multiUser
   if (requirement === "providers")
     return Object.keys(config.providers).length > 0
   if (requirement === "jwks") return config.jwks?.json !== undefined

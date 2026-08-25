@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { mintToken, readSetCookies, request } from "../helpers/request"
+import {
+  mintToken,
+  readRefreshCookie,
+  readSetCookies,
+  refreshCookie,
+  refreshCookieFor,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 
 type TestContext = Awaited<ReturnType<typeof createTestServer>>
@@ -16,15 +23,12 @@ async function signIn(context: TestContext, email: string) {
     })
   )
   return {
-    "auth-ts.refresh": required(
-      readSetCookies(response).get("auth-ts.refresh"),
-      "refresh"
-    ).value
+    ...refreshCookieFor(required(readRefreshCookie(response), "refresh").value)
   }
 }
 
 const tokenFor = (context: TestContext, cookies: Record<string, string>) =>
-  mintToken(context.authServer, cookies["auth-ts.refresh"] ?? "")
+  mintToken(context.authServer, cookies[refreshCookie("signed-in")] ?? "")
 
 async function listSessions(
   context: TestContext,
@@ -98,8 +102,7 @@ describe("DELETE /sessions/:id", () => {
 
     expect(response.status).toBe(204)
     expect(
-      required(readSetCookies(response).get("auth-ts.refresh"), "refresh")
-        .attributes
+      required(readRefreshCookie(response), "refresh").attributes
     ).toContain("Max-Age=0")
     // Asked of the cookie: the revoked session's token stays readable until it
     // expires, which is the revocation latency every token carries.

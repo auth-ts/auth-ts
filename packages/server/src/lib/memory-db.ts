@@ -175,6 +175,18 @@ export function createMemoryDb(): MemoryDb {
       const removed = find(table, where)
       for (const row of removed) tableOf(table).delete(row.id)
 
+      // The one cascade the contract asks a real database for, honoured here so
+      // `authDBChecks` runs against this store the way it runs against yours.
+      if (table === "identities") {
+        for (const identity of removed) {
+          for (const secret of find("identitySecrets", {
+            identityId: identity.id
+          })) {
+            tableOf("identitySecrets").delete(secret.id)
+          }
+        }
+      }
+
       return removed.map((row) => ({ ...row })) as never
     },
 

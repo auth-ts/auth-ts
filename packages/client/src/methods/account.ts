@@ -28,7 +28,7 @@ export type SignOutScope = "local" | "others" | "global"
 export interface SignOutInput {
   scope?: SignOutScope
   /**
-   * Which of this browser's accounts to sign out, under `multiAccount`.
+   * Which of this browser's accounts to sign out, under `multiUser`.
    *
    * Omit it and every account signed in here goes. Name one and only that
    * account goes, whether it is the active one or a parked one; the rest stay

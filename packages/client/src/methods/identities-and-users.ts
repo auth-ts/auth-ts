@@ -1,15 +1,14 @@
 import type {
-  AccountInfo,
+  AuthIdentity,
   AuthUser,
-  IdentityInfo,
   ProviderTokenResult
 } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 
 /** Lists the providers linked to this user. */
 export function createListIdentities(internals: AuthClientInternals) {
-  return async function listIdentities(): Promise<IdentityInfo[]> {
-    return internals.fetchJson<IdentityInfo[]>({
+  return async function listIdentities(): Promise<AuthIdentity[]> {
+    return internals.fetchJson<AuthIdentity[]>({
       method: "GET",
       path: "/identities",
       authenticated: true
@@ -73,39 +72,37 @@ export function createGetProviderToken(internals: AuthClientInternals) {
   }
 }
 
-/** Lists every account signed in to this browser. Requires `multiAccount` server-side. */
-export function createListAccounts(internals: AuthClientInternals) {
-  return async function listAccounts(): Promise<AccountInfo[]> {
-    return internals.fetchJson<AccountInfo[]>({
+/** Lists every user signed in to this browser. Requires `multiUser` server-side. */
+export function createListUsers(internals: AuthClientInternals) {
+  return async function listUsers(): Promise<AuthUser[]> {
+    return internals.fetchJson<AuthUser[]>({
       method: "GET",
-      path: "/accounts",
+      path: "/users",
       authenticated: true
     })
   }
 }
 
-/** Input for switching accounts. */
-export interface SwitchAccountInput {
+/** Input for switching users. */
+export interface SwitchUserInput {
   userId: string
 }
 
 /**
- * Switches to another account already signed in to this browser.
+ * Switches to another user already signed in to this browser.
  *
  * The token and user caches are replaced together, so subscribers fire once and
  * the whole interface flips at the same moment rather than briefly showing one
- * account's name above another's data.
+ * user's name above another's data.
  */
-export function createSwitchAccount(internals: AuthClientInternals) {
-  return async function switchAccount(
-    input: SwitchAccountInput
-  ): Promise<AuthUser> {
+export function createSwitchUser(internals: AuthClientInternals) {
+  return async function switchUser(input: SwitchUserInput): Promise<AuthUser> {
     const result = await internals.fetchJson<{
       token: string
       user: AuthUser
     }>({
       method: "POST",
-      path: "/accounts/switch",
+      path: "/users/switch",
       body: input,
       authenticated: true
     })

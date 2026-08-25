@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest"
 import { AuthConfigError } from "../../src/http/auth-config-error"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import {
+  readRefreshCookie,
+  readSetCookies,
+  refreshCookie,
+  refreshCookieFor,
+  refreshEntryOf,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 
 type TestContext = Awaited<ReturnType<typeof createTestServer>>
@@ -23,16 +30,13 @@ async function signIn(context: TestContext) {
   const { token } = (await response.json()) as { token: string }
 
   return {
-    refreshToken: required(
-      readSetCookies(response).get("auth-ts.refresh"),
-      "refresh"
-    ).value,
+    refreshToken: required(readRefreshCookie(response), "refresh").value,
     token
   }
 }
 
-const cookieHeaders = (refreshToken: string) =>
-  new Headers({ cookie: `auth-ts.refresh=${refreshToken}` })
+const cookieHeaders = (refreshToken: string, userId = "signed-in") =>
+  new Headers({ cookie: `${refreshCookie(userId)}=${refreshToken}` })
 
 describe("getToken as a function", () => {
   it("returns the token and the user, and slides the session it read", async () => {
@@ -87,7 +91,7 @@ describe("getToken as a function", () => {
 
     const result = await context.authServer.getToken(
       request("GET", "/dashboard", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
 
@@ -203,16 +207,20 @@ describe("getToken as a function", () => {
 
     const response = await context.authServer.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
     const cookies = readSetCookies(response)
 
-    expect(required(cookies.get("auth-ts.refresh"), "refresh").value).toBe(
+    expect(required(refreshEntryOf(cookies), "refresh").value).toBe(
       refreshToken
     )
-    expect(cookies.get("auth-ts.refresh")?.attributes).toMatch(/Max-Age/)
-    expect(required(cookies.get("auth-ts.hint"), "hint").value).toBe("in")
+    expect(refreshEntryOf(cookies)?.attributes).toMatch(/Max-Age/)
+    // The hint names whoever is active, which is what tells the next request
+    // which of several refresh cookies to spend.
+    expect(required(cookies.get("auth-ts.hint"), "hint").value).toBe(
+      required(context.db.users()[0], "user").id
+    )
   })
 
   it("sets no cookies on success when sliding is off", async () => {
@@ -223,7 +231,7 @@ describe("getToken as a function", () => {
 
     const response = await context.authServer.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
 
@@ -361,7 +369,7 @@ describe("calling with a token instead of a request", () => {
     // How a caller holding only the cookie gets a token to pass along.
     const minted = await context.authServer.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
     const { token } = (await minted.json()) as { token: string }

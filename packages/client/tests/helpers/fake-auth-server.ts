@@ -40,7 +40,7 @@ export interface FakeAuthServer {
  * Writes, rewrites, or removes the hint cookie the client reads before it asks
  * for a token.
  */
-export function setSessionHint(value: "in" | "out" | undefined) {
+export function setSessionHint(value: string | undefined) {
   // biome-ignore lint/suspicious/noDocumentCookie: stands in for the browser that received the server's Set-Cookie
   globalThis.document.cookie =
     value === undefined

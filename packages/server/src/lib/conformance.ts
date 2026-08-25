@@ -493,6 +493,52 @@ export const authDBChecks: AuthDBCheck[] = [
     }
   },
   {
+    name: "identitySecrets cascade when their identity is deleted",
+    async run(db) {
+      const owner = await create(
+        db,
+        "users",
+        person({ email: `${unique()}@example.test` })
+      )
+      const providerUserId = unique()
+      try {
+        const identity = await create(db, "identities", {
+          userId: owner.id,
+          provider: "github",
+          providerUserId,
+          label: null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        await create(db, "identitySecrets", {
+          identityId: identity.id,
+          accessTokenEncrypted: "v1.ciphertext",
+          refreshTokenEncrypted: "v1.ciphertext",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+
+        await db.delete({ table: "identities", where: { id: identity.id } })
+
+        const orphaned = await db.select({
+          table: "identitySecrets",
+          where: { identityId: identity.id },
+          limit: 1,
+          offset: 0,
+          orderBy: { createdAt: "asc" }
+        })
+        if (orphaned.length > 0) {
+          throw new Error(
+            "a provider's encrypted tokens outlived the identity that addressed them. Core deletes them itself, so this only fails where something else removes an identity — but an orphaned row is a stored credential nothing points at, and no policy can scope it."
+          )
+        }
+      } finally {
+        await db.delete({ table: "identities", where: { providerUserId } })
+        await db.delete({ table: "users", where: { id: owner.id } })
+      }
+    }
+  },
+  {
     name: "delete honours a range, removing what has expired and keeping what has not",
     async run(db) {
       const identifier = `${unique()}@example.test`

@@ -40,7 +40,8 @@ export const disconnectIdentityDocs: EndpointDocs<
  * code signs them back in, and signing in with the provider again matches on
  * that email and re-records the link on the same account.
  *
- * The stored provider tokens go with the row. Nothing is revoked at the
+ * The stored provider tokens go with the row, from `identitySecrets`. Nothing
+ * is revoked at the
  * provider: that is the user's to do from the provider's own account screen,
  * and a revocation call that failed would leave this side lying either way.
  */
@@ -61,6 +62,13 @@ export const disconnectIdentity = defineEndpoint({
       where: { id: input.id, userId: caller.userId }
     })
     if (deleted.length === 0) throw new AuthApiError("notFound", 404)
+
+    // After the ownership-enforcing delete, so an id belonging to someone else
+    // never reaches this. A database cascade would do it too, and should.
+    await internals.db.delete({
+      table: "identitySecrets",
+      where: { identityId: input.id }
+    })
 
     return { data: undefined, status: 204 }
   }

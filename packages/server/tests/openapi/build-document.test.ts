@@ -110,7 +110,7 @@ describe("buildOpenAPIDocument, given a real config", () => {
   it("drops the routes that configuration would 404", async () => {
     const { authServer } = await createTestServer({
       guest: false,
-      multiAccount: false,
+      multiUser: false,
       providers: {}
     })
 
@@ -119,7 +119,7 @@ describe("buildOpenAPIDocument, given a real config", () => {
 
     expect(present.length).toBeLessThan(operations(reference).length)
     expect(document.paths).not.toHaveProperty("/sign-in/guest")
-    expect(document.paths).not.toHaveProperty("/accounts")
+    expect(document.paths).not.toHaveProperty("/users")
     expect(document.paths).not.toHaveProperty("/identities/connect/{provider}")
     expect(document.paths).toHaveProperty("/sign-in/send-code")
   })

@@ -62,12 +62,16 @@ export const revokeSession = defineEndpoint({
     if (revoked.id !== caller.sessionId) return { data: undefined, status: 204 }
 
     // Revoking the session you are using leaves the browser presenting a token
-    // that no longer resolves, so its cookie goes too. The accounts cookie is
-    // left alone: those sessions are still live, and this said nothing about them.
+    // that no longer resolves, so its cookie goes too. Other users signed in
+    // here keep theirs: those sessions are still live, and this said nothing
+    // about them.
     const responseHeaders = new Headers()
+    // Named rather than read from the request: a bearer-only caller presents
+    // no cookie, and its own is exactly the one that has to go.
     for (const cookie of clearedRefreshCookies(internals, {
       requestURL: input.requestURL,
-      headers
+      headers,
+      userId: caller.userId
     })) {
       responseHeaders.append("set-cookie", cookie)
     }

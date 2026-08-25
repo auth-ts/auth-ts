@@ -25,7 +25,7 @@ function isCrossOrigin(baseURL: string) {
  * Absence is only an answer where the hint is guaranteed deliverable, which
  * means same-origin. A cross-origin deployment receives it only if the two
  * hosts share a registrable domain the browser accepts, so there the server
- * writes an explicit `out` and anything else is treated as "ask" — one wasted
+ * writes an explicit `out` and a missing hint is treated as "ask" — one wasted
  * request, rather than a signed-in visitor rendered as a stranger.
  *
  * A runtime with no `document`, or one holding its own cookie jar, is not a
@@ -42,12 +42,13 @@ export function mayHaveSession(config: AuthClientConfig) {
     if (separator === -1) continue
     if (entry.slice(0, separator).trim() !== HINT_COOKIE_NAME) continue
 
-    // Only the two values this server writes mean anything. A cookie left
-    // empty by a browser mid-deletion, or written by something else under the
-    // same name, is treated as no hint rather than as a verdict.
+    // The hint carries the active user's id, so anything non-empty other than
+    // the explicit `out` is a session. A cookie left empty by a browser
+    // mid-deletion, or written by something else under the same name, is
+    // treated as no hint rather than as a verdict.
     const value = entry.slice(separator + 1).trim()
-    if (value === "in") return true
     if (value === "out") return false
+    if (value) return true
     break
   }
 

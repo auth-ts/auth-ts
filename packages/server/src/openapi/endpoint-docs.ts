@@ -11,7 +11,7 @@ export type EndpointTag =
   | "Sign in"
   | "Session"
   | "User"
-  | "Accounts"
+  | "Users"
   | "Identities"
   | "Discovery"
 
@@ -26,7 +26,7 @@ export type EndpointAuth = "bearer" | "cookie" | "none"
  */
 export type EndpointRequirement =
   | "guest"
-  | "multiAccount"
+  | "multiUser"
   | "providers"
   | "jwks"
   | "baseURL"

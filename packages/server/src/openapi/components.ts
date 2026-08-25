@@ -1,5 +1,4 @@
-import type { CoreUserFields } from "../core/auth-db"
-import type { IdentityInfo } from "../endpoints/identities"
+import type { AuthIdentity, CoreUserFields } from "../core/auth-db"
 import type { ProviderTokenResult } from "../endpoints/identities/$id/token"
 import type { SessionInfo } from "../endpoints/sessions"
 import type { TokenResult } from "../endpoints/token"
@@ -44,7 +43,7 @@ const session: ObjectSchemaFor<SessionInfo> = {
   required: ["id", "userId", "createdAt", "expiresAt", "updatedAt"]
 }
 
-const identity: ObjectSchemaFor<IdentityInfo> = {
+const identity: ObjectSchemaFor<AuthIdentity> = {
   type: "object",
   properties: {
     id: { type: "string" },

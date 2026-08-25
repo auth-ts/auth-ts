@@ -1,10 +1,13 @@
-import type { AuthIdentity } from "../../../core/auth-db"
+import type { AuthIdentity, AuthIdentitySecret } from "../../../core/auth-db"
 import type { AuthServerInternals } from "../../../core/auth-server-internals"
 import { AuthApiError, notFound } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
 import { decryptSecret } from "../../../lib/encrypt"
 import { selectOne } from "../../../lib/select-one"
-import { encryptTokens } from "../../../oauth/link-identity"
+import {
+  encryptTokens,
+  storeIdentitySecrets
+} from "../../../oauth/link-identity"
 import { getProvider } from "../../../oauth/providers/get-provider"
 import type { ProviderTokens } from "../../../oauth/providers/oauth-provider"
 import { PROVIDER_DEADLINE_MS } from "../../../oauth/providers/provider-response"
@@ -79,18 +82,24 @@ export const getProviderToken = defineEndpoint({
     })
     if (!identity) throw notFound()
 
-    const stored = await liveAccessToken(internals, identity)
+    // A second read rather than a wider one: the ciphertext lives in its own
+    // table so that `identities` needs no column grants to be safe to read.
+    const secrets = await selectOne(internals, "identitySecrets", {
+      identityId: identity.id
+    })
+
+    const stored = secrets && (await liveAccessToken(internals, secrets))
     if (stored) {
       return {
         data: {
           token: stored,
-          expiresAt: identity.accessTokenExpiresAt ?? null,
+          expiresAt: secrets?.accessTokenExpiresAt ?? null,
           scope: identity.scope ?? null
         } satisfies ProviderTokenResult
       }
     }
 
-    return { data: await refreshProviderToken(internals, identity) }
+    return { data: await refreshProviderToken(internals, identity, secrets) }
   }
 })
 
@@ -104,26 +113,27 @@ export const getProviderToken = defineEndpoint({
  */
 function liveAccessToken(
   internals: AuthServerInternals,
-  identity: AuthIdentity
+  secrets: AuthIdentitySecret
 ) {
-  if (!identity.accessTokenEncrypted) return null
+  if (!secrets.accessTokenEncrypted) return null
 
-  const expiry = identity.accessTokenExpiresAt
+  const expiry = secrets.accessTokenExpiresAt
   if (expiry && expiry.getTime() <= Date.now() + EXPIRY_SKEW_MS) return null
 
-  return decryptSecret(internals.config.secret, identity.accessTokenEncrypted)
+  return decryptSecret(internals.config.secret, secrets.accessTokenEncrypted)
 }
 
 /** Trades the stored refresh token for a fresh grant, and records what comes back. */
 async function refreshProviderToken(
   internals: AuthServerInternals,
-  identity: AuthIdentity
+  identity: AuthIdentity,
+  secrets: AuthIdentitySecret | null
 ): Promise<ProviderTokenResult> {
   const configured = getProvider(internals.config.providers, identity.provider)
-  const refreshToken = identity.refreshTokenEncrypted
+  const refreshToken = secrets?.refreshTokenEncrypted
     ? await decryptSecret(
         internals.config.secret,
-        identity.refreshTokenEncrypted
+        secrets.refreshTokenEncrypted
       )
     : null
 
@@ -148,13 +158,16 @@ async function refreshProviderToken(
       error instanceof AuthApiError &&
       error.code === "providerReconnectRequired"
     ) {
+      // The grant is gone at the provider, so both halves of what recorded it
+      // go: the ciphertext row, and the expiry and scope that described it.
+      await internals.db.delete({
+        table: "identitySecrets",
+        where: { identityId: identity.id }
+      })
       await internals.db.update({
         table: "identities",
         where: { id: identity.id },
         values: {
-          accessTokenEncrypted: null,
-          accessTokenExpiresAt: null,
-          refreshTokenEncrypted: null,
           refreshTokenExpiresAt: null,
           scope: null,
           updatedAt: new Date()
@@ -171,14 +184,15 @@ async function refreshProviderToken(
     throw new AuthApiError("providerReconnectRequired", 403)
   }
 
-  await internals.db.update({
-    table: "identities",
-    where: { id: identity.id },
-    values: {
-      ...(await encryptTokens(internals.config.secret, tokens)),
-      updatedAt: new Date()
-    }
-  })
+  const stored = await encryptTokens(internals.config.secret, tokens)
+  if (Object.keys(stored.identity).length > 0) {
+    await internals.db.update({
+      table: "identities",
+      where: { id: identity.id },
+      values: { ...stored.identity, updatedAt: new Date() }
+    })
+  }
+  await storeIdentitySecrets(internals, identity.id, stored.secrets)
 
   return {
     token: tokens.accessToken,

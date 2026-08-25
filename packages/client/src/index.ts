@@ -20,8 +20,8 @@ export type { GetTokenOptions } from "./methods/get-token"
 export type {
   DisconnectIdentityInput,
   GetProviderTokenInput,
-  SwitchAccountInput
-} from "./methods/identities-and-accounts"
+  SwitchUserInput
+} from "./methods/identities-and-users"
 export type { OAuthNavigationInput } from "./methods/oauth"
 export type {
   SendSignInCodeInput,

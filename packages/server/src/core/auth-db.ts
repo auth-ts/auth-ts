@@ -169,11 +169,36 @@ export interface AuthIdentity {
   providerUserId: string
   /** Whatever the provider gives that a person recognises. Display only. */
   label?: string | null
+  /** When the grant's refresh token expires. Null where the provider reports none. */
+  refreshTokenExpiresAt?: Date | null
+  /** The scopes actually granted, space-delimited as the provider returned them. */
+  scope?: string | null
+  /** Written by core on insert. */
+  createdAt: Date
+  /** Written by core on insert and on every update it makes. */
+  updatedAt: Date
+}
+
+/**
+ * The provider tokens for one identity, encrypted.
+ *
+ * A table of its own rather than columns on `identities`, so that protecting
+ * them is a table nobody writes a policy for rather than a column grant every
+ * consumer has to remember to revoke. `identities` is then safe to read whole,
+ * and the failure mode of forgetting something is nothing rather than
+ * ciphertext on a screen.
+ *
+ * **This table must cascade from `identities`.** Disconnecting a provider
+ * deletes the identity, and an orphaned row here is a stored credential nothing
+ * points at. `authDBChecks` proves the cascade against your own database.
+ */
+export interface AuthIdentitySecret {
+  id: string
+  /** The identity these belong to. Deleting it must delete this row. */
+  identityId: string
   /**
-   * The provider's access token, **encrypted**. Never plaintext, never sent to
-   * a browser: `GET /identities` strips it, and the data plane must not be
-   * granted the column. Short-lived — read it through `getProviderToken`,
-   * which refreshes it rather than handing back a spent one.
+   * The provider's access token, **encrypted**. Short-lived — read it through
+   * `getProviderToken`, which refreshes it rather than handing back a spent one.
    */
   accessTokenEncrypted?: string | null
   /** When {@link accessTokenEncrypted} expires, as the provider reported it. */
@@ -184,10 +209,6 @@ export interface AuthIdentity {
    * user signing in again, and the one column whose leak matters most.
    */
   refreshTokenEncrypted?: string | null
-  /** When {@link refreshTokenEncrypted} expires. Null where the provider reports none. */
-  refreshTokenExpiresAt?: Date | null
-  /** The scopes actually granted, space-delimited as the provider returned them. */
-  scope?: string | null
   /** Written by core on insert. */
   createdAt: Date
   /** Written by core on insert and on every update it makes. */
@@ -201,6 +222,7 @@ export type AuthTable =
   | "verifications"
   | "attempts"
   | "identities"
+  | "identitySecrets"
 
 /** Table name → the row it holds. Your declared fields ride flat on `users`. */
 export interface AuthTables<
@@ -211,6 +233,7 @@ export interface AuthTables<
   verifications: AuthVerification
   attempts: AuthAttempt
   identities: AuthIdentity
+  identitySecrets: AuthIdentitySecret
 }
 
 /** A row of `T`, with your declared fields where they apply. */

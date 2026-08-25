@@ -101,6 +101,7 @@ export const getToken = defineEndpoint({
       // loses nothing: the value is unchanged and the next browser call re-ups.
       for (const cookie of refreshCookies(internals, {
         rawToken,
+        userId: resolved.user.id,
         requestURL: input.requestURL,
         headers: input.headers
       })) {

@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 import type { AuthDeleteInput } from "../../src/core/auth-db"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import {
+  readRefreshCookie,
+  refreshCookieFor,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 
 /** Lets any work a request scheduled after its response settle. */
@@ -131,13 +135,13 @@ describe("logging redaction", () => {
       })
     )
     const refreshToken = required(
-      readSetCookies(verifyResponse).get("auth-ts.refresh"),
+      readRefreshCookie(verifyResponse),
       "refresh"
     ).value
     const { token } = (await verifyResponse.json()) as {
       token: string
     }
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     await context.authServer.handler(
       request("GET", "/api/auth/user", { cookies })

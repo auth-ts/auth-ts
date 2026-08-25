@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { codeChallengeS256 } from "../../src/oauth/pkce"
 import { createTestServer } from "../helpers/create-test-server"
-import { mintToken, readSetCookies, request } from "../helpers/request"
+import {
+  mintToken,
+  readRefreshCookie,
+  readSetCookies,
+  refreshCookieFor,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 import { decodeState, forgeState } from "../helpers/state-cookie"
@@ -297,7 +303,7 @@ describe("oauth callback", () => {
 
     expect(response.status).toBe(302)
     expect(response.headers.get("location")).toBe("/dashboard")
-    expect(readSetCookies(response).has("auth-ts.refresh")).toBe(true)
+    expect(readRefreshCookie(response) !== undefined).toBe(true)
 
     const [user] = db.users()
     expect(user?.email).toBe("ada@example.com")
@@ -548,7 +554,7 @@ describe("oauth callback", () => {
       request("POST", "/api/auth/sign-in/guest")
     )
     const guestRefresh = required(
-      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      readRefreshCookie(guestResponse),
       "refresh"
     ).value
     const guest = ((await guestResponse.json()) as { user: { id: string } })
@@ -560,7 +566,7 @@ describe("oauth callback", () => {
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
           "auth-ts.state": stateCookie,
-          "auth-ts.refresh": guestRefresh
+          ...refreshCookieFor(guestRefresh)
         }
       })
     )
@@ -583,8 +589,7 @@ describe("oauth callback", () => {
       request("GET", "/api/auth/user", {
         token: await mintToken(
           authServer,
-          required(readSetCookies(response).get("auth-ts.refresh"), "refresh")
-            .value
+          required(readRefreshCookie(response), "refresh").value
         )
       })
     )
@@ -592,7 +597,7 @@ describe("oauth callback", () => {
     // The guest session was replaced by the callback, not left live beside it.
     const refused = await authServer.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh": guestRefresh }
+        cookies: refreshCookieFor(guestRefresh)
       })
     )
 
@@ -611,7 +616,7 @@ describe("oauth callback", () => {
       request("POST", "/api/auth/sign-in/guest")
     )
     const guestRefresh = required(
-      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      readRefreshCookie(guestResponse),
       "guest refresh"
     ).value
     const guest = ((await guestResponse.json()) as { user: { id: string } })
@@ -626,7 +631,7 @@ describe("oauth callback", () => {
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
           "auth-ts.state": stateCookie,
-          "auth-ts.refresh": guestRefresh
+          ...refreshCookieFor(guestRefresh)
         }
       })
     )
@@ -659,7 +664,7 @@ describe("oauth callback", () => {
       request("POST", "/api/auth/sign-in/guest")
     )
     const guestRefresh = required(
-      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      readRefreshCookie(guestResponse),
       "refresh"
     ).value
     const guest = ((await guestResponse.json()) as { user: { id: string } })
@@ -667,7 +672,7 @@ describe("oauth callback", () => {
     const startResponse = await authServer.handler(
       request("POST", "/api/auth/identities/connect/github", {
         token: await mintToken(authServer, guestRefresh),
-        cookies: { "auth-ts.refresh": guestRefresh }
+        cookies: refreshCookieFor(guestRefresh)
       })
     )
     const stateCookie = required(
@@ -681,14 +686,14 @@ describe("oauth callback", () => {
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
           "auth-ts.state": stateCookie,
-          "auth-ts.refresh": guestRefresh
+          ...refreshCookieFor(guestRefresh)
         }
       })
     )
 
     // Not the connect branch's 409: a session is issued for the owner.
     expect(response.status).toBe(302)
-    expect(readSetCookies(response).has("auth-ts.refresh")).toBe(true)
+    expect(readRefreshCookie(response) !== undefined).toBe(true)
     expect(
       (await selectRow(db, "users", { id: guest.id }))?.primaryUserId
     ).toBe(owner.id)
@@ -709,7 +714,7 @@ describe("oauth callback", () => {
       request("POST", "/api/auth/sign-in/guest")
     )
     const guestRefresh = required(
-      readSetCookies(guestResponse).get("auth-ts.refresh"),
+      readRefreshCookie(guestResponse),
       "refresh"
     ).value
     const guest = ((await guestResponse.json()) as { user: { id: string } })
@@ -725,7 +730,7 @@ describe("oauth callback", () => {
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
           "auth-ts.state": stateCookie,
-          "auth-ts.refresh": guestRefresh
+          ...refreshCookieFor(guestRefresh)
         }
       })
     )
@@ -1005,10 +1010,7 @@ describe("connect and disconnect", () => {
       })
     )
 
-    return required(
-      readSetCookies(verifyResponse).get("auth-ts.refresh"),
-      "refresh"
-    ).value
+    return required(readRefreshCookie(verifyResponse), "refresh").value
   }
 
   it("requires a session to start a link", async () => {
@@ -1025,7 +1027,7 @@ describe("connect and disconnect", () => {
   it("links a provider to the current user without creating one", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)
     const refreshToken = await signInWithCode(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     const startResponse = await context.authServer.handler(
       request("POST", "/api/auth/identities/connect/github", {
@@ -1071,10 +1073,7 @@ describe("connect and disconnect", () => {
     )
     expect(withToken.status).toBe(200)
 
-    for (const options of [
-      { cookies: { "auth-ts.refresh": refreshToken } },
-      {}
-    ]) {
+    for (const options of [{ cookies: refreshCookieFor(refreshToken) }, {}]) {
       expect(
         (
           await context.authServer.handler(
@@ -1134,7 +1133,7 @@ describe("connect and disconnect", () => {
     })
 
     const refreshToken = await signInWithCode(context)
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
     const startResponse = await context.authServer.handler(
       request("POST", "/api/auth/identities/connect/github", {
         token: await mintToken(context.authServer, refreshToken)
@@ -1340,7 +1339,7 @@ describe("google", () => {
     })
 
     expect(response.status).toBe(302)
-    expect(readSetCookies(response).has("auth-ts.refresh")).toBe(true)
+    expect(readRefreshCookie(response) !== undefined).toBe(true)
     expect(db.users()[0]).toMatchObject({
       email: "ada@example.com",
       name: "Ada",

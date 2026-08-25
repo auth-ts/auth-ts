@@ -12,17 +12,12 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 -- END Neon Data API
 
-revoke select on table "sessions" from authenticated;
-grant select (
-  "id", "userId", "userAgent", "ipAddress", "expiresAt", "createdAt", "updatedAt"
-) on table "sessions" to authenticated;
-
-revoke select on table "identities" from authenticated;
-grant select (
-  "id", "userId", "provider", "providerUserId", "label",
-  "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope",
-  "createdAt", "updatedAt"
-) on table "identities" to authenticated;
-
+-- The only revoke here, and the only one that matters. Neon's default grants
+-- UPDATE on every column, so without this a signed-in user can set their own
+-- "type" to 'admin' or repoint "email" at somebody else's account.
+--
+-- Nothing else needs one. "sessions"."tokenHash" is a SHA-256 of 32 random
+-- bytes and cannot be replayed; the provider tokens live in "identitySecrets",
+-- which has no policy and so is denied to every role but the owner.
 revoke update on table "users" from authenticated;
 grant update ("name", "image", "updatedAt") on table "users" to authenticated;

@@ -14,10 +14,10 @@ import { createGetUser } from "../methods/get-user"
 import {
   createDisconnectIdentity,
   createGetProviderToken,
-  createListAccounts,
   createListIdentities,
-  createSwitchAccount
-} from "../methods/identities-and-accounts"
+  createListUsers,
+  createSwitchUser
+} from "../methods/identities-and-users"
 import {
   createConnectProvider,
   createSignInWithProvider
@@ -68,8 +68,8 @@ export interface AuthClient {
   getProviderToken: ReturnType<typeof createGetProviderToken>
   listSessions: ReturnType<typeof createListSessions>
   revokeSession: ReturnType<typeof createRevokeSession>
-  listAccounts: ReturnType<typeof createListAccounts>
-  switchAccount: ReturnType<typeof createSwitchAccount>
+  listUsers: ReturnType<typeof createListUsers>
+  switchUser: ReturnType<typeof createSwitchUser>
   updateUser: ReturnType<typeof createUpdateUser>
   deleteUser: ReturnType<typeof createDeleteUser>
   sendDeleteUserCode: ReturnType<typeof createSendDeleteUserCode>
@@ -118,8 +118,8 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     getProviderToken: createGetProviderToken(internals),
     listSessions: createListSessions(internals),
     revokeSession: createRevokeSession(internals),
-    listAccounts: createListAccounts(internals),
-    switchAccount: createSwitchAccount(internals),
+    listUsers: createListUsers(internals),
+    switchUser: createSwitchUser(internals),
     updateUser: createUpdateUser(internals),
     deleteUser: createDeleteUser(internals),
     sendDeleteUserCode: createSendDeleteUserCode(internals),

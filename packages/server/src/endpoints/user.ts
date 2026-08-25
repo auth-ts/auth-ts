@@ -3,7 +3,6 @@ import { defineEndpoint } from "../http/define-endpoint"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
-import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
@@ -231,18 +230,12 @@ export const deleteUser = defineEndpoint({
       await deleteUserAndRows(internals, user)
 
       const responseHeaders = new Headers()
-      const secure = shouldUseSecureCookies(input.requestURL)
       for (const cookie of clearedRefreshCookies(internals, {
         requestURL: input.requestURL,
-        headers
+        headers,
+        userId: user.id
       })) {
         responseHeaders.append("set-cookie", cookie)
-      }
-      if (config.multiAccount) {
-        responseHeaders.append(
-          "set-cookie",
-          clearCookie(config.cookie.accountsName, config.cookie.path, secure)
-        )
       }
 
       return { data: undefined, status: 204, headers: responseHeaders }

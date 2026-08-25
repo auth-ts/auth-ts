@@ -1,7 +1,5 @@
 import type { EndpointRegistry } from "../core/endpoint-registry"
 import { getDiscoveryDocs } from "../endpoints/.well-known/openid-configuration"
-import { listAccountsDocs } from "../endpoints/accounts"
-import { switchAccountDocs } from "../endpoints/accounts/switch"
 import { callbackProviderDocs } from "../endpoints/callback/$provider"
 import { listIdentitiesDocs } from "../endpoints/identities"
 import { disconnectIdentityDocs } from "../endpoints/identities/$id"
@@ -19,6 +17,8 @@ import { signOutDocs } from "../endpoints/sign-out"
 import { getTokenDocs } from "../endpoints/token"
 import { deleteUserDocs, getUserDocs, updateUserDocs } from "../endpoints/user"
 import { sendDeleteUserCodeDocs } from "../endpoints/user/send-delete-code"
+import { listUsersDocs } from "../endpoints/users"
+import { switchUserDocs } from "../endpoints/users/switch"
 import type { AnyEndpointDocs } from "./endpoint-docs"
 
 // Declared here rather than beside their endpoints: both serve this document,
@@ -62,8 +62,8 @@ export const endpointDocs: {
   sendDeleteUserCode: sendDeleteUserCodeDocs,
   listSessions: listSessionsDocs,
   revokeSession: revokeSessionDocs,
-  listAccounts: listAccountsDocs,
-  switchAccount: switchAccountDocs,
+  listUsers: listUsersDocs,
+  switchUser: switchUserDocs,
   signInAsGuest: signInAsGuestDocs,
   signInWithProvider: signInWithProviderDocs,
   callbackProvider: callbackProviderDocs,
@@ -97,8 +97,8 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   sendDeleteUserCode: "Send a delete user code",
   listSessions: "List the active sessions",
   revokeSession: "Revoke a session",
-  listAccounts: "List the signed in accounts",
-  switchAccount: "Switch to another signed in account",
+  listUsers: "List the signed in users",
+  switchUser: "Switch to another signed in user",
   signInAsGuest: "Sign in as a guest",
   signInWithProvider: "Sign in with a provider",
   callbackProvider: "Provider callback",

@@ -1,6 +1,4 @@
 import { getDiscovery } from "../endpoints/.well-known/openid-configuration"
-import { listAccounts } from "../endpoints/accounts"
-import { switchAccount } from "../endpoints/accounts/switch"
 import { callbackProvider } from "../endpoints/callback/$provider"
 import { listIdentities } from "../endpoints/identities"
 import { disconnectIdentity } from "../endpoints/identities/$id"
@@ -20,6 +18,8 @@ import { signOut } from "../endpoints/sign-out"
 import { getToken } from "../endpoints/token"
 import { deleteUser, getUser, updateUser } from "../endpoints/user"
 import { sendDeleteUserCode } from "../endpoints/user/send-delete-code"
+import { listUsers } from "../endpoints/users"
+import { switchUser } from "../endpoints/users/switch"
 
 /**
  * Every endpoint, keyed by the name it is exposed under.
@@ -44,8 +44,8 @@ export const endpointRegistry = {
   sendDeleteUserCode,
   listSessions,
   revokeSession,
-  listAccounts,
-  switchAccount,
+  listUsers,
+  switchUser,
   signInAsGuest,
   signInWithProvider,
   callbackProvider,

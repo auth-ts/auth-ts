@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import {
+  readRefreshCookie,
+  readSetCookies,
+  refreshCookieFor,
+  refreshEntryOf,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 
 describe("verification code sign-in over HTTP", () => {
@@ -34,7 +40,7 @@ describe("verification code sign-in over HTTP", () => {
     expect(await authServer.verifyToken(body.token)).toBeTruthy()
 
     // The access token crosses in the body; the refresh token never does.
-    const cookie = readSetCookies(verifyResponse).get("auth-ts.refresh")
+    const cookie = readRefreshCookie(verifyResponse)
     expect(cookie?.attributes).toContain("HttpOnly")
     expect(JSON.stringify(body)).not.toContain(cookie?.value ?? "impossible")
   })
@@ -169,7 +175,7 @@ describe("token and user endpoints", () => {
       })
     )
     const refreshToken = required(
-      readSetCookies(verifyResponse).get("auth-ts.refresh"),
+      readRefreshCookie(verifyResponse),
       "refresh cookie"
     ).value
     const { token } = (await verifyResponse.json()) as { token: string }
@@ -182,7 +188,7 @@ describe("token and user endpoints", () => {
 
     const response = await authServer.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
     const body = (await response.json()) as {
@@ -199,7 +205,7 @@ describe("token and user endpoints", () => {
 
   it("refuses every other endpoint the cookie alone", async () => {
     const { authServer, refreshToken } = await signIn()
-    const cookies = { "auth-ts.refresh": refreshToken }
+    const cookies = refreshCookieFor(refreshToken)
 
     for (const path of [
       "/api/auth/user",
@@ -324,7 +330,7 @@ describe("token and user endpoints", () => {
 
     const response = await authServer.handler(
       request("POST", "/api/auth/sign-out", {
-        cookies: { "auth-ts.refresh": refreshToken },
+        cookies: refreshCookieFor(refreshToken),
         token
       })
     )
@@ -332,7 +338,7 @@ describe("token and user endpoints", () => {
     expect(response.status).toBe(204)
     const cleared = readSetCookies(response)
     expect(
-      required(cleared.get("auth-ts.refresh"), "cleared cookie").attributes
+      required(refreshEntryOf(cleared), "cleared cookie").attributes
     ).toContain("Max-Age=0")
     // The hint goes with it, or the next page load asks a question it already
     // knows the answer to.
@@ -342,7 +348,7 @@ describe("token and user endpoints", () => {
 
     const afterSignOut = await authServer.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh": refreshToken }
+        cookies: refreshCookieFor(refreshToken)
       })
     )
     expect(afterSignOut.status).toBe(200)
@@ -446,11 +452,11 @@ describe("jwks and discovery", () => {
 
 describe("GET /token", () => {
   it("answers null and retires the credential a stranger presented", async () => {
-    const { authServer } = await createTestServer({ multiAccount: true })
+    const { authServer } = await createTestServer({ multiUser: true })
 
     const response = await authServer.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh": "a token no session was ever issued for" }
+        cookies: refreshCookieFor("a token no session was ever issued for")
       })
     )
     const cookies = readSetCookies(response)
@@ -459,9 +465,9 @@ describe("GET /token", () => {
     // an answer may carry the cookies that stop it being asked again.
     expect(response.status).toBe(200)
     expect(await response.json()).toBeNull()
-    expect(
-      required(cookies.get("auth-ts.refresh"), "refresh").attributes
-    ).toContain("Max-Age=0")
+    expect(required(refreshEntryOf(cookies), "refresh").attributes).toContain(
+      "Max-Age=0"
+    )
     expect(required(cookies.get("auth-ts.hint"), "hint").attributes).toContain(
       "Max-Age=0"
     )
@@ -474,13 +480,14 @@ describe("GET /token", () => {
     // Cross-origin, a hint that never arrived is indistinguishable from one
     // that says no — so the refusal has to be stated, not implied by absence.
     const { authServer } = await createTestServer({
-      trustedOrigins: ["https://app.example.com"]
+      trustedOrigins: ["https://app.example.com"],
+      // Named rather than derived: the hint has to be readable where it was
+      // asked from, and only the deployment knows where that is.
+      cookie: { hintDomain: "example.com" }
     })
 
     const response = await authServer.handler(
       request("GET", "/api/auth/token", {
-        // Served from the auth host, asked for by the app: the hint has to be
-        // readable where it was asked from, which names the shared domain.
         origin: "https://api.example.com",
         headers: { origin: "https://app.example.com" }
       })
@@ -509,10 +516,9 @@ describe("GET /token", () => {
       })
     )
     const cookies = {
-      "auth-ts.refresh": required(
-        readSetCookies(signIn).get("auth-ts.refresh"),
-        "refresh cookie"
-      ).value
+      ...refreshCookieFor(
+        required(readRefreshCookie(signIn), "refresh cookie").value
+      )
     }
     const before = required(db.sessions()[0], "session")
 
@@ -557,10 +563,9 @@ describe("where a token comes from", () => {
       context,
       token,
       cookies: {
-        "auth-ts.refresh": required(
-          readSetCookies(verified).get("auth-ts.refresh"),
-          "refresh cookie"
-        ).value
+        ...refreshCookieFor(
+          required(readRefreshCookie(verified), "refresh cookie").value
+        )
       }
     }
   }

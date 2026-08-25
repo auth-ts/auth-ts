@@ -37,6 +37,32 @@ export function request(
   })
 }
 
+/** The cookie one user's refresh token rides in, mirroring `refreshCookieName`. */
+export function refreshCookie(userId: string) {
+  return `auth-ts.refresh.${userId}`
+}
+
+/** Cookie header entries for a browser holding these users' refresh tokens. */
+export function refreshCookies(tokens: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(tokens).map(([userId, token]) => [
+      refreshCookie(userId),
+      token
+    ])
+  )
+}
+
+/**
+ * Cookie entries for one refresh token.
+ *
+ * The id defaults because the server reads whichever refresh cookie it is
+ * given; it only has to be real where several users are signed in at once, or
+ * where an endpoint targets one of them by id.
+ */
+export function refreshCookieFor(token: string, userId = "signed-in") {
+  return { [refreshCookie(userId)]: token }
+}
+
 /** Extracts cookie name → value from a response's `Set-Cookie` headers. */
 export function readSetCookies(response: Response | { headers: Headers }) {
   const cookies = new Map<string, { value: string; attributes: string }>()
@@ -55,14 +81,40 @@ export function readSetCookies(response: Response | { headers: Headers }) {
   return cookies
 }
 
+/** The refresh entry in an already-parsed cookie map, whichever user it names. */
+export function refreshEntryOf(
+  cookies: Map<string, { value: string; attributes: string }>
+) {
+  const refresh = [...cookies].filter(([name]) =>
+    name.startsWith("auth-ts.refresh.")
+  )
+
+  // A response may clear one user's cookie while setting another's — a guest
+  // being converted does exactly that — so a live cookie wins over a cleared
+  // one, and a lone cleared one is still the answer.
+  return (refresh.find(([, entry]) => entry.value !== "") ?? refresh[0])?.[1]
+}
+
+/** The refresh cookie a response set, whichever user it names. */
+export function readRefreshCookie(
+  response: Response | { headers: Headers },
+  userId?: string
+) {
+  const cookies = readSetCookies(response)
+  if (userId !== undefined) return cookies.get(refreshCookie(userId))
+
+  return refreshEntryOf(cookies)
+}
+
 /** Exchanges a refresh cookie for an access token, the way a client boots. */
 export async function mintToken(
   authServer: { handler: (request: Request) => Promise<Response> },
-  refreshToken: string
+  refreshToken: string,
+  userId?: string
 ) {
   const response = await authServer.handler(
     request("GET", "/api/auth/token", {
-      cookies: { "auth-ts.refresh": refreshToken }
+      cookies: refreshCookieFor(refreshToken, userId)
     })
   )
   const body = (await response.json()) as { token?: string } | null
