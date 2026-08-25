@@ -1,8 +1,20 @@
 import { isAuthError } from "@auth-ts/client"
+import {
+  ArrowRightEndOnRectangleIcon,
+  ArrowRightStartOnRectangleIcon,
+  ArrowsRightLeftIcon,
+  CheckCircleIcon,
+  CheckIcon,
+  ExclamationCircleIcon,
+  InformationCircleIcon,
+  LinkSlashIcon,
+  TrashIcon,
+  XMarkIcon
+} from "@heroicons/react/24/outline"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
-import { GitHubIcon } from "../components/icons"
+import { GitHubIcon } from "../components/github-icon"
 import { postgrest } from "../db/postgrest"
 import { useCountdown } from "../hooks/use-countdown"
 import { identitiesQueryKey, useIdentities } from "../hooks/use-identities"
@@ -22,6 +34,25 @@ const noticeClass = {
   success: "alert-success",
   info: "alert-info",
   error: "alert-error"
+}
+
+const noticeIcon = {
+  success: CheckCircleIcon,
+  info: InformationCircleIcon,
+  error: ExclamationCircleIcon
+}
+
+function NoticeAlert({ notice }: { notice: Notice }) {
+  const Icon = noticeIcon[notice.tone]
+  return (
+    <div
+      role="alert"
+      className={`alert alert-soft text-sm ${noticeClass[notice.tone]}`}
+    >
+      <Icon className="size-4 shrink-0" />
+      <span>{notice.text}</span>
+    </div>
+  )
 }
 
 /** Profile, linked providers, sessions, account switching, and deletion. */
@@ -127,6 +158,7 @@ function AccountPage() {
               onClick={() => navigate({ to: "/login" })}
               className="btn btn-primary"
             >
+              <ArrowRightEndOnRectangleIcon className="size-4" />
               Sign in
             </button>
           </div>
@@ -196,14 +228,7 @@ function AccountPage() {
         </div>
       </div>
 
-      {notice ? (
-        <div
-          role="alert"
-          className={`alert alert-soft text-sm ${noticeClass[notice.tone]}`}
-        >
-          <span>{notice.text}</span>
-        </div>
-      ) : null}
+      {notice ? <NoticeAlert notice={notice} /> : null}
 
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body gap-4">
@@ -226,6 +251,7 @@ function AccountPage() {
               disabled={nameUnchanged || rename.isPending}
               className="btn btn-primary join-item"
             >
+              <CheckIcon className="size-4" />
               Save
             </button>
           </form>
@@ -241,7 +267,7 @@ function AccountPage() {
               onClick={() => void linkGitHub()}
               className="btn btn-outline btn-sm"
             >
-              <GitHubIcon />
+              <GitHubIcon className="size-4" />
               Link GitHub
             </button>
           </div>
@@ -262,6 +288,7 @@ function AccountPage() {
                     onClick={() => disconnect.mutate(identity.id)}
                     className="btn btn-ghost btn-sm"
                   >
+                    <LinkSlashIcon className="size-4" />
                     Disconnect
                   </button>
                 </li>
@@ -307,6 +334,7 @@ function AccountPage() {
                     }}
                     className="btn btn-ghost btn-sm"
                   >
+                    <ArrowRightStartOnRectangleIcon className="size-4" />
                     Sign out
                   </button>
                 ) : (
@@ -315,6 +343,7 @@ function AccountPage() {
                     onClick={() => revoke.mutate(session.id)}
                     className="btn btn-ghost btn-sm"
                   >
+                    <XMarkIcon className="size-4" />
                     Revoke
                   </button>
                 )}
@@ -351,6 +380,7 @@ function AccountPage() {
                       }}
                       className="btn btn-outline btn-sm"
                     >
+                      <ArrowsRightLeftIcon className="size-4" />
                       Switch
                     </button>
                   )}
@@ -374,6 +404,7 @@ function AccountPage() {
           }}
           className="btn btn-outline btn-sm"
         >
+          <ArrowRightStartOnRectangleIcon className="size-4" />
           Sign out
         </button>
         <button
@@ -385,6 +416,7 @@ function AccountPage() {
           }}
           className="btn btn-outline btn-sm"
         >
+          <ArrowRightStartOnRectangleIcon className="size-4" />
           Sign out this account
         </button>
         <button
@@ -399,6 +431,7 @@ function AccountPage() {
           }}
           className="btn btn-outline btn-sm"
         >
+          <ArrowRightStartOnRectangleIcon className="size-4" />
           Sign out other devices
         </button>
         <button
@@ -410,6 +443,7 @@ function AccountPage() {
           }}
           className="btn btn-outline btn-sm"
         >
+          <ArrowRightStartOnRectangleIcon className="size-4" />
           Sign out everywhere
         </button>
       </div>
@@ -420,14 +454,7 @@ function AccountPage() {
           <p className="text-sm text-base-content/60">
             This removes your account and everything in it. There is no undo.
           </p>
-          {deletionNotice ? (
-            <div
-              role="alert"
-              className={`alert alert-soft text-sm ${noticeClass[deletionNotice.tone]}`}
-            >
-              <span>{deletionNotice.text}</span>
-            </div>
-          ) : null}
+          {deletionNotice ? <NoticeAlert notice={deletionNotice} /> : null}
           {deletionCode !== null ? (
             <fieldset className="fieldset">
               <legend className="fieldset-legend">Confirmation code</legend>
@@ -450,6 +477,7 @@ function AccountPage() {
               disabled={deletionCooldown > 0 && !deletionCode}
               className="btn btn-error"
             >
+              <TrashIcon className="size-4" />
               {deletionCooldown > 0 && !deletionCode
                 ? `Try again in ${deletionCooldown}s`
                 : deletionCode !== null

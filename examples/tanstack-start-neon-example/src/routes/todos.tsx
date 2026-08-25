@@ -1,7 +1,12 @@
+import {
+  ArrowRightEndOnRectangleIcon,
+  ExclamationCircleIcon,
+  PlusIcon,
+  TrashIcon
+} from "@heroicons/react/24/outline"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { useState } from "react"
 
-import { TrashIcon } from "../components/icons"
 import {
   useDeleteTodo,
   useInsertTodo,
@@ -40,6 +45,7 @@ function TodosPage() {
               this page.
             </p>
             <Link to="/login" className="btn btn-primary">
+              <ArrowRightEndOnRectangleIcon className="size-4" />
               Sign in
             </Link>
           </div>
@@ -85,12 +91,14 @@ function TodosPage() {
           disabled={add.isPending}
           className="btn btn-primary join-item"
         >
+          <PlusIcon className="size-4" />
           Add
         </button>
       </form>
 
       {todos.isError ? (
         <div role="alert" className="alert alert-error alert-soft text-sm">
+          <ExclamationCircleIcon className="size-4 shrink-0" />
           <span>Could not load todos: {String(todos.error)}</span>
         </div>
       ) : null}
@@ -126,7 +134,7 @@ function TodosPage() {
               aria-label={`Delete ${todo.title}`}
               className="btn btn-ghost btn-square btn-sm text-base-content/60"
             >
-              <TrashIcon />
+              <TrashIcon className="size-4" />
             </button>
           </li>
         ))}

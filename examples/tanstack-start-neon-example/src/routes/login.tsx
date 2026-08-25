@@ -1,7 +1,15 @@
 import { isAuthError } from "@auth-ts/client"
+import {
+  ArrowLeftIcon,
+  ArrowRightEndOnRectangleIcon,
+  EnvelopeIcon,
+  ExclamationCircleIcon,
+  InformationCircleIcon,
+  UserIcon
+} from "@heroicons/react/24/outline"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
-import { GitHubIcon } from "../components/icons"
+import { GitHubIcon } from "../components/github-icon"
 import { useCountdown } from "../hooks/use-countdown"
 import { useToken } from "../hooks/use-token"
 import { authClient } from "../lib/auth-client"
@@ -127,7 +135,14 @@ function LoginPage() {
                 disabled={cooldown > 0}
                 className="btn btn-primary w-full"
               >
-                {cooldown ? `Try again in ${cooldown}s` : "Email me a code"}
+                {cooldown ? (
+                  `Try again in ${cooldown}s`
+                ) : (
+                  <>
+                    <EnvelopeIcon className="size-4" />
+                    Email me a code
+                  </>
+                )}
               </button>
             </form>
           ) : (
@@ -152,6 +167,7 @@ function LoginPage() {
                 <p className="label">Sent to {email}</p>
               </fieldset>
               <button type="submit" className="btn btn-primary w-full">
+                <ArrowRightEndOnRectangleIcon className="size-4" />
                 Sign in
               </button>
               <button
@@ -159,6 +175,7 @@ function LoginPage() {
                 onClick={() => setStage("email")}
                 className="btn btn-ghost btn-sm w-full"
               >
+                <ArrowLeftIcon className="size-4" />
                 Use a different address
               </button>
             </form>
@@ -171,6 +188,11 @@ function LoginPage() {
                 notice.tone === "error" ? "alert-error" : "alert-info"
               }`}
             >
+              {notice.tone === "error" ? (
+                <ExclamationCircleIcon className="size-4 shrink-0" />
+              ) : (
+                <InformationCircleIcon className="size-4 shrink-0" />
+              )}
               <span>{notice.text}</span>
             </div>
           ) : null}
@@ -183,7 +205,7 @@ function LoginPage() {
               onClick={() => void continueWithGitHub()}
               className="btn btn-outline w-full"
             >
-              <GitHubIcon />
+              <GitHubIcon className="size-4" />
               Continue with GitHub
             </button>
             {/* A guest needs a signed-out browser, so a signed-in visitor —
@@ -194,6 +216,7 @@ function LoginPage() {
                 onClick={() => void continueAsGuest()}
                 className="btn btn-ghost w-full"
               >
+                <UserIcon className="size-4" />
                 Continue as guest
               </button>
             )}

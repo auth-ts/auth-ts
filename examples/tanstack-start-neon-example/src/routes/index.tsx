@@ -1,3 +1,7 @@
+import {
+  ArrowRightEndOnRectangleIcon,
+  ListBulletIcon
+} from "@heroicons/react/24/outline"
 import { createFileRoute, Link } from "@tanstack/react-router"
 
 export const Route = createFileRoute("/")({ component: HomePage })
@@ -20,10 +24,12 @@ function HomePage() {
 
           <div className="flex gap-2">
             <Link to="/todos" className="btn btn-primary">
+              <ListBulletIcon className="size-4" />
               Open your todos
             </Link>
 
             <Link to="/login" className="btn btn-ghost">
+              <ArrowRightEndOnRectangleIcon className="size-4" />
               Sign in
             </Link>
           </div>

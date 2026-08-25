@@ -1,3 +1,4 @@
+import { ArrowRightEndOnRectangleIcon } from "@heroicons/react/24/outline"
 import { Link } from "@tanstack/react-router"
 import { useUser } from "../hooks/use-user"
 import { Logo } from "./logo"
@@ -58,6 +59,7 @@ export function Header() {
             </Link>
           ) : (
             <Link to="/login" className="btn btn-primary btn-sm">
+              <ArrowRightEndOnRectangleIcon className="size-4" />
               Sign in
             </Link>
           )}
