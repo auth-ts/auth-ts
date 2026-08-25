@@ -163,7 +163,7 @@ export const authDBChecks: AuthDBCheck[] = [
 
         expect(
           (await matching(plainEmail)).length === 1,
-          "a where with a null value did not match the row storing null. In SQL, `= NULL` matches nothing — this needs `IS NULL`. Guest cleanup filters on `primaryUserId: null`, so without it a merged guest's pending migration would not be what spares them."
+          "a where with a null value did not match the row storing null. In SQL, `= NULL` matches nothing — this needs `IS NULL`, or a query for a nullable column silently matches no rows rather than failing."
         )
         expect(
           (await matching(pointedEmail)).length === 0,

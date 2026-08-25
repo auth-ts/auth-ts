@@ -1,6 +1,5 @@
 import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
-import { reapGuests } from "../lib/sweep-expired"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
@@ -137,21 +136,17 @@ export const signOut = defineEndpoint({
       return { data: undefined, status: 204 }
     }
 
-    const ended = []
     for (const target of targets) {
       const sessionId = sessionIdFor(target)
       if (scope !== "global" && !sessionId) continue
-      ended.push(
-        ...(await internals.db.delete({
-          table: "sessions",
-          where:
-            scope === "global"
-              ? { userId: target.userId }
-              : { id: sessionId as string }
-        }))
-      )
+      await internals.db.delete({
+        table: "sessions",
+        where:
+          scope === "global"
+            ? { userId: target.userId }
+            : { id: sessionId as string }
+      })
     }
-    await reapGuests(internals, ended)
 
     // One cookie per user, so signing one out clears exactly its own and the
     // rest keep theirs. The hint moves to whoever is left, or retires.

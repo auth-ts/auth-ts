@@ -1,6 +1,5 @@
 import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
-import { reapGuests } from "../../lib/sweep-expired"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
@@ -57,7 +56,6 @@ export const revokeSession = defineEndpoint({
       where: { id: input.id, userId: caller.userId }
     })
     if (!revoked) throw new AuthApiError("notFound", 404)
-    await reapGuests(internals, [revoked])
 
     if (revoked.id !== caller.sessionId) return { data: undefined, status: 204 }
 

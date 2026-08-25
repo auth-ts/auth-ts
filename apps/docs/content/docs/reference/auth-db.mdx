@@ -109,10 +109,10 @@ index, because the missing constraint only shows under a race.
   write, then writing.
 
   A `null` value means the column stores null — `IS NULL` in SQL, never
-  `= NULL`, which matches nothing. Guest cleanup filters on
-  `primaryUserId: null`, and an implementation that renders it as `= NULL`
-  would delete a merged guest whose pending migration was meant to spare them.
-  The conformance suite checks this.
+  `= NULL`, which matches nothing. Every nullable column the library names can
+  be asked for that way, so an implementation that renders it as `= NULL`
+  silently matches no rows rather than failing. The conformance suite checks
+  this.
 - **`update` returns the rows it wrote**, as `delete` does. That is the other
   half of the single round trip: the library asks for a session that has not
   expired and learns from what comes back whether there was one.
@@ -153,23 +153,21 @@ index, because the missing constraint only shows under a race.
   just for reads. Pass `waitUntil` to
   [`createAuthServer`](/docs/reference/create-auth-server) and the sweep runs
   behind the response instead of ahead of it.
-- **Guests die by the same delete.** Whenever sessions are deleted — sign-out,
-  revocation, the sweep — a guest left with none is removed with
-  `delete` on `users` where `{ id, type: "guest", primaryUserId: null }`. The
-  `where` is the safety: `type` spares real accounts, and the null
-  `primaryUserId` spares a merged guest whose pointer your application has not
-  migrated yet. It is also your hook — a guest's own rows in *your* tables are
-  yours to cascade, and the one moment to do it is when this exact delete
-  crosses your implementation:
+- **Nothing sweeps `users`.** A guest's session is their only credential, so a
+  guest left with no sessions is unreachable — but collecting that row is a
+  retention decision, and retention decisions on your `users` table are yours.
+  The library never deletes a user it did not delete on purpose, which is the
+  same rule `primaryUserId` already states for a merged guest's data.
 
-  ```ts
-  async delete({ table, where }) {
-    if (table === "users" && where.type === "guest") {
-      // The doomed guests, by the library's own criteria — cascade
-      // your app rows for them before the rows naming them are gone.
-    }
-    return run(...)
-  }
+  Collect them on whatever schedule suits you. In SQL that is one statement,
+  and the `where` is the safety — `type` spares real accounts, and the null
+  `primaryUserId` spares a merged guest whose pointer you have not migrated yet:
+
+  ```sql
+  delete from "users" u
+   where u."type" = 'guest'
+     and u."primaryUserId" is null
+     and not exists (select 1 from "sessions" s where s."userId" = u."id");
   ```
 
 ## Rate limiting is a log, not a counter
