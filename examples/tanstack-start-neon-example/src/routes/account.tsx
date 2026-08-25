@@ -146,8 +146,9 @@ function AccountPage() {
       // expected branch of a working flow rather than a failure. Deletion never
       // sends a code itself, so a stale session asks for one explicitly.
       if (result.status === "staleSession") {
-        await authClient.sendDeleteUserCode()
+        // Show the field even if sending fails.
         setDeletionCode("")
+        await authClient.sendDeleteUserCode()
         setDeletionNotice({
           text: "For your security, enter the code we just sent.",
           tone: "info"
