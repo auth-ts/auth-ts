@@ -33,8 +33,8 @@ cost of not having an adapter package.
 | `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
 | `verifications` | `id`, `identifier`, `codeHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
-| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `refreshTokenExpiresAt`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
-| `identitySecrets` | `id`, `identityId`, `accessTokenEncrypted`, `accessTokenExpiresAt`, `refreshTokenEncrypted`, `createdAt`, `updatedAt` | `identityId` | | |
+| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
+| `identitySecrets` | `id`, `identityId`, `accessTokenEncrypted`, `accessTokenExpiresAt`, `refreshTokenEncrypted`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |
 
 **Three of these tables are yours to query. Three are not.**
 

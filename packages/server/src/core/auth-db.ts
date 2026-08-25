@@ -169,8 +169,6 @@ export interface AuthIdentity {
   providerUserId: string
   /** Whatever the provider gives that a person recognises. Display only. */
   label?: string | null
-  /** When the grant's refresh token expires. Null where the provider reports none. */
-  refreshTokenExpiresAt?: Date | null
   /** The scopes actually granted, space-delimited as the provider returned them. */
   scope?: string | null
   /** Written by core on insert. */
@@ -209,6 +207,14 @@ export interface AuthIdentitySecret {
    * user signing in again, and the one column whose leak matters most.
    */
   refreshTokenEncrypted?: string | null
+  /**
+   * When {@link refreshTokenEncrypted} expires. Null where the provider reports
+   * none.
+   *
+   * It sits beside the ciphertext rather than on `identities` because it
+   * describes the credential: a dead grant is one row to clear, not two.
+   */
+  refreshTokenExpiresAt?: Date | null
   /** Written by core on insert. */
   createdAt: Date
   /** Written by core on insert and on every update it makes. */

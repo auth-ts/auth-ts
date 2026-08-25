@@ -55,12 +55,6 @@ const identity: ObjectSchemaFor<AuthIdentity> = {
         "The provider's stable id \u2014 GitHub's numeric id, Google's `sub`."
     },
     label: { type: "string", description: "Display only." },
-    refreshTokenExpiresAt: {
-      type: "string",
-      format: "date-time",
-      description:
-        "When the connection itself dies. Null where the provider reports none."
-    },
     scope: {
       type: "string",
       description: "Space-delimited, as the provider returned it."

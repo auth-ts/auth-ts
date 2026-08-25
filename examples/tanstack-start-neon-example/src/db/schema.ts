@@ -154,9 +154,6 @@ export const identities = pgTable.withRLS(
     provider: text("provider").notNull(),
     providerUserId: text("providerUserId").notNull(),
     label: text("label"),
-    refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
-      withTimezone: true
-    }),
     scope: text("scope"),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
@@ -198,6 +195,9 @@ export const identitySecrets = pgTable.withRLS(
       withTimezone: true
     }),
     refreshTokenEncrypted: text("refreshTokenEncrypted"),
+    refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
+      withTimezone: true
+    }),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
       .defaultNow(),

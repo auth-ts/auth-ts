@@ -140,8 +140,8 @@ async function refreshProviderToken(
   if (
     !configured?.provider.refreshAccessToken ||
     !refreshToken ||
-    (identity.refreshTokenExpiresAt &&
-      identity.refreshTokenExpiresAt.getTime() <= Date.now())
+    (secrets?.refreshTokenExpiresAt &&
+      secrets.refreshTokenExpiresAt.getTime() <= Date.now())
   ) {
     throw new AuthApiError("providerReconnectRequired", 403)
   }
@@ -158,8 +158,8 @@ async function refreshProviderToken(
       error instanceof AuthApiError &&
       error.code === "providerReconnectRequired"
     ) {
-      // The grant is gone at the provider, so both halves of what recorded it
-      // go: the ciphertext row, and the expiry and scope that described it.
+      // The grant is gone at the provider, so what recorded it goes: the
+      // ciphertext row, and the scope that described what it bought.
       await internals.db.delete({
         table: "identitySecrets",
         where: { identityId: identity.id }
@@ -167,11 +167,7 @@ async function refreshProviderToken(
       await internals.db.update({
         table: "identities",
         where: { id: identity.id },
-        values: {
-          refreshTokenExpiresAt: null,
-          scope: null,
-          updatedAt: new Date()
-        }
+        values: { scope: null, updatedAt: new Date() }
       })
       internals.log.warn("provider grant is gone, cleared its tokens", {
         provider: identity.provider

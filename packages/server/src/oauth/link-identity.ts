@@ -44,9 +44,6 @@ export async function encryptTokens(
 }> {
   return {
     identity: {
-      ...(tokens.refreshTokenExpiresAt
-        ? { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }
-        : {}),
       ...(tokens.scope ? { scope: tokens.scope } : {})
     },
     secrets: {
@@ -68,6 +65,9 @@ export async function encryptTokens(
         : {}),
       ...(tokens.accessTokenExpiresAt
         ? { accessTokenExpiresAt: tokens.accessTokenExpiresAt }
+        : {}),
+      ...(tokens.refreshTokenExpiresAt
+        ? { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }
         : {})
     }
   }

@@ -279,7 +279,6 @@ describe("GET /identities/:id/token", () => {
       "identity"
     )
     expect(stored.scope).toBeNull()
-    expect(stored.refreshTokenExpiresAt).toBeNull()
   })
 
   it("asks for a reconnect when there was never a refresh token", async () => {
