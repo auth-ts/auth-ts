@@ -51,15 +51,11 @@ export type {
 } from "./core/create-auth-server"
 export { createAuthServer } from "./core/create-auth-server"
 export type { CallbackProviderInput } from "./endpoints/callback/$provider"
-export type { DisconnectIdentityInput } from "./endpoints/identities/$id"
 export type {
   GetProviderTokenInput,
   ProviderTokenResult
 } from "./endpoints/identities/$id/token"
 export type { ConnectProviderInput } from "./endpoints/identities/connect/$provider"
-export type { CurrentSession } from "./endpoints/session"
-export type { SessionInfo } from "./endpoints/sessions"
-export type { RevokeSessionInput } from "./endpoints/sessions/$id"
 export type { SignInCodeInput } from "./endpoints/sign-in/code"
 export type { SignInGuestInput } from "./endpoints/sign-in/guest"
 export type {

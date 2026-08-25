@@ -40,7 +40,7 @@ describe("cookieStorage", () => {
       token: fakeAccessToken()
     })
 
-    await createAuthClient().getUser()
+    await createAuthClient().refresh()
 
     expect(server.requests[0]?.credentials).toBe("include")
     expect(server.requests[0]?.cookie).toBeNull()
@@ -55,11 +55,11 @@ describe("cookieStorage", () => {
         "auth-ts.refresh=secret; Max-Age=2592000; Path=/; HttpOnly; Secure; SameSite=Lax"
       ]
     })
-    server.on("GET", "/api/auth/session", { body: { id: "session-1" } })
+    server.on("GET", "/api/auth/users", { body: [user] })
     const client = createAuthClient({ cookieStorage: storage })
 
     await client.signInWithCode({ email: "ada@example.com", code: "123456" })
-    await client.getSession()
+    await client.listUsers()
 
     expect(server.requests[0]?.credentials).toBe("omit")
     expect(server.requests[0]?.cookie).toBeNull()
@@ -127,7 +127,7 @@ describe("cookieStorage", () => {
       token: fakeAccessToken()
     })
 
-    await createAuthClient({ cookieStorage: storage }).getUser()
+    await createAuthClient({ cookieStorage: storage }).refresh()
 
     expect(server.requests[0]?.cookie).toBeNull()
   })
@@ -144,7 +144,7 @@ describe("cookieStorage", () => {
     })
 
     expect(
-      await createAuthClient({ cookieStorage: storage }).getUser()
+      await createAuthClient({ cookieStorage: storage }).refresh()
     ).toBeNull()
 
     // A jar holding a refused refresh token is holding a dead credential.

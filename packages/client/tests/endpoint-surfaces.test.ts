@@ -9,8 +9,8 @@ import {
 const METHODS = join(__dirname, "../src/methods")
 const ENDPOINTS = join(__dirname, "../../server/src/endpoints")
 
-// The three routes with no client method, and why. A fourth cannot join this
-// list by accident: the test names them, so removing a client method fails.
+// The routes with no client method, and why. Another cannot join this list by
+// accident: the test names them, so removing a client method fails.
 const SERVER_ONLY = {
   callbackProvider: "a top-level browser navigation, not a fetch",
   getJwks: "read by third-party verifiers, never by this client",

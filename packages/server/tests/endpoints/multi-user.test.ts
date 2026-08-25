@@ -326,19 +326,16 @@ describe("multiUser enabled", () => {
     expect(response.status).toBe(404)
   })
 
-  it("revokes the current session without disturbing the other user", async () => {
+  it("signs one user out without disturbing the other", async () => {
     const context = await server()
     const ada = await signIn(context, "ada@example.com")
     const grace = await signIn(context, "grace@example.com", ada.cookies)
 
-    const current = required(
-      await selectRow(context.db, "sessions", { userId: grace.user.id }),
-      "grace session"
-    )
     const response = await context.authServer.handler(
-      request("DELETE", `/api/auth/sessions/${current.id}`, {
+      request("POST", "/api/auth/sign-out", {
         cookies: grace.cookies,
-        token: await tokenFor(context, grace.cookies)
+        token: await tokenFor(context, grace.cookies),
+        body: { userId: grace.user.id }
       })
     )
     expect(response.status).toBe(204)

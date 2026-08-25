@@ -95,8 +95,6 @@ Plus the JWT-plane functions:
 - `getToken({ headers })` — exchanges the refresh cookie for an access token,
   and returns the user with it, or `null` when nobody is signed in. The one
   function that reads the cookie.
-- `getSession({ headers })` — the session the caller is acting from. One
-  read, no user lookup: the one the token's `sid` names.
 - `getProviderRefreshToken(identityId)` — the decrypted refresh token for one
   connected account. **Not an endpoint**, at any status: it is the durable half
   of a provider grant, and only server code that manages its own refresh cycle —
@@ -163,13 +161,18 @@ so a loader branches instead of catching:
 const session = await authServer.getToken({ headers })
 if (!session) return { user: null }
 
-const sessions = await authServer.listSessions({ token: session.token })
+// The user came with the token. Everything else is your own query, with the
+// same token the browser would have carried.
+const todos = await db
+  .select()
+  .from(todos)
+  .where(eq(todos.userId, session.user.id))
 ```
 
 That shape is the point. A loader that called four endpoints with `{ headers }`
 under a cookie fallback would slide the session four times, read the user four
-times, and sign four tokens it then threw away. One exchange plus four token
-reads costs one session write and no signatures.
+times, and sign four tokens it then threw away. One exchange, then reads that
+cost one session write and no signatures.
 
 Sign-ins hand back a token in the body alongside the user — verification code,
 guest, and account switch — so
@@ -211,7 +214,7 @@ const authServer = createAuthServer({
   user: { additionalFields: { plan: "string", seats: "number" } }
 })
 
-const user = await authServer.getUser({ token })
+const user = await authServer.updateUser({ token, plan: "pro" })
 user.plan // string | null | undefined
 ```
 

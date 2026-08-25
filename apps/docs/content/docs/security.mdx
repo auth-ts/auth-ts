@@ -128,9 +128,11 @@ obtain it — a stolen browser profile, a device backup, a proxy terminating
 TLS — holds the session until that session is revoked or expires. Hashing
 protects the database, not a stolen token.
 
-Revoking a session filters on both the session id and the user id **in the
-query**, so revoking someone else's session is structurally impossible rather
-than a check somebody remembered to write.
+Revoking a session is a delete of the row, through your data plane — so the
+policy that scopes it to its owner is the same one that scopes every other read
+of `sessions`, rather than a check somebody remembered to write. Revoking the
+one this browser is on leaves a cookie pointing at nothing; the next `/token`
+answers `null` and clears it, and `signOut` is the call that does both at once.
 
 **One cookie beside it is readable by script**, on purpose. `auth-ts.hint` holds
 `in` or `out` and nothing else, and is written and retired with the refresh
@@ -161,7 +163,7 @@ of these before any header reaches the server. That is a bonus and not the
 guarantee — whoever answers the preflight is your application's business — so
 the check runs on every request regardless, including when a privacy extension
 has stripped `Origin`. The client already sends it; bodiless requests such as
-`GET /session` are untouched.
+`GET /users` are untouched.
 
 **`GET /token` is the one route a cookie alone authenticates**, and being a
 bodiless `GET` it is exempt from both layers above. That is safe for the reason

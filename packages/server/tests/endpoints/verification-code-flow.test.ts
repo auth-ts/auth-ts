@@ -207,66 +207,29 @@ describe("token and user endpoints", () => {
     const { authServer, refreshToken } = await signIn()
     const cookies = refreshCookieFor(refreshToken)
 
-    for (const path of [
-      "/api/auth/user",
-      "/api/auth/session",
-      "/api/auth/sessions"
-    ]) {
+    for (const [method, path] of [
+      ["POST", "/api/auth/user"],
+      ["DELETE", "/api/auth/user"],
+      ["POST", "/api/auth/user/send-delete-code"]
+    ] as const) {
       const response = await authServer.handler(
-        request("GET", path, { cookies })
+        request(method, path, { cookies })
       )
 
       expect(response.status).toBe(401)
     }
   })
 
-  it("never returns the stored token hash — every column but that one", async () => {
-    // The hash at rest is the whole point of storing sha256(token) instead of the
-    // token. Handing it back would undo that, and it once did.
-    const { authServer, token, db } = await signIn()
-
-    const response = await authServer.handler(
-      request("GET", "/api/auth/session", { token })
-    )
-    const body = { session: (await response.json()) as Record<string, unknown> }
-    const storedHash = required(db.sessions()[0], "session").tokenHash
-
-    expect(JSON.stringify(body)).not.toContain("tokenHash")
-    expect(JSON.stringify(body)).not.toContain(storedHash)
-    // Exact key set, so a new AuthSession column cannot widen this silently.
-    // No userAgent or ipAddress: this sign-in carried neither header, and the
-    // stamp writes only what it was given.
-    expect(Object.keys(body.session).sort()).toEqual([
-      "createdAt",
-      "expiresAt",
-      "id",
-      "updatedAt",
-      "userId"
-    ])
-  })
-
   it("401s the user endpoint without a cookie", async () => {
     const { authServer } = await createTestServer()
-    const response = await authServer.handler(request("GET", "/api/auth/user"))
+    const response = await authServer.handler(
+      request("POST", "/api/auth/user", { body: { name: "Ada" } })
+    )
 
     expect(response.status).toBe(401)
     expect(((await response.json()) as { code: string }).code).toBe(
       "unauthenticated"
     )
-  })
-
-  it("reads the current user and 401s without a session", async () => {
-    const { authServer, token } = await signIn()
-
-    const signedIn = await authServer.handler(
-      request("GET", "/api/auth/user", { token })
-    )
-    expect(((await signedIn.json()) as { email: string }).email).toBe(
-      "ada@example.com"
-    )
-
-    const signedOut = await authServer.handler(request("GET", "/api/auth/user"))
-    expect(signedOut.status).toBe(401)
   })
 
   it("updates name, leaves omitted fields alone, and rejects identity fields", async () => {
@@ -282,7 +245,7 @@ describe("token and user endpoints", () => {
       request("POST", "/api/auth/user", { token, body: { name: "Ada L" } })
     )
     const read = await authServer.handler(
-      request("GET", "/api/auth/user", { token })
+      request("POST", "/api/auth/user", { token, body: { name: "Ada L" } })
     )
     const body = (await read.json()) as { name: string; image: string }
 
@@ -302,27 +265,6 @@ describe("token and user endpoints", () => {
         "invalidField"
       )
     }
-  })
-
-  it("lists the whole session row, less the token hash", async () => {
-    const { authServer, token } = await signIn()
-
-    const response = await authServer.handler(
-      request("GET", "/api/auth/sessions", { token })
-    )
-    const body = (await response.json()) as Array<Record<string, unknown>>
-    const [session] = body
-
-    expect(JSON.stringify(body)).not.toContain("tokenHash")
-    // Everything else is the caller's own row: `updatedAt` is when the device
-    // was last used, and `id` is how they tell which one they are on.
-    expect(Object.keys(session ?? {}).sort()).toEqual([
-      "createdAt",
-      "expiresAt",
-      "id",
-      "updatedAt",
-      "userId"
-    ])
   })
 
   it("signs out locally and clears the cookie", async () => {
@@ -589,7 +531,7 @@ describe("where a token comes from", () => {
     // No endpoint hands a token back on the side any more, so there is no
     // second answer to "where did this token come from".
     const read = await context.authServer.handler(
-      request("GET", "/api/auth/user", { cookies })
+      request("POST", "/api/auth/user", { cookies, body: { name: "Ada" } })
     )
     expect(read.status).toBe(401)
   })
@@ -598,8 +540,9 @@ describe("where a token comes from", () => {
     const { context, cookies } = await signedIn()
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/user", {
+      request("POST", "/api/auth/user", {
         cookies,
+        body: { name: "Ada" },
         headers: { authorization: "Bearer not.a.token" }
       })
     )
@@ -627,7 +570,11 @@ describe("where a token comes from", () => {
     const update = vi.spyOn(context.db, "update")
 
     const response = await context.authServer.handler(
-      request("GET", "/api/auth/sessions", { cookies, token })
+      request("POST", "/api/auth/user", {
+        cookies,
+        token,
+        body: { name: "Ada" }
+      })
     )
 
     expect(response.status).toBe(200)
@@ -641,10 +588,7 @@ describe("where a token comes from", () => {
     const update = vi.spyOn(context.db, "update")
 
     await context.authServer.handler(
-      request("GET", "/api/auth/sessions", { token })
-    )
-    await context.authServer.handler(
-      request("GET", "/api/auth/session", { token })
+      request("POST", "/api/auth/user", { token, body: { name: "Ada" } })
     )
     expect(
       update.mock.calls.filter(([input]) => input.table === "sessions")

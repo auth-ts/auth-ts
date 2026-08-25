@@ -26,7 +26,7 @@ import { endpointRegistry } from "./endpoint-registry"
  * `T` with every user inside it carrying the declared additional fields.
  *
  * Endpoints are written once, against the erased `AuthUser`; this is what puts
- * the schema back on the way out, so `getUser()` returns `user.plan` typed
+ * the schema back on the way out, so `updateUser()` returns `user.plan` typed
  * when `plan` was declared. Everything that is not a user passes through
  * unchanged.
  */

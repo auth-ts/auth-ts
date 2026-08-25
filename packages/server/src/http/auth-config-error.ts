@@ -6,7 +6,7 @@
  * a misconfigured deployment dies on boot with the offending option named,
  * instead of on the first user's sign-in attempt at 3am.
  *
- * The one runtime case is `getSession`/`getToken` finding no cookie while
+ * The one runtime case is `getToken` finding no cookie while
  * `cookie.path` is still scoped to the auth mount: returning null there would
  * present as "SSR is always signed out", which is a bug report rather than a
  * clue.

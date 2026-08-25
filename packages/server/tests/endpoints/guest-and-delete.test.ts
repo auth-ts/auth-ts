@@ -44,9 +44,10 @@ describe("guest sign-in", () => {
     expect(context.db.users()[0]?.email).toBeNull()
 
     const whoami = await context.authServer.handler(
-      request("GET", "/api/auth/user", {
+      request("POST", "/api/auth/user", {
         cookies: refreshCookieFor(refreshToken),
-        token
+        token,
+        body: { name: "Guest" }
       })
     )
     expect(((await whoami.json()) as { id: string }).id).toBe(user.id)

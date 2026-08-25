@@ -80,6 +80,20 @@ describe("buildOpenAPIDocument", () => {
     }
   })
 
+  it("publishes no schema that nothing references", () => {
+    // The other direction, and the one nothing else catches: removing the last
+    // operation that used a schema leaves it shipping in `/openapi.json`
+    // forever, described by no route.
+    const referenced = new Set(
+      refs(reference).map((ref) => ref.replace("#/components/schemas/", ""))
+    )
+    const schemas = reference.components.schemas as Record<string, unknown>
+
+    expect(
+      Object.keys(schemas).filter((name) => !referenced.has(name))
+    ).toEqual([])
+  })
+
   it("survives the JSON round trip it is served through", () => {
     expect(JSON.parse(JSON.stringify(reference))).toEqual(reference)
   })

@@ -37,7 +37,7 @@ async function startFlow(
  *
  * Resolves only if something goes wrong before the navigation — otherwise the
  * page is on its way out. When the user comes back the session cookie is
- * already set, so the application boots, calls `getUser`, and finds them signed
+ * already set, so the application boots, calls `getToken`, and finds them signed
  * in: the callback hands the SPA no token, and the cookie is what buys the first
  * one.
  *

@@ -9,8 +9,8 @@ export interface ClientCall {
   path: string
 }
 
-// The factory's name is the mapping: `createListSessions` provides
-// `authClient.listSessions`. Reading it here rather than the name of whatever
+// The factory's name is the mapping: `createListUsers` provides
+// `authClient.listUsers`. Reading it here rather than the name of whatever
 // the factory returns is what makes the object-of-arrows shape in `get-token.ts`
 // resolve the same way as the plain functions everywhere else.
 const FACTORY = /export function create(\w+)\s*\(/g

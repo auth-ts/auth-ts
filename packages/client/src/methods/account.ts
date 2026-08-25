@@ -1,4 +1,4 @@
-import type { AuthUser, SessionInfo } from "@auth-ts/server"
+import type { AuthUser } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
 
@@ -127,49 +127,6 @@ export function createSendDeleteUserCode(internals: AuthClientInternals) {
     await internals.fetchJson({
       method: "POST",
       path: "/user/send-delete-code",
-      authenticated: true
-    })
-  }
-}
-
-/** {@link SessionInfo} as JSON delivers it, before the dates are revived. */
-type SessionInfoWire = Omit<SessionInfo, "createdAt" | "expiresAt"> & {
-  createdAt: string
-  expiresAt: string
-}
-
-/** Lists this user's sessions — the devices screen. */
-export function createListSessions(internals: AuthClientInternals) {
-  return async function listSessions(): Promise<SessionInfo[]> {
-    const sessions = await internals.fetchJson<SessionInfoWire[]>({
-      method: "GET",
-      path: "/sessions",
-      authenticated: true
-    })
-
-    return sessions.map((session) => ({
-      ...session,
-      createdAt: new Date(session.createdAt),
-      expiresAt: new Date(session.expiresAt)
-    }))
-  }
-}
-
-/** Input for revoking a session. */
-export interface RevokeSessionInput {
-  id: string
-}
-
-/**
- * Revokes one session by id.
- */
-export function createRevokeSession(internals: AuthClientInternals) {
-  return async function revokeSession(
-    input: RevokeSessionInput
-  ): Promise<void> {
-    await internals.fetchJson<undefined>({
-      method: "DELETE",
-      path: `/sessions/${encodeURIComponent(input.id)}`,
       authenticated: true
     })
   }

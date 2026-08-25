@@ -6,12 +6,12 @@ import type {
   AuthOrderBy,
   AuthRange,
   AuthRow,
+  AuthSession,
   AuthUser,
   AuthWhere
 } from "../../src/core/auth-db"
 import type { WithUserFields } from "../../src/core/create-auth-server"
 import { createAuthServer } from "../../src/core/create-auth-server"
-import type { CurrentSession } from "../../src/endpoints/session"
 import { createMemoryDb } from "../../src/lib/memory-db"
 
 // Never executed — vitest typechecks this file and runs nothing in it — so the
@@ -153,13 +153,14 @@ describe("createAuthServer infers the schema and types everything it returns", (
       user: { additionalFields }
     })
 
-    const user = await server.getUser({ headers: new Headers() })
+    const user = await server.updateUser({
+      headers: new Headers(),
+      plan: "pro"
+    })
     expectTypeOf(user.plan).toEqualTypeOf<string | null | undefined>()
     expectTypeOf(user.seats).toEqualTypeOf<number | null | undefined>()
-
-    const session = await server.getSession({ headers: new Headers() })
     // Everything that is not a user passes through unchanged.
-    expectTypeOf(session.createdAt).toEqualTypeOf<Date>()
+    expectTypeOf(user.createdAt).toEqualTypeOf<Date>()
   })
 
   it("refuses an adapter typed against a different schema", () => {
@@ -180,7 +181,10 @@ describe("createAuthServer infers the schema and types everything it returns", (
 
   it("stays open when nothing is declared", async () => {
     const server = createAuthServer({ ...base, db: createMemoryDb() })
-    const user = await server.getUser({ headers: new Headers() })
+    const user = await server.updateUser({
+      headers: new Headers(),
+      anything: 1
+    })
     expectTypeOf(user.anything).toEqualTypeOf<unknown>()
   })
 })
@@ -188,7 +192,7 @@ describe("createAuthServer infers the schema and types everything it returns", (
 describe("WithUserFields", () => {
   it("replaces users wherever they appear and leaves everything else alone", () => {
     type Typed = WithUserFields<
-      { user: AuthUser; session: CurrentSession },
+      { user: AuthUser; session: AuthSession },
       Declared
     >
     expectTypeOf<Typed["user"]["plan"]>().toEqualTypeOf<

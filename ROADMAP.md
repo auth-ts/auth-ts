@@ -430,7 +430,7 @@ There is no company. That is a feature.
 The client's user object is a render hint — it decides whether to show a name in
 the corner. On the server the same object would be an authorization decision made
 from a cache, which is a 1am phone call waiting to happen. Server-side code calls
-`getSession` or `getToken` and gets the truth.
+`getToken` and gets the truth.
 
 ---
 

@@ -586,11 +586,12 @@ describe("oauth callback", () => {
     expect(await selectRows(db, "identities", { userId: other.id })).toEqual([])
 
     const whoami = await authServer.handler(
-      request("GET", "/api/auth/user", {
+      request("POST", "/api/auth/user", {
         token: await mintToken(
           authServer,
           required(readRefreshCookie(response), "refresh").value
-        )
+        ),
+        body: { name: "Ada" }
       })
     )
     expect(((await whoami.json()) as { id: string }).id).toBe(owner.id)
@@ -1050,13 +1051,8 @@ describe("connect and disconnect", () => {
     expect(callbackResponse.status).toBe(302)
     expect(context.db.users()).toHaveLength(1)
 
-    const listed = await context.authServer.handler(
-      request("GET", "/api/auth/identities", {
-        token: await mintToken(context.authServer, refreshToken)
-      })
-    )
-    const body = (await listed.json()) as Array<{ provider: string }>
-    expect(body.map((identity) => identity.provider)).toEqual(["github"])
+    const linked = await selectRows(context.db, "identities", {})
+    expect(linked.map((identity) => identity.provider)).toEqual(["github"])
   })
 
   it("insists on the access token, like every other authenticated route", async () => {
@@ -1158,77 +1154,6 @@ describe("connect and disconnect", () => {
       providerUserId: "4242"
     })
     expect(identity?.userId).toBe(firstUser.id)
-  })
-
-  it("unlinks one connected account, leaving the same provider's others", async () => {
-    // Two GitHub accounts on one user is the case the old provider-keyed route
-    // could not express: disconnecting one of them took both.
-    const context = await createTestServer(OAUTH_OPTIONS)
-    const refreshToken = await signInWithCode(context)
-    const user = required(context.db.users()[0], "user")
-    const link = async (providerUserId: string) =>
-      required(
-        await context.db.insert({
-          table: "identities",
-          values: {
-            userId: user.id,
-            provider: "github",
-            providerUserId,
-            label: providerUserId,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }
-        }),
-        "identity"
-      )
-    const personal = await link("4242")
-    const work = await link("9001")
-
-    const response = await context.authServer.handler(
-      request("DELETE", `/api/auth/identities/${personal.id}`, {
-        token: await mintToken(context.authServer, refreshToken)
-      })
-    )
-
-    expect(response.status).toBe(204)
-    expect(
-      (await selectRows(context.db, "identities", { userId: user.id })).map(
-        (identity) => identity.id
-      )
-    ).toEqual([work.id])
-  })
-
-  it("refuses to unlink someone else's identity, as a 404", async () => {
-    const context = await createTestServer(OAUTH_OPTIONS)
-    const refreshToken = await signInWithCode(context)
-    const stranger = await insertUser(context.db, {
-      email: "grace@example.com"
-    })
-    const theirs = required(
-      await context.db.insert({
-        table: "identities",
-        values: {
-          userId: stranger.id,
-          provider: "github",
-          providerUserId: "4242",
-          label: null,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      }),
-      "identity"
-    )
-
-    const response = await context.authServer.handler(
-      request("DELETE", `/api/auth/identities/${theirs.id}`, {
-        token: await mintToken(context.authServer, refreshToken)
-      })
-    )
-
-    expect(response.status).toBe(404)
-    expect(
-      await selectRows(context.db, "identities", { userId: stranger.id })
-    ).toHaveLength(1)
   })
 })
 

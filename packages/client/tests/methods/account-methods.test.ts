@@ -99,22 +99,16 @@ describe("sendSignInCode", () => {
     }
     // A 401 makes the client refresh its token and retry once, so both the
     // refresh and the retried request need answers.
-    server.on("DELETE", "/api/auth/sessions/other", {
-      status: 401,
-      body: wireBody
-    })
+    server.on("POST", "/api/auth/user", { status: 401, body: wireBody })
     server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("DELETE", "/api/auth/sessions/other", {
-      status: 401,
-      body: wireBody
-    })
+    server.on("POST", "/api/auth/user", { status: 401, body: wireBody })
     const client = await signedIn()
 
     const thrown = await client
-      .revokeSession({ id: "other" })
+      .updateUser({ name: "Ada" })
       .then(() => null)
       .catch((error: unknown) => error)
 
@@ -272,60 +266,6 @@ describe("deleteUser", () => {
 })
 
 describe("sessions and accounts", () => {
-  it("lists sessions and revokes another device without clearing local state", async () => {
-    server.on("GET", "/api/auth/sessions", {
-      body: [
-        {
-          id: "a",
-          createdAt: "2026-08-01T10:00:00.000Z",
-          expiresAt: "2026-08-31T10:00:00.000Z"
-        },
-        {
-          id: "b",
-          createdAt: "2026-08-02T10:00:00.000Z",
-          expiresAt: "2026-09-01T10:00:00.000Z"
-        }
-      ]
-    })
-    server.on("DELETE", "/api/auth/sessions/b", { body: { current: false } })
-    server.on("POST", "/api/auth/sign-in/code", {
-      body: { user },
-      token: fakeAccessToken()
-    })
-
-    const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
-
-    const sessions = await client.listSessions()
-    expect(sessions).toHaveLength(2)
-    // Dates are revived, so `SessionInfo` is honest on the client too.
-    expect(sessions[0]?.createdAt).toBeInstanceOf(Date)
-    expect(sessions[0]?.createdAt.toISOString()).toBe(
-      "2026-08-01T10:00:00.000Z"
-    )
-    expect(sessions[1]?.expiresAt.getTime()).toBe(
-      Date.parse("2026-09-01T10:00:00.000Z")
-    )
-    await client.revokeSession({ id: "b" })
-    // One DELETE, and no second GET /sessions to work out whether it was the
-    // current one — the server says so in the response.
-    expect(
-      server.requests.filter((request) => request.path === "/api/auth/sessions")
-    ).toHaveLength(1)
-  })
-
-  it("clears local state when the server reports the revoked session as current", async () => {
-    server.on("DELETE", "/api/auth/sessions/a", { body: { current: true } })
-    server.on("POST", "/api/auth/sign-in/code", {
-      body: { user },
-      token: fakeAccessToken()
-    })
-
-    const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
-    await client.revokeSession({ id: "a" })
-  })
-
   it("returns the account it switched to, and keeps that account's token", async () => {
     const switched = fakeAccessToken()
     server.on("POST", "/api/auth/sign-in/code", {
@@ -397,19 +337,19 @@ describe("oauth navigation", () => {
 })
 
 describe("connected accounts", () => {
-  it("addresses the token and the disconnectIdentity by identity id", async () => {
+  it("addresses the token by identity id, not by provider", async () => {
     // Not by provider: two accounts at one provider is the case that breaks.
     server.on("GET", "/api/auth/identities/identity-1/token", {
       body: { token: "provider-token", expiresAt: null, scope: "repo" }
     })
-    server.on("DELETE", "/api/auth/identities/identity-1", { status: 204 })
     const client = await signedIn()
 
     const grant = await client.getProviderToken({ id: "identity-1" })
-    expect(grant.token).toBe("provider-token")
 
-    await client.disconnectIdentity({ id: "identity-1" })
-    expect(server.requests.at(-1)?.path).toBe("/api/auth/identities/identity-1")
+    expect(grant.token).toBe("provider-token")
+    expect(server.requests.at(-1)?.path).toBe(
+      "/api/auth/identities/identity-1/token"
+    )
   })
 
   it("throws providerReconnectRequired when the grant is gone", async () => {

@@ -139,26 +139,29 @@ describe("storing a provider grant", () => {
     ).toBe("second-access-token")
   })
 
-  it("never lets the tokens reach the browser through GET /identities", async () => {
+  it("keeps every token column out of identities, so the table reads whole", async () => {
+    // What makes `identities` safe for an application to select without naming
+    // columns: there is nothing on the row to leave out.
     const context = await createTestServer(OAUTH_OPTIONS)
-    const { refreshToken } = await signInWithGitHub(context, GRANT)
+    await signInWithGitHub(context, GRANT)
 
-    const response = await context.authServer.handler(
-      request("GET", "/api/auth/identities", {
-        token: await mintToken(context.authServer, refreshToken)
-      })
+    const identity = required(
+      await selectRow(context.db, "identities", { provider: "github" }),
+      "identity"
     )
-    const [listed] = (await response.json()) as Array<Record<string, unknown>>
 
-    expect(listed).toBeDefined()
-    expect(listed).not.toHaveProperty("accessTokenEncrypted")
-    expect(listed).not.toHaveProperty("refreshTokenEncrypted")
-    // Not a secret, but not an answer either: the listing holds no token, so
-    // its expiry is churn. `getProviderToken` reports the one it hands over.
-    expect(listed).not.toHaveProperty("accessTokenExpiresAt")
+    expect(Object.keys(identity).sort()).toEqual([
+      "createdAt",
+      "id",
+      "label",
+      "provider",
+      "providerUserId",
+      "scope",
+      "updatedAt",
+      "userId"
+    ])
     // The parts an account screen legitimately renders survive.
-    expect(listed?.scope).toBe("read:user user:email repo")
-    expect(listed?.provider).toBe("github")
+    expect(identity.scope).toBe("read:user user:email repo")
   })
 })
 

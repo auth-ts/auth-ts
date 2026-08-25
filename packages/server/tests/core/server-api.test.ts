@@ -146,7 +146,7 @@ describe("getToken as a function", () => {
     const context = await createTestServer()
 
     const thrown = await context.authServer
-      .getUser({ headers: new Headers() })
+      .updateUser({ headers: new Headers(), name: "Ada" })
       .then(() => null)
       .catch((error: unknown) => error)
 
@@ -165,9 +165,9 @@ describe("getToken as a function", () => {
     const headers = cookieHeaders(refreshToken)
 
     for (const call of [
-      () => context.authServer.getUser({ headers }),
-      () => context.authServer.getSession({ headers }),
-      () => context.authServer.listSessions({ headers })
+      () => context.authServer.updateUser({ headers, name: "Ada" }),
+      () => context.authServer.deleteUser({ headers }),
+      () => context.authServer.sendDeleteUserCode({ headers })
     ]) {
       await expect(call()).rejects.toMatchObject({
         code: "unauthenticated",
@@ -189,16 +189,14 @@ describe("getToken as a function", () => {
     )
 
     const update = vi.spyOn(context.db, "update")
-    const [session, user, sessions] = await Promise.all([
-      context.authServer.getSession({ token }),
-      context.authServer.getUser({ token }),
-      context.authServer.listSessions({ token })
-    ])
+    const updated = await context.authServer.updateUser({ token, name: "Ada" })
 
-    expect(update).not.toHaveBeenCalled()
-    expect(user.email).toBe("ada@example.com")
-    expect(sessions).toHaveLength(1)
-    expect(session).not.toHaveProperty("tokenHash")
+    expect(updated.email).toBe("ada@example.com")
+    // The user row is written, the session is not: spending a token never
+    // slides it, however many calls the render makes.
+    expect(
+      update.mock.calls.every(([input]) => input.table !== "sessions")
+    ).toBe(true)
   })
 
   it("re-sends the cookies over HTTP, so their Max-Age slides with the session", async () => {
@@ -239,20 +237,8 @@ describe("getToken as a function", () => {
   })
 })
 
-describe("getSession", () => {
-  it("reads the session the token names, without touching it", async () => {
-    const context = await createTestServer()
-    const { token } = await signIn(context)
-
-    const update = vi.spyOn(context.db, "update")
-    const session = await context.authServer.getSession({ token })
-
-    expect(update).not.toHaveBeenCalled()
-    expect(session.id).toBe(required(context.db.sessions()[0], "row").id)
-    expect(session).not.toHaveProperty("tokenHash")
-  })
-
-  it("refuses a revoked or expired session", async () => {
+describe("a token whose session is gone", () => {
+  it("is refused, even though the signature still verifies", async () => {
     const context = await createTestServer()
     const { token } = await signIn(context)
     const session = required(context.db.sessions()[0], "session")
@@ -264,7 +250,7 @@ describe("getSession", () => {
 
     // The token still verifies — it is the row its `sid` names that is gone.
     await expect(
-      context.authServer.getSession({ token })
+      context.authServer.deleteUser({ token })
     ).rejects.toMatchObject({ code: "unauthenticated", status: 401 })
   })
 
@@ -354,7 +340,7 @@ describe("callables and handlers agree", () => {
     const context = await createTestServer()
 
     await expect(
-      context.authServer.getUser({ headers: new Headers() })
+      context.authServer.updateUser({ headers: new Headers(), name: "Ada" })
     ).rejects.toMatchObject({
       code: "unauthenticated",
       status: 401
@@ -376,16 +362,16 @@ describe("calling with a token instead of a request", () => {
 
     // No cookie, no request — the shape a custom API has after reading its own
     // Authorization header, or a service handed a token some other way.
-    const sessions = await context.authServer.listSessions({ token })
+    const updated = await context.authServer.updateUser({ token, name: "Ada" })
 
-    expect(sessions).toHaveLength(1)
+    expect(updated.name).toBe("Ada")
   })
 
   it("refuses an unreadable token when there is no cookie to fall back to", async () => {
     const { authServer } = await createTestServer()
 
     await expect(
-      authServer.listSessions({ token: "forged.not.real" })
+      authServer.updateUser({ token: "forged.not.real", name: "Ada" })
     ).rejects.toThrow()
   })
 
@@ -396,16 +382,9 @@ describe("calling with a token instead of a request", () => {
     const { token } = await signIn(context)
     const { authServer } = context
 
-    const session = await authServer.getSession({ token })
-    expect(session.id).toBe(required(context.db.sessions()[0], "row").id)
-
-    const user = await authServer.getUser({ token })
-    expect(user.email).toBe("ada@example.com")
-
     const updated = await authServer.updateUser({ token, name: "Ada" })
     expect(updated.name).toBe("Ada")
-
-    expect(await authServer.listIdentities({ token })).toEqual([])
+    expect(updated.email).toBe("ada@example.com")
 
     await authServer.deleteUser({ token })
     expect(context.db.sessions()).toHaveLength(0)
@@ -429,8 +408,8 @@ describe("calling with a token instead of a request", () => {
     const context = await createTestServer({ cookie: { path: "/api/auth" } })
     const { token } = await signIn(context)
 
-    const user = await context.authServer.getUser({ token })
+    const updated = await context.authServer.updateUser({ token, name: "Ada" })
 
-    expect(user.email).toBe("ada@example.com")
+    expect(updated.email).toBe("ada@example.com")
   })
 })

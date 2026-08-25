@@ -4,9 +4,9 @@ import { AuthError } from "../lib/auth-error"
 import { reviveUser } from "../lib/revive-user"
 import { mayHaveSession } from "../lib/session-hint"
 
-/** A token refresh, and the two ways of asking for its result. */
+/** A token refresh, and the three ways of asking for its result. */
 export interface RefreshToken {
-  /** Exchanges the refresh cookie for a token, or `null` when there is no session. */
+  /** Exchanges the refresh cookie for a token and its user, or `null` when there is no session. */
   refresh: () => Promise<TokenResult | null>
   /** A usable token, or `null` when nobody is signed in. */
   getToken: (options?: GetTokenOptions) => Promise<string | null>
@@ -42,10 +42,10 @@ export interface GetTokenOptions {
  * components makes one round-trip and they all see the same token.
  *
  * `refresh` returns the user as well, because `GET /token` reads that row to
- * mint and returns it — which is what lets a cold `getUser` cost one request
- * rather than two.
+ * mint and returns it — which is what lets a cold boot learn who is signed in
+ * for one request rather than two.
  *
- * `getToken` resolves `null` when there is no live session and `requireToken`
+ * `refresh` and `getToken` resolve `null` when there is no live session and `requireToken`
  * throws instead. Nobody signed in is an answer, not a failure, and a caller
  * asking "who is here" should not have to catch to hear it; a caller about to
  * authenticate a request has nothing to do with `null` and wants the error.
@@ -136,20 +136,24 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
     return cached.token
   }
 
-  return {
-    refresh,
-    requireToken,
-
-    getToken: async (options) => {
-      try {
-        return await requireToken(options)
-      } catch (error) {
-        if (error instanceof AuthError && error.code === "unauthenticated") {
-          return null
-        }
-
-        throw error
+  /** Maps the server's "no session" onto the `null` both public reads answer with. */
+  const orNull = async <Result>(read: () => Promise<Result | null>) => {
+    try {
+      return await read()
+    } catch (error) {
+      if (error instanceof AuthError && error.code === "unauthenticated") {
+        return null
       }
+
+      throw error
     }
+  }
+
+  return {
+    // Published, so it answers `null` rather than throwing. `requireToken`
+    // keeps the throwing one, which is what carries the server's own error.
+    refresh: () => orNull(refresh),
+    requireToken,
+    getToken: (options) => orNull(() => requireToken(options))
   }
 }

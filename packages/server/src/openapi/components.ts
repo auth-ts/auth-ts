@@ -1,6 +1,5 @@
-import type { AuthIdentity, CoreUserFields } from "../core/auth-db"
+import type { CoreUserFields } from "../core/auth-db"
 import type { ProviderTokenResult } from "../endpoints/identities/$id/token"
-import type { SessionInfo } from "../endpoints/sessions"
 import type { TokenResult } from "../endpoints/token"
 import type { AuthErrorBody } from "../http/error-response"
 import type {
@@ -27,49 +26,6 @@ const user: ObjectSchemaFor<CoreUserFields> = {
     updatedAt: { type: "string", format: "date-time" }
   },
   required: ["id", "type", "createdAt", "updatedAt"]
-}
-
-const session: ObjectSchemaFor<SessionInfo> = {
-  type: "object",
-  properties: {
-    id: { type: "string" },
-    userId: { type: "string" },
-    createdAt: { type: "string", format: "date-time" },
-    expiresAt: { type: "string", format: "date-time" },
-    updatedAt: { type: "string", format: "date-time" },
-    userAgent: { type: "string" },
-    ipAddress: { type: "string" }
-  },
-  required: ["id", "userId", "createdAt", "expiresAt", "updatedAt"]
-}
-
-const identity: ObjectSchemaFor<AuthIdentity> = {
-  type: "object",
-  properties: {
-    id: { type: "string" },
-    userId: { type: "string" },
-    provider: { type: "string" },
-    providerUserId: {
-      type: "string",
-      description:
-        "The provider's stable id \u2014 GitHub's numeric id, Google's `sub`."
-    },
-    label: { type: "string", description: "Display only." },
-    scope: {
-      type: "string",
-      description: "Space-delimited, as the provider returned it."
-    },
-    createdAt: { type: "string", format: "date-time" },
-    updatedAt: { type: "string", format: "date-time" }
-  },
-  required: [
-    "id",
-    "userId",
-    "provider",
-    "providerUserId",
-    "createdAt",
-    "updatedAt"
-  ]
 }
 
 const providerToken: ObjectSchemaFor<ProviderTokenResult> = {
@@ -147,9 +103,6 @@ const authError: ObjectSchemaFor<AuthErrorBody> = {
  */
 export const componentSchemas: Record<ComponentName, JsonSchema> = {
   User: user,
-  Session: session,
-  Identity: identity,
-  Account: user,
   TokenResult: tokenResult,
   ProviderToken: providerToken,
   AuthorizeURL: {
@@ -157,8 +110,7 @@ export const componentSchemas: Record<ComponentName, JsonSchema> = {
     properties: { url: { type: "string", format: "uri" } },
     required: ["url"]
   },
-  AuthError: authError,
-  AdditionalFields: { type: "object", additionalProperties: true }
+  AuthError: authError
 }
 
 function failure(description: string) {

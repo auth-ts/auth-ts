@@ -1,20 +1,14 @@
 import { decodeToken } from "../lib/decode-token"
 import {
   createDeleteUser,
-  createListSessions,
-  createRevokeSession,
   createSendDeleteUserCode,
   createSignOut,
   createUpdateUser
 } from "../methods/account"
-import { createGetSession } from "../methods/get-session"
-import type { GetTokenOptions } from "../methods/get-token"
+import type { GetTokenOptions, RefreshToken } from "../methods/get-token"
 import { createGetToken } from "../methods/get-token"
-import { createGetUser } from "../methods/get-user"
 import {
-  createDisconnectIdentity,
   createGetProviderToken,
-  createListIdentities,
   createListUsers,
   createSwitchUser
 } from "../methods/identities-and-users"
@@ -54,20 +48,26 @@ export interface AuthClient {
    * there is something to refresh.
    */
   getToken: (options?: GetTokenOptions) => Promise<string | null>
-  /** The user, the session, and a token — or `null`. Always reads the server. */
-  getUser: ReturnType<typeof createGetUser>
-  /** The session this browser is on, confirming it is live and keeping it that way. */
-  getSession: ReturnType<typeof createGetSession>
+  /**
+   * Exchanges the refresh cookie for a token now, and answers with the user it
+   * was minted for — or `null` when nobody is signed in.
+   *
+   * The cheapest way to learn who is here: `GET /token` reads that row to mint,
+   * so the user arrives with the token and a cold boot costs one request. It
+   * always asks, ignoring whatever is in memory, which is what makes it a
+   * reload rather than a read.
+   *
+   * It is not how you keep a name on screen up to date. That row is yours —
+   * query `users` through your data plane, where a rename in another tab
+   * arrives without a token being reminted.
+   */
+  refresh: RefreshToken["refresh"]
   sendSignInCode: ReturnType<typeof createSendSignInCode>
   signInWithCode: ReturnType<typeof createSignInWithCode>
   signInAsGuest: ReturnType<typeof createSignInAsGuest>
   signInWithProvider: ReturnType<typeof createSignInWithProvider>
   connectProvider: ReturnType<typeof createConnectProvider>
-  listIdentities: ReturnType<typeof createListIdentities>
-  disconnectIdentity: ReturnType<typeof createDisconnectIdentity>
   getProviderToken: ReturnType<typeof createGetProviderToken>
-  listSessions: ReturnType<typeof createListSessions>
-  revokeSession: ReturnType<typeof createRevokeSession>
   listUsers: ReturnType<typeof createListUsers>
   switchUser: ReturnType<typeof createSwitchUser>
   updateUser: ReturnType<typeof createUpdateUser>
@@ -106,18 +106,13 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
 
   return {
     getToken,
-    getUser: createGetUser(internals, refresh),
-    getSession: createGetSession(internals),
+    refresh,
     sendSignInCode: createSendSignInCode(internals),
     signInWithCode: createSignInWithCode(internals),
     signInAsGuest: createSignInAsGuest(internals),
     signInWithProvider: createSignInWithProvider(internals),
     connectProvider: createConnectProvider(internals),
-    listIdentities: createListIdentities(internals),
-    disconnectIdentity: createDisconnectIdentity(internals),
     getProviderToken: createGetProviderToken(internals),
-    listSessions: createListSessions(internals),
-    revokeSession: createRevokeSession(internals),
     listUsers: createListUsers(internals),
     switchUser: createSwitchUser(internals),
     updateUser: createUpdateUser(internals),

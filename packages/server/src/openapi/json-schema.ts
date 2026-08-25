@@ -34,14 +34,10 @@ export interface JsonSchema {
  */
 export type ComponentName =
   | "User"
-  | "Session"
-  | "Identity"
-  | "Account"
   | "TokenResult"
   | "AuthorizeURL"
   | "ProviderToken"
   | "AuthError"
-  | "AdditionalFields"
 
 /** The reusable `components.responses` entries, by name. */
 export type ComponentResponseName =

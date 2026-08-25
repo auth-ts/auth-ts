@@ -12,42 +12,6 @@ import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
 import { consumeVerificationCode } from "../verification-code/consume-verification-code"
 
-/** How `GET /user` appears in the OpenAPI document. */
-export const getUserDocs: EndpointDocs<never> = {
-  description:
-    "Skip this if you already call /token, which returns the user too.",
-  tag: "User",
-  auth: "bearer",
-  responses: {
-    200: { description: "The signed-in user.", schema: "User" },
-    401: "Unauthenticated"
-  }
-}
-
-/**
- * Get the current user.
- *
- * One read of `users` and nothing else: the token names the caller, so there is
- * no session to resolve. A caller without a live token gets a 401 and goes to
- * `GET /token`, which returns the user along with the token — so a client
- * refreshing anyway never needs this endpoint at all.
- */
-export const getUser = defineEndpoint({
-  method: "GET",
-  path: "/user",
-  parse: ({ request }): CallerInput => ({ headers: request.headers }),
-  run: async (internals, input: CallerInput) => {
-    const caller = await authenticate(internals, input)
-    const user = await selectOne(internals, "users", { id: caller.userId })
-    // Core deletes a user's sessions before the user, so a token naming one
-    // that is gone means a delete failed part-way. Refuse it rather than trust
-    // it.
-    if (!user) throw unauthenticated()
-
-    return { data: user }
-  }
-})
-
 /**
  * The flat body accepted by `POST /user`.
  *

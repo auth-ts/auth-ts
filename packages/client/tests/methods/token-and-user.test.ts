@@ -183,7 +183,7 @@ describe("getToken", () => {
     client.clearToken()
 
     expect(await client.getToken()).toBeNull()
-    await expect(client.getUser()).resolves.toBeNull()
+    await expect(client.refresh()).resolves.toBeNull()
   })
 
   it("still throws from the methods that need a credential", async () => {
@@ -195,7 +195,7 @@ describe("getToken", () => {
 
     // Asking who is here and asking to act as them are different questions.
     expect(await client.getToken()).toBeNull()
-    await expect(client.listSessions()).rejects.toMatchObject({
+    await expect(client.listUsers()).rejects.toMatchObject({
       code: "unauthenticated"
     })
   })
@@ -257,7 +257,7 @@ describe("the session hint", () => {
     const client = createAuthClient()
 
     expect(await client.getToken()).toBeNull()
-    await expect(client.getUser()).resolves.toBeNull()
+    await expect(client.refresh()).resolves.toBeNull()
     // The point of the whole mechanism: no 401 on load, none on tab focus.
     expect(server.requests).toHaveLength(0)
   })
@@ -266,7 +266,7 @@ describe("the session hint", () => {
     setSessionHint(undefined)
     const client = createAuthClient()
 
-    await expect(client.listSessions()).rejects.toMatchObject({
+    await expect(client.listUsers()).rejects.toMatchObject({
       code: "unauthenticated",
       status: 401
     })
@@ -347,11 +347,11 @@ describe("a refused token", () => {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("GET", "/api/auth/sessions", {
+    server.on("GET", "/api/auth/users", {
       status: 401,
       body: { code: "unauthenticated", message: "You are not signed in." }
     })
-    server.on("GET", "/api/auth/sessions", { body: [] })
+    server.on("GET", "/api/auth/users", { body: [] })
     server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
@@ -359,7 +359,7 @@ describe("a refused token", () => {
     const client = createAuthClient()
     await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
-    expect(await client.listSessions()).toEqual([])
+    expect(await client.listUsers()).toEqual([])
     expect(
       server.requests.filter((entry) => entry.path === "/api/auth/token")
     ).toHaveLength(1)
@@ -374,53 +374,48 @@ describe("a refused token", () => {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("GET", "/api/auth/sessions", refused)
+    server.on("GET", "/api/auth/users", refused)
     server.on("GET", "/api/auth/token", refused)
     const client = createAuthClient()
     await client.signInWithCode({ email: "ada@example.com", code: "123456" })
 
-    await expect(client.listSessions()).rejects.toMatchObject({
+    await expect(client.listUsers()).rejects.toMatchObject({
       code: "unauthenticated"
     })
     expect(
-      server.requests.filter((entry) => entry.path === "/api/auth/sessions")
+      server.requests.filter((entry) => entry.path === "/api/auth/users")
     ).toHaveLength(1)
   })
 })
 
-describe("getUser", () => {
-  it("reads the server every time, because a name can change elsewhere", async () => {
-    server.on("GET", "/api/auth/token", {
-      body: { user },
-      token: fakeAccessToken()
-    })
-    server.on("GET", "/api/auth/user", { body: user })
-    const client = createAuthClient()
-
-    await client.getUser()
-    await client.getUser()
-    await client.getUser()
-
-    // The first call takes the user off the refresh it needed anyway; after
-    // that it is a read per call, because caching is the caller's to decide.
-    expect(
-      server.requests.filter((entry) => entry.path === "/api/auth/token")
-    ).toHaveLength(1)
-    expect(
-      server.requests.filter((entry) => entry.path === "/api/auth/user")
-    ).toHaveLength(2)
-  })
-
+describe("refresh", () => {
   it("costs one request on a cold start, since the refresh carries the user", async () => {
     server.on("GET", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
 
-    const found = await createAuthClient().getUser()
+    const found = await createAuthClient().refresh()
 
-    expect(found?.email).toBe("ada@example.com")
+    expect(found?.user.email).toBe("ada@example.com")
+    expect(found?.token).toEqual(expect.any(String))
     expect(server.requests).toHaveLength(1)
+  })
+
+  it("asks every time, so it is a reload rather than a read", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    const client = createAuthClient()
+
+    await client.refresh()
+    await client.refresh()
+    await client.refresh()
+
+    expect(
+      server.requests.filter((entry) => entry.path === "/api/auth/token")
+    ).toHaveLength(3)
   })
 
   it("resolves null when the session is gone", async () => {
@@ -429,7 +424,7 @@ describe("getUser", () => {
       body: { code: "unauthenticated", message: "You are not signed in." }
     })
 
-    expect(await createAuthClient().getUser()).toBeNull()
+    expect(await createAuthClient().refresh()).toBeNull()
   })
 
   it("returns a token nearing expiry at once, refreshing behind the caller", async () => {

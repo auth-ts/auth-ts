@@ -11,14 +11,12 @@ export type { LeveledLogger, Logger, LogLevel } from "./lib/logger"
 export type {
   DeleteUserInput,
   DeleteUserResult,
-  RevokeSessionInput,
   SignOutInput,
   SignOutScope,
   UpdateUserInput
 } from "./methods/account"
-export type { GetTokenOptions } from "./methods/get-token"
+export type { GetTokenOptions, RefreshToken } from "./methods/get-token"
 export type {
-  DisconnectIdentityInput,
   GetProviderTokenInput,
   SwitchUserInput
 } from "./methods/identities-and-users"

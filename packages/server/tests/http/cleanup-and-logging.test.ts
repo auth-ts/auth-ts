@@ -144,10 +144,11 @@ describe("logging redaction", () => {
     const cookies = refreshCookieFor(refreshToken)
 
     await context.authServer.handler(
-      request("GET", "/api/auth/user", { cookies })
-    )
-    await context.authServer.handler(
-      request("GET", "/api/auth/sessions", { cookies })
+      request("POST", "/api/auth/user", {
+        cookies,
+        token,
+        body: { name: "Ada" }
+      })
     )
     await context.authServer.handler(request("POST", "/api/auth/sign-in/guest"))
     await context.authServer.handler(
@@ -192,7 +193,9 @@ describe("logging redaction", () => {
         body: { email: "ada@example.com" }
       })
     )
-    await context.authServer.handler(request("GET", "/api/auth/user"))
+    await context.authServer.handler(
+      request("POST", "/api/auth/user", { body: { name: "Ada" } })
+    )
     await settle()
 
     expect(context.logCalls).toHaveLength(0)

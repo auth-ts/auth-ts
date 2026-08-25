@@ -41,21 +41,23 @@ every tab focus. A `baseURL` on another origin is the exception: the hint only
 reaches a sibling host when the browser accepts the domain they share, so there
 the client asks and reads the answer.
 
-`getUser()` returns the signed-in user, or `null`, and **always reads the
-server**. There is no cache behind it on purpose: a name or avatar changed in
-another tab, on another device, or by anything other than this client has to
-arrive somehow, and deciding when to ask again is yours to make. When it has to
-refresh anyway — a page load, a fresh tab — the user comes off the refresh, so a
-cold read costs one request rather than two.
+`refresh()` exchanges the refresh cookie for a token now and hands back
+`{ token, user }`, or `null` when nobody is signed in. It is the cheapest way to
+learn who is here: `GET /token` reads that row to mint, so the user arrives with
+the token and a cold boot costs one request. Unlike `getToken()` it always asks,
+ignoring whatever is in memory — a reload, not a read.
+
+It is not how you keep a name on screen current. That row is yours: query
+`users` through your data plane, where a rename in another tab arrives without a
+token being reminted. See [building an account
+page](/docs/guides/account-page).
 
 `null` means the server said the session is gone, and the stored token is dropped
 with it. Every other failure throws — a 502 from a proxy is not a statement about
 whether anyone is signed in.
 
-`getSession()` returns the session this browser is on, confirmed live, with the
-`createdAt` a freshness check reads. To merely know *which* session this is,
-there is no need to ask: the token names it, and `decodeToken(token)?.claims.sid`
-costs no request.
+Which session this browser is on needs no request at all: the token names it, and
+`decodeToken(token)?.claims.sid` reads it locally.
 
 The client keeps no user state at all. No mirror, no `localStorage`, no cross-tab
 listener. Caching, persistence, retry, and refetch-on-focus are what a query
@@ -131,7 +133,7 @@ genuinely gone.
 
 The client's own methods are the other side of this. They need a credential
 rather than an answer, so a call made without a session throws
-`unauthenticated` — `getUser()` and `signOut()` excepted, which resolve to
+`unauthenticated` — `refresh()` and `signOut()` excepted, which resolve to
 `null` because "nobody" is a real answer to what they ask.
 
 ## React
@@ -139,17 +141,23 @@ rather than an answer, so a call made without a session throws
 Nothing bridges into your cache, so the query is the only source of truth:
 
 ```tsx
-export function useUser() {
+export function useToken() {
   return useQuery({
-    queryKey: ["session"],
-    queryFn: authClient.getUser,
+    queryKey: ["token"],
+    queryFn: authClient.getToken,
     refetchOnWindowFocus: true,
     staleTime: 60_000
   })
 }
 ```
 
-`data` is the user, or `null`. A device list tells which entry is this device
+`data` is the token, or `null` when nobody is signed in — which is also the
+answer to "is anyone here". The user is a row in *your* table, so it is read the
+way every other row is; see [Reading the user from your own
+database](#reading-the-user-from-your-own-database) below, and [building an
+account page](/docs/guides/account-page) for the rest of the screen.
+
+A device list tells which entry is this device
 by comparing each row's `id` to the token's `sid` — the list does not carry a
 flag saying so, and the token is already in hand:
 
@@ -316,8 +324,11 @@ keeping. It returns a live access token for one connected account, refreshing it
 server-side first when the stored one is spent:
 
 ```ts
-const identities = await authClient.listIdentities()
-const google = identities.find((identity) => identity.provider === "google")
+const { data: google } = await postgrest
+  .from("identities")
+  .select()
+  .eq("provider", "google")
+  .single()
 
 const { token } = await authClient.getProviderToken({ id: google.id })
 const events = await fetch(
@@ -330,9 +341,12 @@ Ask for it per use and hold it in a variable — never in storage. It expires, a
 it belongs to a service this library does not control. The refresh token behind
 it never leaves your server.
 
-Everything here is addressed by the identity's `id`, not by provider name,
-because one account can have two of the same provider connected — a personal and
-a work Google. `disconnectIdentity({ id })` takes the same address.
+The identity comes from your own `identities` table — there is nothing to strip,
+since the provider tokens live in `identitySecrets`, which nothing grants. It is
+addressed by `id` rather than by provider name, because one account can have two
+of the same provider connected — a personal and a work Google. Disconnecting is
+a delete of that row; see [building an account
+page](/docs/guides/account-page).
 
 Catch `providerReconnectRequired`: the grant is gone — revoked at the provider,
 expired, or never durable — and only sending them through `connectProvider` again

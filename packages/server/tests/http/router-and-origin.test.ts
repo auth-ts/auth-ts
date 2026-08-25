@@ -6,6 +6,7 @@ describe("matchRoute", () => {
   it("dispatches every documented endpoint through the catch-all", async () => {
     const { authServer } = await createTestServer({
       guest: true,
+      multiUser: true,
       jwks: { json: { keys: [] } }
     })
 
@@ -14,16 +15,14 @@ describe("matchRoute", () => {
       ["POST", "/api/auth/sign-in/send-code"],
       ["GET", "/api/auth/token"],
       ["POST", "/api/auth/sign-in/code"],
-      ["POST", "/api/auth/user"],
       ["POST", "/api/auth/sign-out"],
-      ["GET", "/api/auth/user"],
       ["POST", "/api/auth/user"],
       ["DELETE", "/api/auth/user"],
       ["POST", "/api/auth/user/send-delete-code"],
-      ["GET", "/api/auth/sessions"],
-      ["DELETE", "/api/auth/sessions/abc"],
+      ["GET", "/api/auth/users"],
+      ["POST", "/api/auth/users/switch"],
       ["POST", "/api/auth/sign-in/guest"],
-      ["GET", "/api/auth/identities"],
+      ["GET", "/api/auth/identities/abc/token"],
       ["GET", "/api/auth/jwks"]
     ]
 
@@ -126,7 +125,7 @@ describe("matchRoute", () => {
 
     // %2F must not split into two segments, or an id could smuggle a path.
     const response = await authServer.handler(
-      request("DELETE", "/api/auth/sessions/abc%2Fdef")
+      request("GET", "/api/auth/identities/abc%2Fdef/token")
     )
     expect(response.status).toBe(401)
   })
@@ -139,14 +138,14 @@ describe("matchRoute", () => {
 
     for (const path of [
       "/api/auth/%zz",
-      "/api/auth/sessions/%",
+      "/api/auth/identities/%/token",
       "/api/auth/%E0%A4%A"
     ]) {
       const viaCatchAll = await authServer.handler(request("GET", path))
       expect(viaCatchAll.status, `catch-all ${path}`).toBe(404)
 
-      const viaRoute = await authServer.handlers.revokeSession(
-        request("DELETE", path)
+      const viaRoute = await authServer.handlers.getProviderToken(
+        request("GET", path)
       )
       expect(viaRoute.status, `per-route ${path}`).toBeLessThan(500)
     }

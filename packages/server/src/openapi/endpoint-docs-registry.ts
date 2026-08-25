@@ -1,21 +1,16 @@
 import type { EndpointRegistry } from "../core/endpoint-registry"
 import { getDiscoveryDocs } from "../endpoints/.well-known/openid-configuration"
 import { callbackProviderDocs } from "../endpoints/callback/$provider"
-import { listIdentitiesDocs } from "../endpoints/identities"
-import { disconnectIdentityDocs } from "../endpoints/identities/$id"
 import { getProviderTokenDocs } from "../endpoints/identities/$id/token"
 import { connectProviderDocs } from "../endpoints/identities/connect/$provider"
 import { getJwksDocs } from "../endpoints/jwks"
-import { getSessionDocs } from "../endpoints/session"
-import { listSessionsDocs } from "../endpoints/sessions"
-import { revokeSessionDocs } from "../endpoints/sessions/$id"
 import { signInWithCodeDocs } from "../endpoints/sign-in/code"
 import { signInAsGuestDocs } from "../endpoints/sign-in/guest"
 import { signInWithProviderDocs } from "../endpoints/sign-in/provider/$provider"
 import { sendSignInCodeDocs } from "../endpoints/sign-in/send-code"
 import { signOutDocs } from "../endpoints/sign-out"
 import { getTokenDocs } from "../endpoints/token"
-import { deleteUserDocs, getUserDocs, updateUserDocs } from "../endpoints/user"
+import { deleteUserDocs, updateUserDocs } from "../endpoints/user"
 import { sendDeleteUserCodeDocs } from "../endpoints/user/send-delete-code"
 import { listUsersDocs } from "../endpoints/users"
 import { switchUserDocs } from "../endpoints/users/switch"
@@ -55,21 +50,15 @@ export const endpointDocs: {
   getToken: getTokenDocs,
   signInWithCode: signInWithCodeDocs,
   signOut: signOutDocs,
-  getSession: getSessionDocs,
-  getUser: getUserDocs,
   updateUser: updateUserDocs,
   deleteUser: deleteUserDocs,
   sendDeleteUserCode: sendDeleteUserCodeDocs,
-  listSessions: listSessionsDocs,
-  revokeSession: revokeSessionDocs,
   listUsers: listUsersDocs,
   switchUser: switchUserDocs,
   signInAsGuest: signInAsGuestDocs,
   signInWithProvider: signInWithProviderDocs,
   callbackProvider: callbackProviderDocs,
   connectProvider: connectProviderDocs,
-  listIdentities: listIdentitiesDocs,
-  disconnectIdentity: disconnectIdentityDocs,
   getProviderToken: getProviderTokenDocs,
   getJwks: getJwksDocs,
   getDiscovery: getDiscoveryDocs,
@@ -90,21 +79,15 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   getToken: "Get an access token",
   signInWithCode: "Sign in with a code",
   signOut: "Sign out",
-  getSession: "Get the current session",
-  getUser: "Get the current user",
   updateUser: "Update the current user",
   deleteUser: "Delete the current user",
   sendDeleteUserCode: "Send a delete user code",
-  listSessions: "List the active sessions",
-  revokeSession: "Revoke a session",
   listUsers: "List the signed in users",
   switchUser: "Switch to another signed in user",
   signInAsGuest: "Sign in as a guest",
   signInWithProvider: "Sign in with a provider",
   callbackProvider: "Provider callback",
   connectProvider: "Connect a provider",
-  listIdentities: "List the connected providers",
-  disconnectIdentity: "Disconnect a provider",
   getProviderToken: "Get an access token for a provider",
   getJwks: "Get the public key set",
   getDiscovery: "Get the OIDC discovery document",

@@ -1,48 +1,9 @@
-import type {
-  AuthIdentity,
-  AuthUser,
-  ProviderTokenResult
-} from "@auth-ts/server"
+import type { AuthUser, ProviderTokenResult } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
-
-/** Lists the providers linked to this user. */
-export function createListIdentities(internals: AuthClientInternals) {
-  return async function listIdentities(): Promise<AuthIdentity[]> {
-    return internals.fetchJson<AuthIdentity[]>({
-      method: "GET",
-      path: "/identities",
-      authenticated: true
-    })
-  }
-}
-
-/** Input for unlinking one connected account. */
-export interface DisconnectIdentityInput {
-  /** The identity's `id`, from `authClient.listIdentities`. */
-  id: string
-}
-
-/**
- * Unlinks one connected account.
- *
- * By identity, not by provider: someone may have two Google accounts connected,
- * and disconnecting "Google" would take both.
- */
-export function createDisconnectIdentity(internals: AuthClientInternals) {
-  return async function disconnectIdentity(
-    input: DisconnectIdentityInput
-  ): Promise<void> {
-    await internals.fetchJson({
-      method: "DELETE",
-      path: `/identities/${encodeURIComponent(input.id)}`,
-      authenticated: true
-    })
-  }
-}
 
 /** Input for reading a connected account's access token. */
 export interface GetProviderTokenInput {
-  /** The identity's `id`, from `authClient.listIdentities`. */
+  /** The identity's `id`, from your own `identities` table. */
   id: string
 }
 

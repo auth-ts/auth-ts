@@ -1,22 +1,17 @@
 import { getDiscovery } from "../endpoints/.well-known/openid-configuration"
 import { callbackProvider } from "../endpoints/callback/$provider"
-import { listIdentities } from "../endpoints/identities"
-import { disconnectIdentity } from "../endpoints/identities/$id"
 import { getProviderToken } from "../endpoints/identities/$id/token"
 import { connectProvider } from "../endpoints/identities/connect/$provider"
 import { getJwks } from "../endpoints/jwks"
 import { getOpenAPIDocument } from "../endpoints/openapi"
 import { getReference } from "../endpoints/reference"
-import { getSession } from "../endpoints/session"
-import { listSessions } from "../endpoints/sessions"
-import { revokeSession } from "../endpoints/sessions/$id"
 import { signInWithCode } from "../endpoints/sign-in/code"
 import { signInAsGuest } from "../endpoints/sign-in/guest"
 import { signInWithProvider } from "../endpoints/sign-in/provider/$provider"
 import { sendSignInCode } from "../endpoints/sign-in/send-code"
 import { signOut } from "../endpoints/sign-out"
 import { getToken } from "../endpoints/token"
-import { deleteUser, getUser, updateUser } from "../endpoints/user"
+import { deleteUser, updateUser } from "../endpoints/user"
 import { sendDeleteUserCode } from "../endpoints/user/send-delete-code"
 import { listUsers } from "../endpoints/users"
 import { switchUser } from "../endpoints/users/switch"
@@ -37,21 +32,15 @@ export const endpointRegistry = {
   getToken,
   signInWithCode,
   signOut,
-  getSession,
-  getUser,
   updateUser,
   deleteUser,
   sendDeleteUserCode,
-  listSessions,
-  revokeSession,
   listUsers,
   switchUser,
   signInAsGuest,
   signInWithProvider,
   callbackProvider,
   connectProvider,
-  listIdentities,
-  disconnectIdentity,
   getProviderToken,
   getJwks,
   getDiscovery,
