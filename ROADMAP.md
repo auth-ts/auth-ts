@@ -319,8 +319,8 @@ dependency. It is a strict improvement, just not a necessary one.
 
 ### Single-session-per-user enforcement
 
-"Only one device at a time" is a policy some products want. The devices list and
-`DELETE /sessions/:id` already give you the pieces; the missing part is a config
+"Only one device at a time" is a policy some products want. Reading and deleting
+`sessions` rows already gives you the pieces; the missing part is a config
 flag that revokes on sign-in.
 
 ### Lifecycle webhooks
@@ -391,7 +391,7 @@ implement yourself owes you a way to check your work.
 ### Rotating the refresh token on every use
 
 Refresh tokens themselves are core to the design — stable per session, revoked
-through `DELETE /sessions/:id`. Only the rotate-on-every-refresh pattern is excluded.
+by deleting the session row. Only the rotate-on-every-refresh pattern is excluded.
 
 The cookie is `HttpOnly`, host-only, and never crosses an origin, so rotation
 mostly defends against theft requiring a compromise that defeats rotation anyway.
