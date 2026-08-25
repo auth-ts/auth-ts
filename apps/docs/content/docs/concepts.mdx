@@ -92,6 +92,36 @@ insert; promoting someone to `admin` is your own SQL, so no endpoint can do it.
 The payload is readable by anyone holding the token and is shipped to your
 database on every query. Nothing secret belongs in it.
 
+### Adding your own claims
+
+`jwt.claims` is merged into every token. Give it an object for a fixed set, or
+a function to derive them per user — which is how something like an
+organisation list gets in:
+
+```ts
+createAuthServer({
+  jwt: {
+    claims: async (user) => ({
+      role: "authenticated",
+      organizationIds: await organizationIdsFor(user.id)
+    })
+  },
+  ...
+})
+```
+
+It runs once per mint, not once per request, and receives the session as its
+second argument.
+
+Know what a claim costs before you reach for one. It is frozen for `jwt.ttl`,
+so a membership granted or revoked in the meantime does not reach a token
+already issued — harmless where a policy reads it as a hint, a window where a
+policy authorizes on it. A policy that reads `sub` and joins your membership
+table is always current, and the join is the price. Put the list in the token
+when the reader cannot join at all, as a change-feed fan-out cannot.
+
+`sub`, `iat`, and `exp` are refused either way — the signer owns those.
+
 ## Where authorization happens
 
 In the database. The client's user object is a **render hint** — it decides

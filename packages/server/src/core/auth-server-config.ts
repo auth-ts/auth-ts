@@ -11,6 +11,7 @@ import type {
   AuthServerOptions,
   EmailOptions,
   JwksOptions,
+  JwtClaims,
   JwtOptions,
   ProviderCredentials,
   ProvidersOptions,
@@ -156,24 +157,35 @@ function requireLifetime(value: Duration, optionName: string) {
 const SERVER_OWNED_CLAIMS = ["sub", "iat", "exp"] as const
 
 /**
- * Applies the default claims and refuses any that `signToken` owns.
+ * Refuses claims that `signToken` owns.
  *
  * Configured claims sit under the caller's, but `sub`, `iat`, and `exp` are
  * not the caller's either — they are set by the signer from `userId`, the
  * clock, and `ttl`. A configured `sub` in particular would become the subject
  * of every token minted without a `userId`, which is a service token that
  * quietly claims to be a user.
+ *
+ * Exported because a `jwt.claims` function cannot be inspected at construction,
+ * so the same rule has to be applied to whatever it returns.
  */
-function requireClaims(claims: Record<string, unknown> | undefined) {
-  const resolved = claims ?? { role: "authenticated" }
+export function requireOwnedClaimsAbsent(claims: Record<string, unknown>) {
   for (const owned of SERVER_OWNED_CLAIMS) {
-    if (owned in resolved) {
+    if (owned in claims) {
       throw new AuthConfigError(
         `jwt.claims cannot set "${owned}": it is always derived by the signer (${SERVER_OWNED_CLAIMS.join(", ")} are server-owned).`
       )
     }
   }
-  return resolved
+  return claims
+}
+
+/** Applies the default claims, checking the object form while it can. */
+function requireClaims(claims: JwtClaims | undefined): JwtClaims {
+  if (claims === undefined) return { role: "authenticated" }
+
+  return typeof claims === "function"
+    ? claims
+    : requireOwnedClaimsAbsent(claims)
 }
 
 /**

@@ -3,7 +3,13 @@ import type { JwtAlgorithm } from "../jwt/import-signing-key"
 import type { IpAddressOptions } from "../lib/ip-address"
 import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
-import type { AdditionalFieldsSchema, AuthDB, AuthTable } from "./auth-db"
+import type {
+  AdditionalFieldsSchema,
+  AuthDB,
+  AuthSession,
+  AuthTable,
+  AuthUser
+} from "./auth-db"
 
 // The shapes `createAuthServer` accepts — and nothing else. Options are the
 // partial, human-written input; what they resolve to is `AuthServerConfig`, in
@@ -75,6 +81,44 @@ export interface ProvidersOptions {
   google?: ProviderCredentials
 }
 
+/**
+ * The claims merged into every token, as a fixed set or as a function of who
+ * the token is for.
+ *
+ * `sub`, `iat`, and `exp` are refused either way: the subject is always the
+ * `userId` a token is minted for, and the timestamps always come from the clock
+ * and `ttl`. A default for any of them would be either ignored or a way to mint
+ * tokens for someone else. The object form is checked when the server is
+ * constructed; a function is checked on each token it returns.
+ *
+ * The function runs on every mint — one per `GET /token`, not per request — so
+ * a query belongs here only if the claim is worth a round trip. It is the way
+ * to put something like an organisation list in the token:
+ *
+ * ```ts
+ * claims: async (user) => ({
+ *   role: "authenticated",
+ *   organizationIds: await organizationIdsFor(user.id)
+ * })
+ * ```
+ *
+ * Note what that costs. A claim is frozen for `jwt.ttl`, so a membership
+ * granted or revoked in the meantime does not reach a token already issued —
+ * fine for a policy that reads it as a hint, a security window for one that
+ * authorizes on it. A policy that reads `sub` and joins your membership table
+ * is always current, at the price of the join; put the list in the token when
+ * the reader cannot join, as a log-driven fan-out cannot.
+ *
+ * Applies to tokens minted for a session. {@link AuthServer.signToken} has no
+ * user to pass, so a function form contributes nothing to the tokens it signs.
+ */
+export type JwtClaims =
+  | Record<string, unknown>
+  | ((
+      user: AuthUser,
+      session: AuthSession
+    ) => Record<string, unknown> | Promise<Record<string, unknown>>)
+
 /** Token signing and publication. */
 export interface JwtOptions {
   /**
@@ -89,14 +133,9 @@ export interface JwtOptions {
   /**
    * Merged into every token, under the caller's own claims.
    *
-   * `sub`, `iat`, and `exp` are refused here: the subject is always the
-   * `userId` a token is minted for, and the timestamps always come from the
-   * clock and `ttl`. A default for any of them would be either ignored or a
-   * way to mint tokens for someone else, and neither is worth allowing.
-   *
    * @default { role: "authenticated" }
    */
-  claims?: Record<string, unknown>
+  claims?: JwtClaims
   /**
    * Sets `aud` and makes verification enforce it.
    *

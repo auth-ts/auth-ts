@@ -349,6 +349,17 @@ describe("construction failures", () => {
     ).toEqual({ role: "app_user", tier: 2 })
   })
 
+  it("takes a claims function as-is, since construction cannot inspect it", () => {
+    const claims = () => ({ role: "authenticated" })
+
+    expect(
+      createAuthServer({
+        ...baseOptions(),
+        jwt: { ...baseOptions().jwt, claims }
+      }).config.jwt.claims
+    ).toBe(claims)
+  })
+
   it("rejects a trustedProxies count that could never address an entry", () => {
     // Each of these would not error at request time — getIpAddress would index
     // the chain at a position that does not exist, derive nothing, and every

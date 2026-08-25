@@ -1,4 +1,5 @@
-import type { AuthUser } from "../core/auth-db"
+import type { AuthSession, AuthUser } from "../core/auth-db"
+import { requireOwnedClaimsAbsent } from "../core/auth-server-config"
 import type { AuthServerInternals } from "../core/auth-server-internals"
 import { signToken } from "../jwt/sign-token"
 import { randomBytesBase64url } from "../lib/generate-random"
@@ -97,7 +98,7 @@ export async function issueSession(
   if (superseded.size > 0) internals.log.debug("superseded sessions deleted")
 
   const responseHeaders = new Headers()
-  const token = await mintAccessToken(internals, user, session.id)
+  const token = await mintAccessToken(internals, user, session)
   internals.log.debug("session issued", { userType: user.type })
 
   const secure = shouldUseSecureCookies(requestURL)
@@ -138,14 +139,23 @@ export function accessTokenClaims(user: AuthUser, sessionId: string) {
   return { userId: user.id, type: user.type, sid: sessionId }
 }
 
-/** Signs an access token carrying {@link accessTokenClaims}. */
+/**
+ * Signs an access token carrying {@link accessTokenClaims}.
+ *
+ * Takes the session row rather than its id because `jwt.claims` may be a
+ * function, and that function is given both halves of what the token is for.
+ */
 export async function mintAccessToken(
   internals: AuthServerInternals,
   user: AuthUser,
-  sessionId: string
+  session: AuthSession
 ) {
   const { config } = internals
   const { signingKey, kid } = await internals.keys()
+  const claims =
+    typeof config.jwt.claims === "function"
+      ? requireOwnedClaimsAbsent(await config.jwt.claims(user, session))
+      : config.jwt.claims
 
   return signToken(
     {
@@ -153,10 +163,10 @@ export async function mintAccessToken(
       algorithm: config.jwt.alg,
       kid,
       ttl: config.jwt.ttl,
-      claims: config.jwt.claims,
+      claims,
       ...(config.issuer ? { issuer: config.issuer } : {}),
       ...(config.jwt.audience ? { audience: config.jwt.audience } : {})
     },
-    accessTokenClaims(user, sessionId)
+    accessTokenClaims(user, session.id)
   )
 }

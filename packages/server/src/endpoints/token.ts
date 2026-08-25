@@ -89,7 +89,7 @@ export const getToken = defineEndpoint({
     const token = await mintAccessToken(
       internals,
       resolved.user,
-      resolved.session.id
+      resolved.session
     )
 
     const headers = new Headers()

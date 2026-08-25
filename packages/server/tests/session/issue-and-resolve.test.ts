@@ -173,6 +173,55 @@ describe("issueSession", () => {
     expect(claims?.role).toBe("authenticated")
   })
 
+  it("derives claims per token when jwt.claims is a function", async () => {
+    const seen: Array<{ userId: string; sessionId: string }> = []
+    const { internals, db } = await createTestInternals({
+      jwt: {
+        claims: (user, session) => {
+          seen.push({ userId: user.id, sessionId: session.id })
+
+          return { role: "authenticated", organizationIds: [`org-${user.id}`] }
+        }
+      }
+    })
+    const user = await insertUser(db, { email: "ada@example.com" })
+
+    const issued = await issueSession(internals, {
+      user,
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+    const { verificationKeys } = await internals.keys()
+    const claims = await verifyToken(
+      { keys: verificationKeys, algorithm: "RS256" },
+      issued.token
+    )
+
+    expect(claims?.organizationIds).toEqual([`org-${user.id}`])
+    expect(claims?.role).toBe("authenticated")
+    // Both halves of what the token is for, so a claim can be derived from
+    // either — the session it was minted from included.
+    const session = await selectRow(db, "sessions", { userId: user.id })
+    expect(seen).toEqual([
+      { userId: user.id, sessionId: required(session, "session").id }
+    ])
+  })
+
+  it("refuses a server-owned claim the function returned, not just a configured one", async () => {
+    const { internals, db } = await createTestInternals({
+      jwt: { claims: () => ({ sub: "somebody-else" }) }
+    })
+    const user = await insertUser(db, { email: "ada@example.com" })
+
+    await expect(
+      issueSession(internals, {
+        user,
+        headers: new Headers(),
+        requestURL: REQUEST_URL
+      })
+    ).rejects.toThrow(/jwt\.claims.*"sub"/)
+  })
+
   it("never puts primaryUserId in the token", async () => {
     const { internals, db } = await createTestInternals()
     const guest = await insertUser(db, { type: "guest" })

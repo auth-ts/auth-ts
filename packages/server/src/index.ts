@@ -33,6 +33,7 @@ export type {
   CookieOptions,
   EmailOptions,
   JwksOptions,
+  JwtClaims,
   JwtOptions,
   ProviderCredentials,
   ProvidersOptions,

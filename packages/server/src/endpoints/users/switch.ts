@@ -87,7 +87,7 @@ export const switchUser = defineEndpoint({
     const user = await selectOne(internals, "users", { id: input.userId })
     if (!user) throw notFound()
 
-    const token = await mintAccessToken(internals, user, resolved.session.id)
+    const token = await mintAccessToken(internals, user, resolved.session)
     const responseHeaders = new Headers()
     // Re-sent unchanged: the value is the same cookie the browser already has,
     // and writing it is how the hint comes to name this user.

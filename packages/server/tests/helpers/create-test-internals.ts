@@ -69,13 +69,15 @@ export async function createTestInternals(
         })
       }
     },
-    jwt: { privateKey: privateKeyPem },
     secret: "test-server-secret-long-enough-to-pass",
     logLevel: overrides.logLevel ?? "debug",
     logger: (level, message, data) => {
       logCalls.push({ level, message, ...(data ? { data } : {}) })
     },
     ...overrides,
+    // Merged rather than replaced, so a test overriding one jwt option does not
+    // have to know it is also holding the signing key.
+    jwt: { privateKey: privateKeyPem, ...overrides.jwt },
     ...(overrides.sms
       ? {
           sms: {

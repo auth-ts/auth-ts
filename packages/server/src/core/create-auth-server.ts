@@ -188,7 +188,12 @@ export function createAuthServer<
           algorithm: resolved.jwt.alg,
           kid,
           ttl: resolved.jwt.ttl,
-          claims: resolved.jwt.claims,
+          // A `jwt.claims` function is given the user and session a token is
+          // for, and this signs tokens that are for neither.
+          claims:
+            typeof resolved.jwt.claims === "function"
+              ? {}
+              : resolved.jwt.claims,
           ...(resolved.issuer ? { issuer: resolved.issuer } : {}),
           ...(resolved.jwt.audience ? { audience: resolved.jwt.audience } : {})
         },
