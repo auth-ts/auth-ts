@@ -576,6 +576,26 @@ describe("account deletion", () => {
     expect(context.db.users()).toHaveLength(0)
   })
 
+  it("sends nothing for a token whose session is already revoked", async () => {
+    const context = await createTestServer({
+      user: { deleteFreshWindow: "0s" }
+    })
+    const { refreshToken, token } = await signIn(context)
+    const cookies = refreshCookieFor(refreshToken)
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", { cookies, token })
+    )
+    const before = context.sentCodes.length
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/user/send-delete-code", { token })
+    )
+
+    expect(response.status).toBe(401)
+    expect(context.sentCodes.length).toBe(before)
+  })
+
   it("refuses a sign-in code as a deletion code", async () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "0s" }

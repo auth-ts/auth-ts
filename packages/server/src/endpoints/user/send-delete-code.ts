@@ -43,10 +43,14 @@ export const sendDeleteUserCode = defineEndpoint({
     const headers = input.headers ?? new Headers()
     const caller = await authenticate(internals, input)
     const user = await selectOne(internals, "users", { id: caller.userId })
+    const session = await selectOne(internals, "sessions", {
+      id: caller.sessionId
+    })
     // Core deletes a user's sessions before the user, so a token naming one
     // that is gone means a delete failed part-way. Refuse it rather than trust
-    // it.
-    if (!user) throw unauthenticated()
+    // it. A session revoked since the token was minted refuses too, or a
+    // signed-out token would keep putting codes in flight.
+    if (!user || !session) throw unauthenticated()
 
     const identifier = user.email
       ? ({ kind: "email", value: user.email } as const)
