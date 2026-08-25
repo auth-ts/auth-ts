@@ -91,10 +91,13 @@ describe("the table types the four functions take", () => {
 
   it("queries a declared field at its declared type", () => {
     expectTypeOf(usersWhere({ plan: 3 }).plan).toEqualTypeOf<
-      number | null | undefined
+      number | undefined
     >()
     // Core fields query the same way.
     usersWhere({ email: "ada@example.com", type: "guest" })
+
+    // @ts-expect-error a nullable column is still never queried for null
+    usersWhere({ email: null })
 
     // @ts-expect-error plan is declared a number, so a string cannot match it
     usersWhere({ plan: "pro" })

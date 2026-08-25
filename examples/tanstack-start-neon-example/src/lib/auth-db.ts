@@ -6,7 +6,7 @@ import type {
   AuthWhere
 } from "@auth-ts/server"
 import { defineAuthDB } from "@auth-ts/server"
-import { and, asc, desc, eq, getColumns, gt, is, isNull, lt } from "drizzle-orm"
+import { and, asc, desc, eq, getColumns, gt, is, lt } from "drizzle-orm"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import { PgTable } from "drizzle-orm/pg-core"
 
@@ -31,8 +31,7 @@ const buildWhere = (table: AuthTable, where: AuthWhere) => {
             value.lt === undefined ? undefined : lt(columns[name], value.lt),
             value.gt === undefined ? undefined : gt(columns[name], value.gt)
           ]
-        : // `eq(column, null)` renders `= NULL`, which SQL never matches.
-          [value === null ? isNull(columns[name]) : eq(columns[name], value)]
+        : [eq(columns[name], value)]
     )
   )
 }

@@ -109,11 +109,12 @@ index, because the missing constraint only shows under a race.
   whether it may write, then writing. The type confines it to `expiresAt`, so
   that is the only column your implementation has to handle both ways.
 
-  A `null` value means the column stores null — `IS NULL` in SQL, never
-  `= NULL`, which matches nothing. Every nullable column the library names can
-  be asked for that way, so an implementation that renders it as `= NULL`
-  silently matches no rows rather than failing. The conformance suite checks
-  this.
+  **`null` is never a value here**, even though the columns are nullable, so
+  your implementation needs no `IS NULL` branch. That is deliberate rather than
+  an omission: the library looks accounts up by an identifier, and an identifier
+  that arrived null would otherwise ask for "the first row that has none" —
+  some arbitrary guest. Excluding it from the type makes that a compile error in
+  the library instead of a rule its own call sites have to remember.
 - **`update` returns the rows it wrote**, as `delete` does. That is the other
   half of the single round trip: the library asks for a session that has not
   expired and learns from what comes back whether there was one.
@@ -375,7 +376,7 @@ what it removed. Neither is observable against a mock, because a mock agrees
 with whatever you assumed.
 
 The checks cover `insert` returning the stored row with its id, `where` matching
-by equality and by an expiry range, `update` returning what it changed, equality `where`
+by equality and by an expiry range, `update` returning what it changed, `where` matching
 on one column and on several, `limit`, `orderBy` in both directions,
 `update` applying only what it was given, `delete` returning what it removed and
 matching on every column, a duplicate insert being refused for each unique set

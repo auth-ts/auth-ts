@@ -275,14 +275,21 @@ export interface AuthRange<V> {
  * a range is a non-null object that is not a `Date`. So an implementation reads
  * `value instanceof Date || typeof value !== "object"` as "equality" and
  * everything else as a range, and only ever sees the second case on `expiresAt`.
+ *
+ * **`null` is not a value here**, though the columns are nullable. Core looks
+ * accounts up by an identifier, and an identifier that came back null would
+ * otherwise compile into a query matching the first row that has none — some
+ * arbitrary guest. Excluding it makes that a type error at the call site
+ * instead of a check somebody has to remember, and leaves every implementation
+ * with one comparison rather than an `IS NULL` branch it will never reach.
  */
 export type AuthWhere<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
 > = {
   [K in keyof AuthRow<S, T>]?: K extends "expiresAt"
-    ? AuthRow<S, T>[K] | AuthRange<AuthRow<S, T>[K]>
-    : AuthRow<S, T>[K]
+    ? NonNullable<AuthRow<S, T>[K]> | AuthRange<NonNullable<AuthRow<S, T>[K]>>
+    : NonNullable<AuthRow<S, T>[K]>
 }
 
 /** Sort direction, per {@link AuthOrderBy}. */

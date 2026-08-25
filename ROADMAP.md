@@ -213,7 +213,7 @@ removed, and neither is observable against a mock. It deviates from the earlier
 `testAuthDB(() => authDB)` sketch for that reason: a function that registers
 tests has to import a runner.
 
-Verified against the reference application's Neon database, all eleven checks
+Verified against the reference application's Neon database, every check
 passing, and the library's own suite runs them against `createMemoryDb` plus a
 set of deliberately broken stores — a `delete` that returns nothing, a `where`
 that matches on any column rather than all of them, a `select` that ignores
