@@ -10,14 +10,14 @@ import { issueSession } from "../../session/issue-session"
 import { readRefreshToken } from "../../session/resolve-session"
 
 /** Body accepted by `POST /sign-in/guest`. */
-export interface SignInGuestInput {
+export interface SignInAsGuestInput {
   additionalFields?: Record<string, unknown>
   headers?: Headers
   requestURL?: string
 }
 
 /** How `POST /sign-in/guest` appears in the OpenAPI document. */
-export const signInAsGuestDocs: EndpointDocs<SignInGuestInput> = {
+export const signInAsGuestDocs: EndpointDocs<SignInAsGuestInput> = {
   description: "Fails if this browser is already signed in.",
   tag: "Sign in",
   auth: "none",
@@ -50,12 +50,12 @@ export const signInAsGuestDocs: EndpointDocs<SignInGuestInput> = {
 export const signInAsGuest = defineEndpoint({
   method: "POST",
   path: "/sign-in/guest",
-  parse: async ({ request }): Promise<SignInGuestInput> => {
-    const body = (await request.json().catch(() => ({}))) as SignInGuestInput
+  parse: async ({ request }): Promise<SignInAsGuestInput> => {
+    const body = (await request.json().catch(() => ({}))) as SignInAsGuestInput
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },
-  run: async (internals, input: SignInGuestInput) => {
+  run: async (internals, input: SignInAsGuestInput) => {
     const { config } = internals
     // Not merely disabled: absent. An endpoint that is off should look like an
     // endpoint that does not exist.

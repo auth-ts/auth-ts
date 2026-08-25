@@ -10,12 +10,12 @@ import type { CallerInput } from "../../../session/authenticate"
 import { authenticate } from "../../../session/authenticate"
 import type {
   AuthorizeURLResult,
-  SignInProviderInput
+  SignInWithProviderInput
 } from "../../sign-in/provider/$provider"
 
 /** Input for connecting a provider. */
 export interface ConnectProviderInput
-  extends SignInProviderInput,
+  extends SignInWithProviderInput,
     CallerInput {}
 
 /** How `POST /identities/connect/$provider` appears in the OpenAPI document. */

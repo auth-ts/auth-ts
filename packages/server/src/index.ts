@@ -56,11 +56,11 @@ export type {
   ProviderTokenResult
 } from "./endpoints/identities/$id/token"
 export type { ConnectProviderInput } from "./endpoints/identities/connect/$provider"
-export type { SignInCodeInput } from "./endpoints/sign-in/code"
-export type { SignInGuestInput } from "./endpoints/sign-in/guest"
+export type { SignInWithCodeInput } from "./endpoints/sign-in/code"
+export type { SignInAsGuestInput } from "./endpoints/sign-in/guest"
 export type {
   AuthorizeURLResult,
-  SignInProviderInput
+  SignInWithProviderInput
 } from "./endpoints/sign-in/provider/$provider"
 export type { SendSignInCodeInput } from "./endpoints/sign-in/send-code"
 export type {

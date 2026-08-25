@@ -23,7 +23,7 @@ export type {
 export type { OAuthNavigationInput } from "./methods/oauth"
 export type {
   SendSignInCodeInput,
-  SignInCodeInput,
-  SignInGuestInput,
-  SignInResult
+  SignInAsGuestInput,
+  SignInResult,
+  SignInWithCodeInput
 } from "./methods/sign-in"

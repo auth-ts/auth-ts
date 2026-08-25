@@ -10,7 +10,7 @@ import { createStateCookie } from "../../../oauth/state-cookie"
 import type { EndpointDocs } from "../../../openapi/endpoint-docs"
 
 /** Input for starting an OAuth sign-in. */
-export interface SignInProviderInput {
+export interface SignInWithProviderInput {
   provider: string
   /** Same-origin path to return to; anything else falls back to `/`. */
   redirect?: string
@@ -27,7 +27,7 @@ export interface AuthorizeURLResult {
 
 /** How `POST /sign-in/provider/$provider` appears in the OpenAPI document. */
 export const signInWithProviderDocs: EndpointDocs<
-  SignInProviderInput,
+  SignInWithProviderInput,
   "provider"
 > = {
   description: "Navigate to the url. Do not fetch it.",
@@ -90,9 +90,9 @@ export const signInWithProvider = defineEndpoint({
     request,
     params,
     internals
-  }): Promise<SignInProviderInput> => {
+  }): Promise<SignInWithProviderInput> => {
     const body = (await request.json().catch(() => ({}))) as Omit<
-      SignInProviderInput,
+      SignInWithProviderInput,
       "provider"
     >
 
@@ -109,7 +109,7 @@ export const signInWithProvider = defineEndpoint({
       requestURL: request.url
     }
   },
-  run: async (internals, input: SignInProviderInput) => {
+  run: async (internals, input: SignInWithProviderInput) => {
     const { config } = internals
     const configured = getProvider(config.providers, input.provider)
     if (!configured) throw notFound()

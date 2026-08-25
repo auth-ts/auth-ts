@@ -12,7 +12,7 @@ import type { IdentifierBody } from "../../verification-code/resolve-code-identi
 import { resolveCodeIdentifier } from "../../verification-code/resolve-code-identifier"
 
 /** Body accepted by `POST /sign-in/code`. */
-export interface SignInCodeInput extends IdentifierBody {
+export interface SignInWithCodeInput extends IdentifierBody {
   code: string
   /** Values for fields declared in `user.additionalFields`, applied on creation only. */
   additionalFields?: Record<string, unknown>
@@ -21,7 +21,7 @@ export interface SignInCodeInput extends IdentifierBody {
 }
 
 /** How `POST /sign-in/code` appears in the OpenAPI document. */
-export const signInWithCodeDocs: EndpointDocs<SignInCodeInput> = {
+export const signInWithCodeDocs: EndpointDocs<SignInWithCodeInput> = {
   description: "A failed request does not use up the code.",
   tag: "Sign in",
   auth: "none",
@@ -59,12 +59,12 @@ export const signInWithCodeDocs: EndpointDocs<SignInCodeInput> = {
 export const signInWithCode = defineEndpoint({
   method: "POST",
   path: "/sign-in/code",
-  parse: async ({ request }): Promise<SignInCodeInput> => {
-    const body = (await request.json().catch(() => ({}))) as SignInCodeInput
+  parse: async ({ request }): Promise<SignInWithCodeInput> => {
+    const body = (await request.json().catch(() => ({}))) as SignInWithCodeInput
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },
-  run: async (internals, input: SignInCodeInput) => {
+  run: async (internals, input: SignInWithCodeInput) => {
     const headers = input.headers ?? new Headers()
     const identifier = resolveCodeIdentifier(internals, input)
 

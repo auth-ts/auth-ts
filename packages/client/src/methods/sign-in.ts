@@ -7,7 +7,7 @@ export type SendSignInCodeInput =
   | { phoneNumber: string; email?: never }
 
 /** The identifier, the code, and any declared sign-up fields. */
-export type SignInCodeInput = SendSignInCodeInput & {
+export type SignInWithCodeInput = SendSignInCodeInput & {
   code: string
   /** Applied only if this verification creates the account. */
   additionalFields?: Record<string, string | number | boolean>
@@ -51,7 +51,7 @@ export function createSendSignInCode(internals: AuthClientInternals) {
  */
 export function createSignInWithCode(internals: AuthClientInternals) {
   return async function signInWithCode(
-    input: SignInCodeInput
+    input: SignInWithCodeInput
   ): Promise<SignInResult> {
     const result = await internals.fetchJson<SignInResult>({
       method: "POST",
@@ -65,7 +65,7 @@ export function createSignInWithCode(internals: AuthClientInternals) {
 }
 
 /** Input for anonymous sign-in. */
-export interface SignInGuestInput {
+export interface SignInAsGuestInput {
   additionalFields?: Record<string, string | number | boolean>
 }
 
@@ -78,7 +78,7 @@ export interface SignInGuestInput {
  */
 export function createSignInAsGuest(internals: AuthClientInternals) {
   return async function signInAsGuest(
-    input: SignInGuestInput = {}
+    input: SignInAsGuestInput = {}
   ): Promise<SignInResult> {
     const result = await internals.fetchJson<SignInResult>({
       method: "POST",
