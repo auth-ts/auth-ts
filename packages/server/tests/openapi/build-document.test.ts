@@ -107,6 +107,18 @@ describe("buildOpenAPIDocument", () => {
     expect(schemas.AuthError?.properties.code?.enum).toEqual(ERROR_CODES)
   })
 
+  it("documents the origin refusal on every state-changing operation", () => {
+    const undocumented = Object.entries(reference.paths).flatMap(
+      ([path, item]) =>
+        Object.entries(item as Record<string, { responses: object }>)
+          .filter(([method]) => !["get", "head", "options"].includes(method))
+          .filter(([, operation]) => !("403" in operation.responses))
+          .map(([method]) => `${method.toUpperCase()} ${path}`)
+    )
+
+    expect(undocumented).toEqual([])
+  })
+
   it("gives every operation a summary", () => {
     // A description is optional on purpose: where the summary and the schemas
     // already say it, a paraphrase reads as a second, competing answer.

@@ -1,6 +1,7 @@
 import type { AuthServerConfig } from "../core/auth-server-config"
 import type { EndpointRegistry } from "../core/endpoint-registry"
 import { endpointRegistry } from "../core/endpoint-registry"
+import { SAFE_METHODS } from "../http/check-origin"
 import type { AnyEndpoint } from "../http/define-endpoint"
 import { componentResponses, componentSchemas } from "./components"
 import type { AnyEndpointDocs, EndpointRequirement } from "./endpoint-docs"
@@ -141,6 +142,11 @@ function operation(
     }
   }
 
+  // The origin check refuses before any endpoint runs, so the refusal is
+  // documented here rather than repeated on every state-changing route.
+  if (!SAFE_METHODS.has(endpoint.method)) {
+    responses["403"] ??= componentResponses.Forbidden
+  }
   responses["405"] = componentResponses.MethodNotAllowed
   responses["500"] = componentResponses.InternalError
 
