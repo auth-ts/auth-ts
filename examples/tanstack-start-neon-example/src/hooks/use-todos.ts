@@ -9,6 +9,12 @@ import { v7 as uuidv7 } from "uuid"
 import { postgrest } from "../db/postgrest"
 import type { Todo, TodoInsert } from "../db/schema"
 
+const toTodo = (todo: Todo): Todo => ({
+  ...todo,
+  createdAt: new Date(todo.createdAt),
+  updatedAt: new Date(todo.updatedAt)
+})
+
 export function useTodos(userId?: string) {
   return useQuery({
     queryKey: ["todos", userId],
@@ -20,11 +26,7 @@ export function useTodos(userId?: string) {
             .order("createdAt", { ascending: false })
             .throwOnError()
 
-          return data.map((todo) => ({
-            ...todo,
-            createdAt: new Date(todo.createdAt),
-            updatedAt: new Date(todo.updatedAt)
-          }))
+          return data.map(toTodo)
         }
       : skipToken
   })
@@ -36,7 +38,14 @@ export function useInsertTodo(userId?: string) {
 
   const mutation = useMutation({
     mutationFn: async (todo: Todo) => {
-      await postgrest.from("todos").insert(todo).throwOnError()
+      const { data } = await postgrest
+        .from("todos")
+        .insert(todo)
+        .select()
+        .single()
+        .throwOnError()
+
+      return toTodo(data)
     },
     onMutate: async (todo) => {
       await queryClient.cancelQueries({ queryKey })
@@ -78,7 +87,15 @@ export function useUpdateTodo(userId?: string) {
 
   const mutation = useMutation({
     mutationFn: async ({ id, ...values }: TodoUpdate) => {
-      await postgrest.from("todos").update(values).eq("id", id).throwOnError()
+      const { data } = await postgrest
+        .from("todos")
+        .update(values)
+        .eq("id", id)
+        .select()
+        .single()
+        .throwOnError()
+
+      return toTodo(data)
     },
     onMutate: async (values) => {
       await queryClient.cancelQueries({ queryKey })
