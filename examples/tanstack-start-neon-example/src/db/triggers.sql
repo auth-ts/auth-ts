@@ -7,6 +7,3 @@ $$ language plpgsql;
 
 create or replace trigger "usersUpdatedAt" before update on "users"
   for each row execute function set_updated_at();
-
-create or replace trigger "todosUpdatedAt" before update on "todos"
-  for each row execute function set_updated_at();

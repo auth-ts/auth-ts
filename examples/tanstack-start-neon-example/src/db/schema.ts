@@ -92,8 +92,6 @@ export const sessions = pgTable.withRLS(
   ]
 )
 
-// No policy, and never one: there is no userId to scope it by, so any readable
-// policy would expose every address signing in.
 export const verifications = pgTable.withRLS(
   "verifications",
   {
