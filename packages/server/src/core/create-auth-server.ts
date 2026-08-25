@@ -219,7 +219,7 @@ export function createAuthServer<
  * `ipAddress.disableTracking` derives no address at all, which leaves
  * `sendCodePerIP`, `signInCodePerIP`, and `guestPerIP` inert and
  * `session.ipAddress` null — a safe failure, and exactly the kind that is never
- * noticed until someone sprays `/send-code` across a thousand addresses. A
+ * noticed until someone sprays `/sign-in/send-code` across a thousand addresses. A
  * warning rather than an error, because turning tracking off on purpose is a
  * legitimate thing to do and `rateLimit` is on by default.
  *
