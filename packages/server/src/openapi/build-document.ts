@@ -142,10 +142,11 @@ function operation(
     }
   }
 
-  // The origin check refuses before any endpoint runs, so the refusal is
-  // documented here rather than repeated on every state-changing route.
+  // The origin check refuses before any endpoint runs, so its two refusals
+  // are documented here rather than repeated on every state-changing route.
   if (!SAFE_METHODS.has(endpoint.method)) {
     responses["403"] ??= componentResponses.Forbidden
+    responses["415"] = componentResponses.UnsupportedMediaType
   }
   responses["405"] = componentResponses.MethodNotAllowed
   responses["500"] = componentResponses.InternalError

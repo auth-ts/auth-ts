@@ -49,6 +49,7 @@ export type ComponentResponseName =
   | "StaleSession"
   | "Conflict"
   | "GuestCannotReceiveCode"
+  | "UnsupportedMediaType"
   | "MethodNotAllowed"
   | "InternalError"
 

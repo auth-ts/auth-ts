@@ -107,12 +107,15 @@ describe("buildOpenAPIDocument", () => {
     expect(schemas.AuthError?.properties.code?.enum).toEqual(ERROR_CODES)
   })
 
-  it("documents the origin refusal on every state-changing operation", () => {
+  it("documents both origin refusals on every state-changing operation", () => {
     const undocumented = Object.entries(reference.paths).flatMap(
       ([path, item]) =>
         Object.entries(item as Record<string, { responses: object }>)
           .filter(([method]) => !["get", "head", "options"].includes(method))
-          .filter(([, operation]) => !("403" in operation.responses))
+          .filter(
+            ([, operation]) =>
+              !("403" in operation.responses) || !("415" in operation.responses)
+          )
           .map(([method]) => `${method.toUpperCase()} ${path}`)
     )
 
