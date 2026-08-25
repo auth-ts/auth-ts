@@ -12,8 +12,6 @@ export type AuthErrorCode =
   | "rateLimited"
   /** Wrong, expired, already-used, or for a different purpose. */
   | "invalidCode"
-  /** Deletion needs confirmation; a code has been sent. */
-  | "codeSent"
   /** The session is too old for this action without re-proving identity. */
   | "staleSession"
   /** No session, or a session that no longer resolves. */

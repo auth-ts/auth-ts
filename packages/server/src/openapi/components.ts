@@ -59,7 +59,6 @@ export const ERROR_CODES = [
   "cooldown",
   "rateLimited",
   "invalidCode",
-  "codeSent",
   "staleSession",
   "unauthenticated",
   "providerConflict",

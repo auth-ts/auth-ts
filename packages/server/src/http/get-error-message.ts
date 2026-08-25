@@ -16,7 +16,6 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   cooldown: "Please wait {retryAfter} seconds before requesting another code.",
   rateLimited: "Too many attempts. Please try again in {retryAfter} seconds.",
   invalidCode: "That code is not valid. Request a new one and try again.",
-  codeSent: "For your security, confirm this with the code we just sent you.",
   staleSession: "Please sign in again to continue.",
   unauthenticated: "You are not signed in.",
   providerConflict: "That account is already connected to a different user.",
