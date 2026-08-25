@@ -8,7 +8,7 @@ and in exchange the library never owns your schema, your migrations, or your dat
 
 There are four of them — `select`, `insert`, `update`, `delete`.
 Every query the library makes is one of those four against
-one of five tables, filtered on named columns by equality or, for the one
+one of six tables, filtered on named columns by equality or, for the one
 question equality cannot ask, by order. There is no operator language beyond
 that: no `OR`, no joins, no expressions. That is the property that makes the
 same four functions trivial against Drizzle, raw SQL, a data API, or a document
@@ -33,17 +33,38 @@ cost of not having an adapter package.
 | `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
 | `verifications` | `id`, `identifier`, `codeHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
-| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `accessTokenEncrypted`, `accessTokenExpiresAt`, `refreshTokenEncrypted`, `refreshTokenExpiresAt`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
+| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `refreshTokenExpiresAt`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
+| `identitySecrets` | `id`, `identityId`, `accessTokenEncrypted`, `accessTokenExpiresAt`, `refreshTokenEncrypted`, `createdAt`, `updatedAt` | `identityId` | | |
 
-**Two of those columns are credentials for somebody else's service.**
-`identities.accessTokenEncrypted` and `identities.refreshTokenEncrypted` hold the grant a
-connected account gave you, encrypted with AES-256-GCM under a key derived from
-your `secret` before they ever reach your `insert`. Store them as text and let
-them be — the library is the only thing that reads them back. They must not be
-readable by whatever role your data plane runs as: see
-[the Neon guide](/docs/guides/neon) for the column grant that keeps them out of
-the browser. Rotating `secret` makes them unreadable, which surfaces as
-"reconnect this account" and never as a wrong token sent to a provider.
+**Three of these tables are yours to query. Three are not.**
+
+> `users`, `sessions`, and `identities` are yours to query.
+> `verifications`, `attempts`, and `identitySecrets` are never granted.
+
+Nothing in the first three can authenticate anyone. `sessions.tokenHash` is a
+SHA-256 of thirty-two random bytes, so it cannot be replayed and does not need
+hiding. The second three hold either a credential or the identifier somebody is
+signing in with, and no application needs to read them.
+
+That split is why the provider tokens sit in `identitySecrets` rather than in
+columns on `identities`: protection becomes a table nobody writes a policy for,
+instead of a column grant everybody has to remember. Forget a policy and you
+leak nothing; forget a revoke and you leaked ciphertext.
+
+`accessTokenEncrypted` and `refreshTokenEncrypted` hold the grant a connected
+account gave you, encrypted with AES-256-GCM under a key derived from your
+`secret` before they ever reach your `insert`. Store them as text and let them
+be — the library is the only thing that reads them back. Rotating `secret` makes
+them unreadable, which surfaces as "reconnect this account" and never as a wrong
+token sent to a provider.
+
+**`identitySecrets` must cascade from `identities`.** Disconnecting a provider
+deletes the identity, and an orphaned row here is a stored credential nothing
+points at. `authDBChecks` proves the cascade against your own database.
+
+See [the Neon guide](/docs/guides/neon) for the SQL, and
+`examples/tanstack-start-neon-example/tests/privileges.test.ts` for the rule as
+an executable test.
 
 **`createdAt` and `updatedAt` are written by core**, on every insert and on
 every update it makes, so nothing is required of your columns for the library's

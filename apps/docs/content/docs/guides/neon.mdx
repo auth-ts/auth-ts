@@ -56,54 +56,74 @@ query on your owner connection silently sees everything.
 **Neon grants the `authenticated` role full access to everything in `public` when
 the Data API is enabled.** Your `users`, `sessions`, and `verifications` tables are
 not private by default, which means any signed-in user could read every account
-and every session hash straight from the REST endpoint.
+and every code straight from the REST endpoint.
 
-Enable row-level security on them with **no policy**. That denies every role
-except the owner, so your server keeps working and the Data API sees nothing:
+The rule is per table, not per column:
+
+> `users`, `sessions`, and `identities` are yours to query.
+> `verifications`, `attempts`, and `identitySecrets` are never granted.
+
+Enable row-level security everywhere. Three of the tables get **no policy**,
+which denies every role but the owner — your server connects as the owner and
+keeps working, and the Data API sees nothing:
+
+```sql
+alter table "verifications" enable row level security;
+alter table "attempts" enable row level security;
+alter table "identitySecrets" enable row level security;
+```
+
+The other three get ownership policies, because your account page reads them:
 
 ```sql
 alter table "users" enable row level security;
 alter table "sessions" enable row level security;
-alter table "verifications" enable row level security;
-alter table "attempts" enable row level security;
 alter table "identities" enable row level security;
+
+create policy "selectOwnSessions" on "sessions" for select to authenticated
+  using ("userId" = (auth.user_id())::uuid);
+create policy "deleteOwnSessions" on "sessions" for delete to authenticated
+  using ("userId" = (auth.user_id())::uuid);
 ```
 
-Do not force it here — the server connects as the owner and must still read them.
+`users` and `identities` take the same shape — see the reference application's
+`src/db/schema.ts` for all six.
+
+Do not force row-level security here — the server connects as the owner and must
+still read every one of these.
+
+Nothing in those three tables can authenticate anybody, which is what makes
+reading them whole safe. `sessions.tokenHash` is a SHA-256 of thirty-two random
+bytes: knowing it does not let you present the token it came from. The provider
+tokens live in `identitySecrets`, which nothing grants.
+
+That is the point of the split. Protection is a table nobody writes a policy
+for, not a column somebody has to remember to revoke — forget a policy and you
+leak nothing, forget a revoke and you leaked ciphertext.
 
 Verify rather than assume:
 
 ```sql
 set local role authenticated;
-select count(*) from users;  -- must be 0
+select count(*) from "identitySecrets";  -- must be 0
 ```
 
-### Columns, where a policy is not enough
+### The one grant that is not a policy
 
-A table the browser is *supposed* to read still has columns it is not. Add a
-policy for `sessions` or `identities` — a device list, a connected-accounts
-screen — and the policy alone hands over the session's `tokenHash` and a
-connected account's provider tokens along with it. Grants are per column, so
-narrow them:
+Row-level security says which *rows* a role may touch, never which columns.
+Neon's default grants UPDATE on every column of `users`, so a signed-in user can
+set their own `type` to `admin` or repoint `email` at somebody else's account.
+Policies do not stop that. Narrow the grant:
 
 ```sql
-revoke select on table "sessions" from authenticated;
-grant select (
-  "id", "userId", "userAgent", "ipAddress", "expiresAt", "createdAt", "updatedAt"
-) on table "sessions" to authenticated;
-
-revoke select on table "identities" from authenticated;
-grant select (
-  "id", "userId", "provider", "providerUserId", "label",
-  "accessTokenExpiresAt", "refreshTokenExpiresAt", "scope",
-  "createdAt", "updatedAt"
-) on table "identities" to authenticated;
+revoke update on table "users" from authenticated;
+grant update ("name", "image", "updatedAt") on table "users" to authenticated;
 ```
 
-The provider tokens are encrypted at rest, so this is a second lock rather than
-the only one — but ciphertext in a browser has no use and every downside. Note
-that PostgREST expands `select()` to `*`: once a column is revoked, your client
-must name the columns it wants, or the request fails as a whole.
+This is the only column grant the schema needs, and it is load bearing.
+`examples/tanstack-start-neon-example/tests/privileges.test.ts` asserts all of
+the above against a real Postgres, so the rule is executable rather than
+remembered.
 
 ## 5. Set the allowed origins
 

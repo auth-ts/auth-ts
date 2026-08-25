@@ -315,6 +315,15 @@ would let a single caller lock everyone out of a flow.
 If your database exposes a REST API, check what it grants by default. Neon, for
 example, grants the `authenticated` role full access to everything in `public`
 when the Data API is enabled — so the auth tables must be explicitly protected,
-or any signed-in user can read every session hash in your system. The reference
-application enables row-level security with no policy on those tables, which
-denies every role except the owner.
+or any signed-in user can read every code in your system.
+
+The split is per table:
+
+> `users`, `sessions`, and `identities` are yours to query.
+> `verifications`, `attempts`, and `identitySecrets` are never granted.
+
+Nothing in the first three can authenticate anybody, so reading them whole is
+safe. The second three hold a credential or the identifier somebody is signing
+in with, and they are protected by having no policy rather than by a column
+grant — forgetting a policy leaks nothing, where forgetting a revoke leaks
+ciphertext. See [the Neon guide](/docs/guides/neon) for the SQL.
