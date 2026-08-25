@@ -30,7 +30,6 @@ export async function deleteUser(
     table: "identities",
     where: { userId: user.id },
     limit: IDENTITY_PAGE_SIZE,
-    offset: 0,
     orderBy: { createdAt: "asc" }
   })
   for (const identity of identities) {

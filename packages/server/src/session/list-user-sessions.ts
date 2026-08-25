@@ -20,7 +20,6 @@ export function listUserSessions(
     table: "sessions",
     where: { userId },
     limit: SESSION_PAGE_SIZE,
-    offset: 0,
     orderBy: { createdAt: "desc" }
   })
 }

@@ -123,7 +123,6 @@ export const authDBChecks: AuthDBCheck[] = [
             table: "users",
             where,
             limit: 10,
-            offset: 0,
             orderBy: { id: "asc" }
           })
 
@@ -157,7 +156,6 @@ export const authDBChecks: AuthDBCheck[] = [
             table: "users",
             where: { email, primaryUserId: null },
             limit: 10,
-            offset: 0,
             orderBy: { id: "asc" }
           })
 
@@ -176,7 +174,7 @@ export const authDBChecks: AuthDBCheck[] = [
     }
   },
   {
-    name: "select honours limit, offset, and both directions of orderBy",
+    name: "select honours limit and both directions of orderBy",
     async run(db) {
       const key = unique()
       const times = [3, 1, 2].map(
@@ -191,36 +189,31 @@ export const authDBChecks: AuthDBCheck[] = [
         })
       }
       try {
-        const page = (
-          direction: "asc" | "desc",
-          limit: number,
-          offset: number
-        ) =>
+        const page = (direction: "asc" | "desc", limit: number) =>
           db.select({
             table: "attempts",
             where: { key },
             limit,
-            offset,
             orderBy: { expiresAt: direction }
           })
 
         const ascending = times.map((date) => date.getTime()).sort()
 
         expect(
-          ordered(await page("asc", 10, 0), ascending),
+          ordered(await page("asc", 10), ascending),
           "orderBy asc did not sort by the column it was given. Core reads the live verification code as the newest row, so an ordering that is ignored hands back a stale one."
         )
         expect(
-          ordered(await page("desc", 10, 0), [...ascending].reverse()),
+          ordered(await page("desc", 10), [...ascending].reverse()),
           "orderBy desc did not reverse the order"
         )
         expect(
-          (await page("asc", 2, 0)).length === 2,
+          (await page("asc", 2)).length === 2,
           "limit did not cap the number of rows returned"
         )
         expect(
-          ordered(await page("asc", 10, 1), ascending.slice(1)),
-          "offset did not skip from the start of the order"
+          ordered(await page("asc", 2), ascending.slice(0, 2)),
+          "limit did not cap from the start of the order"
         )
       } finally {
         await db.delete({ table: "attempts", where: { key } })
@@ -283,7 +276,6 @@ export const authDBChecks: AuthDBCheck[] = [
               table: "attempts",
               where,
               limit: 10,
-              offset: 0,
               orderBy: { expiresAt: "asc" }
             })
           ).length
@@ -328,7 +320,6 @@ export const authDBChecks: AuthDBCheck[] = [
           table: "users",
           where: { email },
           limit: 10,
-          offset: 0,
           orderBy: { id: "asc" }
         })
 
@@ -524,7 +515,6 @@ export const authDBChecks: AuthDBCheck[] = [
           table: "identitySecrets",
           where: { identityId: identity.id },
           limit: 1,
-          offset: 0,
           orderBy: { createdAt: "asc" }
         })
         if (orphaned.length > 0) {
@@ -569,7 +559,6 @@ export const authDBChecks: AuthDBCheck[] = [
           table: "verifications",
           where: { identifier },
           limit: 10,
-          offset: 0,
           orderBy: { id: "asc" }
         })
         expect(

@@ -335,7 +335,6 @@ export type AuthSelectInput<
     table: K
     where: AuthWhere<S, K>
     limit: number
-    offset: number
     orderBy: AuthOrderBy<S, K>
   }
 }[AuthTable]
@@ -406,17 +405,20 @@ export interface AuthDB<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > {
   /**
-   * Reads rows matching `where`, ordered, offset, and capped.
+   * Reads rows matching `where`, ordered and capped.
    *
    * Nothing here is optional, so there is no `undefined` to branch on and one
    * code path per store. Core fills every value at the call site, and an
    * unbounded read is a type error: every list core makes has a ceiling.
+   *
+   * There is no `offset`, because core never pages that way. Where it walks a
+   * set larger than one page — signing out other devices — it deletes what it
+   * read and re-reads from the start, so the next page is whatever is left.
    */
   select<T extends AuthTable>(input: {
     table: T
     where: AuthWhere<S, T>
     limit: number
-    offset: number
     orderBy: AuthOrderBy<S, T>
   }): Promise<AuthRow<S, T>[]>
 

@@ -57,16 +57,16 @@ describe("authDBChecks", () => {
     )
   })
 
-  it("catches a select that ignores limit and offset", async () => {
+  it("catches a select that ignores limit", async () => {
     const db = createMemoryDb()
     const failed = await failures(
       broken({
-        select: (input) => db.select({ ...input, limit: 100, offset: 0 })
+        select: (input) => db.select({ ...input, limit: 100 })
       })
     )
 
     expect(failed).toContain(
-      "select honours limit, offset, and both directions of orderBy"
+      "select honours limit and both directions of orderBy"
     )
   })
 

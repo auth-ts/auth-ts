@@ -41,7 +41,6 @@ export function selectRows<T extends AuthTable>(
     table,
     where,
     limit: 1000,
-    offset: 0,
     orderBy: { id: "asc" } as never
   })
 }

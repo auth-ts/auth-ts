@@ -127,7 +127,7 @@ export function createMemoryDb(): MemoryDb {
   // narrows to the intersection of all five row types, which nothing satisfies.
   // A real implementation asserts at the same boundary for the same reason.
   return {
-    async select({ table, where, limit, offset, orderBy }) {
+    async select({ table, where, limit, orderBy }) {
       const [[column, direction] = ["id", "asc" as AuthDirection]] =
         Object.entries(orderBy) as [string, AuthDirection][]
 
@@ -136,7 +136,7 @@ export function createMemoryDb(): MemoryDb {
           const order = compare(left[column], right[column])
           return direction === "asc" ? order : -order
         })
-        .slice(offset, offset + limit)
+        .slice(0, limit)
         .map((row) => ({ ...row })) as never
     },
 

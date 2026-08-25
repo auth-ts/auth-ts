@@ -20,7 +20,6 @@ const liveCode = async (db: MemoryDb) => {
     table: "verifications",
     where: { identifier: emailIdentifier.value },
     limit: 1,
-    offset: 0,
     orderBy: { expiresAt: "desc" }
   })
 

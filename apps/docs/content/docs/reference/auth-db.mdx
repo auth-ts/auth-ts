@@ -116,13 +116,16 @@ index, because the missing constraint only shows under a race.
 - **`update` returns the rows it wrote**, as `delete` does. That is the other
   half of the single round trip: the library asks for a session that has not
   expired and learns from what comes back whether there was one.
-- **`select` takes `limit`, `offset`, and `orderBy`, always.** Nothing is
-  optional, so there is no `undefined` to branch on and your implementation has
-  one code path. `orderBy` is one column and a direction —
-  `{ createdAt: "desc" }` — which is enough for "newest" and for paging, and the
-  smallest ordering every store can express. Read it the same way you read
-  `where`, by mapping over its entries; there is no reason to pull the single
-  key out by hand.
+- **`select` takes `limit` and `orderBy`, always.** Neither is optional, so
+  there is no `undefined` to branch on and your implementation has one code
+  path. `orderBy` is one column and a direction — `{ createdAt: "desc" }` —
+  which is enough for "newest" and the smallest ordering every store can
+  express. Read it the same way you read `where`, by mapping over its entries;
+  there is no reason to pull the single key out by hand.
+
+  There is no `offset`, because the library never pages that way. The one place
+  it walks more than a page — signing out every other device — deletes what it
+  read and re-reads from the start, so the next page is whatever is left.
 - **`insert` returns the row as stored**, or `undefined`. Stores hand it back
   differently — `RETURNING` gives a set to pick from, a document store gives the
   document, some give nothing — so return what you have and let the library
@@ -235,14 +238,13 @@ const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
 }
 
 export const authDB = defineAuthDB({
-  select: ({ table, where, limit, offset, orderBy }) =>
+  select: ({ table, where, limit, orderBy }) =>
     db
       .select()
       .from(authTables[table])
       .where(buildWhere(table, where))
       .orderBy(...buildOrderBy(table, orderBy))
-      .limit(limit)
-      .offset(offset),
+      .limit(limit),
 
   insert: ({ table, values }) =>
     db
@@ -373,7 +375,7 @@ with whatever you assumed.
 
 The checks cover `insert` returning the stored row with its id, `where` matching
 by equality and by range, `update` returning what it changed, equality `where`
-on one column and on several, `limit`, `offset`, `orderBy` in both directions,
+on one column and on several, `limit`, `orderBy` in both directions,
 `update` applying only what it was given, `delete` returning what it removed and
 matching on every column, a duplicate insert being refused for each unique set
 above, and `delete` honouring a range — removing what has expired while keeping

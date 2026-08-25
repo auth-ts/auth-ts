@@ -33,7 +33,6 @@ export async function countAttempt(
     table: "attempts",
     where: { key },
     limit: limit + 1,
-    offset: 0,
     orderBy: { id: "asc" }
   })
 

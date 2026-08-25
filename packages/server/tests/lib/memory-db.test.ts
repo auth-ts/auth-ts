@@ -43,7 +43,6 @@ const read = <T extends "users" | "sessions" | "verifications" | "attempts">(
     table,
     where: where as never,
     limit,
-    offset: 0,
     orderBy: { id: "asc" } as never
   })
 
@@ -132,31 +131,17 @@ describe("select", () => {
       table: "users",
       where: {},
       limit: 10,
-      offset: 0,
       orderBy: { name: "asc" }
     })
     const descending = await db.select({
       table: "users",
       where: {},
       limit: 10,
-      offset: 0,
       orderBy: { name: "desc" }
     })
 
     expect(ascending.map((row) => row.name)).toEqual(["Ada", "Alan", "Grace"])
     expect(descending.map((row) => row.name)).toEqual(["Grace", "Alan", "Ada"])
-  })
-
-  it("skips the offset, so a page after the first is reachable", async () => {
-    const page = await db.select({
-      table: "users",
-      where: {},
-      limit: 2,
-      offset: 1,
-      orderBy: { name: "asc" }
-    })
-
-    expect(page.map((row) => row.name)).toEqual(["Alan", "Grace"])
   })
 
   it("orders dates chronologically rather than as strings", async () => {
@@ -190,7 +175,6 @@ describe("select", () => {
       table: "verifications",
       where: { identifier },
       limit: 1,
-      offset: 0,
       orderBy: { expiresAt: "desc" }
     })
 

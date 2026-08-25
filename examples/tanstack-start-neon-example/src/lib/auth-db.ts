@@ -50,14 +50,13 @@ const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
 }
 
 export const authDB = defineAuthDB({
-  select: ({ table, where, limit, offset, orderBy }) =>
+  select: ({ table, where, limit, orderBy }) =>
     db
       .select()
       .from(authTables[table])
       .where(buildWhere(table, where))
       .orderBy(...buildOrderBy(table, orderBy))
-      .limit(limit)
-      .offset(offset),
+      .limit(limit),
   insert: ({ table, values }) =>
     db
       .insert(authTables[table])
