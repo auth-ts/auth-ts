@@ -120,13 +120,13 @@ export async function resolveSession(
 /**
  * Resolves the session the caller is acting from, by token where it can.
  *
- * For the handful of endpoints that need the *session*, not just who is
- * calling: the guest a sign-in is about to convert, the account a connect flow
- * links to. A live token names the session outright, and reading that row costs
- * no write. Anything else — no token, a spent one, or one naming a session
- * since revoked — falls through to the cookie, which is what makes this work
- * for `/identities/connect/:provider` and the OAuth callback, both of which arrive as
- * top-level navigations that can carry no `Authorization` header.
+ * For the two endpoints that need the *session* rather than just who is
+ * calling — verifying a sign-in code, and the OAuth callback — because both may
+ * be converting a guest whose session is about to be replaced. A live token
+ * names the session outright, and reading that row costs no write. Anything
+ * else — no token, a spent one, or one naming a session since revoked — falls
+ * through to the cookie, which is what makes the callback work at all: it
+ * arrives as a top-level navigation that can carry no `Authorization` header.
  *
  * @returns The session and user, or `null` when neither credential resolves.
  */
