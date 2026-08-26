@@ -258,6 +258,28 @@ Codes were chosen for v1 because they survive the common case where the link
 opens in a different browser than the one you started in. Links need one-time
 URLs, a different email template, and their own expiry semantics.
 
+### Passkeys
+
+The ceremony itself is ordinary: a server-issued challenge, single-use and
+short-lived, and a signature verified against a stored public key. The cost that
+is not ordinary is the `AuthTable` union — credentials are a seventh table, and
+that is a contract change every implementation feels rather than a feature they
+can ignore. `sessions.amr` already has somewhere to put the answer afterwards;
+RFC 8176 spells a device-bound credential `hwk` and a synced one `swk`.
+
+### Password authentication
+
+A different threat model with its own permanent obligations: breach lists, reset
+flows, rotation policies, and slow hashing. That is the weight to pick up
+deliberately, rather than the reason not to.
+
+### Two-factor
+
+A real feature and a real subsystem; it is not a v1 omission that gets quietly
+patched in. `sessions.amr` is an array for this reason — a second factor adds to
+what proved identity the first time rather than replacing it — so the claim
+shape does not have to change when it arrives.
+
 ### Custom OIDC providers
 
 Two halves of very different sizes.
@@ -408,18 +430,11 @@ the concurrent case. That is a coherent design, and the opposite one from this.
 The combination to avoid is half of each — a token a script can read that never
 rotates.
 
-### Password authentication
-
-A different threat model with its own permanent obligations: breach lists, reset
-flows, rotation policies, and slow hashing. The library would become mostly
-password machinery.
-
-### Organisations, role-based access control, and two-factor
+### Organisations and role-based access control
 
 `type` is carried into the JWT so your policies can read it, and `admin` is
 vocabulary the library never assigns — promoting someone is your own SQL. Beyond
-that, authorization is your schema's job. Two-factor is a real feature and a real
-subsystem; it is not a v1 omission that gets quietly patched in.
+that, authorization is your schema's job.
 
 ### A hosted service
 
