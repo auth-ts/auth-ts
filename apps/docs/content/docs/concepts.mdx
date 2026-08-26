@@ -69,6 +69,12 @@ This is worth saying plainly next to any "sign out everywhere" button, because
 the alternative is a support conversation. Shorten `jwt.ttl` if you want a
 tighter bound; you are trading refresh traffic for revocation speed.
 
+`GET /identities/:id/token` is the one endpoint that does not accept this
+latency. What it returns is a *provider* token, and a GitHub OAuth App issues
+tokens with no expiry at all — so a token handed out after the session was
+revoked would outlive the revocation permanently, not for ten minutes. That
+endpoint reads the session row and refuses when it is gone.
+
 ## The claim shape
 
 ```json

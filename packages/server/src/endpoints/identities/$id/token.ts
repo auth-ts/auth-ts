@@ -1,6 +1,10 @@
 import type { AuthIdentity, AuthIdentitySecret } from "../../../core/auth-db"
 import type { AuthServerInternals } from "../../../core/auth-server-internals"
-import { AuthApiError, notFound } from "../../../http/auth-api-error"
+import {
+  AuthApiError,
+  notFound,
+  unauthenticated
+} from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
 import { decryptSecret } from "../../../lib/encrypt"
 import { selectOne } from "../../../lib/select-one"
@@ -59,11 +63,17 @@ export const getProviderTokenDocs: EndpointDocs<GetProviderTokenInput, "id"> = {
  * This is what makes a connection worth keeping: the application calls Google
  * or GitHub as the user, for as long as the grant lives, without sending them
  * back through a consent screen. The durable half of the grant never leaves the
- * server — only this short-lived token does, which is the same posture as the
- * library's own access token, and short enough that handing it to the browser
- * for a direct CORS call to the provider is a reasonable thing to do.
+ * server — only the access token does, which is the same posture as the
+ * library's own.
  *
- * @throws {AuthApiError} `notFound` when the caller has no such identity, and
+ * Where a provider issues tokens that never expire — a GitHub OAuth App does —
+ * what this returns is durable rather than short-lived, and nothing the library
+ * revokes can reach it afterwards. So this is the one endpoint that confirms
+ * the session is still live instead of trusting the access token alone: signing
+ * out has to cut off the credential that outlasts signing out.
+ *
+ * @throws {AuthApiError} `unauthenticated` when the session the token names is
+ * gone, `notFound` when the caller has no such identity, and
  * `providerReconnectRequired` when the grant cannot produce a token any more.
  */
 export const getProviderToken = defineEndpoint({
@@ -75,6 +85,13 @@ export const getProviderToken = defineEndpoint({
   }),
   run: async (internals, input: GetProviderTokenInput) => {
     const caller = await authenticate(internals, input)
+
+    // Provider tokens can outlive this session.
+    const session = await selectOne(internals, "sessions", {
+      id: caller.sessionId,
+      expiresAt: { gt: new Date() }
+    })
+    if (!session) throw unauthenticated()
 
     const identity = await selectOne(internals, "identities", {
       id: input.id,

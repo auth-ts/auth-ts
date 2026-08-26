@@ -362,6 +362,33 @@ describe("GET /identities/:id/token", () => {
 
     expect(response.status).toBe(401)
   })
+
+  it("refuses a token whose session was signed out", async () => {
+    const context = await createTestServer(OAUTH_OPTIONS)
+    const { refreshToken, identity } = await signInWithGitHub(context, GRANT)
+    const token = await mintToken(context.authServer, refreshToken)
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", {
+        token,
+        body: { scope: "global" }
+      })
+    )
+
+    const response = await context.authServer.handler(
+      request("GET", `/api/auth/identities/${identity.id}/token`, { token })
+    )
+
+    expect(context.db.sessions()).toHaveLength(0)
+    expect(response.status).toBe(401)
+
+    // The token itself is still live.
+    const stateless = await context.authServer.handler(
+      request("POST", "/api/auth/user", { token, body: { name: "Ada" } })
+    )
+
+    expect(stateless.status).toBe(200)
+  })
 })
 
 describe("getProviderRefreshToken", () => {
