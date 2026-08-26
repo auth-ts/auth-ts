@@ -500,6 +500,27 @@ describe("account deletion", () => {
     }
   })
 
+  it("refuses a token whose session has expired but is unswept", async () => {
+    // Sessions are swept on insert only.
+    vi.useFakeTimers()
+    try {
+      const context = await createTestServer({
+        session: { ttl: "1s", sliding: false }
+      })
+      const { token } = await signIn(context)
+
+      vi.advanceTimersByTime(2000)
+      const response = await context.authServer.handler(
+        request("DELETE", "/api/auth/user", { token })
+      )
+
+      expect(response.status).toBe(401)
+      expect(context.db.users()).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("deletes immediately at the boundary of a non-zero window", async () => {
     vi.useFakeTimers()
     try {

@@ -186,7 +186,8 @@ export const deleteUser = defineEndpoint({
     // The fresh window is measured from the session, and a session already
     // revoked refuses the delete rather than honouring a token that outlived it.
     const session = await selectOne(internals, "sessions", {
-      id: caller.sessionId
+      id: caller.sessionId,
+      expiresAt: { gt: new Date() }
     })
     if (!user || !session) throw unauthenticated()
 
