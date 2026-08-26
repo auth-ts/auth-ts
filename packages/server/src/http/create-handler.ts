@@ -142,15 +142,11 @@ function toErrorResponse(
     error: String(error)
   })
 
-  headers.set("content-type", "application/json")
-
-  return new Response(
-    JSON.stringify({
-      name: "AuthError",
-      code: "internalError",
-      message: "Something went wrong."
-    }),
-    { status: 500, headers }
+  return errorResponse(
+    "internalError",
+    500,
+    getErrorMessage("internalError", locale, config.localization),
+    { headers }
   )
 }
 

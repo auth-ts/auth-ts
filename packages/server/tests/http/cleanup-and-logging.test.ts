@@ -118,6 +118,63 @@ describe("sweeping", () => {
   })
 })
 
+describe("an unhandled throw", () => {
+  const failing = {
+    email: {
+      sendCode: () => {
+        throw new Error("smtp says relay access denied for ada@example.com")
+      }
+    }
+  }
+
+  it("answers the standard envelope, localized like every other code", async () => {
+    const { authServer } = await createTestServer({
+      ...failing,
+      localization: {
+        defaultLocale: "en",
+        messages: { de: { internalError: "Etwas ist schiefgelaufen." } }
+      }
+    })
+
+    const response = await authServer.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" },
+        headers: { "accept-language": "de" }
+      })
+    )
+
+    expect(response.status).toBe(500)
+    expect(response.headers.get("content-type")).toBe("application/json")
+    expect(await response.json()).toEqual({
+      name: "AuthError",
+      code: "internalError",
+      message: "Etwas ist schiefgelaufen."
+    })
+  })
+
+  it("says nothing about what failed, whatever the thrown message held", async () => {
+    const context = await createTestServer(failing)
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const body = await response.text()
+
+    expect(body).not.toContain("smtp")
+    expect(body).not.toContain("ada@example.com")
+    // The detail goes to the log instead, which is where it is useful.
+    expect(
+      context.logCalls.some(
+        (call) =>
+          call.level === "error" &&
+          String(call.data?.error).includes("relay access denied")
+      )
+    ).toBe(true)
+  })
+})
+
 describe("logging redaction", () => {
   it("never lets a token, code, code hash, or cookie value reach the sink at any level", async () => {
     const context = await createTestServer({ guest: true, logLevel: "debug" })
