@@ -3,7 +3,11 @@ import { defineEndpoint } from "../http/define-endpoint"
 
 // Pinned rather than floating: the page is served by this library, so a bad
 // upstream release would be our outage, not theirs.
-const SCALAR = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.36.2"
+const SCALAR =
+  "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.36.2/dist/browser/standalone.min.js"
+// Bumping the version means recomputing this hash.
+const SCALAR_INTEGRITY =
+  "sha384-+ogMiA10J3eSijYXbRgFuAx3DVVwnEdCo7US4+q+x2D1Qal3CHlk4L9D6ETLzSKb"
 
 /**
  * Get the API reference.
@@ -36,7 +40,7 @@ export const getReference = defineEndpoint({
 </head>
 <body>
 <script id="api-reference" data-url="${specURL}"></script>
-<script src="${SCALAR}"></script>
+<script src="${SCALAR}" integrity="${SCALAR_INTEGRITY}" crossorigin="anonymous"></script>
 </body>
 </html>`
     }
