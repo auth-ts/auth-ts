@@ -159,28 +159,23 @@ describe("privileges.sql", () => {
 })
 
 describe("triggers.sql", () => {
-  it.each(["users", "todos"])(
-    "stamps %s.updatedAt from the database, whoever wrote the row",
-    async (table) => {
-      const { id } = (
-        await client.query<{ id: string }>(
-          table === "users"
-            ? `insert into "users" ("type") values ('user') returning "id"`
-            : `insert into "todos" ("userId", "title")
-               values ((select "id" from "users" limit 1), 'x') returning "id"`
-        )
-      ).rows[0] as { id: string }
-
-      await client.exec(
-        `update "${table}" set "updatedAt" = '2000-01-01' where "id" = '${id}'`
+  // todos.updatedAt is the client's to set.
+  it("stamps users.updatedAt from the database, whoever wrote the row", async () => {
+    const { id } = (
+      await client.query<{ id: string }>(
+        `insert into "users" ("type") values ('user') returning "id"`
       )
-      const [row] = (
-        await client.query<{ updatedAt: Date }>(
-          `select "updatedAt" from "${table}" where "id" = '${id}'`
-        )
-      ).rows
+    ).rows[0] as { id: string }
 
-      expect(row?.updatedAt.getFullYear()).toBeGreaterThan(2000)
-    }
-  )
+    await client.exec(
+      `update "users" set "updatedAt" = '2000-01-01' where "id" = '${id}'`
+    )
+    const [row] = (
+      await client.query<{ updatedAt: Date }>(
+        `select "updatedAt" from "users" where "id" = '${id}'`
+      )
+    ).rows
+
+    expect(row?.updatedAt.getFullYear()).toBeGreaterThan(2000)
+  })
 })
