@@ -35,11 +35,16 @@ export interface AuthClientOptions {
    * Where to keep the auth cookies, for a runtime with no cookie jar of its own.
    *
    * A browser holds the refresh cookie itself and never shows it to
-   * JavaScript, so leave this unset there. A native app has no such jar: pass
-   * a storage the platform protects — the keychain or keystore — and the
+   * JavaScript, so leave this unset there. A native app has no such jar: the
    * client keeps whatever the server sets and sends it back as the `Cookie`
    * header on every auth request, with `credentials: "omit"`. The server is
    * none the wiser, and the refresh token still travels nowhere else.
+   *
+   * The storage passed here MUST be one the platform protects — the keychain
+   * or the keystore. What lands in it is the refresh token, and the refresh
+   * token is not rotated, so a copy of it is the session for the session's
+   * whole life. A store any script on the device can read is the one
+   * combination this design excludes.
    */
   cookieStorage?: CookieStorage
   /** @default "error" — quiet in other people's consoles. */

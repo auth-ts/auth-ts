@@ -2,9 +2,10 @@
  * Where a client with no cookie jar of its own keeps the auth cookies.
  *
  * The shape of the web `Storage` interface, which is also the shape of the
- * usual native key-value stores, so most can be passed straight through. Use a
- * store the platform protects — the keychain or keystore — because what lands
- * here is the refresh token, the credential that *is* the session.
+ * usual native key-value stores, so most can be passed straight through. The
+ * store MUST be one the platform protects — the keychain or the keystore —
+ * because what lands here is the refresh token, the credential that *is* the
+ * session, and it is not rotated for the whole of that session's life.
  */
 export interface CookieStorage {
   getItem(key: string): string | null | Promise<string | null>

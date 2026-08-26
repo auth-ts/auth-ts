@@ -58,6 +58,10 @@ presents a token the first has already spent.
 
 If you store the refresh token outside an `HttpOnly` cookie, rotation and reuse
 detection become mandatory — which is exactly why that mode is not supported.
+A native client passing `cookieStorage` is not an exception to this: the store
+it hands over must be one the platform protects, the keychain or the keystore.
+A store any script on the device can read is the combination this design rules
+out, and nothing on the server can compensate for it.
 
 ## Revocation has a latency, and it is the access token's lifetime
 
