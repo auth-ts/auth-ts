@@ -1,6 +1,7 @@
 import type { AuthUser } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
+import { reviveUser } from "../lib/revive-user"
 
 /** The flat body accepted by profile updates. */
 export type UpdateUserInput = {
@@ -17,7 +18,7 @@ export function createUpdateUser(internals: AuthClientInternals) {
       body: input,
       authenticated: true
     })
-    return user
+    return reviveUser(user)
   }
 }
 

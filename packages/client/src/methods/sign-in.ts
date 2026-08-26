@@ -1,5 +1,6 @@
 import type { AuthUser } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
+import { reviveUser } from "../lib/revive-user"
 
 /** Exactly one identifier: whichever you pass selects the channel. */
 export type SendSignInCodeInput =
@@ -60,7 +61,7 @@ export function createSignInWithCode(internals: AuthClientInternals) {
     })
     internals.tokenStore.set(result.token)
 
-    return result
+    return { ...result, user: reviveUser(result.user) }
   }
 }
 
@@ -87,6 +88,6 @@ export function createSignInAsGuest(internals: AuthClientInternals) {
     })
     internals.tokenStore.set(result.token)
 
-    return result
+    return { ...result, user: reviveUser(result.user) }
   }
 }

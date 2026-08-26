@@ -1,5 +1,6 @@
 import type { AuthUser, ProviderTokenResult } from "@auth-ts/server"
 import type { AuthClientInternals } from "../core/auth-client-internals"
+import { reviveUser } from "../lib/revive-user"
 
 /** Input for reading a connected account's access token. */
 export interface GetProviderTokenInput {
@@ -36,11 +37,13 @@ export function createGetProviderToken(internals: AuthClientInternals) {
 /** Lists every user signed in to this browser. Requires `multiUser` server-side. */
 export function createListUsers(internals: AuthClientInternals) {
   return async function listUsers(): Promise<AuthUser[]> {
-    return internals.fetchJson<AuthUser[]>({
+    const users = await internals.fetchJson<AuthUser[]>({
       method: "GET",
       path: "/users",
       authenticated: true
     })
+
+    return users.map(reviveUser)
   }
 }
 
@@ -69,6 +72,6 @@ export function createSwitchUser(internals: AuthClientInternals) {
     })
     internals.tokenStore.set(result.token)
 
-    return result.user
+    return reviveUser(result.user)
   }
 }

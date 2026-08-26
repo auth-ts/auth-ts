@@ -52,6 +52,58 @@ describe("signInWithCode", () => {
   })
 })
 
+describe("timestamps on the wire", () => {
+  const dated = {
+    ...user,
+    createdAt: "2026-01-02T03:04:05.000Z",
+    updatedAt: "2026-01-02T03:04:05.000Z"
+  }
+  const isRealDate = (value: unknown) =>
+    value instanceof Date && !Number.isNaN(value.getTime())
+
+  it("revives them on every method that answers with a user", async () => {
+    server.on("POST", "/api/auth/sign-in/code", {
+      body: { user: dated },
+      token: fakeAccessToken()
+    })
+    const client = createAuthClient()
+
+    const { user: signedIn } = await client.signInWithCode({
+      email: "ada@example.com",
+      code: "123456"
+    })
+    expect(isRealDate(signedIn.createdAt)).toBe(true)
+    expect(signedIn.createdAt.toISOString()).toBe(dated.createdAt)
+
+    server.on("POST", "/api/auth/user", { body: { user: dated } })
+    expect(
+      isRealDate((await client.updateUser({ name: "Ada" })).createdAt)
+    ).toBe(true)
+
+    server.on("GET", "/api/auth/users", { body: [dated] })
+    expect(isRealDate((await client.listUsers())[0]?.createdAt)).toBe(true)
+
+    server.on("POST", "/api/auth/users/switch", {
+      body: { user: dated },
+      token: fakeAccessToken()
+    })
+    expect(
+      isRealDate((await client.switchUser({ userId: user.id })).createdAt)
+    ).toBe(true)
+  })
+
+  it("revives them for a guest as well", async () => {
+    server.on("POST", "/api/auth/sign-in/guest", {
+      body: { user: dated },
+      token: fakeAccessToken()
+    })
+
+    const { user: guest } = await createAuthClient().signInAsGuest()
+
+    expect(isRealDate(guest.createdAt)).toBe(true)
+  })
+})
+
 describe("sendSignInCode", () => {
   it("passes the identifier through and reports a cooldown with its countdown", async () => {
     server.on("POST", "/api/auth/sign-in/send-code", { body: { sent: true } })
