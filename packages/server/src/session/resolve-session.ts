@@ -128,28 +128,47 @@ export async function resolveSession(
  * for `/identities/connect/:provider` and the OAuth callback, both of which arrive as
  * top-level navigations that can carry no `Authorization` header.
  *
- * The expiry check has to be here as well as in `slideSession`: `selectOne` by
- * id would happily return a row whose lifetime has run out.
- *
  * @returns The session and user, or `null` when neither credential resolves.
  */
 export async function resolveCallerSession(
   internals: AuthServerInternals,
   input: CallerInput
 ): Promise<ResolvedSession | null> {
+  return (
+    (await resolveTokenSession(internals, input)) ??
+    (input.headers ? resolveSession(internals, input.headers) : null)
+  )
+}
+
+/**
+ * Resolves the session a live token names, and never the cookie.
+ *
+ * The half of {@link resolveCallerSession} that reads only what the token
+ * says, for callers that need the answer to be about *this* token: a cookie
+ * fallback would answer with whichever session the browser happens to hold,
+ * which is a different question, and would slide it on the way past.
+ *
+ * The expiry check has to be here as well as in `slideSession`: `selectOne` by
+ * id would happily return a row whose lifetime has run out.
+ *
+ * @returns The session and user, or `null` when no live token named a live one.
+ */
+export async function resolveTokenSession(
+  internals: AuthServerInternals,
+  input: CallerInput
+): Promise<ResolvedSession | null> {
   const { caller } = await verifyBearer(internals, input)
+  if (!caller) return null
 
-  if (caller) {
-    const session = await selectOne(internals, "sessions", {
-      id: caller.sessionId,
-      expiresAt: { gt: new Date() }
-    })
-    const user = session
-      ? await selectOne(internals, "users", { id: session.userId })
-      : null
+  const session = await selectOne(internals, "sessions", {
+    id: caller.sessionId,
+    expiresAt: { gt: new Date() }
+  })
+  const user = session
+    ? await selectOne(internals, "users", { id: session.userId })
+    : null
 
-    if (session && user) return { session, user, tokenHash: session.tokenHash }
-  }
-
-  return input.headers ? resolveSession(internals, input.headers) : null
+  return session && user
+    ? { session, user, tokenHash: session.tokenHash }
+    : null
 }

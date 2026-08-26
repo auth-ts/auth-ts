@@ -73,7 +73,7 @@ This is worth saying plainly next to any "sign out everywhere" button, because
 the alternative is a support conversation. Shorten `jwt.ttl` if you want a
 tighter bound; you are trading refresh traffic for revocation speed.
 
-An action that cannot accept this latency does not have to: `verifySession(token)`
+An action that cannot accept this latency does not have to: `verifySession`
 reads the session row the token names and answers `null` once it is revoked,
 where `verifyToken` still answers claims. It costs two reads and no write, and
 it is meant for the handful of actions worth that — not for every route.

@@ -268,12 +268,23 @@ describe("verifySession", () => {
     const context = await createTestServer()
     const { token } = await signIn(context)
 
-    const resolved = await context.authServer.verifySession(token)
+    const resolved = await context.authServer.verifySession({ token })
 
     expect(resolved?.user.email).toBe("ada@example.com")
     expect(resolved?.session.id).toBe(
       required(context.db.sessions()[0], "session").id
     )
+  })
+
+  it("reads the bearer off headers, as every other call does", async () => {
+    const context = await createTestServer()
+    const { token } = await signIn(context)
+
+    const resolved = await context.authServer.verifySession({
+      headers: new Headers({ authorization: `Bearer ${token}` })
+    })
+
+    expect(resolved?.user.email).toBe("ada@example.com")
   })
 
   it("answers null once the session is revoked, where verifyToken does not", async () => {
@@ -282,15 +293,29 @@ describe("verifySession", () => {
 
     await context.authServer.signOut({ token, scope: "global" })
 
-    expect(await context.authServer.verifySession(token)).toBeNull()
+    expect(await context.authServer.verifySession({ token })).toBeNull()
     // The distinction the two calls exist to draw.
     expect(await context.authServer.verifyToken(token)).not.toBeNull()
+  })
+
+  it("never answers from the cookie, so it cannot resolve another session", async () => {
+    const context = await createTestServer()
+    const stale = await signIn(context)
+    // A second sign-in presenting no cookie leaves the first session alone.
+    const live = await signIn(context)
+    await context.authServer.signOut({ token: stale.token })
+
+    const headers = cookieHeaders(live.refreshToken)
+    headers.set("authorization", `Bearer ${stale.token}`)
+
+    expect(context.db.sessions()).toHaveLength(1)
+    expect(await context.authServer.verifySession({ headers })).toBeNull()
   })
 
   it("answers null for a token that does not verify at all", async () => {
     const { authServer } = await createTestServer()
 
-    expect(await authServer.verifySession("not-a-token")).toBeNull()
+    expect(await authServer.verifySession({ token: "not-a-token" })).toBeNull()
   })
 
   it("reads without writing, so checking per action never slides a session", async () => {
@@ -307,7 +332,7 @@ describe("verifySession", () => {
       }
     }
 
-    await context.authServer.verifySession(token)
+    await context.authServer.verifySession({ token })
 
     expect(writes).toEqual([])
   })

@@ -15,7 +15,7 @@ import type { CallerInput } from "../session/authenticate"
 import type { ResolvedSession } from "../session/resolve-session"
 import {
   readRefreshToken,
-  resolveCallerSession
+  resolveTokenSession
 } from "../session/resolve-session"
 import type { AdditionalFieldsSchema, AuthUser } from "./auth-db"
 import type { AuthServerConfig } from "./auth-server-config"
@@ -93,9 +93,15 @@ export interface AuthServer<
    * or expired answers `null` where `verifyToken` would still answer claims.
    * Reach for it per action rather than per request — checking everywhere is
    * the design this library is built to avoid.
+   *
+   * The token may be passed directly or arrive as `Authorization: Bearer` on
+   * `headers`, as everywhere else. A refresh cookie on those headers is *not*
+   * a second way in: this answers for the token it was given, and resolving
+   * the cookie instead would answer about a different session and slide it.
+   * A caller holding the cookie has `getToken`, which reads the session anyway.
    */
   verifySession: (
-    token: string
+    input: CallerInput
   ) => Promise<WithUserFields<ResolvedSession, S> | null>
   /** Signs an arbitrary payload. The private key with a function signature. */
   signToken: (claims?: SignTokenClaims) => Promise<string>
@@ -199,11 +205,11 @@ export function createAuthServer<
         token
       )
     },
-    verifySession: async (token) =>
-      // No headers, so the cookie fallback inside cannot fire.
-      (await resolveCallerSession(internals, {
-        token
-      })) as WithUserFields<ResolvedSession, S> | null,
+    verifySession: async (input) =>
+      (await resolveTokenSession(internals, input)) as WithUserFields<
+        ResolvedSession,
+        S
+      > | null,
     signToken: async (claims = {}) => {
       const { signingKey, kid } = await internals.keys()
 

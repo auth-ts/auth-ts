@@ -88,9 +88,10 @@ Plus the JWT-plane functions:
 
 - `verifyToken(token)` — verifies locally against the public key. No database, no
   network. Returns `null` for any failure.
-- `verifySession(token)` — verifies the token *and* confirms the session it
-  names is still live, returning that session and its user, or `null`. Two reads
-  and no write. This is the way out of the revocation latency below, for the
+- `verifySession({ headers, token })` — verifies the token *and* confirms the
+  session it names is still live, returning that session and its user, or
+  `null`. Two reads and no write, and never the cookie: it answers for the token
+  it was given. This is the way out of the revocation latency below, for the
   actions that cannot accept it.
 - `signToken(claims)` — mints anything, with no session check. This is the
   private key with a function signature; never expose it through a route.
@@ -200,7 +201,7 @@ too.
 
 Where an action cannot live with that bound — a transfer, a permission change,
 anything a stolen token must not still reach minutes after the person signed out
-everywhere — `verifySession(token)` reads the session row the token names and
+everywhere — `verifySession` reads the session row the token names and
 answers `null` when it is gone. Reach for it per action, not per request: making
 every route check is the cost this design exists to avoid.
 
