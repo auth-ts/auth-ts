@@ -263,6 +263,56 @@ describe("a token whose session is gone", () => {
   })
 })
 
+describe("verifySession", () => {
+  it("answers the session and its user while the session is live", async () => {
+    const context = await createTestServer()
+    const { token } = await signIn(context)
+
+    const resolved = await context.authServer.verifySession(token)
+
+    expect(resolved?.user.email).toBe("ada@example.com")
+    expect(resolved?.session.id).toBe(
+      required(context.db.sessions()[0], "session").id
+    )
+  })
+
+  it("answers null once the session is revoked, where verifyToken does not", async () => {
+    const context = await createTestServer()
+    const { token } = await signIn(context)
+
+    await context.authServer.signOut({ token, scope: "global" })
+
+    expect(await context.authServer.verifySession(token)).toBeNull()
+    // The distinction the two calls exist to draw.
+    expect(await context.authServer.verifyToken(token)).not.toBeNull()
+  })
+
+  it("answers null for a token that does not verify at all", async () => {
+    const { authServer } = await createTestServer()
+
+    expect(await authServer.verifySession("not-a-token")).toBeNull()
+  })
+
+  it("reads without writing, so checking per action never slides a session", async () => {
+    const context = await createTestServer()
+    const { token } = await signIn(context)
+    const writes: string[] = []
+    for (const method of ["insert", "update", "delete"] as const) {
+      const original = context.db[method].bind(context.db)
+      // biome-ignore lint/suspicious/noExplicitAny: test spy over a heterogeneous method set
+      ;(context.db as any)[method] = (...args: unknown[]) => {
+        writes.push(method)
+        // biome-ignore lint/suspicious/noExplicitAny: forwarding the spied call
+        return (original as any)(...args)
+      }
+    }
+
+    await context.authServer.verifySession(token)
+
+    expect(writes).toEqual([])
+  })
+})
+
 describe("signToken and decodeToken", () => {
   it("mints an arbitrary payload that verifies", async () => {
     const { authServer } = await createTestServer()

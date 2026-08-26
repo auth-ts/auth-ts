@@ -12,7 +12,11 @@ import { verifyToken } from "../jwt/verify-token"
 import { decryptSecret } from "../lib/encrypt"
 import { selectOne } from "../lib/select-one"
 import type { CallerInput } from "../session/authenticate"
-import { readRefreshToken } from "../session/resolve-session"
+import type { ResolvedSession } from "../session/resolve-session"
+import {
+  readRefreshToken,
+  resolveCallerSession
+} from "../session/resolve-session"
 import type { AdditionalFieldsSchema, AuthUser } from "./auth-db"
 import type { AuthServerConfig } from "./auth-server-config"
 import { resolveAuthServerConfig } from "./auth-server-config"
@@ -77,6 +81,22 @@ export interface AuthServer<
   handlers: AuthHandlers
   /** Verifies a token locally — no database, no network. */
   verifyToken: (token: string) => Promise<TokenClaims | null>
+  /**
+   * Verifies a token and confirms the session it names is still live.
+   *
+   * The database-backed twin of {@link AuthServer.verifyToken}, for the actions
+   * where a revocation latency of `jwt.ttl` is too long to accept — a transfer,
+   * a permission change, anything a stolen token must not still reach minutes
+   * after the person signed out everywhere.
+   *
+   * Two reads and no write: the token names its session, and a session revoked
+   * or expired answers `null` where `verifyToken` would still answer claims.
+   * Reach for it per action rather than per request — checking everywhere is
+   * the design this library is built to avoid.
+   */
+  verifySession: (
+    token: string
+  ) => Promise<WithUserFields<ResolvedSession, S> | null>
   /** Signs an arbitrary payload. The private key with a function signature. */
   signToken: (claims?: SignTokenClaims) => Promise<string>
   /** Decodes without verifying. Never authorize with this. */
@@ -179,6 +199,11 @@ export function createAuthServer<
         token
       )
     },
+    verifySession: async (token) =>
+      // No headers, so the cookie fallback inside cannot fire.
+      (await resolveCallerSession(internals, {
+        token
+      })) as WithUserFields<ResolvedSession, S> | null,
     signToken: async (claims = {}) => {
       const { signingKey, kid } = await internals.keys()
 

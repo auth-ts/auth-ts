@@ -98,4 +98,7 @@ export type { OAuthStatePayload, StateCookie } from "./oauth/state-cookie"
 export type { OpenAPIDocument } from "./openapi/build-document"
 export { buildOpenAPIDocument } from "./openapi/build-document"
 export type { GuestConversion, GuestIdentity } from "./session/convert-guest"
-export type { HeadersInput } from "./session/resolve-session"
+export type {
+  HeadersInput,
+  ResolvedSession
+} from "./session/resolve-session"

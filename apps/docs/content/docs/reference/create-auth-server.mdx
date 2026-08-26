@@ -88,6 +88,10 @@ Plus the JWT-plane functions:
 
 - `verifyToken(token)` — verifies locally against the public key. No database, no
   network. Returns `null` for any failure.
+- `verifySession(token)` — verifies the token *and* confirms the session it
+  names is still live, returning that session and its user, or `null`. Two reads
+  and no write. This is the way out of the revocation latency below, for the
+  actions that cannot accept it.
 - `signToken(claims)` — mints anything, with no session check. This is the
   private key with a function signature; never expose it through a route.
 - `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
@@ -193,6 +197,12 @@ The cost of trusting a token is revocation latency: a session revoked elsewhere
 keeps working until that token expires, `jwt.ttl` at the outside. That is the
 same bound your database already lives with, since it authorizes on the token
 too.
+
+Where an action cannot live with that bound — a transfer, a permission change,
+anything a stolen token must not still reach minutes after the person signed out
+everywhere — `verifySession(token)` reads the session row the token names and
+answers `null` when it is gone. Reach for it per action, not per request: making
+every route check is the cost this design exists to avoid.
 
 Every refusal is logged at `debug` with a `reason` of `missing`, `expired`, or
 `invalid`. Counting them is worth doing: a client refreshes ahead of expiry, so a
