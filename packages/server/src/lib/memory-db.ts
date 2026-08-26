@@ -7,6 +7,7 @@ import type {
   AuthTable,
   AuthUser
 } from "../core/auth-db"
+import { isAuthRange } from "../core/auth-db"
 
 /** An in-memory {@link AuthDB} plus a few helpers for inspecting it in tests. */
 export interface MemoryDb extends AuthDB {
@@ -74,10 +75,6 @@ export function createMemoryDb(): MemoryDb {
     return rows
   }
 
-  /** A range, per the contract: an object that is not a Date. */
-  const isRange = (value: unknown): value is { lt?: unknown; gt?: unknown } =>
-    typeof value === "object" && value !== null && !(value instanceof Date)
-
   const order = (stored: unknown, bound: unknown) =>
     stored instanceof Date && bound instanceof Date
       ? stored.getTime() - bound.getTime()
@@ -87,7 +84,7 @@ export function createMemoryDb(): MemoryDb {
     Object.entries(where).every(([column, value]) => {
       const stored = row[column]
 
-      if (isRange(value)) {
+      if (isAuthRange(value)) {
         if (value.lt !== undefined && order(stored, value.lt) >= 0) return false
         if (value.gt !== undefined && order(stored, value.gt) <= 0) return false
         return true

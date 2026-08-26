@@ -279,6 +279,19 @@ export interface AuthRange<V> {
 }
 
 /**
+ * Tells a range apart from a value, which is the one branch a `where` needs.
+ *
+ * The shape is chosen so this stays a single check: a range is a non-null
+ * object that is not a `Date`, and everything else compares for equality. It
+ * ships rather than being described because every implementation would
+ * otherwise hand-copy the same three conditions, and a column of object type
+ * would be misread by each of them separately.
+ */
+export function isAuthRange(value: unknown): value is AuthRange<unknown> {
+  return typeof value === "object" && value !== null && !(value instanceof Date)
+}
+
+/**
  * A query: column/value pairs, **all** of which must match.
  *
  * Every column compares for equality, except `expiresAt`, which also accepts an
@@ -286,10 +299,9 @@ export interface AuthRange<V> {
  * expiry still ahead — in the same statement that updates it, rather than
  * reading first to find out whether it may write.
  *
- * Telling the two apart is one check, and the shape is chosen so it stays one:
- * a range is a non-null object that is not a `Date`. So an implementation reads
- * `value instanceof Date || typeof value !== "object"` as "equality" and
- * everything else as a range, and only ever sees the second case on `expiresAt`.
+ * Telling the two apart is one check, and {@link isAuthRange} is that check —
+ * an implementation reads anything it refuses as equality, and only ever meets
+ * the other case on `expiresAt`.
  *
  * **`null` is not a value here**, though the columns are nullable. Core looks
  * accounts up by an identifier, and an identifier that came back null would

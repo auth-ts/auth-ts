@@ -94,12 +94,11 @@ index, because the missing constraint only shows under a race.
   where: { tokenHash, expiresAt: { gt: new Date() } }
   ```
 
-  Telling the two apart is one check, and the shape is chosen so it stays one —
-  a range is a non-null object that is not a `Date`:
+  Telling the two apart is one check, and the library ships it rather than
+  asking you to write it — a range is a non-null object that is not a `Date`:
 
   ```ts
-  const isRange = (value: unknown) =>
-    typeof value === "object" && value !== null && !(value instanceof Date)
+  import { isAuthRange } from "@auth-ts/server"
   ```
 
   That is the whole operator surface: no `OR`, no `in`, no negation. The
