@@ -42,6 +42,7 @@ describe("guest sign-in", () => {
     expect(user.type).toBe("guest")
     expect(context.db.users()).toHaveLength(1)
     expect(context.db.users()[0]?.email).toBeNull()
+    expect(context.db.sessions()[0]?.amr).toEqual(["anonymous"])
 
     const whoami = await context.authServer.handler(
       request("POST", "/api/auth/user", {

@@ -309,6 +309,7 @@ describe("oauth callback", () => {
     expect(user?.email).toBe("ada@example.com")
     expect(user?.name).toBe("Ada")
     expect(user?.type).toBe("user")
+    expect(db.sessions()[0]?.amr).toEqual(["fed"])
   })
 
   it("records the handle as the label, and refreshes it when it changes", async () => {

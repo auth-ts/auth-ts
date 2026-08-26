@@ -160,6 +160,55 @@ describe("verification code sign-in over HTTP", () => {
   })
 })
 
+describe("what a session records about proving identity", () => {
+  it("names an emailed code otp, which is the registered value for one", async () => {
+    const { authServer, sentCodes, db } = await createTestServer()
+
+    await authServer.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const verified = await authServer.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: {
+          email: "ada@example.com",
+          code: required(sentCodes.at(-1), "sent code").code
+        }
+      })
+    )
+
+    expect(db.sessions()[0]?.amr).toEqual(["otp"])
+
+    // And it reaches the token, which is the thing a policy reads.
+    const { token } = (await verified.json()) as { token: string }
+    expect((await authServer.verifyToken(token))?.amr).toEqual(["otp"])
+  })
+
+  it("names a texted code sms, which the registry distinguishes", async () => {
+    const codes: string[] = []
+    const { authServer, db } = await createTestServer({
+      sms: { sendCode: ({ code }) => void codes.push(code) }
+    })
+
+    await authServer.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { phoneNumber: "+15555550123" }
+      })
+    )
+    await authServer.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: {
+          phoneNumber: "+15555550123",
+          code: required(codes.at(-1), "sent code")
+        }
+      })
+    )
+
+    expect(db.sessions()[0]?.amr).toEqual(["sms"])
+  })
+})
+
 describe("token and user endpoints", () => {
   const signIn = async () => {
     const context = await createTestServer()

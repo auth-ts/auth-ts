@@ -28,6 +28,12 @@ export interface IssueSessionInput {
   user: AuthUser
   headers: Headers
   /**
+   * What proved identity, as RFC 8176 method references — see
+   * {@link AuthSession.amr}. Required so a new sign-in path cannot forget to
+   * say how it authenticated somebody.
+   */
+  amr: string[]
+  /**
    * The request's URL, when there is one.
    *
    * Read only to decide whether cookies carry `Secure`; absent for an endpoint
@@ -59,7 +65,7 @@ export interface IssueSessionInput {
  */
 export async function issueSession(
   internals: AuthServerInternals,
-  { user, headers, requestURL, replaces }: IssueSessionInput
+  { user, headers, requestURL, replaces, amr }: IssueSessionInput
 ): Promise<IssueResult> {
   const { config } = internals
   const rawToken = randomBytesBase64url(32)
@@ -70,6 +76,7 @@ export async function issueSession(
     insertRow(internals, "sessions", {
       userId: user.id,
       tokenHash,
+      amr,
       expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
       ...sessionStamp(internals, headers)
     }),
@@ -127,16 +134,24 @@ export async function issueSession(
  * `type` rides along because row-level security reads it; `role` stays whatever
  * the configuration says, because it maps to a real Postgres role. `sid` names
  * the session the token was minted from, so an endpoint authenticated by the
- * token alone still knows which session it is acting for. Nothing that
- * identifies the person does: the token is handed to the database, to sync
- * services, and to whatever logs sit between them, and none of them need a name
- * or an address to authorize a query.
+ * token alone still knows which session it is acting for. `amr` says what
+ * proved identity, for a policy that treats a texted code and a federated
+ * assertion differently — it is here rather than left to `jwt.claims` because
+ * a column no token carries cannot be read by the thing it exists for. Nothing
+ * that identifies the person rides along: the token is handed to the database,
+ * to sync services, and to whatever logs sit between them, and none of them
+ * need a name or an address to authorize a query.
  *
  * `primaryUserId` is deliberately never included either — it describes a
  * pending data migration, not who is signed in.
  */
-export function accessTokenClaims(user: AuthUser, sessionId: string) {
-  return { userId: user.id, type: user.type, sid: sessionId }
+export function accessTokenClaims(user: AuthUser, session: AuthSession) {
+  return {
+    userId: user.id,
+    type: user.type,
+    sid: session.id,
+    ...(session.amr?.length ? { amr: session.amr } : {})
+  }
 }
 
 /**
@@ -167,6 +182,6 @@ export async function mintAccessToken(
       ...(config.issuer ? { issuer: config.issuer } : {}),
       ...(config.jwt.audience ? { audience: config.jwt.audience } : {})
     },
-    accessTokenClaims(user, session.id)
+    accessTokenClaims(user, session)
   )
 }

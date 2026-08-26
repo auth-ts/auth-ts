@@ -116,6 +116,21 @@ export interface AuthSession {
   expiresAt: Date
   userAgent?: string | null
   ipAddress?: string | null
+  /**
+   * How this session was authenticated, as RFC 8176 method references.
+   *
+   * The registry's vocabulary wherever it has a value: `otp` for an emailed
+   * code, `sms` for one sent to a phone. Federated sign-in and guests have no
+   * registered value, so they take `fed` and `anonymous`, which is what the
+   * large providers settled on for the same two cases.
+   *
+   * An array because a session accumulates — a second factor adds to what
+   * proved identity the first time rather than replacing it. Return it from
+   * `jwt.claims` and it is the `amr` claim as OpenID Connect defines it: a flat
+   * array of strings, which a row-level security policy tests with one
+   * operator where an array of objects would need a path query.
+   */
+  amr?: string[] | null
   /** Written by core on insert and on every update it makes. */
   updatedAt: Date
 }

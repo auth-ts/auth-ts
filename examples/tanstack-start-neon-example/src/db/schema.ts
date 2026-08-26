@@ -68,6 +68,7 @@ export const sessions = pgTable.withRLS(
     expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
     userAgent: text("userAgent"),
     ipAddress: text("ipAddress"),
+    amr: text("amr").array(),
     createdAt: timestamp("createdAt", { withTimezone: true })
       .notNull()
       .defaultNow(),

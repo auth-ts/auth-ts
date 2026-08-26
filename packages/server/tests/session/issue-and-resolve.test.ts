@@ -31,6 +31,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -50,6 +51,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -75,6 +77,7 @@ describe("issueSession", () => {
     })
     const issuedCross = await issueSession(cross.internals, {
       user: await insertUser(cross.db, { email: "ada@example.com" }),
+      amr: ["otp"],
       headers: new Headers({ origin: "https://app.example.com" }),
       requestURL: "https://api.example.com/api/auth/sign-in/code"
     })
@@ -90,6 +93,7 @@ describe("issueSession", () => {
     const hostOnly = await createTestInternals({})
     const issuedHostOnly = await issueSession(hostOnly.internals, {
       user: await insertUser(hostOnly.db, { email: "ada@example.com" }),
+      amr: ["otp"],
       headers: new Headers({ origin: "https://app.example.com" }),
       requestURL: "https://api.example.com/api/auth/sign-in/code"
     })
@@ -108,6 +112,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -130,7 +135,12 @@ describe("issueSession", () => {
       "x-forwarded-for": "9.9.9.9, 203.0.113.7"
     })
 
-    await issueSession(internals, { user, headers, requestURL: REQUEST_URL })
+    await issueSession(internals, {
+      user,
+      amr: ["otp"],
+      headers,
+      requestURL: REQUEST_URL
+    })
     const [stored] = db.sessions()
 
     expect(stored?.userAgent).toBe("TestBrowser/1.0")
@@ -143,6 +153,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: "http://localhost:3000/api/auth/sign-in/code"
     })
@@ -159,6 +170,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -188,6 +200,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -216,6 +229,7 @@ describe("issueSession", () => {
     await expect(
       issueSession(internals, {
         user,
+        amr: ["otp"],
         headers: new Headers(),
         requestURL: REQUEST_URL
       })
@@ -235,6 +249,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user: required(converted, "converted guest"),
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -253,6 +268,7 @@ describe("issueSession", () => {
 
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -267,6 +283,7 @@ describe("resolveSession", () => {
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -284,6 +301,7 @@ describe("resolveSession", () => {
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -306,6 +324,7 @@ describe("resolveSession", () => {
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -328,6 +347,7 @@ describe("resolveSession", () => {
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -355,6 +375,7 @@ describe("resolveSession", () => {
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -383,6 +404,7 @@ describe("resolveSession", () => {
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -407,6 +429,7 @@ describe("resolveCallerSession", () => {
     const user = await insertUser(db, { email: "ada@example.com" })
     const issued = await issueSession(internals, {
       user,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })
@@ -439,6 +462,7 @@ describe("resolveCallerSession", () => {
     const other = await insertUser(db, { email: "grace@example.com" })
     const reissued = await issueSession(internals, {
       user: other,
+      amr: ["otp"],
       headers: new Headers(),
       requestURL: REQUEST_URL
     })

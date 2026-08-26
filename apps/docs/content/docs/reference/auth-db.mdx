@@ -30,7 +30,7 @@ cost of not having an adapter package.
 | table | columns | unique | indexed | swept |
 | --- | --- | --- | --- | --- |
 | `users` | `id`, `email`, `phoneNumber`, `name`, `image`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
-| `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
+| `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
 | `verifications` | `id`, `identifier`, `codeHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |

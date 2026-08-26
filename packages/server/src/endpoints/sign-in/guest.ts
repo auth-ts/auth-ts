@@ -101,6 +101,7 @@ export const signInAsGuest = defineEndpoint({
     const issued = await issueSession(internals, {
       user,
       headers,
+      amr: ["anonymous"],
       requestURL: input.requestURL
     })
 

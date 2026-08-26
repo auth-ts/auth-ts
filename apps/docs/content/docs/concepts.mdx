@@ -92,6 +92,7 @@ endpoint reads the session row and refuses when it is gone.
   "sid": "the session id",
   "role": "authenticated",
   "type": "user",
+  "amr": ["otp"],
   "iat": 1771200000,
   "exp": 1771200600
 }
@@ -106,6 +107,32 @@ insert; promoting someone to `admin` is your own SQL, so no endpoint can do it.
 
 The payload is readable by anyone holding the token and is shipped to your
 database on every query. Nothing secret belongs in it.
+
+### What proved identity
+
+Every session records how it was authenticated, in `sessions.amr`, and every
+token minted from it carries that as its `amr` claim. The vocabulary is the
+[RFC 8176](https://www.rfc-editor.org/rfc/rfc8176) registry's wherever it has a
+value for the case:
+
+| sign-in | `amr` | in the registry |
+| --- | --- | --- |
+| emailed code | `["otp"]` | yes |
+| texted code | `["sms"]` | yes |
+| Google, GitHub | `["fed"]` | no — nothing registered covers a federated assertion |
+| guest | `["anonymous"]` | no — nothing registered covers an unauthenticated session |
+
+The registry is explicitly not exhaustive — OpenID Connect leaves the values to
+agreement between the parties reading them — so the last two take the names the
+large providers converged on rather than inventing a third spelling.
+
+It is an array because a session accumulates: whatever proves identity again
+later adds to the list rather than replacing it. The shape is the one OIDC
+defines — a flat array of strings — so a policy tests it with one operator:
+
+```sql
+auth.jwt()->'amr' ? 'fed'
+```
 
 ### Adding your own claims
 
