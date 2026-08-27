@@ -59,9 +59,12 @@ export const listUsers = defineEndpoint({
           tokenHash: await sha256Hex(rawToken),
           expiresAt: { gt: new Date() }
         })
-        if (!session) return null
+        // The row is read by the session's own owner, never by the name on the
+        // cookie: a name is written by whoever sent it, so trusting one would
+        // hand back any user's row to anybody holding a token of their own.
+        if (!session || session.userId !== userId) return null
 
-        return selectOne(internals, "users", { id: userId })
+        return selectOne(internals, "users", { id: session.userId })
       })
     )
 

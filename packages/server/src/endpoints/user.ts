@@ -198,7 +198,7 @@ export const deleteUser = defineEndpoint({
       for (const cookie of clearedRefreshCookies(internals, {
         requestURL: input.requestURL,
         headers,
-        userId: user.id
+        userIds: [user.id]
       })) {
         responseHeaders.append("set-cookie", cookie)
       }

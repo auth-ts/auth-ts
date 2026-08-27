@@ -374,3 +374,158 @@ describe("guest conversion under multiUser", () => {
     ).toBe("user")
   })
 })
+
+describe("a refresh cookie carrying somebody else's name", () => {
+  /** The attacker's own refresh token, relabelled as the victim's. */
+  const relabelled = (cookies: Cookies, victimId: string) => {
+    const own = required(
+      Object.entries(cookies).find(([name]) =>
+        name.startsWith("auth-ts.refresh.")
+      )?.[1],
+      "attacker refresh cookie"
+    )
+
+    return { [`auth-ts.refresh.${victimId}`]: own }
+  }
+
+  it("cannot switch onto the named user, nor mint a token for them", async () => {
+    const context = await createTestServer({ multiUser: true })
+    const victim = await signIn(context, "victim@example.com")
+    const attacker = await signIn(context, "attacker@example.com")
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/users/switch", {
+        body: { userId: victim.user.id },
+        cookies: relabelled(attacker.cookies, victim.user.id),
+        token: await tokenFor(context, attacker.cookies)
+      })
+    )
+
+    expect(response.status).toBe(404)
+  })
+
+  it("cannot read the named user's row from the switcher", async () => {
+    const context = await createTestServer({ multiUser: true })
+    const victim = await signIn(context, "victim@example.com")
+    const attacker = await signIn(context, "attacker@example.com")
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/users", {
+        cookies: relabelled(attacker.cookies, victim.user.id),
+        token: await tokenFor(context, attacker.cookies)
+      })
+    )
+    const users = (await response.json()) as { id: string }[]
+
+    expect(users.map(({ id }) => id)).not.toContain(victim.user.id)
+  })
+
+  it("cannot revoke the named user's sessions at any scope", async () => {
+    for (const scope of ["local", "others", "global"] as const) {
+      const context = await createTestServer({ multiUser: true })
+      const victim = await signIn(context, "victim@example.com")
+      const attacker = await signIn(context, "attacker@example.com")
+
+      await context.authServer.handler(
+        request("POST", "/api/auth/sign-out", {
+          body: { scope, userId: victim.user.id },
+          cookies: relabelled(attacker.cookies, victim.user.id),
+          token: await tokenFor(context, attacker.cookies)
+        })
+      )
+
+      expect(
+        await selectRows(context.db, "sessions", { userId: victim.user.id })
+      ).toHaveLength(1)
+    }
+  })
+
+  it("cannot revoke a stranger's sessions with a cookie holding nothing", async () => {
+    const context = await createTestServer()
+    const victim = await signIn(context, "victim@example.com")
+    const attacker = await signIn(context, "attacker@example.com")
+
+    await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", {
+        body: { scope: "global", userId: victim.user.id },
+        cookies: { [`auth-ts.refresh.${victim.user.id}`]: "not-a-token" },
+        token: await tokenFor(context, attacker.cookies)
+      })
+    )
+
+    expect(
+      await selectRows(context.db, "sessions", { userId: victim.user.id })
+    ).toHaveLength(1)
+  })
+})
+
+describe("retiring a browser's cookies", () => {
+  it("keeps a live cookie when the hinted one is dead, and hands it the hint", async () => {
+    const context = await createTestServer({ multiUser: true })
+    const ada = await signIn(context, "ada@example.com")
+    const grace = await signIn(context, "grace@example.com", ada.cookies)
+
+    // Grace is active; her session is revoked from another device.
+    await context.db.delete({
+      table: "sessions",
+      where: { userId: grace.user.id }
+    })
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies: grace.cookies })
+    )
+    expect(await response.clone().json()).toBeNull()
+
+    const after = applyCookies(grace.cookies, response)
+    expect(usersInCookies(after)).toEqual([ada.user.id])
+    expect(after["auth-ts.hint"]).toBe(ada.user.id)
+
+    // Ada's session was never touched, so the next call resolves to her.
+    expect(
+      await selectRows(context.db, "sessions", { userId: ada.user.id })
+    ).toHaveLength(1)
+    const whoami = await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies: after })
+    )
+    expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
+      ada.user.id
+    )
+  })
+
+  it("retires every cookie when none of them resolves", async () => {
+    const context = await createTestServer({ multiUser: true })
+    const ada = await signIn(context, "ada@example.com")
+    const grace = await signIn(context, "grace@example.com", ada.cookies)
+    await context.db.delete({ table: "sessions", where: {} })
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/token", { cookies: grace.cookies })
+    )
+
+    expect(await response.clone().json()).toBeNull()
+    expect(usersInCookies(applyCookies(grace.cookies, response))).toEqual([])
+  })
+
+  it("answers for the token's own owner and relabels a mislabelled cookie", async () => {
+    const context = await createTestServer({ multiUser: true })
+    const ada = await signIn(context, "ada@example.com")
+    const own = required(
+      Object.entries(ada.cookies).find(([name]) =>
+        name.startsWith("auth-ts.refresh.")
+      )?.[1],
+      "ada refresh cookie"
+    )
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/token", {
+        cookies: { "auth-ts.refresh.someone-else": own }
+      })
+    )
+
+    // Possession of the token is the proof, so the name it arrived under
+    // decides nothing: it resolves to Ada and is written back as hers.
+    const body = (await response.clone().json()) as { user: { id: string } }
+    expect(body.user.id).toBe(ada.user.id)
+    expect(usersInCookies(applyCookies({}, response))).toEqual([ada.user.id])
+  })
+})

@@ -136,9 +136,13 @@ export const signOut = defineEndpoint({
       return { data: undefined, status: 204 }
     }
 
+    // A session id is what proves the target is this caller's to revoke: it
+    // comes from the token, or from a cookie whose own row named the same user.
+    // `global` is no exception — deleting by `userId` alone would revoke
+    // whoever a forged cookie name pointed at.
     for (const target of targets) {
       const sessionId = sessionIdFor(target)
-      if (scope !== "global" && !sessionId) continue
+      if (!sessionId) continue
       await internals.db.delete({
         table: "sessions",
         where:
@@ -159,7 +163,7 @@ export const signOut = defineEndpoint({
     } else {
       for (const cookie of clearedRefreshCookies(internals, {
         ...context,
-        userId: input.userId
+        userIds: [input.userId]
       })) {
         responseHeaders.append("set-cookie", cookie)
       }

@@ -98,11 +98,13 @@ export function refreshCookies(
 }
 
 /**
- * The `Set-Cookie` values that retire one user's session, or every one of them.
+ * The `Set-Cookie` values that retire the named users' sessions, or every one
+ * of them.
  *
- * `userId` retires that user alone and points the hint at whoever is left,
+ * `userIds` retires those alone and points the hint at whoever is left,
  * because signing one user out of a shared browser must not sign out the rest.
- * Omitting it retires everything this browser presented.
+ * Omitting it retires everything this browser presented, which is only correct
+ * where the caller has established that none of it resolves to a live session.
  *
  * With `cookie.hintDomain` set the hint is written `out` rather than cleared. A
  * cross-subdomain deployment cannot tell a hint that was never delivered from
@@ -111,7 +113,11 @@ export function refreshCookies(
  */
 export function clearedRefreshCookies(
   internals: AuthServerInternals,
-  { requestURL, headers, userId }: SessionCookieContext & { userId?: string }
+  {
+    requestURL,
+    headers,
+    userIds
+  }: SessionCookieContext & { userIds?: readonly string[] }
 ) {
   const { config } = internals
   const secure = shouldUseSecureCookies(requestURL)
@@ -120,7 +126,7 @@ export function clearedRefreshCookies(
   const presented = headers
     ? readRefreshCookies(internals, headers)
     : new Map<string, string>()
-  const retiring = userId === undefined ? [...presented.keys()] : [userId]
+  const retiring = userIds ?? [...presented.keys()]
   const cookies = retiring.map((id) =>
     clearCookie(refreshCookieName(config, id), config.cookie.path, secure)
   )

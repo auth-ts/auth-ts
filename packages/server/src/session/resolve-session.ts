@@ -68,6 +68,12 @@ export function readRefreshToken(
  * alive, and the columns say when it was last used rather than when it was last
  * written to.
  *
+ * Asking for a `userId` asks about *that user's* cookie, so the session it
+ * resolves to must belong to them. The name a cookie carries is written by
+ * whoever sent it, and only the hash inside proves anything — without this a
+ * caller could present their own refresh token under somebody else's name and
+ * be answered with a session, and through it a token, that is not theirs.
+ *
  * @returns The session and the hash it was found by, or `null`.
  */
 export async function resolveSessionRow(
@@ -85,6 +91,11 @@ export async function resolveSessionRow(
   const [session] = await slideSession(internals, tokenHash, headers)
   if (!session) {
     internals.log.debug("no live session for this refresh credential")
+    return null
+  }
+
+  if (userId !== undefined && session.userId !== userId) {
+    internals.log.warn("refresh cookie names a user it does not belong to")
     return null
   }
 

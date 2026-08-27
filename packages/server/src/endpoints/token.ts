@@ -1,11 +1,14 @@
 import type { AuthUser } from "../core/auth-db"
 import { defineEndpoint } from "../http/define-endpoint"
+import { sha256Hex } from "../lib/hash"
+import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import { mintAccessToken } from "../session/issue-session"
 import type { HeadersInput } from "../session/resolve-session"
 import { readRefreshToken, resolveSession } from "../session/resolve-session"
 import {
   clearedRefreshCookies,
+  readRefreshCookies,
   refreshCookies
 } from "../session/session-cookies"
 
@@ -78,8 +81,27 @@ export const getToken = defineEndpoint({
     const { config } = internals
     const resolved = await resolveSession(internals, input.headers)
     if (!resolved) {
+      // Every credential is resolved before any of it is retired. This answer
+      // is about the one cookie the hint named; a browser holding another
+      // user's live session must not be signed out of it, and a cookie cleared
+      // while its row lives on strands a session nobody can reach.
+      const presented = [...readRefreshCookies(internals, input.headers)]
+      const spent = await Promise.all(
+        presented.map(async ([userId, rawToken]) => {
+          const live = await selectOne(internals, "sessions", {
+            tokenHash: await sha256Hex(rawToken),
+            expiresAt: { gt: new Date() }
+          })
+
+          return live?.userId === userId ? null : userId
+        })
+      )
+
       const headers = new Headers()
-      for (const cookie of clearedRefreshCookies(internals, input)) {
+      for (const cookie of clearedRefreshCookies(internals, {
+        ...input,
+        userIds: spent.filter((userId) => userId !== null)
+      })) {
         headers.append("set-cookie", cookie)
       }
 

@@ -84,7 +84,11 @@ export const switchUser = defineEndpoint({
     const resolved = await resolveSessionRow(internals, headers, input.userId)
     if (!resolved) throw notFound()
 
-    const user = await selectOne(internals, "users", { id: input.userId })
+    // The session's own owner, not the id that was asked for. They are equal
+    // by the time this runs, and minting a token is not the place to assume it.
+    const user = await selectOne(internals, "users", {
+      id: resolved.session.userId
+    })
     if (!user) throw notFound()
 
     const token = await mintAccessToken(internals, user, resolved.session)
