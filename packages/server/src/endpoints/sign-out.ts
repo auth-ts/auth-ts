@@ -3,7 +3,7 @@ import { defineEndpoint } from "../http/define-endpoint"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
-import { resolveSessionRow } from "../session/resolve-session"
+import { resolveSessionRowForUser } from "../session/resolve-session"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
 import {
   clearedRefreshCookies,
@@ -99,7 +99,8 @@ export const signOut = defineEndpoint({
     const fromCookies = await Promise.all(
       presented.map(async ([userId]) => ({
         userId,
-        session: (await resolveSessionRow(internals, headers, userId))?.session
+        session: (await resolveSessionRowForUser(internals, headers, userId))
+          ?.session
       }))
     )
     // The caller always counts, cookie or not: a bearer-only client — a native

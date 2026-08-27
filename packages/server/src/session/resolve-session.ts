@@ -57,7 +57,7 @@ export function readRefreshToken(
 }
 
 /**
- * Resolves the session row alone, without reading the user.
+ * Finds a live session by a raw refresh token and marks it used.
  *
  * One statement: the session is found and touched together, matched on the hash
  * and on an expiry still ahead of now. Expiry is therefore enforced here rather
@@ -67,21 +67,12 @@ export function readRefreshToken(
  * Sliding on the way through means being in the application keeps a session
  * alive, and the columns say when it was last used rather than when it was last
  * written to.
- *
- * Asking for a `userId` asks about *that user's* cookie, so the session it
- * resolves to must belong to them. The name a cookie carries is written by
- * whoever sent it, and only the hash inside proves anything — without this a
- * caller could present their own refresh token under somebody else's name and
- * be answered with a session, and through it a token, that is not theirs.
- *
- * @returns The session and the hash it was found by, or `null`.
  */
-export async function resolveSessionRow(
+async function liveSession(
   internals: AuthServerInternals,
   headers: Headers,
-  userId?: string
+  rawToken: string | undefined
 ): Promise<Omit<ResolvedSession, "user"> | null> {
-  const rawToken = readRefreshToken(internals, headers, userId)
   if (!rawToken) {
     internals.log.debug("no refresh credential on request")
     return null
@@ -94,12 +85,56 @@ export async function resolveSessionRow(
     return null
   }
 
-  if (userId !== undefined && session.userId !== userId) {
+  return { session, tokenHash }
+}
+
+/**
+ * Resolves whichever session this browser holds, without reading the user.
+ *
+ * Answers for whoever the presented token turns out to belong to, because no
+ * claim is being made about who that is — possession of the token is the whole
+ * proof. Use {@link resolveSessionRowForUser} wherever the caller names a user.
+ *
+ * @returns The session and the hash it was found by, or `null`.
+ */
+export function resolveSessionRow(
+  internals: AuthServerInternals,
+  headers: Headers
+): Promise<Omit<ResolvedSession, "user"> | null> {
+  return liveSession(internals, headers, readRefreshToken(internals, headers))
+}
+
+/**
+ * Resolves the session held under one user's name, and only if it is theirs.
+ *
+ * Separate from {@link resolveSessionRow} rather than an optional argument on
+ * it, because the difference is a security boundary and an omitted parameter
+ * makes one look like the other. Naming a user is a claim, and the row is what
+ * settles it: a cookie's name is written by whoever sent it, and only the hash
+ * inside proves anything. Without the check a caller could present their own
+ * refresh token under somebody else's name and be answered with a session — and
+ * through it an access token — that is not theirs.
+ *
+ * @returns The session and the hash it was found by, or `null`.
+ */
+export async function resolveSessionRowForUser(
+  internals: AuthServerInternals,
+  headers: Headers,
+  userId: string
+): Promise<Omit<ResolvedSession, "user"> | null> {
+  const resolved = await liveSession(
+    internals,
+    headers,
+    readRefreshToken(internals, headers, userId)
+  )
+  if (!resolved) return null
+
+  if (resolved.session.userId !== userId) {
     internals.log.warn("refresh cookie names a user it does not belong to")
     return null
   }
 
-  return { session, tokenHash }
+  return resolved
 }
 
 /**
@@ -109,10 +144,9 @@ export async function resolveSessionRow(
  */
 export async function resolveSession(
   internals: AuthServerInternals,
-  headers: Headers,
-  userId?: string
+  headers: Headers
 ): Promise<ResolvedSession | null> {
-  const resolved = await resolveSessionRow(internals, headers, userId)
+  const resolved = await resolveSessionRow(internals, headers)
   if (!resolved) return null
 
   const user = await selectOne(internals, "users", {

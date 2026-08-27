@@ -7,7 +7,7 @@ import { authenticate } from "../../session/authenticate"
 import { mintAccessToken } from "../../session/issue-session"
 import {
   readRefreshToken,
-  resolveSessionRow
+  resolveSessionRowForUser
 } from "../../session/resolve-session"
 import { refreshCookies } from "../../session/session-cookies"
 
@@ -81,7 +81,11 @@ export const switchUser = defineEndpoint({
     // Resolved through the same path as any other request, so a cookie whose
     // session has expired or been revoked is a 404 rather than a switch onto
     // nothing — and the switch slides it, which is what makes it the active one.
-    const resolved = await resolveSessionRow(internals, headers, input.userId)
+    const resolved = await resolveSessionRowForUser(
+      internals,
+      headers,
+      input.userId
+    )
     if (!resolved) throw notFound()
 
     // The session's own owner, not the id that was asked for. They are equal
