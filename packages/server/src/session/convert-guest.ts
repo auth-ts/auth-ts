@@ -73,12 +73,12 @@ export async function convertGuest(
   // The one place `type` legitimately changes: an anonymous row becoming the
   // real account it always was.
   const upgraded = await updateUser(internals, guest, {
+    ...identity.additionalFields,
     type: "user",
     email: identity.email,
     phoneNumber: identity.phoneNumber,
     name: identity.name,
-    image: identity.image,
-    ...identity.additionalFields
+    image: identity.image
   })
   internals.log.info("guest upgraded in place, keeping its id and its rows")
 
