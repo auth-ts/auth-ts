@@ -6,6 +6,7 @@ import { randomBytesBase64url } from "../lib/generate-random"
 import { sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
+import { selectOne } from "../lib/select-one"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { sweepExpired } from "../lib/sweep-expired"
 import {
@@ -87,13 +88,28 @@ export async function issueSession(
   // browser, so it is deleted rather than left to run out a month-long lifetime
   // somewhere nobody can revoke it. Without multiUser that is every session the
   // browser presented; with it, only this user's own previous one.
-  const presented = readRefreshCookies(internals, headers)
-  const stranded = [...presented].filter(
-    ([userId]) => !config.multiUser || userId === user.id
+  //
+  // Which is which comes from each row rather than from the name its cookie
+  // arrived under, so a mislabelled cookie retires the session it actually
+  // holds instead of being counted as somebody else's and left behind.
+  const held = await Promise.all(
+    [...readRefreshCookies(internals, headers)].map(
+      async ([cookieUserId, rawToken]) => {
+        const hash = await sha256Hex(rawToken)
+
+        return {
+          cookieUserId,
+          hash,
+          ownerId: (await selectOne(internals, "sessions", { tokenHash: hash }))
+            ?.userId
+        }
+      }
+    )
   )
-  const superseded = new Set(
-    await Promise.all(stranded.map(([, token]) => sha256Hex(token)))
+  const stranded = held.filter(
+    ({ ownerId }) => !config.multiUser || ownerId === user.id
   )
+  const superseded = new Set(stranded.map(({ hash }) => hash))
   if (replaces) superseded.add(replaces)
   // Only once the replacement exists: if creating it had failed, the caller
   // would still hold a working session rather than none.
@@ -109,11 +125,15 @@ export async function issueSession(
   internals.log.debug("session issued", { userType: user.type })
 
   const secure = shouldUseSecureCookies(requestURL)
-  for (const [userId] of stranded) {
-    if (userId === user.id) continue
+  for (const { cookieUserId } of stranded) {
+    if (cookieUserId === user.id) continue
     responseHeaders.append(
       "set-cookie",
-      clearCookie(refreshCookieName(config, userId), config.cookie.path, secure)
+      clearCookie(
+        refreshCookieName(config, cookieUserId),
+        config.cookie.path,
+        secure
+      )
     )
   }
   for (const cookie of refreshCookies(internals, {

@@ -360,11 +360,9 @@ export interface AuthServerOptions<
    * Absolute origin of this server, e.g. `https://app.example.com`.
    *
    * Optional, with no environment variable behind it. Left unset, every origin
-   * this server needs — the OAuth `redirect_uri` above all — is derived per
-   * request from `X-Forwarded-Host` and `X-Forwarded-Proto`, falling back to the
-   * request URL. That is correct for a single-origin app, behind a proxy or not,
-   * and a forged host does not become a redirect anywhere: providers only ever
-   * redirect to a URI registered in their own console.
+   * this server needs — the OAuth `redirect_uri` above all — is the request
+   * URL's own origin, or what a proxy forwarded when `trustedProxyHeaders` says
+   * to read it.
    *
    * Set it to pin the canonical origin — a proxy that rewrites the host without
    * forwarding it, or an app answering on several origins that must always name
@@ -372,6 +370,23 @@ export interface AuthServerOptions<
    * need a fixed value, so both are absent without it.
    */
   baseURL?: string
+  /**
+   * Derive this server's origin from `X-Forwarded-Host` and `X-Forwarded-Proto`.
+   *
+   * Off by default, because nothing about a request proves those headers came
+   * from a proxy rather than from whoever sent it. The origin they name is what
+   * the OAuth `redirect_uri` is built from and is allowed through the origin
+   * check, so a deployment that reads them without a proxy in front lets a
+   * caller nominate its own origin.
+   *
+   * Turn it on when this server sits behind a proxy that sets both headers and
+   * cannot be bypassed — a runtime that only ever sees an internal URL, or an
+   * app answering on several approved domains. `baseURL` wins when set, so the
+   * two are alternatives rather than layers.
+   *
+   * @default false
+   */
+  trustedProxyHeaders?: boolean
   /** Refresh-token lifetime and whether it slides on use. */
   session?: SessionOptions
   /** Refresh-cookie name and scope. Security attributes are fixed, not options. */

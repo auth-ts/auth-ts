@@ -529,3 +529,27 @@ describe("retiring a browser's cookies", () => {
     expect(usersInCookies(applyCookies({}, response))).toEqual([ada.user.id])
   })
 })
+
+describe("superseding a session", () => {
+  it("retires the session a mislabelled cookie actually holds", async () => {
+    const context = await createTestServer({ multiUser: true })
+    const ada = await signIn(context, "ada@example.com")
+    const own = required(
+      Object.entries(ada.cookies).find(([name]) =>
+        name.startsWith("auth-ts.refresh.")
+      )?.[1],
+      "ada refresh cookie"
+    )
+
+    // Her own token, relabelled. The row still says Ada, so signing in again
+    // retires it rather than leaving it live under a name nobody looks up.
+    const again = await signIn(context, "ada@example.com", {
+      "auth-ts.refresh.bogus": own
+    })
+
+    expect(
+      await selectRows(context.db, "sessions", { userId: ada.user.id })
+    ).toHaveLength(1)
+    expect(usersInCookies(again.cookies)).toEqual([ada.user.id])
+  })
+})

@@ -44,6 +44,7 @@ export interface AuthServerConfig {
   secret: string
   basePath: string
   baseURL?: string
+  trustedProxyHeaders: boolean
   issuer?: string
   session: Required<SessionOptions>
   cookie: {
@@ -399,6 +400,7 @@ export function resolveAuthServerConfig(
     secret,
     basePath,
     ...(baseURL ? { baseURL, issuer: `${baseURL}${basePath}` } : {}),
+    trustedProxyHeaders: options.trustedProxyHeaders ?? false,
     session: {
       ttl: requireLifetime(options.session?.ttl ?? "30d", "session.ttl"),
       sliding: options.session?.sliding ?? true

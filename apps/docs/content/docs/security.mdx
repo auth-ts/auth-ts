@@ -151,10 +151,30 @@ browser that does not enforce it — able to sign the user out, sign them into
 someone else's account, or have a guest's session merged into an attacker's. So
 every non-`GET` request that carries an `Origin` (or, failing that, a `Referer`)
 must name the server's own origin — as the runtime sees it, or as a proxy
-forwarded it — its `baseURL`, or one of its `trustedOrigins`; anything else is refused
-with **403 `forbiddenOrigin`** before the body is parsed. A request with neither
-header is a non-browser client, which holds no cookie and cannot be made to act
-for anyone.
+forwarded it once `trustedProxyHeaders` is on — its `baseURL`, or one of its
+`trustedOrigins`; anything else is refused with **403 `forbiddenOrigin`** before
+the body is parsed. A request with neither header is a non-browser client, which
+holds no cookie and cannot be made to act for anyone.
+
+**`X-Forwarded-Host` is read only when you say a proxy sets it.** Nothing about
+a request distinguishes a forwarded header from one its sender wrote, and the
+origin those headers name is both what the OAuth `redirect_uri` is built from
+and an entry in the allowlist above — so reading them unasked would let a caller
+nominate the origin it is then checked against. `trustedProxyHeaders` defaults
+to `false`, and the origin is the request URL's own:
+
+```ts
+createAuthServer({
+  // ...
+  trustedProxyHeaders: true
+})
+```
+
+Turn it on when this server sits behind a proxy that sets `X-Forwarded-Host` and
+`X-Forwarded-Proto` and cannot be bypassed — a runtime that only ever sees an
+internal URL, or an app answering on several approved domains. A `baseURL` wins
+outright when set, so the two are alternatives rather than layers: pin the origin
+or derive it, not both.
 
 **Request bodies must be `application/json`**, or the answer is **415
 `unsupportedMediaType`**. This is the second, independent layer: a page cannot

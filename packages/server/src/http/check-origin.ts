@@ -37,20 +37,24 @@ function originOf(url: string) {
  * The origins allowed to make state-changing requests.
  *
  * The request's own origin is always allowed — that is the same-origin case.
- * The forwarded origin is allowed for the same reason it is what the redirect
- * URI is built from: behind a proxy the URL the runtime sees is internal while
- * the browser names the public origin, and the two only meet in
- * `X-Forwarded-Host`. A page cannot forge that header — it is not
- * CORS-safelisted, so setting it forces a preflight this check would refuse —
- * and a client that can set it directly is not a browser and carries no cookie.
- * `baseURL` is allowed whenever one is configured, and every entry in
- * `trustedOrigins` because that option exists to say so.
+ * The forwarded origin joins it only under `trustedProxyHeaders`, for the same
+ * reason it is what the redirect URI is built from: behind a proxy the URL the
+ * runtime sees is internal while the browser names the public origin, and the
+ * two only meet in `X-Forwarded-Host`. Off by default because an origin taken
+ * from the request cannot also be what the request is checked against — that is
+ * a caller nominating its own permission. `baseURL` is allowed whenever one is
+ * configured, and every entry in `trustedOrigins` because that option exists to
+ * say so.
  */
 function allowedOrigins(config: AuthServerConfig, request: Request) {
   const allowed = new Set<string>()
   const self = originOf(request.url)
   if (self) allowed.add(self)
-  const forwarded = getRequestOrigin(request.url, request.headers)
+  const forwarded = getRequestOrigin(
+    request.url,
+    request.headers,
+    config.trustedProxyHeaders
+  )
   if (forwarded) allowed.add(forwarded)
   if (config.baseURL) {
     const base = originOf(config.baseURL)

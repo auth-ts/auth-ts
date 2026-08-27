@@ -210,11 +210,35 @@ describe("origin check", () => {
     ).toBe(200)
   })
 
-  it("allows the forwarded origin, so a proxied app needs no baseURL", async () => {
+  it("ignores a forwarded origin unless the proxy headers are trusted", async () => {
+    const { authServer } = await createTestServer({ guest: true })
+
+    // Nothing marks these as a proxy's rather than the sender's, so off by
+    // default they buy an origin nothing: the request is judged on its own.
+    expect(
+      (
+        await authServer.handler(
+          request("POST", "/api/auth/sign-in/guest", {
+            origin: "http://10.0.0.5:3000",
+            headers: {
+              origin: "https://attacker.example.com",
+              "x-forwarded-host": "attacker.example.com",
+              "x-forwarded-proto": "https"
+            }
+          })
+        )
+      ).status
+    ).toBe(403)
+  })
+
+  it("allows the forwarded origin once the proxy headers are trusted", async () => {
     // The runtime sees the internal URL and the browser stamps the public one.
     // Without this the same deployment that derives its redirect URI from these
     // headers would refuse every request the browser makes to it.
-    const { authServer } = await createTestServer({ guest: true })
+    const { authServer } = await createTestServer({
+      guest: true,
+      trustedProxyHeaders: true
+    })
 
     expect(
       (

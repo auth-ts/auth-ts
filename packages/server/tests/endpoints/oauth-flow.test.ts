@@ -159,7 +159,10 @@ describe("oauth start", () => {
 })
 
 describe("oauth redirect_uri origin", () => {
+  // No baseURL, and the proxy in front of this deployment sets the forwarded
+  // headers — the two conditions for deriving the origin per request.
   const NO_BASE_URL = {
+    trustedProxyHeaders: true,
     providers: {
       github: { clientId: "client-id", clientSecret: "client-secret" }
     }

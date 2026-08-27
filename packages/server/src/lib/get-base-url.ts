@@ -21,14 +21,25 @@ function firstEntry(value: string | null | undefined) {
  * `X-Forwarded-Proto` carry the origin the browser actually used. Normalized
  * through `URL` so a header carrying a path, a port, or plain nonsense can
  * never produce anything but an origin.
+ *
+ * The forwarded headers are read only when `trustProxyHeaders` says a proxy
+ * sets them. Nothing about a request distinguishes a header a proxy wrote from
+ * one its sender did, and this origin is both what the OAuth `redirect_uri` is
+ * built from and an entry in the origin check's allowlist — so reading them
+ * unasked would let a caller nominate the origin it is then checked against.
  */
-export function getRequestOrigin(requestURL: string, headers?: Headers) {
+export function getRequestOrigin(
+  requestURL: string,
+  headers?: Headers,
+  trustProxyHeaders = false
+) {
   let url: URL
   try {
     url = new URL(requestURL)
   } catch {
     return undefined
   }
+  if (!trustProxyHeaders) return url.origin
 
   const host = firstEntry(headers?.get("x-forwarded-host")) ?? url.host
   const protocol =
@@ -46,17 +57,13 @@ export function getRequestOrigin(requestURL: string, headers?: Headers) {
 /**
  * The absolute origin this server is reached at.
  *
- * `baseURL` when one is configured, and otherwise the origin the request names.
- * Deriving it is what lets `baseURL` stay optional: a single-origin app,
- * including one behind a proxy, needs no origin configured anywhere.
+ * `baseURL` when one is configured, and otherwise the origin the request names
+ * — the request URL's own, or what a proxy forwarded once `trustedProxyHeaders`
+ * is on. Deriving it is what lets `baseURL` stay optional: a single-origin app
+ * needs no origin configured anywhere.
  *
- * The OAuth redirect URI built from this is not a trust boundary by itself. A
- * provider only ever redirects to a URI registered in its own console, so a
- * forged `Host` yields an error page at the provider rather than an
- * authorization code delivered somewhere else. Configure `baseURL` when the
- * canonical origin should be pinned regardless — a proxy that does not forward
- * the host, or a deployment that answers on several origins but must always
- * name one.
+ * `baseURL` wins outright rather than being one candidate among several, so a
+ * deployment that pins its origin cannot have it moved by a header.
  *
  * @throws {AuthConfigError} When there is nothing to derive from: an endpoint
  * called in-process without a request, on a server with no `baseURL`.
@@ -68,7 +75,9 @@ export function getBaseURL(
 ) {
   if (config.baseURL) return config.baseURL
 
-  const origin = requestURL ? getRequestOrigin(requestURL, headers) : undefined
+  const origin = requestURL
+    ? getRequestOrigin(requestURL, headers, config.trustedProxyHeaders)
+    : undefined
   if (!origin) {
     throw new AuthConfigError(
       "Cannot determine this server's origin: no baseURL is configured and this call carried no request to derive one from. Pass the request's headers and requestURL, or set baseURL."
