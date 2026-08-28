@@ -21,16 +21,7 @@ export interface SignInResult {
   token: string
 }
 
-/**
- * Requests a sign-in code.
- *
- * Always succeeds for a well-formed address, whether or not an account exists —
- * the server has nothing to reveal, since the account is created at verification.
- *
- * @throws {AuthError} `cooldown` or `rateLimited`, both carrying `retryAfter`.
- * Render the countdown rather than only disabling the button; "try again later"
- * with no number is the most annoying error message in software.
- */
+/** Builds `sendSignInCode`. */
 export function createSendSignInCode(internals: AuthClientInternals) {
   return async function sendSignInCode(
     input: SendSignInCodeInput
@@ -43,13 +34,7 @@ export function createSendSignInCode(internals: AuthClientInternals) {
   }
 }
 
-/**
- * Verifies a code and starts a session.
- *
- * The token comes back with the user and is stored on the way through, so the
- * sign-in and the first render cost one round trip between them rather than a
- * sign-in followed by a refresh.
- */
+/** Builds `signInWithCode`. */
 export function createSignInWithCode(internals: AuthClientInternals) {
   return async function signInWithCode(
     input: SignInWithCodeInput
@@ -70,13 +55,7 @@ export interface SignInAsGuestInput {
   additionalFields?: Record<string, string | number | boolean>
 }
 
-/**
- * Signs in anonymously.
- *
- * Available only when the server sets `guest: true`. The resulting user is real
- * in every way that matters — they own rows, they have a session — which is what
- * lets them keep everything when they later add an email or connect a provider.
- */
+/** Builds `signInAsGuest`. */
 export function createSignInAsGuest(internals: AuthClientInternals) {
   return async function signInAsGuest(
     input: SignInAsGuestInput = {}

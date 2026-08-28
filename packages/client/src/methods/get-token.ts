@@ -27,43 +27,8 @@ export interface GetTokenOptions {
   onRefresh?: (result: TokenResult) => void
 }
 
-/**
- * Builds the token refresh and the cached read over it.
- *
- * `getToken` is the data-plane workhorse: hand it to a PostgREST client as its
- * token callback and it will return the cached token until shortly before
- * expiry, then transparently exchange the refresh cookie for a new one.
- *
- * Only a token too close to expiry to be worth handing out makes a caller wait.
- * Approaching that point the cached token is returned immediately and the
- * refresh runs behind it, so the common case costs no round trip.
- *
- * Concurrent callers share a single request, so a page that mounts ten
- * components makes one round-trip and they all see the same token.
- *
- * `refresh` returns the user as well, because `GET /token` reads that row to
- * mint and returns it — which is what lets a cold boot learn who is signed in
- * for one request rather than two.
- *
- * `refresh` and `getToken` resolve `null` when there is no live session and `requireToken`
- * throws instead. Nobody signed in is an answer, not a failure, and a caller
- * asking "who is here" should not have to catch to hear it; a caller about to
- * authenticate a request has nothing to do with `null` and wants the error.
- * Every other failure — the server erroring, a proxy answering for it, the
- * network dropping — throws from both, and clears nothing: none of those is a
- * verdict on the session, and blanking the interface because a deploy was
- * mid-flight is the bug, not the fix.
- *
- * A signed-out browser answers `null` without a request at all — see
- * {@link mayHaveSession} — so a page nobody is signed in to costs nothing on
- * load and nothing again on every tab focus.
- */
+/** Builds the token refresh and the cached read over it. */
 export function createGetToken(internals: AuthClientInternals): RefreshToken {
-  // Built here rather than caught from the server, because a client that never
-  // sent the request still owes `requireToken` the same error it would have.
-  const noSession = () =>
-    new AuthError("unauthenticated", 401, "You are not signed in.")
-
   const forget = async () => {
     internals.tokenStore.clear()
     // The refresh cookie is what was just refused, so a jar holding it is
@@ -115,7 +80,12 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
     const cached = internals.tokenStore.get()
     if (!cached || internals.tokenStore.mustRefresh()) {
       const result = await refresh()
-      if (!result) throw noSession()
+      if (!result) {
+        // Built here rather than caught from the server, because a client that
+        // never sent the request still owes `requireToken` the same error it
+        // would have.
+        throw new AuthError("unauthenticated", 401, "You are not signed in.")
+      }
       options?.onRefresh?.(result)
 
       return result.token

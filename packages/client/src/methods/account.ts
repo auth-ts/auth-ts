@@ -9,7 +9,7 @@ export type UpdateUserInput = {
   image?: string
 } & Record<string, string | number | boolean | undefined>
 
-/** Updates the signed-in user and returns the row as stored. */
+/** Builds `updateUser`. */
 export function createUpdateUser(internals: AuthClientInternals) {
   return async function updateUser(input: UpdateUserInput): Promise<AuthUser> {
     const { user } = await internals.fetchJson<{ user: AuthUser }>({
@@ -38,15 +38,7 @@ export interface SignOutInput {
   userId?: string
 }
 
-/**
- * Signs out.
- *
- * `"others"` deliberately clears nothing locally — it is the "sign out my other
- * devices" button, and this device is meant to survive it.
- *
- * A session that is already gone resolves rather than throwing: the caller
- * asked to end up signed out, and they are.
- */
+/** Builds `signOut`. */
 export function createSignOut(internals: AuthClientInternals) {
   return async function signOut(input: SignOutInput = {}): Promise<void> {
     const scope = input.scope ?? "local"
@@ -80,17 +72,7 @@ export interface DeleteUserInput {
   code?: string
 }
 
-/**
- * Deletes the account, in one or two steps.
- *
- * A recently authenticated session deletes immediately; an older one gets a
- * `"staleSession"` result, at which point you call `sendDeleteUserCode()` and
- * retry with the code it sends. The two-step case is reported as a value rather
- * than an error because it is an expected branch of a working flow, not a
- * failure.
- *
- * @throws {AuthError} For a wrong code, or when a guest has no way to receive one.
- */
+/** Builds `deleteUser`. */
 export function createDeleteUser(internals: AuthClientInternals) {
   return async function deleteUser(
     input: DeleteUserInput = {}
@@ -114,15 +96,7 @@ export function createDeleteUser(internals: AuthClientInternals) {
   }
 }
 
-/**
- * Sends the code that confirms account deletion.
- *
- * Goes to whichever address is already on the account — there is nothing to
- * choose, so there is nothing to pass.
- *
- * @throws {AuthError} `cooldown` or `rateLimited`, or `guestCannotReceiveCode`
- * for a guest with no email or phone number on file.
- */
+/** Builds `sendDeleteUserCode`. */
 export function createSendDeleteUserCode(internals: AuthClientInternals) {
   return async function sendDeleteUserCode(): Promise<void> {
     await internals.fetchJson({

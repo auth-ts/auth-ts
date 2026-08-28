@@ -1,4 +1,5 @@
 import { decodeToken } from "../lib/decode-token"
+import type { LeveledLogger } from "../lib/logger"
 
 /** The in-memory access token and what is known about its lifetime. */
 export interface TokenState {
@@ -53,7 +54,7 @@ export interface TokenStore {
  * cross-site scripting flaw into a credential an attacker can exfiltrate and
  * keep using after the tab is closed; in memory, it dies with the page.
  */
-export function createTokenStore(): TokenStore {
+export function createTokenStore(log?: LeveledLogger): TokenStore {
   let state: TokenState | null = null
   let inFlight: Promise<unknown> | null = null
 
@@ -61,7 +62,9 @@ export function createTokenStore(): TokenStore {
     get: () => state,
 
     set(token) {
-      const claims = decodeToken(token)?.claims ?? {}
+      const decoded = decodeToken(token)
+      if (!decoded) log?.warn("stored a token that could not be decoded")
+      const claims = decoded?.claims ?? {}
       const now = Date.now()
       const issuedAt = typeof claims.iat === "number" ? claims.iat * 1000 : now
       const expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : now
@@ -94,8 +97,6 @@ export function createTokenStore(): TokenStore {
     },
 
     async singleFlight<Result>(refresh: () => Promise<Result>) {
-      // Ten components mounting at once should cost one request, not ten — and
-      // more importantly should not produce ten different answers.
       inFlight ??= refresh().finally(() => {
         inFlight = null
       })

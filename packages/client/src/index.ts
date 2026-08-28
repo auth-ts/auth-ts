@@ -1,13 +1,11 @@
+export type { AuthErrorCode, AuthUser, TokenResult } from "@auth-ts/server"
 export type { AuthClientConfig } from "./core/auth-client-config"
 export type { AuthClientOptions } from "./core/auth-client-options"
 export type { AuthClient } from "./core/create-auth-client"
 export { createAuthClient } from "./core/create-auth-client"
-export type { TokenState } from "./core/token-store"
-export { REFRESH_AHEAD_MS } from "./core/token-store"
 export { AuthError, AuthNetworkError, isAuthError } from "./lib/auth-error"
 export type { CookieStorage } from "./lib/cookie-jar"
-export type { FetchJson, FetchJsonOptions } from "./lib/fetch-json"
-export type { LeveledLogger, Logger, LogLevel } from "./lib/logger"
+export type { Logger, LogLevel } from "./lib/logger"
 export type {
   DeleteUserInput,
   DeleteUserResult,

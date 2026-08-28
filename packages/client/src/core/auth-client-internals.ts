@@ -10,13 +10,7 @@ import type { AuthClientOptions } from "./auth-client-options"
 import type { TokenStore } from "./token-store"
 import { createTokenStore } from "./token-store"
 
-/**
- * The shared state every client method is built on.
- *
- * The mirror of the server's struct, and a struct for the same mundane reason:
- * each method needs the same five things, and passing one object beats threading
- * five parameters through every function.
- */
+/** The shared state every client method is built on. */
 export interface AuthClientInternals {
   /** The resolved configuration — options after defaults. */
   config: AuthClientConfig
@@ -37,30 +31,21 @@ export interface AuthClientInternals {
   locale: string | undefined
 }
 
-/** Builds the internals. Performs no network work and touches no storage. */
+/** Builds the internals. */
 export function createAuthClientInternals(
   options: AuthClientOptions = {}
 ): AuthClientInternals {
   const config = resolveAuthClientConfig(options)
-
-  const tokenStore = createTokenStore()
-
-  const internals: AuthClientInternals = {
-    config,
-    tokenStore,
-    fetchJson: undefined as unknown as FetchJson,
-    requireToken: undefined as unknown as () => Promise<string>,
-    cookieJar: config.cookieStorage
-      ? createCookieJar(config.cookieStorage)
-      : undefined,
-    log: createLogger(config.logLevel, config.logger),
-    locale: config.locale
-  }
+  const log = createLogger(config.logLevel, config.logger)
+  const tokenStore = createTokenStore(log)
+  const cookieJar = config.cookieStorage
+    ? createCookieJar(config.cookieStorage)
+    : undefined
 
   // Reads `internals.locale` on each request, so setLocale takes effect
   // immediately rather than only for clients constructed afterwards.
-  internals.fetchJson = createFetchJson(
-    internals.cookieJar,
+  const fetchJson = createFetchJson(
+    cookieJar,
     config,
     () => internals.locale,
     // Sent even when it is close to expiry: the server reads it to know which
@@ -70,6 +55,18 @@ export function createAuthClientInternals(
     () => internals.requireToken(),
     () => tokenStore.clear()
   )
+
+  const internals: AuthClientInternals = {
+    config,
+    tokenStore,
+    fetchJson,
+    requireToken: () => {
+      throw new Error("requireToken not wired: use createAuthClient")
+    },
+    cookieJar,
+    log,
+    locale: config.locale
+  }
 
   return internals
 }

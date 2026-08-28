@@ -32,17 +32,7 @@ async function startFlow(
   globalThis.location.assign(url)
 }
 
-/**
- * Starts an OAuth sign-in, sending the browser to the provider.
- *
- * Resolves only if something goes wrong before the navigation — otherwise the
- * page is on its way out. When the user comes back the session cookie is
- * already set, so the application boots, calls `getToken`, and finds them signed
- * in: the callback hands the SPA no token, and the cookie is what buys the first
- * one.
- *
- * Signing in while already signed in never links accounts. Use `connectProvider` for that.
- */
+/** Builds `signInWithProvider`. */
 export function createSignInWithProvider(internals: AuthClientInternals) {
   return function signInWithProvider(
     input: OAuthNavigationInput
@@ -51,7 +41,7 @@ export function createSignInWithProvider(internals: AuthClientInternals) {
   }
 }
 
-/** Starts linking a provider to the currently signed-in user. */
+/** Builds `connectProvider`. */
 export function createConnectProvider(internals: AuthClientInternals) {
   return function connectProvider(input: OAuthNavigationInput): Promise<void> {
     return startFlow(internals, "/identities/connect", input, true)

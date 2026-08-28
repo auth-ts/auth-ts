@@ -122,6 +122,17 @@ export function createFetchJson(
 
     if (response.status === 204) return undefined as Result
 
-    return (await response.json().catch(() => undefined)) as Result
+    const text = await response.text()
+    if (!text) return undefined as Result
+
+    try {
+      return JSON.parse(text) as Result
+    } catch {
+      throw new AuthError(
+        "internalError",
+        response.status,
+        "The server answered with a malformed body."
+      )
+    }
   }
 }

@@ -1,10 +1,6 @@
 import type { CookieStorage } from "../lib/cookie-jar"
 import type { Logger, LogLevel } from "../lib/logger"
 
-// The shape `createAuthClient` accepts — and nothing else. Options are the
-// partial input; what they resolve to is `AuthClientConfig`, in
-// `auth-client-config.ts`. Same split as the server, for the same reason.
-
 /** Options accepted by `createAuthClient`. Everything is optional. */
 export interface AuthClientOptions {
   /** Where the auth server is mounted. Must match the server's `basePath`. @default "/api/auth" */

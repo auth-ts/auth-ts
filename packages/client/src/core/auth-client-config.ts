@@ -19,7 +19,7 @@ export interface AuthClientConfig {
   logger?: Logger
 }
 
-/** Applies defaults. Performs no input/output — constructing a client is free. */
+/** Applies defaults. */
 export function resolveAuthClientConfig(
   options: AuthClientOptions = {}
 ): AuthClientConfig {
