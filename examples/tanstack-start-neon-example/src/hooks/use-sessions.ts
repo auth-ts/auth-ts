@@ -1,6 +1,6 @@
 import { skipToken, useQuery } from "@tanstack/react-query"
 
-import { postgrest } from "../db/postgrest"
+import { postgrest, reviveDates } from "../db/postgrest"
 
 /** The query key a user's sessions live under, shared so revoking can invalidate it. */
 export const sessionsQueryKey = (userId?: string) => ["sessions", userId]
@@ -17,12 +17,9 @@ export function useSessions(userId?: string) {
             .order("createdAt", { ascending: false })
             .throwOnError()
 
-          return data.map((session) => ({
-            ...session,
-            expiresAt: new Date(session.expiresAt),
-            createdAt: new Date(session.createdAt),
-            updatedAt: new Date(session.updatedAt)
-          }))
+          return data.map((session) =>
+            reviveDates(session, "expiresAt", "createdAt", "updatedAt")
+          )
         }
       : skipToken
   })

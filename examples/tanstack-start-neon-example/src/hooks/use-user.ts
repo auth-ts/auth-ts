@@ -1,6 +1,6 @@
 import { skipToken, useQuery } from "@tanstack/react-query"
 
-import { postgrest } from "../db/postgrest"
+import { postgrest, reviveDates } from "../db/postgrest"
 import { useToken } from "./use-token"
 
 export const userQueryKey = ["user"] as const
@@ -21,11 +21,7 @@ export function useUser() {
             .single()
             .throwOnError()
 
-          return {
-            ...data,
-            createdAt: new Date(data.createdAt),
-            updatedAt: new Date(data.updatedAt)
-          }
+          return reviveDates(data, "createdAt", "updatedAt")
         }
   })
 }

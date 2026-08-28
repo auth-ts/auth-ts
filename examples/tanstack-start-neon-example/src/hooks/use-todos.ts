@@ -6,18 +6,14 @@ import {
 } from "@tanstack/react-query"
 import { v7 as uuidv7 } from "uuid"
 
-import { postgrest } from "../db/postgrest"
+import { postgrest, reviveDates } from "../db/postgrest"
 import type { Todo, TodoInsert } from "../db/schema"
 
-const toTodo = (todo: Todo): Todo => ({
-  ...todo,
-  createdAt: new Date(todo.createdAt),
-  updatedAt: new Date(todo.updatedAt)
-})
+export const todosQueryKey = (userId?: string) => ["todos", userId]
 
 export function useTodos(userId?: string) {
   return useQuery({
-    queryKey: ["todos", userId],
+    queryKey: todosQueryKey(userId),
     queryFn: userId
       ? async () => {
           const { data } = await postgrest
@@ -26,7 +22,7 @@ export function useTodos(userId?: string) {
             .order("createdAt", { ascending: false })
             .throwOnError()
 
-          return data.map(toTodo)
+          return data.map((todo) => reviveDates(todo, "createdAt", "updatedAt"))
         }
       : skipToken
   })
@@ -34,98 +30,83 @@ export function useTodos(userId?: string) {
 
 export function useInsertTodo(userId?: string) {
   const queryClient = useQueryClient()
-  const queryKey = ["todos", userId]
+  const queryKey = todosQueryKey(userId)
 
-  const mutation = useMutation({
-    mutationFn: async (todo: Todo) => {
+  return useMutation({
+    mutationFn: async (values: TodoInsert) => {
+      if (!userId) throw new Error("Cannot insert a todo while signed out.")
       const { data } = await postgrest
         .from("todos")
-        .insert(todo)
+        .insert(values)
         .select()
         .single()
         .throwOnError()
 
-      return toTodo(data)
+      return reviveDates(data, "createdAt", "updatedAt")
     },
-    onMutate: async (todo) => {
+    onMutate: async (values) => {
+      if (!userId) return
       await queryClient.cancelQueries({ queryKey })
+      const now = new Date()
 
       queryClient.setQueryData<Todo[]>(queryKey, (todos) =>
-        todos ? [todo, ...todos] : undefined
+        todos
+          ? [
+              {
+                id: uuidv7(),
+                userId,
+                completed: false,
+                createdAt: now,
+                updatedAt: now,
+                ...values
+              },
+              ...todos
+            ]
+          : undefined
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey })
   })
-
-  const withDefaults = (values: TodoInsert): Todo => {
-    if (!userId) throw new Error("Cannot insert a todo while signed out.")
-    const now = new Date()
-
-    return {
-      id: uuidv7(),
-      userId,
-      completed: false,
-      createdAt: now,
-      updatedAt: now,
-      ...values
-    }
-  }
-
-  return {
-    ...mutation,
-    mutate: (values: TodoInsert) => mutation.mutate(withDefaults(values)),
-    mutateAsync: (values: TodoInsert) =>
-      mutation.mutateAsync(withDefaults(values))
-  }
 }
 
 type TodoUpdate = Pick<Todo, "id"> & Partial<Todo>
 
 export function useUpdateTodo(userId?: string) {
   const queryClient = useQueryClient()
-  const queryKey = ["todos", userId]
+  const queryKey = todosQueryKey(userId)
 
-  const mutation = useMutation({
+  return useMutation({
     mutationFn: async ({ id, ...values }: TodoUpdate) => {
+      if (!userId) throw new Error("Cannot update a todo while signed out.")
       const { data } = await postgrest
         .from("todos")
-        .update(values)
+        .update({ updatedAt: new Date(), ...values })
         .eq("id", id)
         .select()
         .single()
         .throwOnError()
 
-      return toTodo(data)
+      return reviveDates(data, "createdAt", "updatedAt")
     },
     onMutate: async (values) => {
+      if (!userId) return
       await queryClient.cancelQueries({ queryKey })
 
       queryClient.setQueryData<Todo[]>(queryKey, (todos) =>
         todos?.map((todo) =>
-          todo.id === values.id ? { ...todo, ...values } : todo
+          todo.id === values.id
+            ? { ...todo, updatedAt: new Date(), ...values }
+            : todo
         )
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey })
   })
-
-  const withDefaults = (values: TodoUpdate): TodoUpdate => {
-    if (!userId) throw new Error("Cannot update a todo while signed out.")
-
-    return { updatedAt: new Date(), ...values }
-  }
-
-  return {
-    ...mutation,
-    mutate: (values: TodoUpdate) => mutation.mutate(withDefaults(values)),
-    mutateAsync: (values: TodoUpdate) =>
-      mutation.mutateAsync(withDefaults(values))
-  }
 }
 
 export function useDeleteTodo(userId?: string) {
   const queryClient = useQueryClient()
-  const queryKey = ["todos", userId]
+  const queryKey = todosQueryKey(userId)
 
   return useMutation({
     mutationFn: async (id: string) => {

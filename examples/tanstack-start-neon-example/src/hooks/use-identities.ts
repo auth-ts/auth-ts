@@ -1,6 +1,6 @@
 import { skipToken, useQuery } from "@tanstack/react-query"
 
-import { postgrest } from "../db/postgrest"
+import { postgrest, reviveDates } from "../db/postgrest"
 
 /** The query key a user's linked providers live under, shared so disconnecting can invalidate it. */
 export const identitiesQueryKey = (userId?: string) => ["identities", userId]
@@ -17,11 +17,9 @@ export function useIdentities(userId?: string) {
             .order("provider", { ascending: true })
             .throwOnError()
 
-          return data.map((identity) => ({
-            ...identity,
-            createdAt: new Date(identity.createdAt),
-            updatedAt: new Date(identity.updatedAt)
-          }))
+          return data.map((identity) =>
+            reviveDates(identity, "createdAt", "updatedAt")
+          )
         }
       : skipToken
   })

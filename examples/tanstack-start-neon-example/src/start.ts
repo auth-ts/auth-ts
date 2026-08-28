@@ -25,7 +25,9 @@ const cors = createMiddleware().server(async ({ next, request }) => {
 
   const result = await next()
   result.response.headers.set("access-control-allow-origin", origin)
-  result.response.headers.set("access-control-allow-credentials", "true")
+  for (const [name, value] of Object.entries(CORS_HEADERS)) {
+    result.response.headers.set(name, value)
+  }
 
   return result
 })

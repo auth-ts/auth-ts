@@ -1,12 +1,13 @@
 import {
-  ArrowRightEndOnRectangleIcon,
   ExclamationCircleIcon,
   PlusIcon,
   TrashIcon
 } from "@heroicons/react/24/outline"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 
+import { PendingSpinner } from "../components/pending-spinner"
+import { SignedOutCard } from "../components/signed-out-card"
 import {
   useDeleteTodo,
   useInsertTodo,
@@ -26,31 +27,14 @@ function TodosPage() {
   const remove = useDeleteTodo(user?.id)
   const [title, setTitle] = useState("")
 
-  if (isPending) {
-    return (
-      <div className="flex justify-center py-16">
-        <span className="loading loading-spinner loading-lg" />
-      </div>
-    )
-  }
+  if (isPending) return <PendingSpinner />
 
   if (!user) {
     return (
-      <section className="mx-auto max-w-sm">
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body items-center gap-4 text-center">
-            <h1 className="card-title text-2xl">Your todos</h1>
-            <p className="text-base-content/70">
-              Sign in to see them. Rows are scoped by row-level security, not by
-              this page.
-            </p>
-            <Link to="/login" className="btn btn-primary">
-              <ArrowRightEndOnRectangleIcon className="size-4" />
-              Sign in
-            </Link>
-          </div>
-        </div>
-      </section>
+      <SignedOutCard title="Your todos">
+        Sign in to see them. Rows are scoped by row-level security, not by this
+        page.
+      </SignedOutCard>
     )
   }
 

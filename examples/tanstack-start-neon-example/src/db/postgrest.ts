@@ -40,6 +40,16 @@ const withRetry: typeof fetch = async (input, init) => {
   return withToken(input, init)
 }
 
+/** Revives JSON date strings into Dates. */
+export function reviveDates<K extends string, Row extends Record<K, Date>>(
+  row: Row,
+  ...keys: K[]
+): Row {
+  const dates: Partial<Record<K, Date>> = {}
+  for (const key of keys) dates[key] = new Date(row[key])
+  return { ...row, ...dates }
+}
+
 /** The data plane: PostgREST over Neon, authenticated by our access token. */
 export const postgrest = new NeonPostgrestClient<
   DrizzlePostgrest<typeof schema>

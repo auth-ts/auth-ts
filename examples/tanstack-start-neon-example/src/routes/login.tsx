@@ -3,23 +3,18 @@ import {
   ArrowLeftIcon,
   ArrowRightEndOnRectangleIcon,
   EnvelopeIcon,
-  ExclamationCircleIcon,
-  InformationCircleIcon,
   UserIcon
 } from "@heroicons/react/24/outline"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/github-icon"
+import type { Notice } from "../components/notice"
+import { NoticeAlert } from "../components/notice"
 import { useCountdown } from "../hooks/use-countdown"
 import { useToken } from "../hooks/use-token"
 import { authClient } from "../lib/auth-client"
 
 export const Route = createFileRoute("/login")({ component: LoginPage })
-
-interface Notice {
-  text: string
-  tone: "info" | "error"
-}
 
 /** Every way in that this demo has configured. */
 function LoginPage() {
@@ -181,21 +176,7 @@ function LoginPage() {
             </form>
           )}
 
-          {notice ? (
-            <div
-              role="alert"
-              className={`alert alert-soft text-sm ${
-                notice.tone === "error" ? "alert-error" : "alert-info"
-              }`}
-            >
-              {notice.tone === "error" ? (
-                <ExclamationCircleIcon className="size-4 shrink-0" />
-              ) : (
-                <InformationCircleIcon className="size-4 shrink-0" />
-              )}
-              <span>{notice.text}</span>
-            </div>
-          ) : null}
+          {notice ? <NoticeAlert notice={notice} /> : null}
 
           <div className="divider my-0 text-xs">or</div>
 
