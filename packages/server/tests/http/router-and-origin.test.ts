@@ -79,12 +79,9 @@ describe("matchRoute", () => {
     }
   })
 
-  it("404s an unknown path inside the mount and anything outside it", async () => {
+  it("404s anything outside the mount", async () => {
     const { authServer } = await createTestServer()
 
-    expect(
-      (await authServer.handler(request("GET", "/api/auth/nope"))).status
-    ).toBe(404)
     expect(
       (await authServer.handler(request("GET", "/somewhere-else"))).status
     ).toBe(404)

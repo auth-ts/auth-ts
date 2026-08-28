@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createAuthClient } from "../../src/core/create-auth-client"
-import { AuthError } from "../../src/lib/auth-error"
+import { AuthError, AuthNetworkError } from "../../src/lib/auth-error"
 import type { FakeAuthServer } from "../helpers/fake-auth-server"
 import {
   fakeAccessToken,
@@ -385,6 +385,44 @@ describe("a refused token", () => {
     expect(
       server.requests.filter((entry) => entry.path === "/api/auth/users")
     ).toHaveLength(1)
+  })
+})
+
+describe("a network failure", () => {
+  it("throws AuthNetworkError and keeps the token it holds", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    server.on("GET", "/api/auth/token", { networkError: true })
+    const client = createAuthClient()
+    const held = await client.getToken()
+
+    // The tunnel is not a verdict on the session.
+    await expect(client.refresh()).rejects.toBeInstanceOf(AuthNetworkError)
+    expect(await client.getToken()).toBe(held)
+    expect(server.requests).toHaveLength(2)
+  })
+
+  it("wraps a proxy's non-JSON error page in the standard envelope", async () => {
+    server.restore()
+    const proxy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async () => new Response("<html>Bad Gateway</html>", { status: 502 })
+      )
+
+    try {
+      setSessionHint("in")
+      await expect(createAuthClient().getToken()).rejects.toMatchObject({
+        code: "internalError",
+        status: 502,
+        message: "Request failed with status 502."
+      })
+    } finally {
+      proxy.mockRestore()
+      server = fakeAuthServer()
+    }
   })
 })
 

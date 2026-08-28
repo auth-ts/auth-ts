@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { parseCookies, readCookie } from "../../src/lib/parse-cookies"
+import {
+  parseCookies,
+  readCookie,
+  requestCookies
+} from "../../src/lib/parse-cookies"
 import {
   clearCookie,
   clearHintCookie,
@@ -67,6 +71,27 @@ describe("parseCookies", () => {
     const headers = new Headers({ Cookie: "auth-ts.refresh=abc" })
     expect(readCookie(headers, "auth-ts.refresh")).toBe("abc")
     expect(readCookie(headers, "missing")).toBeUndefined()
+  })
+})
+
+describe("requestCookies", () => {
+  it("parses once per Headers object and answers the same map", () => {
+    const headers = new Headers({ cookie: "a=1; b=2" })
+
+    const first = requestCookies(headers)
+    expect(first.get("a")).toBe("1")
+    expect(requestCookies(headers)).toBe(first)
+  })
+
+  it("re-parses when the header changes under it", () => {
+    const headers = new Headers({ cookie: "a=1" })
+    expect(requestCookies(headers).get("a")).toBe("1")
+
+    headers.set("cookie", "a=2")
+    expect(requestCookies(headers).get("a")).toBe("2")
+
+    headers.delete("cookie")
+    expect(requestCookies(headers).size).toBe(0)
   })
 })
 

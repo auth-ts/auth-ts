@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
 import { readSetCookies, request } from "../helpers/request"
 import { required } from "../helpers/required"
@@ -261,6 +261,10 @@ describe("multiUser enabled", () => {
 
     const after = applyCookies(grace.cookies, response)
     expect(after["auth-ts.hint"]).toBe(ada.user.id)
+    expect(usersInCookies(after)).toEqual([ada.user.id])
+    expect(
+      await selectRows(context.db, "sessions", { userId: ada.user.id })
+    ).toHaveLength(1)
 
     const whoami = await context.authServer.handler(
       request("GET", "/api/auth/token", { cookies: after })
@@ -268,6 +272,27 @@ describe("multiUser enabled", () => {
     expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
       ada.user.id
     )
+  })
+
+  it("writes to no session on the way out, not even the ones it keeps", async () => {
+    const context = await server()
+    const ada = await signIn(context, "ada@example.com")
+    const grace = await signIn(context, "grace@example.com", ada.cookies)
+    const token = await tokenFor(context, grace.cookies)
+    const updates = vi.spyOn(context.db, "update")
+
+    const response = await context.authServer.handler(
+      request("POST", "/api/auth/sign-out", {
+        body: { scope: "others" },
+        cookies: grace.cookies,
+        token
+      })
+    )
+
+    expect(response.status).toBe(204)
+    expect(
+      updates.mock.calls.filter(([input]) => input.table === "sessions")
+    ).toHaveLength(0)
   })
 
   it("reaches every signed in user's other devices under scope: global", async () => {
@@ -325,27 +350,6 @@ describe("multiUser enabled", () => {
 
     expect(response.status).toBe(404)
   })
-
-  it("signs one user out without disturbing the other", async () => {
-    const context = await server()
-    const ada = await signIn(context, "ada@example.com")
-    const grace = await signIn(context, "grace@example.com", ada.cookies)
-
-    const response = await context.authServer.handler(
-      request("POST", "/api/auth/sign-out", {
-        cookies: grace.cookies,
-        token: await tokenFor(context, grace.cookies),
-        body: { userId: grace.user.id }
-      })
-    )
-    expect(response.status).toBe(204)
-
-    const after = applyCookies(grace.cookies, response)
-    expect(usersInCookies(after)).toEqual([ada.user.id])
-    expect(
-      await selectRows(context.db, "sessions", { userId: ada.user.id })
-    ).toHaveLength(1)
-  })
 })
 
 describe("guest conversion under multiUser", () => {
@@ -402,6 +406,21 @@ describe("a refresh cookie carrying somebody else's name", () => {
     )
 
     expect(response.status).toBe(404)
+  })
+
+  it("mints for the attacker's own account even when the stolen name is real", async () => {
+    const context = await createTestServer({ multiUser: true })
+    const victim = await signIn(context, "victim@example.com")
+    const attacker = await signIn(context, "attacker@example.com")
+
+    const response = await context.authServer.handler(
+      request("GET", "/api/auth/token", {
+        cookies: relabelled(attacker.cookies, victim.user.id)
+      })
+    )
+
+    const body = (await response.json()) as { user: { id: string } }
+    expect(body.user.id).toBe(attacker.user.id)
   })
 
   it("cannot read the named user's row from the switcher", async () => {
@@ -551,5 +570,35 @@ describe("superseding a session", () => {
       await selectRows(context.db, "sessions", { userId: ada.user.id })
     ).toHaveLength(1)
     expect(usersInCookies(again.cookies)).toEqual([ada.user.id])
+  })
+
+  it("retires a mislabelled cookie's session without multiUser, reading no rows for it", async () => {
+    const context = await createTestServer()
+    const ada = await signIn(context, "ada@example.com")
+    const own = required(
+      Object.entries(ada.cookies).find(([name]) =>
+        name.startsWith("auth-ts.refresh.")
+      )?.[1],
+      "ada refresh cookie"
+    )
+    const selects = vi.spyOn(context.db, "select")
+
+    const again = await signIn(context, "ada@example.com", {
+      "auth-ts.refresh.bogus": own
+    })
+
+    expect(
+      await selectRows(context.db, "sessions", { userId: ada.user.id })
+    ).toHaveLength(1)
+    expect(usersInCookies(again.cookies)).toEqual([ada.user.id])
+    // Without multiUser, superseding reads no session rows.
+    expect(
+      selects.mock.calls.filter(
+        ([input]) =>
+          input.table === "sessions" &&
+          "tokenHash" in input.where &&
+          !("expiresAt" in input.where)
+      )
+    ).toHaveLength(0)
   })
 })

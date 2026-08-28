@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { verifyToken } from "../../src/jwt/verify-token"
 import { issueSession } from "../../src/session/issue-session"
 import {
@@ -340,31 +340,6 @@ describe("resolveSession", () => {
     expect(await resolveSession(internals, headers)).toBeNull()
   })
 
-  it("enforces expiry on read, without waiting for a cleanup sweep", async () => {
-    const { internals, db } = await createTestInternals({
-      session: { ttl: "1s" }
-    })
-    const user = await insertUser(db, { email: "ada@example.com" })
-    const issued = await issueSession(internals, {
-      user,
-      amr: ["otp"],
-      headers: new Headers(),
-      requestURL: REQUEST_URL
-    })
-
-    const [stored] = db.sessions()
-    await db.update({
-      table: "sessions",
-      where: { id: required(stored, "stored session").id },
-      values: { expiresAt: new Date(Date.now() - 1000) }
-    })
-
-    const headers = new Headers({
-      cookie: cookieHeaderOf(issued)
-    })
-    expect(await resolveSession(internals, headers)).toBeNull()
-  })
-
   it("refuses an expired session without extending it", async () => {
     // The row is found and touched by one statement, and an expiry already past
     // matches nothing — so the write that records activity on a live session
@@ -420,6 +395,91 @@ describe("resolveSession", () => {
       cookie: cookieHeaderOf(issued)
     })
     expect(await resolveSession(internals, headers)).toBeNull()
+  })
+})
+
+describe("sliding behind waitUntil", () => {
+  const signedIn = async () => {
+    const deferred: Promise<unknown>[] = []
+    const context = await createTestInternals({
+      waitUntil: (promise) => deferred.push(promise),
+      session: { sliding: true }
+    })
+    const user = await insertUser(context.db, { email: "ada@example.com" })
+    const issued = await issueSession(context.internals, {
+      user,
+      amr: ["otp"],
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+
+    return {
+      ...context,
+      deferred,
+      user,
+      headers: new Headers({ cookie: cookieHeaderOf(issued) })
+    }
+  }
+
+  it("answers from a read and hands the write to waitUntil", async () => {
+    const { internals, db, deferred, headers } = await signedIn()
+    const stale = new Date(Date.now() + 60_000)
+    await db.update({
+      table: "sessions",
+      where: {},
+      values: { expiresAt: stale }
+    })
+
+    const resolved = await resolveSession(internals, headers)
+
+    expect(resolved?.session.expiresAt.getTime()).toBeGreaterThan(
+      stale.getTime()
+    )
+    expect(deferred.length).toBeGreaterThan(0)
+    await Promise.all(deferred)
+    const [after] = db.sessions()
+    expect(required(after, "session").expiresAt.getTime()).toBeGreaterThan(
+      stale.getTime()
+    )
+  })
+
+  it("cannot revive a session revoked between the read and the deferred write", async () => {
+    const { internals, db, deferred, user, headers } = await signedIn()
+
+    let open = () => {}
+    const gate = new Promise<void>((resolve) => {
+      open = resolve
+    })
+    const realUpdate = db.update.bind(db)
+    vi.spyOn(db, "update").mockImplementation(async (input) => {
+      await gate
+      return realUpdate(input)
+    })
+
+    const resolved = await resolveSession(internals, headers)
+    expect(resolved?.user.id).toBe(user.id)
+
+    await db.delete({ table: "sessions", where: {} })
+    open()
+    await Promise.all(deferred)
+
+    expect(db.sessions()).toHaveLength(0)
+  })
+
+  it("routes a failed deferred write to the logger, never the answer", async () => {
+    const { internals, db, deferred, logCalls, user, headers } =
+      await signedIn()
+    vi.spyOn(db, "update").mockRejectedValue(new Error("connection lost"))
+
+    const resolved = await resolveSession(internals, headers)
+
+    expect(resolved?.user.id).toBe(user.id)
+    await Promise.all(deferred)
+    expect(
+      logCalls.some(
+        (call) => call.level === "error" && call.message.includes("slide")
+      )
+    ).toBe(true)
   })
 })
 
