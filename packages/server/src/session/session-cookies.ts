@@ -1,6 +1,6 @@
 import type { AuthServerConfig } from "../core/auth-server-config"
 import type { AuthServerInternals } from "../core/auth-server-internals"
-import { parseCookies } from "../lib/parse-cookies"
+import { requestCookies } from "../lib/parse-cookies"
 import {
   clearCookie,
   clearHintCookie,
@@ -37,7 +37,7 @@ export function readRefreshCookies(
   const prefix = `${internals.config.cookie.name}.`
   const tokens = new Map<string, string>()
 
-  for (const [name, value] of parseCookies(headers.get("cookie"))) {
+  for (const [name, value] of requestCookies(headers)) {
     if (!name.startsWith(prefix) || !value) continue
     const userId = name.slice(prefix.length)
     if (userId) tokens.set(userId, value)

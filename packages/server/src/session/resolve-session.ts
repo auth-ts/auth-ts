@@ -38,22 +38,29 @@ export interface ResolvedSession {
  * matter how many users are signed in here. A hint pointing at a cookie this
  * browser does not hold falls back to any it does, which is what makes a
  * script-rewritten hint a no-op rather than a way to look signed out.
+ *
+ * The `userId` returned is the cookie's name — a claim, not a fact. Only the
+ * session row the token resolves to says whose it is.
  */
 export function readRefreshToken(
   internals: AuthServerInternals,
   headers: Headers,
   userId?: string
-) {
+): { userId: string; token: string } | undefined {
   const presented = readRefreshCookies(internals, headers)
-  if (userId !== undefined) return presented.get(userId)
+  if (userId !== undefined) {
+    const token = presented.get(userId)
+    return token === undefined ? undefined : { userId, token }
+  }
 
   const hinted = readCookie(headers, HINT_COOKIE_NAME)
   if (hinted) {
     const token = presented.get(hinted)
-    if (token) return token
+    if (token) return { userId: hinted, token }
   }
 
-  return presented.values().next().value
+  const [first] = presented
+  return first ? { userId: first[0], token: first[1] } : undefined
 }
 
 /**
@@ -101,7 +108,11 @@ export function resolveSessionRow(
   internals: AuthServerInternals,
   headers: Headers
 ): Promise<Omit<ResolvedSession, "user"> | null> {
-  return liveSession(internals, headers, readRefreshToken(internals, headers))
+  return liveSession(
+    internals,
+    headers,
+    readRefreshToken(internals, headers)?.token
+  )
 }
 
 /**
@@ -125,7 +136,7 @@ export async function resolveSessionRowForUser(
   const resolved = await liveSession(
     internals,
     headers,
-    readRefreshToken(internals, headers, userId)
+    readRefreshToken(internals, headers, userId)?.token
   )
   if (!resolved) return null
 
@@ -140,18 +151,29 @@ export async function resolveSessionRowForUser(
 /**
  * Resolves the caller's session and the user it belongs to.
  *
+ * The user is read concurrently with the session, keyed by the name the cookie
+ * arrived under. That name is a claim, so the row settles it: a read that turns
+ * out to name someone else is discarded and the session's own `userId` is
+ * fetched instead. The forged-name case pays one extra read; the honest case —
+ * every real request — pays one round-trip instead of two.
+ *
  * @returns The session and user, or `null` if there is no live session.
  */
 export async function resolveSession(
   internals: AuthServerInternals,
   headers: Headers
 ): Promise<ResolvedSession | null> {
-  const resolved = await resolveSessionRow(internals, headers)
+  const picked = readRefreshToken(internals, headers)
+  const [resolved, named] = await Promise.all([
+    liveSession(internals, headers, picked?.token),
+    picked ? selectOne(internals, "users", { id: picked.userId }) : null
+  ])
   if (!resolved) return null
 
-  const user = await selectOne(internals, "users", {
-    id: resolved.session.userId
-  })
+  const user =
+    named?.id === resolved.session.userId
+      ? named
+      : await selectOne(internals, "users", { id: resolved.session.userId })
   if (!user) {
     // Core deletes a user's sessions before the user, so a session pointing at
     // nothing means a delete failed part-way. Refuse it rather than trust it.

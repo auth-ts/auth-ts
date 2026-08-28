@@ -73,7 +73,15 @@ export async function issueSession(
   const tokenHash = await sha256Hex(rawToken)
   const now = new Date()
 
-  const [session] = await Promise.all([
+  // A cookie about to be overwritten leaves its session unreachable from this
+  // browser, so it is deleted rather than left to run out a month-long lifetime
+  // somewhere nobody can revoke it. Without multiUser that is every session the
+  // browser presented — no row needs reading to know it. With multiUser it is
+  // only this user's own previous one, and which is which comes from each row
+  // rather than from the name its cookie arrived under, so a mislabelled cookie
+  // retires the session it actually holds instead of being counted as somebody
+  // else's and left behind.
+  const [session, , held] = await Promise.all([
     insertRow(internals, "sessions", {
       userId: user.id,
       tokenHash,
@@ -81,31 +89,24 @@ export async function issueSession(
       expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
       ...sessionStamp(internals, headers)
     }),
-    sweepExpired(internals, "sessions")
-  ])
+    sweepExpired(internals, "sessions"),
+    Promise.all(
+      [...readRefreshCookies(internals, headers)].map(
+        async ([cookieUserId, rawToken]) => {
+          const hash = await sha256Hex(rawToken)
 
-  // A cookie about to be overwritten leaves its session unreachable from this
-  // browser, so it is deleted rather than left to run out a month-long lifetime
-  // somewhere nobody can revoke it. Without multiUser that is every session the
-  // browser presented; with it, only this user's own previous one.
-  //
-  // Which is which comes from each row rather than from the name its cookie
-  // arrived under, so a mislabelled cookie retires the session it actually
-  // holds instead of being counted as somebody else's and left behind.
-  const held = await Promise.all(
-    [...readRefreshCookies(internals, headers)].map(
-      async ([cookieUserId, rawToken]) => {
-        const hash = await sha256Hex(rawToken)
-
-        return {
-          cookieUserId,
-          hash,
-          ownerId: (await selectOne(internals, "sessions", { tokenHash: hash }))
-            ?.userId
+          return {
+            cookieUserId,
+            hash,
+            ownerId: config.multiUser
+              ? (await selectOne(internals, "sessions", { tokenHash: hash }))
+                  ?.userId
+              : undefined
+          }
         }
-      }
+      )
     )
-  )
+  ])
   const stranded = held.filter(
     ({ ownerId }) => !config.multiUser || ownerId === user.id
   )
@@ -115,13 +116,15 @@ export async function issueSession(
   // would still hold a working session rather than none.
   superseded.delete(tokenHash)
 
-  for (const hash of superseded) {
-    await internals.db.delete({ table: "sessions", where: { tokenHash: hash } })
-  }
+  const [token] = await Promise.all([
+    mintAccessToken(internals, user, session),
+    ...[...superseded].map((hash) =>
+      internals.db.delete({ table: "sessions", where: { tokenHash: hash } })
+    )
+  ])
   if (superseded.size > 0) internals.log.debug("superseded sessions deleted")
 
   const responseHeaders = new Headers()
-  const token = await mintAccessToken(internals, user, session)
   internals.log.debug("session issued", { userType: user.type })
 
   const secure = shouldUseSecureCookies(requestURL)

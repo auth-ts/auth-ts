@@ -46,7 +46,31 @@ export function parseCookies(cookieHeader: string | null | undefined) {
   return cookies
 }
 
+const parsed = new WeakMap<
+  Headers,
+  { header: string | null; cookies: Map<string, string> }
+>()
+
+/**
+ * The request's cookies, parsed once per `Headers` object.
+ *
+ * A request's header is read several times on the hot path — the refresh map,
+ * the hint, the re-send — and each read costs a full parse without this. Keyed
+ * by the `Headers` instance and checked against the raw header, so a mutated
+ * header re-parses rather than answering stale. Callers must not mutate the
+ * returned map.
+ */
+export function requestCookies(headers: Headers) {
+  const header = headers.get("cookie")
+  const cached = parsed.get(headers)
+  if (cached && cached.header === header) return cached.cookies
+
+  const cookies = parseCookies(header)
+  parsed.set(headers, { header, cookies })
+  return cookies
+}
+
 /** Reads a single cookie from a `Headers` object, or `undefined` when absent. */
 export function readCookie(headers: Headers, name: string) {
-  return parseCookies(headers.get("cookie")).get(name)
+  return requestCookies(headers).get(name)
 }

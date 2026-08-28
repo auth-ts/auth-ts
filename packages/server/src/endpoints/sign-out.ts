@@ -1,9 +1,10 @@
 import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { sha256Hex } from "../lib/hash"
+import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
-import { resolveSessionRowForUser } from "../session/resolve-session"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
 import {
   clearedRefreshCookies,
@@ -92,16 +93,24 @@ export const signOut = defineEndpoint({
 
     const scope = input.scope ?? "local"
 
-    // Every user this browser presented, resolved through the same path a
-    // request would. A cookie whose session is already gone contributes
-    // nothing to revoke but still has a cookie worth clearing.
+    // Every user this browser presented, read without sliding: a session on
+    // its way out should not have its life extended by the request ending it.
+    // The row's own userId settles whose it is, exactly as the resolver would;
+    // a cookie under a name its row does not carry — or whose session is gone —
+    // contributes nothing to revoke but still has a cookie worth clearing.
     const presented = [...readRefreshCookies(internals, headers)]
     const fromCookies = await Promise.all(
-      presented.map(async ([userId]) => ({
-        userId,
-        session: (await resolveSessionRowForUser(internals, headers, userId))
-          ?.session
-      }))
+      presented.map(async ([userId, rawToken]) => {
+        const session = await selectOne(internals, "sessions", {
+          tokenHash: await sha256Hex(rawToken),
+          expiresAt: { gt: new Date() }
+        })
+
+        return {
+          userId,
+          session: session?.userId === userId ? session : undefined
+        }
+      })
     )
     // The caller always counts, cookie or not: a bearer-only client — a native
     // app, a server calling in-process — presents none, and signing out is the
@@ -128,12 +137,14 @@ export const signOut = defineEndpoint({
     // `others` reaches other devices and never this one, so no cookie moves and
     // whoever is signed in here stays signed in.
     if (scope === "others") {
-      for (const target of targets) {
-        const sessionId = sessionIdFor(target)
-        if (sessionId) {
-          await revokeOtherSessions(internals, target.userId, sessionId)
-        }
-      }
+      await Promise.all(
+        targets.map((target) => {
+          const sessionId = sessionIdFor(target)
+          return sessionId
+            ? revokeOtherSessions(internals, target.userId, sessionId)
+            : undefined
+        })
+      )
       return { data: undefined, status: 204 }
     }
 
@@ -141,17 +152,18 @@ export const signOut = defineEndpoint({
     // comes from the token, or from a cookie whose own row named the same user.
     // `global` is no exception — deleting by `userId` alone would revoke
     // whoever a forged cookie name pointed at.
-    for (const target of targets) {
-      const sessionId = sessionIdFor(target)
-      if (!sessionId) continue
-      await internals.db.delete({
-        table: "sessions",
-        where:
-          scope === "global"
-            ? { userId: target.userId }
-            : { id: sessionId as string }
+    await Promise.all(
+      targets.map((target) => {
+        const sessionId = sessionIdFor(target)
+        if (!sessionId) return undefined
+
+        return internals.db.delete({
+          table: "sessions",
+          where:
+            scope === "global" ? { userId: target.userId } : { id: sessionId }
+        })
       })
-    }
+    )
 
     // One cookie per user, so signing one out clears exactly its own and the
     // rest keep theirs. The hint moves to whoever is left, or retires.

@@ -15,6 +15,10 @@ import { AuthApiError } from "./auth-api-error"
  * atomic increment for, and what a generic `update` with literal values could
  * never express.
  *
+ * The insert and the read run together, one round-trip rather than two. A read
+ * that raced past its own insert simply counts it back in, so this attempt is
+ * always in the number — which the callers' accounting depends on.
+ *
  * The read is capped at `limit + 1` because core never needs the exact number,
  * only whether more than `limit` exist. That cap is also what keeps an attacker
  * from turning every request into a ten-thousand-row read.
@@ -27,16 +31,19 @@ export async function countAttempt(
   expiresAt: Date,
   limit: number
 ) {
-  await insertRow(internals, "attempts", { key, expiresAt })
+  const [inserted, attempts] = await Promise.all([
+    insertRow(internals, "attempts", { key, expiresAt }),
+    internals.db.select({
+      table: "attempts",
+      where: { key },
+      limit: limit + 1,
+      orderBy: { id: "asc" }
+    })
+  ])
 
-  const attempts = await internals.db.select({
-    table: "attempts",
-    where: { key },
-    limit: limit + 1,
-    orderBy: { id: "asc" }
-  })
-
-  return attempts.length
+  return attempts.some(({ id }) => id === inserted.id)
+    ? attempts.length
+    : Math.min(attempts.length + 1, limit + 1)
 }
 
 /**

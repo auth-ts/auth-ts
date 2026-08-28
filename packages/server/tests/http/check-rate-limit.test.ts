@@ -47,17 +47,17 @@ describe("checkRateLimit", () => {
       return originalInsert(input)
     }
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       Array.from({ length: 10 }, () => checkRateLimit(internals, KEY, WINDOW))
     )
 
     expect(await selectRows(db, "attempts")).toHaveLength(10)
-    // Every request that ran to completion after the burst settled is refused;
-    // the overshoot is bounded by the burst itself, which is the trade
-    // append-and-count makes and the docs state.
-    expect(
-      results.filter((result) => result.status === "rejected").length
-    ).toBeGreaterThan(0)
+    // Once the burst settles the window is over-full, so everything after it
+    // is refused. The overshoot is bounded by the burst itself, which is the
+    // trade append-and-count makes and the docs state.
+    await expect(checkRateLimit(internals, KEY, WINDOW)).rejects.toMatchObject({
+      code: "rateLimited"
+    })
   })
 
   it("reports retryAfter from the end of the window, not from a stored row", async () => {

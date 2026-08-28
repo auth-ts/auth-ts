@@ -182,13 +182,15 @@ export const deleteUser = defineEndpoint({
     const caller = await authenticate(internals, input)
 
     const { config } = internals
-    const user = await selectOne(internals, "users", { id: caller.userId })
     // The fresh window is measured from the session, and a session already
     // revoked refuses the delete rather than honouring a token that outlived it.
-    const session = await selectOne(internals, "sessions", {
-      id: caller.sessionId,
-      expiresAt: { gt: new Date() }
-    })
+    const [user, session] = await Promise.all([
+      selectOne(internals, "users", { id: caller.userId }),
+      selectOne(internals, "sessions", {
+        id: caller.sessionId,
+        expiresAt: { gt: new Date() }
+      })
+    ])
     if (!user || !session) throw unauthenticated()
 
     const finishDeletion = async () => {

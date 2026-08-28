@@ -75,7 +75,7 @@ export const switchUser = defineEndpoint({
     const headers = input.headers ?? new Headers()
     await authenticate(internals, input)
 
-    const rawToken = readRefreshToken(internals, headers, input.userId)
+    const rawToken = readRefreshToken(internals, headers, input.userId)?.token
     if (!rawToken) throw notFound()
 
     // Resolved through the same path as any other request, so a cookie whose

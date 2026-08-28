@@ -115,7 +115,7 @@ export const getToken = defineEndpoint({
     )
 
     const headers = new Headers()
-    const rawToken = readRefreshToken(internals, input.headers)
+    const rawToken = readRefreshToken(internals, input.headers)?.token
     if (config.session.sliding && rawToken) {
       // The browser deletes the cookie `ttl` after it was last *written*, not
       // last used — without this re-send a sliding session row outlives its own

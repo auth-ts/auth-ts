@@ -93,13 +93,14 @@ export const signInWithCode = defineEndpoint({
       }
     }
 
-    await consumeVerificationCode(internals, {
-      identifier: identifier.value,
-      code: input.code,
-      purpose: "signIn"
-    })
-
-    const active = await resolveCallerSession(internals, input)
+    const [, active] = await Promise.all([
+      consumeVerificationCode(internals, {
+        identifier: identifier.value,
+        code: input.code,
+        purpose: "signIn"
+      }),
+      resolveCallerSession(internals, input)
+    ])
     const user =
       active?.user.type === "guest"
         ? (

@@ -86,24 +86,24 @@ export const getProviderToken = defineEndpoint({
   run: async (internals, input: GetProviderTokenInput) => {
     const caller = await authenticate(internals, input)
 
-    // Provider tokens can outlive this session.
-    const session = await selectOne(internals, "sessions", {
-      id: caller.sessionId,
-      expiresAt: { gt: new Date() }
-    })
+    // One parallel wave — all three keys are known up-front. The secrets read
+    // is speculative and discarded unread when the checks below refuse the
+    // caller. Provider tokens can outlive this session, hence the session
+    // check; the ciphertext lives in its own table so that `identities` needs
+    // no column grants to be safe to read.
+    const [session, identity, secrets] = await Promise.all([
+      selectOne(internals, "sessions", {
+        id: caller.sessionId,
+        expiresAt: { gt: new Date() }
+      }),
+      selectOne(internals, "identities", {
+        id: input.id,
+        userId: caller.userId
+      }),
+      selectOne(internals, "identitySecrets", { identityId: input.id })
+    ])
     if (!session) throw unauthenticated()
-
-    const identity = await selectOne(internals, "identities", {
-      id: input.id,
-      userId: caller.userId
-    })
     if (!identity) throw notFound()
-
-    // A second read rather than a wider one: the ciphertext lives in its own
-    // table so that `identities` needs no column grants to be safe to read.
-    const secrets = await selectOne(internals, "identitySecrets", {
-      identityId: identity.id
-    })
 
     const stored = secrets && (await liveAccessToken(internals, secrets))
     if (stored) {

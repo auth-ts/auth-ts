@@ -26,14 +26,12 @@ export async function revokeOtherSessions(
     const others = page.filter((session) => session.id !== currentSessionId)
     if (others.length === 0) return revoked
 
-    let removed = 0
-    for (const session of others) {
-      const rows = await internals.db.delete({
-        table: "sessions",
-        where: { id: session.id }
-      })
-      removed += rows.length
-    }
+    const deleted = await Promise.all(
+      others.map((session) =>
+        internals.db.delete({ table: "sessions", where: { id: session.id } })
+      )
+    )
+    const removed = deleted.reduce((sum, rows) => sum + rows.length, 0)
     revoked += removed
 
     // A pass that saw rows and removed none would page over them forever. That
