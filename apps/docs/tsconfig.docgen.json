@@ -4,8 +4,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": [
-    "../../packages/server/src/**/*.ts",
-    "../../packages/client/src/**/*.ts"
-  ]
+  "include": ["../../packages/core/src/**/*.ts"]
 }

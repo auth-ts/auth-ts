@@ -1,0 +1,308 @@
+import { type AuthApiError, isAuthApiError } from "../http/auth-api-error"
+import { AuthConfigError } from "../http/auth-config-error"
+import type { AuthHandler } from "../http/create-handler"
+import { createHandler, handleRequest } from "../http/create-handler"
+import type { AnyEndpoint, EndpointDefinition } from "../http/define-endpoint"
+import { compileRoutes, matchRoute } from "../http/match-route"
+import { decodeToken } from "../jwt/decode-token"
+import type { SignTokenClaims } from "../jwt/sign-token"
+import { signToken } from "../jwt/sign-token"
+import type { TokenClaims } from "../jwt/verify-token"
+import { verifyToken } from "../jwt/verify-token"
+import { decryptSecret } from "../lib/encrypt"
+import { selectOne } from "../lib/select-one"
+import type { CallerInput } from "../session/authenticate"
+import type { ResolvedSession } from "../session/resolve-session"
+import {
+  readRefreshToken,
+  resolveTokenSession
+} from "../session/resolve-session"
+import type { AuthConfig } from "./auth-config"
+import { resolveAuthConfig } from "./auth-config"
+import type { AdditionalFieldsSchema, AuthUser } from "./auth-db"
+import type { AuthInternals } from "./auth-internals"
+import { createAuthInternals } from "./auth-internals"
+import type { AuthOptions } from "./auth-options"
+import type { EndpointRegistry } from "./endpoint-registry"
+import { endpointRegistry } from "./endpoint-registry"
+
+/**
+ * `T` with every user inside it carrying the declared additional fields.
+ *
+ * Endpoints are written once, against the erased `AuthUser`; this is what puts
+ * the schema back on the way out, so `updateUser()` returns `user.plan` typed
+ * when `plan` was declared. Everything that is not a user passes through
+ * unchanged.
+ */
+export type WithUserFields<
+  T,
+  S extends AdditionalFieldsSchema
+> = T extends AuthUser
+  ? AuthUser<S>
+  : T extends ReadonlyArray<infer Item>
+    ? WithUserFields<Item, S>[]
+    : T extends Date | ((...args: never[]) => unknown)
+      ? T
+      : T extends object
+        ? { [K in keyof T]: WithUserFields<T[K], S> }
+        : T
+
+/** The callable form of an endpoint: its input in, its data out. */
+type EndpointCallable<Endpoint, S extends AdditionalFieldsSchema> =
+  Endpoint extends EndpointDefinition<infer Input, infer Data>
+    ? (input: Input) => Promise<WithUserFields<Data, S>>
+    : never
+
+/** Every endpoint as a directly callable function. */
+export type AuthCallables<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = {
+  [Name in keyof EndpointRegistry]: EndpointCallable<EndpointRegistry[Name], S>
+}
+
+/** Every endpoint as an HTTP handler. */
+export type AuthHandlers = { [Name in keyof EndpointRegistry]: AuthHandler }
+
+/** The configured server. `S` is the declared additional fields; see {@link AuthOptions}. */
+export interface Auth<S extends AdditionalFieldsSchema = AdditionalFieldsSchema>
+  extends AuthCallables<S> {
+  /**
+   * The configuration this server runs on — the options after defaults and
+   * validation. Read it back in tests, or to learn a default without guessing.
+   */
+  config: AuthConfig
+  /**
+   * The catch-all handler. Mount once at `<basePath>/*` and it dispatches
+   * everything.
+   */
+  handler: AuthHandler
+  /** Individual handlers, for mounting routes explicitly instead. */
+  handlers: AuthHandlers
+  /** Verifies a token locally — no database, no network. */
+  verifyToken: (token: string) => Promise<TokenClaims | null>
+  /**
+   * Verifies a token and confirms the session it names is still live.
+   *
+   * The database-backed twin of {@link Auth.verifyToken}, for the actions
+   * where a revocation latency of `jwt.ttl` is too long to accept — a transfer,
+   * a permission change, anything a stolen token must not still reach minutes
+   * after the person signed out everywhere.
+   *
+   * Two reads and no write: the token names its session, and a session revoked
+   * or expired answers `null` where `verifyToken` would still answer claims.
+   * Reach for it per action rather than per request — checking everywhere is
+   * the design this library is built to avoid.
+   *
+   * The token may be passed directly or arrive as `Authorization: Bearer` on
+   * `headers`, as everywhere else. A refresh cookie on those headers is *not*
+   * a second way in: this answers for the token it was given, and resolving
+   * the cookie instead would answer about a different session and slide it.
+   * A caller holding the cookie has `getToken`, which reads the session anyway.
+   */
+  verifySession: (
+    input: CallerInput
+  ) => Promise<WithUserFields<ResolvedSession, S> | null>
+  /** Signs an arbitrary payload. The private key with a function signature. */
+  signToken: (claims?: SignTokenClaims) => Promise<string>
+  /** Decodes without verifying. Never authorize with this. */
+  decodeToken: typeof decodeToken
+  /**
+   * The decrypted refresh token for one connected account, or `null`.
+   *
+   * Deliberately not an endpoint: this is the durable half of a provider grant,
+   * and no HTTP route serves it at any status. It exists for work that manages
+   * its own refresh cycle — a background job that syncs a mailbox for weeks
+   * without a request to hang off. Everything interactive wants
+   * `getProviderToken` instead, which refreshes and hands back the short-lived
+   * half.
+   *
+   * Takes the identity's own id, unscoped by user, because a worker has no
+   * session to be scoped by. Whatever calls it is inside your server and is
+   * trusted accordingly.
+   */
+  getProviderRefreshToken: (identityId: string) => Promise<string | null>
+}
+
+/**
+ * Creates the auth server.
+ *
+ * Synchronous and free of input/output: every default is applied and every
+ * misconfiguration is thrown here rather than on the first request, and the
+ * signing key is imported lazily. That makes it cheap to memoize one instance per
+ * tenant and dispatch to it from your own routing.
+ *
+ * The returned object exposes the same endpoints three ways — as callables, as
+ * individual handlers, and behind one catch-all handler — all derived from a
+ * single registry, so they cannot disagree about what exists or what it does.
+ *
+ * @throws {AuthConfigError} When the configuration is incomplete or contradictory.
+ */
+export function createAuth<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+>(options: AuthOptions<S>): Auth<S> {
+  const resolved = resolveAuthConfig(options)
+  const internals = createAuthInternals(resolved)
+  const routes = compileRoutes(endpointRegistry)
+  warnAboutInertIpLimits(internals)
+
+  const callables = {} as Record<string, (input: unknown) => Promise<unknown>>
+  const handlers = {} as Record<string, AuthHandler>
+
+  for (const [name, endpoint] of Object.entries(endpointRegistry) as Array<
+    [string, AnyEndpoint]
+  >) {
+    callables[name] = async (input: unknown) => {
+      // `getToken` is the one callable that reads the cookie, and called
+      // in-process is where the "server-side rendering never sees the cookie"
+      // trap is explained instead of silently resolving to null.
+      if (name === "getToken") {
+        assertCookieReachable(
+          resolved,
+          (input as CallerInput | undefined)?.headers,
+          internals
+        )
+      }
+
+      const result = await endpoint.run(internals, input as never)
+      return result.data
+    }
+    handlers[name] = createHandler(internals, endpoint)
+  }
+
+  const handler: AuthHandler = async (request) => {
+    try {
+      // The router already parsed the URL and pulled out the `$params`, so they
+      // are handed straight to the endpoint rather than matched a second time.
+      const { endpoint, params } = matchRoute(internals, request, routes)
+      return await handleRequest(internals, endpoint, request, params)
+    } catch (error) {
+      if (!isAuthApiError(error)) throw error
+      return handleRequest(
+        internals,
+        notFoundEndpoint(error, request),
+        request,
+        {}
+      )
+    }
+  }
+
+  return {
+    ...(callables as unknown as AuthCallables<S>),
+    config: resolved,
+    handler,
+    handlers: handlers as AuthHandlers,
+    verifyToken: async (token) => {
+      const { verificationKeys } = await internals.keys()
+
+      return verifyToken(
+        {
+          keys: verificationKeys,
+          algorithm: resolved.jwt.alg,
+          ...(resolved.issuer ? { issuer: resolved.issuer } : {}),
+          ...(resolved.jwt.audience ? { audience: resolved.jwt.audience } : {})
+        },
+        token
+      )
+    },
+    verifySession: async (input) =>
+      (await resolveTokenSession(internals, input)) as WithUserFields<
+        ResolvedSession,
+        S
+      > | null,
+    signToken: async (claims = {}) => {
+      const { signingKey, kid } = await internals.keys()
+
+      return signToken(
+        {
+          signingKey,
+          algorithm: resolved.jwt.alg,
+          kid,
+          ttl: resolved.jwt.ttl,
+          // A `jwt.claims` function is given the user and session a token is
+          // for, and this signs tokens that are for neither.
+          claims:
+            typeof resolved.jwt.claims === "function"
+              ? {}
+              : resolved.jwt.claims,
+          ...(resolved.issuer ? { issuer: resolved.issuer } : {}),
+          ...(resolved.jwt.audience ? { audience: resolved.jwt.audience } : {})
+        },
+        claims
+      )
+    },
+    decodeToken,
+    getProviderRefreshToken: async (identityId) => {
+      const secrets = await selectOne(internals, "identitySecrets", {
+        identityId
+      })
+
+      return secrets?.refreshTokenEncrypted
+        ? decryptSecret(resolved.secret, secrets.refreshTokenEncrypted)
+        : null
+    }
+  }
+}
+
+/**
+ * Says out loud that the per-IP limits are configured and cannot fire.
+ *
+ * `ipAddress.disableTracking` derives no address at all, which leaves
+ * `sendCodePerIP`, `signInCodePerIP`, and `guestPerIP` inert and
+ * `session.ipAddress` null — a safe failure, and exactly the kind that is never
+ * noticed until someone sprays `/sign-in/send-code` across a thousand addresses. A
+ * warning rather than an error, because turning tracking off on purpose is a
+ * legitimate thing to do and `rateLimit` is on by default.
+ *
+ * The other way the limits go quiet — a deployment where no header ever carries
+ * a usable address — cannot be seen from here: it takes a request to find out.
+ * That one is warned about once, at the point it happens, in `ipRateLimitKey`.
+ */
+function warnAboutInertIpLimits(internals: AuthInternals) {
+  const { config } = internals
+  if (config.rateLimit === false || !config.ipAddress.disableTracking) return
+
+  internals.log.warn(
+    "per-IP rate limits are configured but will not apply: ipAddress.disableTracking is on, so no client address is derived. " +
+      "sendCodePerIP, signInCodePerIP, and guestPerIP are inert and session.ipAddress will be null."
+  )
+}
+
+/**
+ * Turns a routing failure into an endpoint, so it flows through the usual
+ * middleware. It claims the request's own method so the handler's method check
+ * is a no-op here and the router's verdict — 404 or 405 — is what gets served.
+ */
+function notFoundEndpoint(error: AuthApiError, request: Request): AnyEndpoint {
+  return {
+    method: request.method,
+    path: "/",
+    run: async () => {
+      throw error
+    }
+  } as AnyEndpoint
+}
+
+/**
+ * Explains the "server-side rendering is always signed out" trap before it happens.
+ *
+ * A `cookie.path` narrowed to the auth mount means the refresh cookie is never
+ * sent to a page request, so a server-side read answers `null` — the same
+ * answer a real visitor gets, and therefore indistinguishable from one. That
+ * presents as a bug in the application rather than the cost of a configuration
+ * choice, so it throws with the fix in the message instead. The default path is
+ * `"/"`, so this is only ever reached by opting into scoping.
+ */
+function assertCookieReachable(
+  resolved: AuthConfig,
+  headers: Headers | undefined,
+  internals: AuthInternals
+) {
+  if (resolved.cookie.path === "/") return
+  if (headers && readRefreshToken(internals, headers)) return
+  if (!headers?.get("cookie")) {
+    throw new AuthConfigError(
+      `No auth cookie on this request, and cookie.path is "${resolved.cookie.path}" rather than "/". ` +
+        'Server-side rendering only receives the refresh cookie when cookie.path is "/".'
+    )
+  }
+}

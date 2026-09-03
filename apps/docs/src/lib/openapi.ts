@@ -1,4 +1,4 @@
-import { buildOpenAPIDocument } from "@auth-ts/server"
+import { buildOpenAPIDocument } from "@auth-ts/core"
 import type { OpenAPIOptions } from "fumadocs-openapi/server"
 import { createOpenAPI } from "fumadocs-openapi/server"
 

@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { createAuthServer } from "@auth-ts/server"
-import { createMemoryDb } from "@auth-ts/server/testing"
+import { createAuth } from "@auth-ts/core"
+import { createMemoryDb } from "@auth-ts/core/testing"
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from "jose"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { Jwks } from "../src/keygen"
@@ -26,7 +26,7 @@ function serverFor(
   secret: string,
   alg: "RS256" | "ES256" = "RS256"
 ) {
-  return createAuthServer({
+  return createAuth({
     db: createMemoryDb(),
     guest: true,
     secret,
@@ -40,12 +40,8 @@ describe("keygen", () => {
     "generates a %s key whose tokens verify against the written jwks.json, as a database would",
     async (algorithm) => {
       const result = await keygen({ algorithm })
-      const authServer = serverFor(
-        result.privateKeyPem,
-        result.secret,
-        algorithm
-      )
-      const token = await authServer.signToken({ userId: "user-1" })
+      const auth = serverFor(result.privateKeyPem, result.secret, algorithm)
+      const token = await auth.signToken({ userId: "user-1" })
 
       // The token names the key by the kid the file publishes ...
       expect(decodeProtectedHeader(token).kid).toBe(result.jwks.keys[0]?.kid)
@@ -157,8 +153,8 @@ describe("auth-ts keygen", () => {
       stdout.match(/^JWT_PRIVATE_KEY="(.+)"$/m)?.[1] ?? ""
     ).replace(/\\n/g, "\n")
     const secret = env.match(/^AUTH_SECRET="(.+)"$/m)?.[1]
-    const authServer = serverFor(privateKeyPem, secret ?? "")
-    const token = await authServer.signToken({ userId: "user-1" })
+    const auth = serverFor(privateKeyPem, secret ?? "")
+    const token = await auth.signToken({ userId: "user-1" })
     const published = JSON.parse(
       await readFile(join(directory, "public/jwks.json"), "utf8")
     ) as Jwks

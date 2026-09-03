@@ -141,7 +141,7 @@ a function to derive them per user — which is how something like an
 organisation list gets in:
 
 ```ts
-createAuthServer({
+createAuth({
   jwt: {
     claims: async (user) => ({
       role: "authenticated",

@@ -93,7 +93,7 @@ long-lived npm token once the first release is out.
       shortest lifetime npm allows, add it as the `NPM_TOKEN` repository
       secret, and run **Release** with `dry-run` off and `first-release` on.
 - [ ] **Switch to trusted publishing.** On npmjs.com, for each of
-      `@auth-ts/server`, `@auth-ts/client`, and `@auth-ts/cli`: package →
+      `@auth-ts/core`, `@auth-ts/core/client`, and `@auth-ts/cli`: package →
       Settings → Trusted
       publishing → GitHub Actions, owner `auth-ts`, repository `auth-ts`,
       workflow `release.yml`, environment `npm`, allowed action `npm publish`.
@@ -194,12 +194,12 @@ has to do the things that are easy to skip:
 
 ### A conformance suite for the four functions
 
-**Shipped.** `authDBChecks` in `@auth-ts/server/testing` is the contract as a
+**Shipped.** `authDBChecks` in `@auth-ts/core/testing` is the contract as a
 list of checks, each `{ name, run(db) }`, throwing on failure so it fits any
 runner without dragging a test framework into the package's dependencies:
 
 ```ts
-import { authDBChecks } from "@auth-ts/server/testing"
+import { authDBChecks } from "@auth-ts/core/testing"
 
 for (const check of authDBChecks) {
   it(check.name, () => check.run(authDB)) // your four functions, your database
@@ -381,7 +381,7 @@ One exists, and it is the reference application. The others each prove a
 different edge of the design and should be built in roughly this order:
 
 - **Next.js.** Server components and route handlers exchanging the cookie with
-  `authServer.getToken({ headers })` once per render and spending the token, and
+  `auth.getToken({ headers })` once per render and spending the token, and
   the cookie-path trap.
 - **Supabase with row-level security.** The same data-plane story as Neon, with
   `auth.jwt()` policies instead of `auth.session()`, and the JWKS published

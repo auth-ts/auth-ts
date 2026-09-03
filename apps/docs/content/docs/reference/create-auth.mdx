@@ -1,0 +1,276 @@
+---
+title: createAuth
+description: Every option, its default, and why it defaults that way.
+---
+
+```ts
+import { createAuth } from "@auth-ts/core"
+
+export const auth = createAuth({
+  db: {
+    /* four functions — see the AuthDB reference */
+  },
+  email: { sendCode: async ({ email, code }) => {} }
+})
+```
+
+Construction is synchronous and does no input/output, so it is cheap to memoize
+one instance per tenant. Everything that can be wrong with a configuration throws
+here — a missing key, no sign-in method, a reserved field name — with the
+offending option named, rather than surfacing on the first user's sign-in.
+
+Two words are used deliberately. **Options** are what you pass: the partial,
+human-written `AuthOptions` below. **Config** is what resolving them
+produces: `AuthConfig`, with every default applied and every value
+validated, exposed as `auth.config`. When options cannot be resolved into
+a config, construction throws an `AuthConfigError`.
+
+<auto-type-table path="../../../../../packages/core/src/core/auth-options.ts" name="AuthOptions" />
+
+## Generating ids
+
+Unset by default, and unset is usually right: rows go to your store without an
+`id` and your own column default fills it — `uuidv7()`, a `$defaultFn`, an
+identity column, whatever the table already does. `insert` hands the stored row
+back, so the library reads the id it was given rather than assuming one.
+
+```ts
+createAuth({
+  db: authDB,
+  generateId: (table) => `${table}_${crypto.randomUUID()}`
+})
+```
+
+Set it when ids are the application's to mint: a store with no default of its
+own, a prefixed id, or an id you need to know before the write. It is called
+once per inserted row, awaited, with the table name, and the result becomes that
+row's `id`.
+
+## Cleanup
+
+There is no cleanup schedule to own. The library sweeps expired rows itself,
+through your own [`AuthDB.delete`](/docs/reference/auth-db), on the requests
+that create new ones: a sign-in sweeps `sessions`, a code send sweeps
+`verifications`, and the first attempt of each rate-limit window sweeps
+`attempts`. Garbage accrues only through inserts, so sweeping at insert time
+keys the sweep rate to the growth rate — including the rows left by people who
+never come back. Only the library's own tables are swept; `users` is never one
+of them, so an unreachable guest row is yours to collect.
+
+```ts
+import { waitUntil } from "cloudflare:workers"
+
+createAuth({ waitUntil, ... })
+```
+
+`waitUntil` is optional. Provide it and the sweep runs behind the response;
+leave it out and the sweep is awaited, because an unawaited promise is not
+guaranteed to run on Cloudflare Workers once the response has returned. A
+failed sweep is logged, never surfaced — expiry is enforced on read regardless.
+
+## What you get back
+
+The same endpoints, three ways, all derived from one registry so they cannot
+disagree:
+
+```ts
+// 1. Call it directly from your own backend. No HTTP round-trip to yourself.
+const session = await auth.getToken({ headers }) // null when nobody is
+
+// 2. One catch-all handler, mounted once.
+auth.handler(request)
+
+// 3. Individual handlers, if you prefer explicit routes.
+auth.handlers.sendSignInCode(request)
+```
+
+Plus the JWT-plane functions:
+
+- `verifyToken(token)` — verifies locally against the public key. No database, no
+  network. Returns `null` for any failure.
+- `verifySession({ headers, token })` — verifies the token *and* confirms the
+  session it names is still live, returning that session and its user, or
+  `null`. Two reads and no write, and never the cookie: it answers for the token
+  it was given. This is the way out of the revocation latency below, for the
+  actions that cannot accept it.
+- `signToken(claims)` — mints anything, with no session check. This is the
+  private key with a function signature; never expose it through a route.
+- `decodeToken(token)` — **unverified**, synchronous, for logging and triage.
+  Never authorize with it.
+- `getToken({ headers })` — exchanges the refresh cookie for an access token,
+  and returns the user with it, or `null` when nobody is signed in. The one
+  function that reads the cookie.
+- `getProviderRefreshToken(identityId)` — the decrypted refresh token for one
+  connected account. **Not an endpoint**, at any status: it is the durable half
+  of a provider grant, and only server code that manages its own refresh cycle —
+  a nightly sync job, say — has any use for it. Everything interactive wants
+  `getProviderToken` instead.
+
+## Connected accounts
+
+Configure a provider with the scopes your application needs and, where the
+provider distinguishes them, ask for a grant that outlives the sign-in:
+
+```ts
+createAuth({
+  providers: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+      offlineAccess: true
+    }
+  }
+})
+```
+
+Google issues a refresh token only for an offline grant, and only from a consent
+screen — so `offlineAccess` also means the consent screen appears on every
+sign-in with that provider. That is the visible cost of a connection that keeps
+working; leave it off and you get sign-in only.
+
+What the provider hands over is stored on the identity, encrypted. To use it,
+ask for a live access token by identity id:
+
+```ts
+const { token, expiresAt, scope } = await auth.getProviderToken({
+  token: accessToken,
+  id: identity.id
+})
+```
+
+It refreshes first when the stored token is spent, so what comes back is usable
+now. Addressed by identity rather than by provider because one user may connect
+two Google accounts, and `authClient.getProviderToken({ id })` is the same call
+from the browser — provider APIs are CORS-enabled, so a short-lived scoped token
+in a variable is often better than proxying every call through your server.
+`providerReconnectRequired` means the grant is gone: send them through `connect`
+again.
+
+### The token is the credential
+
+Every authenticated endpoint takes `{ headers?, token? }` and authenticates from
+the access token alone: a token passed directly, then an `Authorization: Bearer`
+header, then a 401. There is no cookie fallback.
+
+`GET /token` is the exception, and the only one. It reads the refresh cookie,
+slides the session, signs a token, and answers with `{ token, user }`. Nothing
+else touches a session at all.
+
+It answers `null` rather than throwing when there is no session — a visitor
+nobody is signed in as is the ordinary case on a public page, not a failure —
+so a loader branches instead of catching:
+
+```ts
+// Server-side rendering: buy a token once, then spend it.
+const session = await auth.getToken({ headers })
+if (!session) return { user: null }
+
+// The user came with the token. Everything else is your own query, with the
+// same token the browser would have carried.
+const todos = await db
+  .select()
+  .from(todos)
+  .where(eq(todos.userId, session.user.id))
+```
+
+That shape is the point. A loader that called four endpoints with `{ headers }`
+under a cookie fallback would slide the session four times, read the user four
+times, and sign four tokens it then threw away. One exchange, then reads that
+cost one session write and no signatures.
+
+Sign-ins hand back a token in the body alongside the user — verification code,
+guest, and account switch — so
+signing in and the first render cost one round trip between them rather than a
+sign-in followed by a refresh. Nothing crosses in a response header any more,
+which is also why there is nothing for CORS to expose.
+
+There is no exception to that. The OAuth routes —
+`POST /sign-in/provider/:provider` and `POST /identities/connect/:provider` — answer with
+the provider's authorize URL rather than a 302, so the caller is making an
+ordinary request and can present a token like anything else. They have to: a
+desktop or mobile shell must open the system browser instead of its own webview,
+and it cannot read a `Location` header out of a redirect, because a
+manual-redirect fetch response is opaque. Handing back the URL is the only shape
+that serves a browser and a native app at once.
+
+The cost of trusting a token is revocation latency: a session revoked elsewhere
+keeps working until that token expires, `jwt.ttl` at the outside. That is the
+same bound your database already lives with, since it authorizes on the token
+too.
+
+Where an action cannot live with that bound — a transfer, a permission change,
+anything a stolen token must not still reach minutes after the person signed out
+everywhere — `verifySession` reads the session row the token names and
+answers `null` when it is gone. Reach for it per action, not per request: making
+every route check is the cost this design exists to avoid.
+
+Every refusal is logged at `debug` with a `reason` of `missing`, `expired`, or
+`invalid`. Counting them is worth doing: a client refreshes ahead of expiry, so a
+healthy deployment refuses about never — a rate above that is a client that has
+stopped refreshing, showing up as a graph rather than as user reports.
+
+<auto-type-table path="../../../../../packages/core/src/jwt/sign-token.ts" name="SignTokenClaims" />
+
+## Additional fields
+
+`user.additionalFields` declares the extra columns on your users table that
+sign-up may set and `POST /user` may edit — a name → type map, and the source
+of truth for types as well as validation. Declare a field and every user this
+server returns carries it, typed:
+
+```ts
+const auth = createAuth({
+  db,
+  user: { additionalFields: { plan: "string", seats: "number" } }
+})
+
+const user = await auth.updateUser({ token, plan: "pro" })
+user.plan // string | null | undefined
+```
+
+Optional and nullable on the way out, because nothing guarantees a row has set
+them; optional and never null on the way in, because core only writes a value
+that validated against its declared type. Requests that send an undeclared key
+or the wrong primitive are rejected with `invalidField`, and declared fields are
+applied on insert only — signing in cannot overwrite an existing profile. Typing
+your `AuthDB` against the same schema is covered in [AuthDB](/docs/reference/auth-db#typing-your-implementation).
+
+## Client IP
+
+`ipAddress` decides how the client's address is read from proxy headers — the
+per-IP rate-limit key, and the `ipAddress` stored on each session. It needs no
+configuration where the platform overwrites `x-forwarded-for`; a chain of two or
+more entries is ambiguous until you say what your topology is, and until then no
+address is derived from it. See [Security](/docs/security#deploying) for what
+each form is worth.
+
+```ts
+createAuth({
+  // Cloudflare, Akamai: a header the edge controls and a client cannot append to.
+  ipAddress: { headers: ["cf-connecting-ip"] }
+})
+
+createAuth({
+  // Behind proxies you run: their count, or their addresses.
+  ipAddress: { trustedProxies: 1 }
+})
+```
+
+<auto-type-table path="../../../../../packages/core/src/lib/ip-address.ts" name="IpAddressOptions" />
+
+During development — `NODE_ENV=development` — a request with no forwarded header
+reports `127.0.0.1` rather than nothing, so per-IP limits are testable on the one
+machine where you want to try them. Nothing is invented in production.
+
+## Durations
+
+Every duration uses one format — `"10m"`, `"30d"`, `"60s"` — and one parser, so
+`jwt.ttl` and a rate-limit window cannot disagree about what `"1h"` means. Months
+are unsupported because their length is ambiguous.
+
+## OpenAPI
+
+`openapi: true` serves `GET {basePath}/openapi.json` and a browsable
+`GET {basePath}/reference`, both describing this server's own configuration.
+Off by default. See [the OpenAPI guide](/docs/guides/openapi).

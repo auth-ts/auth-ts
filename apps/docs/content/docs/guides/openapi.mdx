@@ -17,7 +17,7 @@ document describing *your* deployment.
 One option, off by default:
 
 ```ts
-const auth = createAuthServer({
+const auth = createAuth({
   // ...
   openapi: true
 })
@@ -44,7 +44,7 @@ remember to turn off.
 If you would rather not serve it, build it directly:
 
 ```ts
-import { buildOpenAPIDocument } from "@auth-ts/server"
+import { buildOpenAPIDocument } from "@auth-ts/core"
 
 const document = buildOpenAPIDocument(auth.config)
 ```
@@ -57,7 +57,7 @@ bun run scripts/write-openapi.ts > openapi.json
 
 Point Scalar, Swagger UI, Insomnia, or Postman at either the route or the file.
 `openapi-typescript` will generate types from it, and most client generators
-take it as-is — `operationId` is the same name the method has on `authServer`
+take it as-is — `operationId` is the same name the method has on `auth`
 and on `authClient`, so a generated client lines up with both.
 
 ## What the document reflects

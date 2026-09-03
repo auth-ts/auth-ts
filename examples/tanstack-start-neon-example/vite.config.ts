@@ -13,7 +13,7 @@ export default defineConfig({
   ],
   // Vite answers CORS preflights itself, permissively for any localhost origin
   // and without Allow-Credentials, which shadows the auth handler and makes dev
-  // disagree with production. Off in both servers, so `authServer.handler`
+  // disagree with production. Off in both servers, so `auth.handler`
   // answers OPTIONS everywhere.
   server: { port: 3000, cors: false },
   preview: { cors: false }

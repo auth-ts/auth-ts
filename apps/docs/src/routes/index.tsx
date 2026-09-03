@@ -54,9 +54,9 @@ const FEATURES = [
   }
 ]
 
-const SERVER_SNIPPET = `import { createAuthServer } from "@auth-ts/server"
+const SERVER_SNIPPET = `import { createAuth } from "@auth-ts/core"
 
-export const authServer = createAuthServer({
+export const auth = createAuth({
   db: {
     /* four functions — see the AuthDB reference */
   },
@@ -67,7 +67,7 @@ export const authServer = createAuthServer({
   }
 })`
 
-const CLIENT_SNIPPET = `import { createAuthClient } from "@auth-ts/client"
+const CLIENT_SNIPPET = `import { createAuthClient } from "@auth-ts/core/client"
 
 export const authClient = createAuthClient()
 
@@ -186,7 +186,7 @@ function Hero() {
           <div className="mt-8 max-w-md">
             <DynamicCodeBlock
               lang="bash"
-              code={`bun add @auth-ts/server @auth-ts/client
+              code={`bun add @auth-ts/core @auth-ts/core/client
 bun x @auth-ts/cli keygen`}
             />
           </div>
@@ -253,8 +253,8 @@ function Snippets() {
             <span className="text-fd-primary">01</span> On the server
           </h2>
           <p className="text-fd-muted-foreground text-sm text-pretty">
-            Write the four functions, mount <code>authServer.handler</code> once
-            at <code>/api/auth/*</code>, and point your database at{" "}
+            Write the four functions, mount <code>auth.handler</code> once at{" "}
+            <code>/api/auth/*</code>, and point your database at{" "}
             <code>/jwks.json</code>.
           </p>
           <DynamicCodeBlock lang="ts" code={SERVER_SNIPPET} />

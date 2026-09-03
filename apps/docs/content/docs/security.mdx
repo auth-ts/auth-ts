@@ -164,7 +164,7 @@ nominate the origin it is then checked against. `trustedProxyHeaders` defaults
 to `false`, and the origin is the request URL's own:
 
 ```ts
-createAuthServer({
+createAuth({
   // ...
   trustedProxyHeaders: true
 })
@@ -224,7 +224,7 @@ what the reference application does — there is nothing to configure here.
 When they do not, name the application:
 
 ```ts
-createAuthServer({
+createAuth({
   // ...
   trustedOrigins: ["https://app.example.com"]
 })

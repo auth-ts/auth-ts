@@ -23,8 +23,7 @@
     "keygen": "bun x auth-ts keygen"
   },
   "dependencies": {
-    "@auth-ts/client": "workspace:*",
-    "@auth-ts/server": "workspace:*",
+    "@auth-ts/core": "workspace:*",
     "@heroicons/react": "^2.2.0",
     "@neondatabase/postgrest-js": "^0.2.0-beta",
     "@neondatabase/serverless": "1.1.0",

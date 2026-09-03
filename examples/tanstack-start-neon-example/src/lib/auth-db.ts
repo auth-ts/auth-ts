@@ -4,8 +4,8 @@ import type {
   AuthRange,
   AuthTable,
   AuthWhere
-} from "@auth-ts/server"
-import { defineAuthDB } from "@auth-ts/server"
+} from "@auth-ts/core"
+import { defineAuthDB } from "@auth-ts/core"
 import { and, asc, desc, eq, getColumns, gt, is, lt } from "drizzle-orm"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import { PgTable } from "drizzle-orm/pg-core"

@@ -19,7 +19,7 @@ spoofable authentication bypass, and non-HTTP callers — tests, migrations, the
 in-memory fixture — drive this contract directly. For multi-tenancy, close over
 the tenant when you construct the server.
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthDB" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthDB" />
 
 ## The tables
 
@@ -98,7 +98,7 @@ index, because the missing constraint only shows under a race.
   asking you to write it — a range is a non-null object that is not a `Date`:
 
   ```ts
-  import { isAuthRange } from "@auth-ts/server"
+  import { isAuthRange } from "@auth-ts/core"
   ```
 
   That is the whole operator surface: no `OR`, no `in`, no negation. The
@@ -135,7 +135,7 @@ index, because the missing constraint only shows under a race.
   before it inserts, and the constraint is deliberately the arbiter of the race
   between the two.
 - **Ids are yours.** The row arrives without one unless you set
-  [`generateId`](/docs/reference/create-auth-server#generating-ids), so your `uuidv7()` default,
+  [`generateId`](/docs/reference/create-auth#generating-ids), so your `uuidv7()` default,
   `$defaultFn`, or identity column fills it as it always would.
 - **`update` never receives an empty set.** The library composes the fields
   itself and skips the call entirely when a request changes nothing, so you need
@@ -155,7 +155,7 @@ index, because the missing constraint only shows under a race.
   `attempts`. There is nothing extra to implement and no schedule to own — but
   it does mean an index on `expiresAt` is load-bearing for those tables, not
   just for reads. Pass `waitUntil` to
-  [`createAuthServer`](/docs/reference/create-auth-server) and the sweep runs
+  [`createAuth`](/docs/reference/create-auth) and the sweep runs
   behind the response instead of ahead of it.
 - **Nothing sweeps `users`.** A guest's session is their only credential, so a
   guest left with no sessions is unreachable — but collecting that row is a
@@ -211,7 +211,7 @@ A **table dictionary** is one query per function, whatever the table. This is
 the whole read path from the reference application:
 
 ```ts
-import { defineAuthDB } from "@auth-ts/server"
+import { defineAuthDB } from "@auth-ts/core"
 
 import * as schema from "./db/schema"
 
@@ -301,8 +301,8 @@ export const authDB = defineAuthDB({
 schema once, and both sides agree:
 
 ```ts
-import type { AdditionalFieldsSchema } from "@auth-ts/server"
-import { defineAuthDB } from "@auth-ts/server"
+import type { AdditionalFieldsSchema } from "@auth-ts/core"
+import { defineAuthDB } from "@auth-ts/core"
 
 export const additionalFields = {
   plan: "string",
@@ -322,7 +322,7 @@ export const authDB = defineAuthDB<typeof additionalFields>({
   // ...
 })
 
-createAuthServer({ db: authDB, user: { additionalFields } })
+createAuth({ db: authDB, user: { additionalFields } })
 ```
 
 Your declared fields ride flat on the `users` row, beside the core ones, so
@@ -337,23 +337,23 @@ source of truth.
 The core fields of a user. Your declared additional fields sit beside them on
 `AuthUser`, typed from the schema you declare.
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="CoreUserFields" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="CoreUserFields" />
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthSession" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthSession" />
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthVerification" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthVerification" />
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthAttempt" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthAttempt" />
 
-<auto-type-table path="../../../../../packages/server/src/core/auth-db.ts" name="AuthIdentity" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthIdentity" />
 
 ## Testing your implementation
 
-`@auth-ts/server/testing` exports the contract on this page as a list of checks
+`@auth-ts/core/testing` exports the contract on this page as a list of checks
 you can run against your own four functions:
 
 ```ts
-import { authDBChecks } from "@auth-ts/server/testing"
+import { authDBChecks } from "@auth-ts/core/testing"
 import { authDB } from "./auth-db"
 
 describe("authDB", () => {
@@ -418,7 +418,7 @@ reason to run the checks against your real database at least once as well.
 The store the library's own suite runs against is public too:
 
 ```ts
-import { createMemoryDb } from "@auth-ts/server/testing"
+import { createMemoryDb } from "@auth-ts/core/testing"
 
 const db = createMemoryDb()
 ```

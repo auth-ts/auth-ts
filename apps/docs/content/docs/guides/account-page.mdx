@@ -45,7 +45,7 @@ Row-level security already answers "which user", so there is no `eq` to write.
 With an ORM on your own server, the id comes from the verified token:
 
 ```ts
-const claims = await authServer.verifyToken(token)
+const claims = await auth.verifyToken(token)
 const [user] = await db.select().from(users).where(eq(users.id, claims.sub))
 ```
 

@@ -6,7 +6,7 @@ import {
   generateKeyPair
 } from "jose"
 
-/** The signing algorithms `@auth-ts/server` accepts. */
+/** The signing algorithms `@auth-ts/core` accepts. */
 export type JwtAlgorithm = "RS256" | "ES256"
 
 /** What `keygen` needs to know. */
@@ -31,7 +31,7 @@ export interface KeygenResult {
 }
 
 /**
- * The public JWK for this key, as `@auth-ts/server` identifies it.
+ * The public JWK for this key, as `@auth-ts/core` identifies it.
  *
  * The public members only, then `alg`, `use`, and the RFC 7638 thumbprint as
  * `kid` — the same `kid` the server stamps on every token header, which is how

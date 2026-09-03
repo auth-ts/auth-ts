@@ -18,9 +18,9 @@
     "sourceMap": true,
     "noEmit": true,
     "paths": {
-      "@auth-ts/server": ["./packages/server/src/index.ts"],
-      "@auth-ts/server/testing": ["./packages/server/src/lib/memory-db.ts"],
-      "@auth-ts/client": ["./packages/client/src/index.ts"]
+      "@auth-ts/core": ["./packages/core/src/index.ts"],
+      "@auth-ts/core/client": ["./packages/core/src/client.ts"],
+      "@auth-ts/core/testing": ["./packages/core/src/testing.ts"]
     }
   },
   "exclude": ["node_modules", "dist"]

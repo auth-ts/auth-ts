@@ -1,4 +1,4 @@
-import { isAuthError } from "@auth-ts/client"
+import { isAuthError } from "@auth-ts/core/client"
 import {
   ArrowLeftIcon,
   ArrowRightEndOnRectangleIcon,

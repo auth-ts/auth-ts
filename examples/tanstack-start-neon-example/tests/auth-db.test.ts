@@ -1,4 +1,4 @@
-import { authDBChecks } from "@auth-ts/server/testing"
+import { authDBChecks } from "@auth-ts/core/testing"
 import { describe, it } from "vitest"
 import { authDB } from "../src/lib/auth-db"
 

@@ -7,11 +7,11 @@ export default defineConfig({
     // is exercised here without a build in between — the same thing
     // tsconfig.base.json's `paths` do for the typechecker.
     alias: {
-      "@auth-ts/server/testing": resolve(
+      "@auth-ts/core/testing": resolve(
         import.meta.dirname,
-        "../server/src/lib/memory-db.ts"
+        "../core/src/testing.ts"
       ),
-      "@auth-ts/server": resolve(import.meta.dirname, "../server/src/index.ts")
+      "@auth-ts/core": resolve(import.meta.dirname, "../core/src/index.ts")
     }
   },
   test: {

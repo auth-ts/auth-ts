@@ -6,7 +6,7 @@
     "noEmit": true,
     "paths": {
       "~/*": ["./src/*"],
-      "@auth-ts/server": ["../../packages/server/src/index.ts"]
+      "@auth-ts/core": ["../../packages/core/src/index.ts"]
     },
     "declaration": false
   },

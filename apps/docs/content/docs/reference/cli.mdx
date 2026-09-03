@@ -75,7 +75,7 @@ The file belongs to the key: running `keygen` again generates a new key and a
 new file, and the two are deployed together. See
 [rotating keys](/docs/guides/key-rotation).
 
-No public folder? Take the JSON it printed and pass it to `createAuthServer` as
+No public folder? Take the JSON it printed and pass it to `createAuth` as
 `jwks: { json }`; it is then served at `/api/auth/jwks`.
 If it is hosted somewhere else, `jwks: { url }` tells the discovery document
 where.

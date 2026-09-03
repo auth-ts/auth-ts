@@ -1,6 +1,6 @@
 # @auth-ts/cli
 
-The command line for [`@auth-ts/server`](https://www.npmjs.com/package/@auth-ts/server).
+The command line for [`@auth-ts/core`](https://www.npmjs.com/package/@auth-ts/core).
 
 ```bash
 bun x @auth-ts/cli keygen

@@ -1,7 +1,7 @@
 {
   "name": "@auth-ts/cli",
   "version": "0.1.0",
-  "description": "Command line for @auth-ts/server: generate signing keys and the JWKS to publish.",
+  "description": "Command line for @auth-ts/core: generate signing keys and the JWKS to publish.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -24,7 +24,7 @@
     "jose": "6.2.9"
   },
   "devDependencies": {
-    "@auth-ts/server": "workspace:*"
+    "@auth-ts/core": "workspace:*"
   },
   "repository": {
     "type": "git",

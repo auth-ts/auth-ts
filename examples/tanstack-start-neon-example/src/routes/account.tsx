@@ -1,5 +1,5 @@
-import type { SignOutInput } from "@auth-ts/client"
-import { isAuthError } from "@auth-ts/client"
+import type { SignOutInput } from "@auth-ts/core/client"
+import { isAuthError } from "@auth-ts/core/client"
 import {
   ArrowRightStartOnRectangleIcon,
   ArrowsRightLeftIcon,

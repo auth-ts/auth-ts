@@ -23,7 +23,7 @@ needs to own your schema.
 ### 1. Install
 
 ```bash
-bun add @auth-ts/server @auth-ts/client
+bun add @auth-ts/core
 ```
 
 ### 2. Generate a signing key
@@ -40,9 +40,9 @@ verification-code HMAC, and they have different blast radiuses.
 ### 3. Write the four functions
 
 ```ts
-import { createAuthServer } from "@auth-ts/server"
+import { createAuth } from "@auth-ts/core"
 
-export const authServer = createAuthServer({
+export const auth = createAuth({
   db: {
     /* select, insert, update, delete — see the AuthDB reference */
   },
@@ -53,7 +53,7 @@ export const authServer = createAuthServer({
   }
 })
 
-export type AuthServer = typeof authServer
+export type Auth = typeof auth
 ```
 
 ### 4. Mount one route
@@ -63,9 +63,9 @@ export type AuthServer = typeof authServer
 export const Route = createFileRoute("/api/auth/$")({
   server: {
     handlers: {
-      GET: ({ request }) => authServer.handler(request),
-      POST: ({ request }) => authServer.handler(request),
-      DELETE: ({ request }) => authServer.handler(request)
+      GET: ({ request }) => auth.handler(request),
+      POST: ({ request }) => auth.handler(request),
+      DELETE: ({ request }) => auth.handler(request)
     }
   }
 })
@@ -84,7 +84,7 @@ lives if it is hosted somewhere else entirely.
 ## Then, in the browser
 
 ```ts
-import { createAuthClient } from "@auth-ts/client"
+import { createAuthClient } from "@auth-ts/core/client"
 
 export const authClient = createAuthClient()
 

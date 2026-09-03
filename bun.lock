@@ -19,7 +19,7 @@
     "apps/docs": {
       "name": "docs",
       "dependencies": {
-        "@auth-ts/server": "workspace:*",
+        "@auth-ts/core": "workspace:*",
         "@tanstack/react-router": "1.170.31",
         "@tanstack/react-start": "1.168.48",
         "fumadocs-core": "^16.15.0",
@@ -44,8 +44,7 @@
     "examples/tanstack-start-neon-example": {
       "name": "tanstack-start-neon-example",
       "dependencies": {
-        "@auth-ts/client": "workspace:*",
-        "@auth-ts/server": "workspace:*",
+        "@auth-ts/core": "workspace:*",
         "@heroicons/react": "^2.2.0",
         "@neondatabase/postgrest-js": "^0.2.0-beta",
         "@neondatabase/serverless": "1.1.0",
@@ -83,21 +82,11 @@
         "jose": "6.2.9",
       },
       "devDependencies": {
-        "@auth-ts/server": "workspace:*",
+        "@auth-ts/core": "workspace:*",
       },
     },
-    "packages/client": {
-      "name": "@auth-ts/client",
-      "version": "0.1.0",
-      "devDependencies": {
-        "@auth-ts/server": "workspace:*",
-      },
-      "peerDependencies": {
-        "@auth-ts/server": "workspace:*",
-      },
-    },
-    "packages/server": {
-      "name": "@auth-ts/server",
+    "packages/core": {
+      "name": "@auth-ts/core",
       "version": "0.1.0",
       "dependencies": {
         "jose": "6.2.9",
@@ -110,9 +99,7 @@
   "packages": {
     "@auth-ts/cli": ["@auth-ts/cli@workspace:packages/cli"],
 
-    "@auth-ts/client": ["@auth-ts/client@workspace:packages/client"],
-
-    "@auth-ts/server": ["@auth-ts/server@workspace:packages/server"],
+    "@auth-ts/core": ["@auth-ts/core@workspace:packages/core"],
 
     "@babel/code-frame": ["@babel/code-frame@7.27.1", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.27.1", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg=="],
 

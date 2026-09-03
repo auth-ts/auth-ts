@@ -9,10 +9,11 @@ PostgREST — or anything that trusts a JWKS URL. Your database verifies the tok
 and your policies decide what comes back, so authorization lives in Postgres
 rather than in application code.
 
-* `@auth-ts/server` — the issuer. Zero framework dependencies, zero database
+* `@auth-ts/core` — the issuer. Zero framework dependencies, zero database
   dependencies, `jose` and nothing else. Runs on Node 20+, Cloudflare Workers,
   Deno, and Bun.
-* `@auth-ts/client` — browser token management. Zero runtime dependencies.
+* `@auth-ts/core/client` — browser token management, from the same package. The
+  entry a browser imports carries none of the issuer.
 * `@auth-ts/cli` — `bun x @auth-ts/cli keygen`: the signing key, the
   `AUTH_SECRET`, and the `public/jwks.json` to deploy with your app.
 
@@ -21,7 +22,7 @@ Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous 
 ## Quickstart
 
 ```bash
-bun add @auth-ts/server @auth-ts/client
+bun add @auth-ts/core
 bun x @auth-ts/cli keygen
 ```
 
@@ -31,9 +32,9 @@ written to `public/jwks.json`, which your framework serves at `/jwks.json`.
 
 ```ts
 // auth-server.ts
-import { createAuthServer } from "@auth-ts/server"
+import { createAuth } from "@auth-ts/core"
 
-export const authServer = createAuthServer({
+export const auth = createAuth({
   db: {
     /* four functions — see the AuthDB reference */
   },
@@ -44,7 +45,7 @@ export const authServer = createAuthServer({
   }
 })
 
-export type AuthServer = typeof authServer
+export type Auth = typeof auth
 ```
 
 Mount it once, at `<basePath>/*`:
@@ -53,9 +54,9 @@ Mount it once, at `<basePath>/*`:
 export const Route = createFileRoute("/api/auth/$")({
   server: {
     handlers: {
-      GET: ({ request }) => authServer.handler(request),
-      POST: ({ request }) => authServer.handler(request),
-      DELETE: ({ request }) => authServer.handler(request)
+      GET: ({ request }) => auth.handler(request),
+      POST: ({ request }) => auth.handler(request),
+      DELETE: ({ request }) => auth.handler(request)
     }
   }
 })
@@ -64,7 +65,7 @@ export const Route = createFileRoute("/api/auth/$")({
 Then point your database at `https://your.app/jwks.json`, and in the browser:
 
 ```ts
-import { createAuthClient } from "@auth-ts/client"
+import { createAuthClient } from "@auth-ts/core/client"
 
 export const authClient = createAuthClient()
 
@@ -100,8 +101,7 @@ minutes by default — which is stated plainly rather than glossed over.
 ## Repository
 
 ```text
-packages/server    @auth-ts/server
-packages/client    @auth-ts/client
+packages/core      @auth-ts/core
 packages/cli       @auth-ts/cli
 apps/docs          the documentation site
 examples/          TanStack Start + Neon reference application

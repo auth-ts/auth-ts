@@ -1,4 +1,4 @@
-import type { UserType, VerificationPurpose } from "@auth-ts/server"
+import type { UserType, VerificationPurpose } from "@auth-ts/core"
 import { sql } from "drizzle-orm"
 import { authenticatedRole } from "drizzle-orm/neon"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"

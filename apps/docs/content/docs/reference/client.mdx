@@ -4,10 +4,14 @@ description: The client. Zero dependencies, token in memory only.
 ---
 
 ```ts
-import { createAuthClient } from "@auth-ts/client"
+import { createAuthClient } from "@auth-ts/core/client"
 
 export const authClient = createAuthClient()
 ```
+
+The `/client` entry is the load-bearing detail: it is built separately from the
+issuer, so a browser bundle that imports it carries no server code and no `jose`.
+Importing `@auth-ts/core` in browser-reachable code is what undoes that.
 
 Construction performs no network request and touches no storage, so importing the
 module is free and safe during server-side rendering. Everything reconciles on
@@ -15,10 +19,10 @@ the first read.
 
 Every method here has an identically named callable on the server —
 `signInWithCode` dispatches `POST /sign-in/code` on both `authClient` and
-`authServer`. Moving a call between a loader and a component is changing
-`authServer` to `authClient` and nothing else.
+`auth`. Moving a call between a loader and a component is changing
+`auth` to `authClient` and nothing else.
 
-<auto-type-table path="../../../../../packages/client/src/core/auth-client-options.ts" name="AuthClientOptions" />
+<auto-type-table path="../../../../../packages/core/src/client/core/auth-client-options.ts" name="AuthClientOptions" />
 
 ## The two reads
 
@@ -94,7 +98,7 @@ const token = await authClient.getToken({
 })
 ```
 
-<auto-type-table path="../../../../../packages/client/src/methods/get-token.ts" name="GetTokenOptions" />
+<auto-type-table path="../../../../../packages/core/src/client/methods/get-token.ts" name="GetTokenOptions" />
 
 It fires only when that call actually minted. A token served from memory read
 nothing, and the user it could report would be as old as the token — so a warm
@@ -283,7 +287,7 @@ Every failure is an `AuthError` carrying a stable `code`. Switch on the code,
 never on the message — messages are localized and free to change.
 
 ```ts
-import { isAuthError } from "@auth-ts/client"
+import { isAuthError } from "@auth-ts/core/client"
 
 try {
   await authClient.sendSignInCode({ email })
@@ -318,7 +322,7 @@ Reading `error.code` off a value typed `Error` needs one of two things. Inside a
 type once and every `error` in the app carries `code` without a guard:
 
 ```ts
-import type { AuthError } from "@auth-ts/client"
+import type { AuthError } from "@auth-ts/core/client"
 
 declare module "@tanstack/react-query" {
   interface Register {
