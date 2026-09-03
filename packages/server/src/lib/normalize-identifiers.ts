@@ -26,8 +26,3 @@ export function normalizePhone(phoneNumber: string) {
   }
   return stripped
 }
-
-/** Returns `true` when the string looks like an email address. */
-export function looksLikeEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
-}

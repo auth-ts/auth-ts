@@ -149,19 +149,3 @@ function toErrorResponse(
     { headers }
   )
 }
-
-/** Mounts every endpoint in a registry, keyed by name. */
-export function createHandlers<Registry extends Record<string, AnyEndpoint>>(
-  internals: AuthServerInternals,
-  registry: Registry
-) {
-  const handlers = {} as Record<keyof Registry, AuthHandler>
-
-  for (const [name, endpoint] of Object.entries(registry) as Array<
-    [keyof Registry, AnyEndpoint]
-  >) {
-    handlers[name] = createHandler(internals, endpoint)
-  }
-
-  return handlers
-}

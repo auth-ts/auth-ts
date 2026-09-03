@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import {
-  looksLikeEmail,
   normalizeEmail,
   normalizePhone
 } from "../../src/lib/normalize-identifiers"
@@ -25,12 +24,5 @@ describe("normalizePhone", () => {
     expect(() => normalizePhone("+123")).toThrow(TypeError)
     expect(() => normalizePhone("+1234567890123456")).toThrow(TypeError)
     expect(() => normalizePhone("+1555abc4567")).toThrow(TypeError)
-  })
-})
-
-describe("looksLikeEmail", () => {
-  it("distinguishes emails from phone numbers", () => {
-    expect(looksLikeEmail("ada@example.com")).toBe(true)
-    expect(looksLikeEmail("+15551234567")).toBe(false)
   })
 })
