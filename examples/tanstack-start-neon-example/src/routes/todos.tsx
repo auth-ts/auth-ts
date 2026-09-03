@@ -6,6 +6,8 @@ import {
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 
+import type { Notice } from "../components/notice"
+import { NoticeAlert } from "../components/notice"
 import { PendingSpinner } from "../components/pending-spinner"
 import { SignedOutCard } from "../components/signed-out-card"
 import {
@@ -16,10 +18,26 @@ import {
 } from "../hooks/use-todos"
 import { useUser } from "../hooks/use-user"
 
-export const Route = createFileRoute("/todos")({ component: TodosPage })
+export const Route = createFileRoute("/todos")({
+  component: TodosPage,
+  validateSearch: (search: Record<string, unknown>): { error?: string } =>
+    typeof search.error === "string" ? { error: search.error } : {}
+})
+
+/** A failed OAuth flow lands back here with its code in `?error=`. */
+const signInFailures: Record<string, string> = {
+  providerDenied: "That sign-in was cancelled.",
+  providerRejected: "That sign-in could not be completed. Please try again.",
+  providerEmailUnverified:
+    "Verify your email address with that provider, then try again.",
+  providerUnavailable: "The provider did not respond. Please try again.",
+  providerConflict: "That account is already connected to a different user.",
+  invalidState: "That sign-in attempt expired. Please start again."
+}
 
 /** The todo list — the whole point of the demo. */
 function TodosPage() {
+  const { error } = Route.useSearch()
   const { data: user, isPending } = useUser()
   const todos = useTodos(user?.id)
   const add = useInsertTodo(user?.id)
@@ -30,11 +48,22 @@ function TodosPage() {
   if (isPending) return <PendingSpinner />
 
   if (!user) {
+    const notice: Notice | null = error
+      ? { text: signInFailures[error] ?? "That sign-in failed.", tone: "error" }
+      : null
+
     return (
-      <SignedOutCard title="Your todos">
-        Sign in to see them. Rows are scoped by row-level security, not by this
-        page.
-      </SignedOutCard>
+      <div className="flex flex-col items-center gap-4">
+        {notice ? (
+          <div className="w-full max-w-sm">
+            <NoticeAlert notice={notice} />
+          </div>
+        ) : null}
+        <SignedOutCard title="Your todos">
+          Sign in to see them. Rows are scoped by row-level security, not by
+          this page.
+        </SignedOutCard>
+      </div>
     )
   }
 
