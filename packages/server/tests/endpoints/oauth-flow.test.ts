@@ -24,6 +24,13 @@ const verifiedEmails = (email: string) => [
   { email, primary: true, verified: true }
 ]
 
+/** The `?error=` the callback sent the browser back to the app with. */
+const callbackError = (response: Response) =>
+  new URL(
+    required(response.headers.get("location"), "location"),
+    "https://app.example.com"
+  ).searchParams.get("error")
+
 afterEach(() => {
   vi.restoreAllMocks()
 })
@@ -426,7 +433,7 @@ describe("oauth callback", () => {
     }
   })
 
-  it("gives the provider a deadline and renders a page when it is not met", async () => {
+  it("gives the provider a deadline and reports the miss to the app", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie, state } = await startSignIn(authServer)
     const signals: unknown[] = []
@@ -444,16 +451,15 @@ describe("oauth callback", () => {
 
     expect(signals).toHaveLength(1)
     expect(signals[0]).toBeInstanceOf(AbortSignal)
-    expect(response.status).toBe(502)
-    expect(response.headers.get("content-type")).toContain("text/html")
-    expect(await response.text()).toContain("did not respond")
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerUnavailable")
     // The state cookie is cleared whichever way the callback ends.
     expect(
       required(readSetCookies(response).get("auth-ts.state"), "state").value
     ).toBe("")
   })
 
-  it("renders a page, not a JSON envelope, when the provider rejects the code", async () => {
+  it("sends the browser back to the app when the provider rejects the code", async () => {
     const { authServer } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie, state } = await startSignIn(authServer)
     stubGitHub({ id: 4242, token: null })
@@ -464,8 +470,25 @@ describe("oauth callback", () => {
       })
     )
 
-    expect(response.status).toBe(401)
-    expect(response.headers.get("content-type")).toContain("text/html")
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerRejected")
+  })
+
+  it("names a cancelled consent as denied, not as a broken sign-in", async () => {
+    const { authServer, db } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer)
+
+    const response = await authServer.handler(
+      request(
+        "GET",
+        `/api/auth/callback/github?error=access_denied&state=${state}`,
+        { cookies: { "auth-ts.state": stateCookie } }
+      )
+    )
+
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerDenied")
+    expect(db.users()).toHaveLength(0)
   })
 
   it("reports a provider 5xx as unavailable, not as a refused sign-in", async () => {
@@ -492,8 +515,10 @@ describe("oauth callback", () => {
         })
       )
 
-      expect(response.status, JSON.stringify(status)).toBe(502)
-      expect(await response.text()).toContain("did not respond")
+      expect(response.status, JSON.stringify(status)).toBe(302)
+      expect(callbackError(response), JSON.stringify(status)).toBe(
+        "providerUnavailable"
+      )
     }
     expect(db.users()).toHaveLength(0)
 
@@ -515,7 +540,10 @@ describe("oauth callback", () => {
           cookies: { "auth-ts.state": stateCookie }
         })
       )
-      expect(throttled.status, JSON.stringify(headers)).toBe(502)
+      expect(throttled.status, JSON.stringify(headers)).toBe(302)
+      expect(callbackError(throttled), JSON.stringify(headers)).toBe(
+        "providerUnavailable"
+      )
     }
 
     // A plain 403 on the emails endpoint is the scope not being granted, which
@@ -533,7 +561,8 @@ describe("oauth callback", () => {
         cookies: { "auth-ts.state": stateCookie }
       })
     )
-    expect(refused.status).toBe(403)
+    expect(refused.status).toBe(302)
+    expect(callbackError(refused)).toBe("providerEmailUnverified")
   })
 
   it("merges a guest into the account a provider identity is already linked to, without moving the link", async () => {
@@ -779,7 +808,8 @@ describe("oauth callback", () => {
       })
     )
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("invalidField")
     expect(db.users()).toHaveLength(0)
     // The state cookie is cleared whichever way the callback ends.
     expect(
@@ -829,6 +859,11 @@ describe("oauth callback", () => {
         })
       )
       expect(response.status, JSON.stringify(forged)).toBe(401)
+      // No verified redirect target, so this one cannot go back to the app.
+      expect(
+        ((await response.json()) as { code: string }).code,
+        JSON.stringify(forged)
+      ).toBe("invalidState")
     }
     expect(db.users()).toHaveLength(0)
   })
@@ -902,7 +937,8 @@ describe("oauth callback", () => {
       })
     )
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerEmailUnverified")
     expect(db.users()).toHaveLength(0)
   })
 
@@ -920,7 +956,8 @@ describe("oauth callback", () => {
       })
     )
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerEmailUnverified")
     expect(db.users()).toHaveLength(0)
   })
 
@@ -1107,7 +1144,8 @@ describe("connect and disconnect", () => {
       })
     )
 
-    expect(callbackResponse.status).toBe(401)
+    expect(callbackResponse.status).toBe(302)
+    expect(callbackError(callbackResponse)).toBe("unauthenticated")
     expect(
       await selectRows(context.db, "identities", {
         userId: required(context.db.users()[0], "user").id
@@ -1152,7 +1190,8 @@ describe("connect and disconnect", () => {
       })
     )
 
-    expect(callbackResponse.status).toBe(409)
+    expect(callbackResponse.status).toBe(302)
+    expect(callbackError(callbackResponse)).toBe("providerConflict")
     const identity = await selectRow(context.db, "identities", {
       provider: "github",
       providerUserId: "4242"
@@ -1251,7 +1290,10 @@ describe("google", () => {
         emailVerified: true,
         nonce
       })
-      expect(response.status, JSON.stringify(nonce)).toBe(401)
+      expect(response.status, JSON.stringify(nonce)).toBe(302)
+      expect(callbackError(response), JSON.stringify(nonce)).toBe(
+        "providerRejected"
+      )
     }
     expect(db.users()).toHaveLength(0)
   })
@@ -1299,7 +1341,10 @@ describe("google", () => {
         emailVerified: true,
         token
       })
-      expect(response.status, JSON.stringify(token)).toBe(401)
+      expect(response.status, JSON.stringify(token)).toBe(302)
+      expect(callbackError(response), JSON.stringify(token)).toBe(
+        "providerRejected"
+      )
     }
     expect(db.users()).toHaveLength(0)
   })
@@ -1313,7 +1358,8 @@ describe("google", () => {
       emailVerified: false
     })
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerEmailUnverified")
     expect(db.users()).toHaveLength(0)
   })
 
@@ -1327,7 +1373,8 @@ describe("google", () => {
       status: { token: 503 }
     })
 
-    expect(response.status).toBe(502)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerUnavailable")
     expect(db.users()).toHaveLength(0)
   })
 

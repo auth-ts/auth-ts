@@ -1,6 +1,5 @@
 import { notFound } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
-import { resolveLocale } from "../../../http/resolve-locale"
 import { validateAdditionalFields } from "../../../http/validate-additional-fields"
 import { shouldUseSecureCookies } from "../../../lib/serialize-cookie"
 import { validateRedirect } from "../../../lib/validate-redirect"
@@ -14,7 +13,6 @@ export interface SignInWithProviderInput {
   provider: string
   /** Same-origin path to return to; anything else falls back to `/`. */
   redirect?: string
-  locale?: string
   additionalFields?: Record<string, unknown>
   headers?: Headers
   requestURL?: string
@@ -45,11 +43,6 @@ export const signInWithProviderDocs: EndpointDocs<
         type: "string",
         description:
           "Same-origin path to return to; anything else falls back to `/`."
-      },
-      locale: {
-        type: "string",
-        description:
-          "Overrides the locale otherwise resolved from `Accept-Language`."
       }
     }
   },
@@ -86,11 +79,7 @@ export const signInWithProviderDocs: EndpointDocs<
 export const signInWithProvider = defineEndpoint({
   method: "POST",
   path: "/sign-in/provider/$provider",
-  parse: async ({
-    request,
-    params,
-    internals
-  }): Promise<SignInWithProviderInput> => {
+  parse: async ({ request, params }): Promise<SignInWithProviderInput> => {
     const body = (await request.json().catch(() => ({}))) as Omit<
       SignInWithProviderInput,
       "provider"
@@ -99,12 +88,6 @@ export const signInWithProvider = defineEndpoint({
     return {
       ...body,
       provider: params.provider ?? "",
-      locale:
-        body.locale ??
-        resolveLocale(
-          request.headers.get("accept-language"),
-          internals.config.localization
-        ),
       headers: request.headers,
       requestURL: request.url
     }
@@ -132,7 +115,6 @@ export const signInWithProvider = defineEndpoint({
       {
         intent: "signIn",
         redirect: validateRedirect(input.redirect),
-        ...(input.locale ? { locale: input.locale } : {}),
         ...(Object.keys(additionalFields).length > 0
           ? { additionalFields }
           : {})
@@ -140,8 +122,8 @@ export const signInWithProvider = defineEndpoint({
       secure
     )
 
-    const headers = new Headers()
-    headers.append("set-cookie", setCookie)
+    const responseHeaders = new Headers()
+    responseHeaders.append("set-cookie", setCookie)
 
     const data: AuthorizeURLResult = {
       url: configured.provider.authorizeURL({
@@ -153,6 +135,6 @@ export const signInWithProvider = defineEndpoint({
       })
     }
 
-    return { data, headers }
+    return { data, headers: responseHeaders }
   }
 })

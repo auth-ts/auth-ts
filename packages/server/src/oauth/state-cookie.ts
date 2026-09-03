@@ -62,8 +62,6 @@ export interface OAuthStatePayload {
    * for some other flow cannot complete this one.
    */
   nonce: string
-  /** Locale, carried here because a navigation cannot set `Accept-Language`. */
-  locale?: string
   /** Sign-up fields, applied only if the callback creates a user. */
   additionalFields?: Record<string, string | number | boolean>
   /** For `connect`: the user who started the flow, so the callback can require the same one. */
@@ -194,22 +192,22 @@ export async function readStateCookie(
   provider: string
 ) {
   const raw = readCookie(headers, internals.config.cookie.stateName)
-  if (!raw || !stateParameter) throw new AuthApiError("unauthenticated", 401)
+  if (!raw || !stateParameter) throw new AuthApiError("invalidState", 401)
 
   const payload = await verifyStatePayload(raw, internals.config.secret)
   if (!payload) {
     internals.log.warn("oauth state cookie failed signature check")
-    throw new AuthApiError("unauthenticated", 401)
+    throw new AuthApiError("invalidState", 401)
   }
 
   if (typeof payload.state !== "string" || payload.state !== stateParameter) {
     internals.log.warn("oauth state mismatch")
-    throw new AuthApiError("unauthenticated", 401)
+    throw new AuthApiError("invalidState", 401)
   }
 
   if (payload.provider !== provider) {
     internals.log.warn("oauth state presented at another provider's callback")
-    throw new AuthApiError("unauthenticated", 401)
+    throw new AuthApiError("invalidState", 401)
   }
 
   const age =
@@ -219,7 +217,7 @@ export async function readStateCookie(
     age < -ISSUED_AT_TOLERANCE_MS
   ) {
     internals.log.warn("oauth state expired")
-    throw new AuthApiError("unauthenticated", 401)
+    throw new AuthApiError("invalidState", 401)
   }
 
   if (
@@ -229,7 +227,7 @@ export async function readStateCookie(
     payload.nonce.length === 0
   ) {
     internals.log.warn("oauth state is missing its verifier or nonce")
-    throw new AuthApiError("unauthenticated", 401)
+    throw new AuthApiError("invalidState", 401)
   }
 
   return payload

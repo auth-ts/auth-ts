@@ -36,8 +36,7 @@ export const connectProviderDocs: EndpointDocs<
         type: "string",
         description:
           "Same-origin path to return to; anything else falls back to `/`."
-      },
-      locale: { type: "string" }
+      }
     }
   },
   responses: {
@@ -108,8 +107,7 @@ export const connectProvider = defineEndpoint({
       {
         intent: "connect",
         redirect: validateRedirect(input.redirect),
-        userId: caller.userId,
-        ...(input.locale ? { locale: input.locale } : {})
+        userId: caller.userId
       },
       secure
     )

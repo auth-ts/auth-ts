@@ -1,9 +1,12 @@
 import type { AuthServerInternals } from "../../core/auth-server-internals"
-import { isAuthApiError, notFound } from "../../http/auth-api-error"
+import {
+  AuthApiError,
+  isAuthApiError,
+  notFound,
+  unauthenticated
+} from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import type { AuthErrorCode } from "../../http/error-response"
-import { getErrorMessage } from "../../http/get-error-message"
-import type { AdditionalFieldValues } from "../../http/validate-additional-fields"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { selectOne } from "../../lib/select-one"
 import { shouldUseSecureCookies } from "../../lib/serialize-cookie"
@@ -52,13 +55,9 @@ export const callbackProviderDocs: EndpointDocs<
   responses: {
     302: {
       description:
-        "Signed in or linked. Redirects to the `redirect` recorded at the start.",
+        "Redirects to the `redirect` recorded at the start, with `?error=` when the flow failed.",
       setsCookie: "refresh",
       redirect: true
-    },
-    401: {
-      description: "The flow failed. Renders the localized reason as a page.",
-      contentType: "text/html"
     }
   }
 }
@@ -102,111 +101,93 @@ export const callbackProvider = defineEndpoint({
       input.state,
       input.provider
     )
-    const locale = payload.locale ?? config.localization?.defaultLocale ?? "en"
-
-    if (input.providerError || !input.code) {
-      return errorPage(internals, "unauthenticated", locale, clearState)
-    }
-
-    // Validated again here, not trusted from the cookie. The signature proves
-    // the payload came from this server; it does not prove the fields are still
-    // declared, or that every path able to sign a payload validated them first.
-    // The write is what matters, so the check sits next to it rather than a
-    // request away — otherwise an undeclared column rides into user creation.
-    let additionalFields: AdditionalFieldValues
+    // Every failure from here on is a redirect back to the app: the state
+    // cookie verified, so the return target is known and trustworthy.
     try {
-      additionalFields = validateAdditionalFields(
+      if (input.providerError || !input.code)
+        throw new AuthApiError("providerDenied", 401)
+
+      // Validated again here, not trusted from the cookie. The signature proves
+      // the payload came from this server; it does not prove the fields are
+      // still declared, or that every path able to sign a payload validated
+      // them first. The write is what matters, so the check sits next to it —
+      // otherwise an undeclared column rides into user creation.
+      const additionalFields = validateAdditionalFields(
         config.user.additionalFields,
         payload.additionalFields
       )
-    } catch (error) {
-      if (!isAuthApiError(error)) throw error
-      return errorPage(internals, error.code, locale, clearState, error.status)
-    }
 
-    let identity: ProviderIdentity
-    try {
-      identity = await configured.provider.exchangeCode({
-        credentials: configured.credentials,
-        redirectURI: getCallbackURL(
-          config,
-          input.provider,
-          input.requestURL,
-          input.headers
-        ),
-        code: input.code,
-        codeVerifier: payload.codeVerifier,
-        nonce: payload.nonce,
-        signal: AbortSignal.timeout(PROVIDER_DEADLINE_MS)
-      })
-    } catch (error) {
-      // Still a top-level navigation, so a provider failure is a page, not a
-      // JSON envelope. A rejected code is the provider's verdict; anything else
-      // — the deadline, a DNS failure — is the provider being unreachable.
-      if (isAuthApiError(error)) {
-        return errorPage(
+      let identity: ProviderIdentity
+      try {
+        identity = await configured.provider.exchangeCode({
+          credentials: configured.credentials,
+          redirectURI: getCallbackURL(
+            config,
+            input.provider,
+            input.requestURL,
+            input.headers
+          ),
+          code: input.code,
+          codeVerifier: payload.codeVerifier,
+          nonce: payload.nonce,
+          signal: AbortSignal.timeout(PROVIDER_DEADLINE_MS)
+        })
+      } catch (error) {
+        // A rejected code is the provider's verdict; anything else — the
+        // deadline, a DNS failure — is the provider being unreachable.
+        if (isAuthApiError(error)) throw error
+        internals.log.error("oauth provider request failed", {
+          provider: input.provider,
+          error: String(error)
+        })
+        throw new AuthApiError("providerUnavailable", 502)
+      }
+
+      const active = await resolveCallerSession(internals, input)
+
+      // Linking only means linking for a real user. A guest who "connects" a
+      // provider is really signing in: the identity decides whether they upgrade
+      // in place or merge into the account it already belongs to, and they get a
+      // session for the result — exactly what `/sign-in/provider/:provider` would do.
+      if (payload.intent === "connect" && active?.user.type !== "guest") {
+        return await connectIdentity(
           internals,
-          error.code,
-          locale,
+          input,
+          active,
+          payload.userId,
+          identity,
           clearState,
-          error.status
+          payload.redirect
         )
       }
-      internals.log.error("oauth provider request failed", {
-        provider: input.provider,
-        error: String(error)
+
+      // A signed-in guest converts rather than creating a new user. The lookup
+      // lives inside resolveOAuthUser so the guest path runs the same
+      // identity-first cascade as everyone else — a provider account already
+      // linked to an account is never silently re-pointed at the guest.
+      const user = await resolveOAuthUser(internals, input.provider, identity, {
+        additionalFields,
+        ...(active?.user.type === "guest" ? { guest: active.user } : {})
       })
-      return errorPage(
-        internals,
-        "providerUnavailable",
-        locale,
-        clearState,
-        502
-      )
+
+      const issued = await issueSession(internals, {
+        user,
+        headers: input.headers,
+        amr: ["fed"],
+        requestURL: input.requestURL,
+        // The guest's session has done its job either way — see `convertGuest`.
+        ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
+      })
+
+      const headers = new Headers(issued.headers)
+      headers.append("set-cookie", clearState)
+      headers.set("location", payload.redirect)
+
+      return { data: undefined, status: 302, headers }
+    } catch (error) {
+      if (!isAuthApiError(error)) throw error
+      return errorRedirect(error.code, clearState, payload.redirect)
     }
-
-    const active = await resolveCallerSession(internals, input)
-
-    // Linking only means linking for a real user. A guest who "connects" a
-    // provider is really signing in: the identity decides whether they upgrade
-    // in place or merge into the account it already belongs to, and they get a
-    // session for the result — exactly what `/sign-in/provider/:provider` would do.
-    if (payload.intent === "connect" && active?.user.type !== "guest") {
-      return connectIdentity(
-        internals,
-        input,
-        active,
-        payload.userId,
-        identity,
-        locale,
-        clearState,
-        payload.redirect
-      )
-    }
-
-    // A signed-in guest converts rather than creating a new user. The lookup
-    // lives inside resolveOAuthUser so the guest path runs the same
-    // identity-first cascade as everyone else — a provider account already
-    // linked to an account is never silently re-pointed at the guest.
-    const user = await resolveOAuthUser(internals, input.provider, identity, {
-      additionalFields,
-      ...(active?.user.type === "guest" ? { guest: active.user } : {})
-    })
-
-    const issued = await issueSession(internals, {
-      user,
-      headers: input.headers,
-      amr: ["fed"],
-      requestURL: input.requestURL,
-      // The guest's session has done its job either way — see `convertGuest`.
-      ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
-    })
-
-    const headers = new Headers(issued.headers)
-    headers.append("set-cookie", clearState)
-    headers.set("location", payload.redirect)
-
-    return { data: undefined, status: 302, headers }
   }
 })
 
@@ -224,12 +205,11 @@ async function connectIdentity(
   resolved: ResolvedSession | null,
   expectedUserId: string | undefined,
   identity: ProviderIdentity,
-  locale: string,
   clearState: string,
   redirect: string
 ) {
   if (!resolved || !expectedUserId || resolved.user.id !== expectedUserId) {
-    return errorPage(internals, "unauthenticated", locale, clearState)
+    throw unauthenticated()
   }
 
   const existing = await selectOne(internals, "identities", {
@@ -240,7 +220,7 @@ async function connectIdentity(
   // Never re-point an existing link: that would move someone else's provider
   // identity onto this account.
   if (existing && existing.userId !== resolved.user.id) {
-    return errorPage(internals, "providerConflict", locale, clearState, 409)
+    throw new AuthApiError("providerConflict", 409)
   }
 
   await linkIdentity(internals, {
@@ -259,32 +239,19 @@ async function connectIdentity(
   return { data: undefined, status: 302, headers }
 }
 
-/**
- * Renders a human-readable failure.
- *
- * A callback is a top-level navigation, so the person is looking at whatever it
- * returns — a JSON envelope would be a wall of braces. The message is the same
- * localized string the API would have returned.
- */
-function errorPage(
-  internals: AuthServerInternals,
+function errorRedirect(
   code: AuthErrorCode,
-  locale: string,
   clearState: string,
-  status = 401
+  redirect: string
 ) {
-  const message = getErrorMessage(code, locale, internals.config.localization)
-  const headers = new Headers({ "content-type": "text/html; charset=utf-8" })
+  // Parsed against a base so an existing query survives; only the path is sent.
+  const target = new URL(redirect, "http://redirect.invalid")
+  target.searchParams.set("error", code)
+
+  const headers = new Headers({
+    location: `${target.pathname}${target.search}${target.hash}`
+  })
   headers.append("set-cookie", clearState)
 
-  const escaped = message.replace(/[<>&]/g, (character) =>
-    character === "<" ? "&lt;" : character === ">" ? "&gt;" : "&amp;"
-  )
-
-  return {
-    data: undefined,
-    status,
-    headers,
-    body: `<!doctype html><meta charset="utf-8"><title>Sign-in failed</title><p>${escaped}</p>`
-  }
+  return { data: undefined, status: 302, headers }
 }
