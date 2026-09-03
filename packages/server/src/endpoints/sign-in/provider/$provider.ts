@@ -1,5 +1,6 @@
 import { notFound } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
+import { readBody } from "../../../http/read-body"
 import { validateAdditionalFields } from "../../../http/validate-additional-fields"
 import { shouldUseSecureCookies } from "../../../lib/serialize-cookie"
 import { validateRedirect } from "../../../lib/validate-redirect"
@@ -87,10 +88,10 @@ export const signInWithProvider = defineEndpoint({
   method: "POST",
   path: "/sign-in/provider/$provider",
   parse: async ({ request, params }): Promise<SignInWithProviderInput> => {
-    const body = (await request.json().catch(() => ({}))) as Omit<
-      SignInWithProviderInput,
-      "provider"
-    >
+    const body = await readBody<Omit<SignInWithProviderInput, "provider">>(
+      request,
+      ["redirect", "errorRedirect", "additionalFields"]
+    )
 
     return {
       ...body,

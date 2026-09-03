@@ -1,5 +1,6 @@
 import { AuthApiError, unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { readBody } from "../http/read-body"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
@@ -55,11 +56,12 @@ export const updateUserDocs: EndpointDocs<UpdateUserInput> = {
 export const updateUser = defineEndpoint({
   method: "POST",
   path: "/user",
-  parse: async ({ request }): Promise<UpdateUserInput> => {
-    const body = (await request.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >
+  parse: async ({ request, internals }): Promise<UpdateUserInput> => {
+    const body = await readBody<UpdateUserInput>(request, [
+      "name",
+      "image",
+      ...Object.keys(internals.config.user.additionalFields)
+    ])
 
     return { ...body, headers: request.headers }
   },
@@ -173,7 +175,7 @@ export const deleteUser = defineEndpoint({
   method: "DELETE",
   path: "/user",
   parse: async ({ request }): Promise<DeleteUserInput> => {
-    const body = (await request.json().catch(() => ({}))) as { code?: string }
+    const body = await readBody<{ code?: string }>(request, ["code"])
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },

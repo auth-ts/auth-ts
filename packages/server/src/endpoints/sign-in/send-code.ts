@@ -1,4 +1,5 @@
 import { defineEndpoint } from "../../http/define-endpoint"
+import { readBody } from "../../http/read-body"
 import { resolveLocale } from "../../http/resolve-locale"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { IdentifierBody } from "../../verification-code/resolve-code-identifier"
@@ -52,7 +53,10 @@ export const sendSignInCode = defineEndpoint({
   method: "POST",
   path: "/sign-in/send-code",
   parse: async ({ request }): Promise<SendSignInCodeInput> => {
-    const body = (await request.json().catch(() => ({}))) as IdentifierBody
+    const body = await readBody<IdentifierBody>(request, [
+      "email",
+      "phoneNumber"
+    ])
 
     return { ...body, headers: request.headers }
   },

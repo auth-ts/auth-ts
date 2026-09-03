@@ -1,6 +1,7 @@
 import { AuthApiError } from "../../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
+import { readBody } from "../../http/read-body"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import { sha256Hex } from "../../lib/hash"
 import { insertRow } from "../../lib/insert-row"
@@ -51,7 +52,9 @@ export const signInAsGuest = defineEndpoint({
   method: "POST",
   path: "/sign-in/guest",
   parse: async ({ request }): Promise<SignInAsGuestInput> => {
-    const body = (await request.json().catch(() => ({}))) as SignInAsGuestInput
+    const body = await readBody<SignInAsGuestInput>(request, [
+      "additionalFields"
+    ])
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },

@@ -1,5 +1,6 @@
 import { notFound } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
+import { readBody } from "../../http/read-body"
 import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
@@ -60,7 +61,7 @@ export const switchUser = defineEndpoint({
   method: "POST",
   path: "/users/switch",
   parse: async ({ request }): Promise<SwitchUserInput> => {
-    const body = (await request.json().catch(() => ({}))) as { userId?: string }
+    const body = await readBody<{ userId?: string }>(request, ["userId"])
 
     return {
       userId: body.userId ?? "",

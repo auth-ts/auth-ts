@@ -1,6 +1,7 @@
 import { AuthApiError } from "../../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
+import { readBody } from "../../http/read-body"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { convertGuest } from "../../session/convert-guest"
@@ -60,7 +61,12 @@ export const signInWithCode = defineEndpoint({
   method: "POST",
   path: "/sign-in/code",
   parse: async ({ request }): Promise<SignInWithCodeInput> => {
-    const body = (await request.json().catch(() => ({}))) as SignInWithCodeInput
+    const body = await readBody<SignInWithCodeInput>(request, [
+      "email",
+      "phoneNumber",
+      "code",
+      "additionalFields"
+    ])
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },

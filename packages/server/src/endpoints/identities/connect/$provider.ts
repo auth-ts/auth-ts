@@ -1,5 +1,6 @@
 import { notFound } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
+import { readBody } from "../../../http/read-body"
 import { shouldUseSecureCookies } from "../../../lib/serialize-cookie"
 import { validateRedirect } from "../../../lib/validate-redirect"
 import { getCallbackURL } from "../../../oauth/callback-url"
@@ -77,10 +78,10 @@ export const connectProvider = defineEndpoint({
   method: "POST",
   path: "/identities/connect/$provider",
   parse: async ({ request, params }): Promise<ConnectProviderInput> => {
-    const body = (await request.json().catch(() => ({}))) as Omit<
-      ConnectProviderInput,
-      "provider"
-    >
+    const body = await readBody<Omit<ConnectProviderInput, "provider">>(
+      request,
+      ["redirect", "errorRedirect"]
+    )
 
     return {
       ...body,

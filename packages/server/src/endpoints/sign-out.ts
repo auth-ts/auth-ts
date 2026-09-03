@@ -1,5 +1,6 @@
 import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { readBody } from "../http/read-body"
 import { sha256Hex } from "../lib/hash"
 import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
@@ -80,10 +81,10 @@ export const signOut = defineEndpoint({
   method: "POST",
   path: "/sign-out",
   parse: async ({ request }): Promise<SignOutInput> => {
-    const body = (await request.json().catch(() => ({}))) as {
-      scope?: SignOutScope
-      userId?: string
-    }
+    const body = await readBody<{ scope?: SignOutScope; userId?: string }>(
+      request,
+      ["scope", "userId"]
+    )
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },
