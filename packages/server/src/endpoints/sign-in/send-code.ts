@@ -7,8 +7,7 @@ import { sendVerificationCode } from "../../verification-code/send-verification-
 
 /** Body accepted by `POST /sign-in/send-code`: exactly one identifier. */
 export interface SendSignInCodeInput extends IdentifierBody {
-  /** Pre-resolved locale and headers, filled in from the request when over HTTP. */
-  locale?: string
+  /** Request headers, filled in from the request when over HTTP. */
   headers?: Headers
 }
 
@@ -24,11 +23,6 @@ export const sendSignInCodeDocs: EndpointDocs<SendSignInCodeInput> = {
       phoneNumber: {
         type: "string",
         description: "E.164, e.g. `+15551234567`."
-      },
-      locale: {
-        type: "string",
-        description:
-          "Overrides the locale otherwise resolved from `Accept-Language`."
       }
     }
   },
@@ -57,27 +51,23 @@ export const sendSignInCodeDocs: EndpointDocs<SendSignInCodeInput> = {
 export const sendSignInCode = defineEndpoint({
   method: "POST",
   path: "/sign-in/send-code",
-  parse: async ({ request, internals }): Promise<SendSignInCodeInput> => {
+  parse: async ({ request }): Promise<SendSignInCodeInput> => {
     const body = (await request.json().catch(() => ({}))) as IdentifierBody
 
-    return {
-      ...body,
-      locale: resolveLocale(
-        request.headers.get("accept-language"),
-        internals.config.localization
-      ),
-      headers: request.headers
-    }
+    return { ...body, headers: request.headers }
   },
   run: async (internals, input: SendSignInCodeInput) => {
     const identifier = resolveCodeIdentifier(internals, input)
+    const headers = input.headers ?? new Headers()
 
     await sendVerificationCode(internals, {
       identifier,
       purpose: "signIn",
-      locale:
-        input.locale ?? internals.config.localization?.defaultLocale ?? "en",
-      headers: input.headers ?? new Headers()
+      locale: resolveLocale(
+        headers.get("accept-language"),
+        internals.config.localization
+      ),
+      headers
     })
 
     return { data: { sent: true } }
