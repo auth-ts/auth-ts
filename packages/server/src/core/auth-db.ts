@@ -562,7 +562,7 @@ export function defineAuthDB<
 >(implementation: {
   select(input: AuthSelectInput<S>): Promise<AuthRow<S, AuthTable>[]>
   insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable> | undefined>
-  update(input: AuthUpdateInput<S>): Promise<unknown>
+  update(input: AuthUpdateInput<S>): Promise<AuthRow<S, AuthTable>[]>
   delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
 }): AuthDB<S> {
   return implementation as unknown as AuthDB<S>
