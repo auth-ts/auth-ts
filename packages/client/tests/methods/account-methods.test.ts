@@ -75,7 +75,7 @@ describe("timestamps on the wire", () => {
     expect(isRealDate(signedIn.createdAt)).toBe(true)
     expect(signedIn.createdAt.toISOString()).toBe(dated.createdAt)
 
-    server.on("POST", "/api/auth/user", { body: { user: dated } })
+    server.on("POST", "/api/auth/user", { body: dated })
     expect(
       isRealDate((await client.updateUser({ name: "Ada" })).createdAt)
     ).toBe(true)
@@ -194,9 +194,7 @@ describe("signInAsGuest", () => {
 
 describe("updateUser", () => {
   it("refreshes the mirror from the row the update returned", async () => {
-    server.on("POST", "/api/auth/user", {
-      body: { user: { ...user, name: "Ada" } }
-    })
+    server.on("POST", "/api/auth/user", { body: { ...user, name: "Ada" } })
     const client = await signedIn()
 
     const updated = await client.updateUser({ name: "Ada" })

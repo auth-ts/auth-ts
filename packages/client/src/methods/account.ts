@@ -12,7 +12,7 @@ export type UpdateUserInput = {
 /** Builds `updateUser`. */
 export function createUpdateUser(internals: AuthClientInternals) {
   return async function updateUser(input: UpdateUserInput): Promise<AuthUser> {
-    const { user } = await internals.fetchJson<{ user: AuthUser }>({
+    const user = await internals.fetchJson<AuthUser>({
       method: "POST",
       path: "/user",
       body: input,
