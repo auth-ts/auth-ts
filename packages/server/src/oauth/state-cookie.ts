@@ -62,6 +62,8 @@ export interface OAuthStatePayload {
    * for some other flow cannot complete this one.
    */
   nonce: string
+  /** Where a failed flow returns to. Falls back to `baseURL`, then to a JSON error. */
+  errorRedirect?: string
   /** Sign-up fields, applied only if the callback creates a user. */
   additionalFields?: Record<string, string | number | boolean>
   /** For `connect`: the user who started the flow, so the callback can require the same one. */

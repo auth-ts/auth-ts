@@ -396,7 +396,10 @@ describe("oauth callback", () => {
           cookies: { "auth-ts.state": await forgeState(stale) }
         })
       )
-      expect(response.status, JSON.stringify(stale.issuedAt)).toBe(401)
+      expect(response.status, JSON.stringify(stale.issuedAt)).toBe(302)
+      expect(callbackError(response), JSON.stringify(stale.issuedAt)).toBe(
+        "invalidState"
+      )
     }
     expect(db.users()).toHaveLength(0)
 
@@ -429,7 +432,8 @@ describe("oauth callback", () => {
           cookies: { "auth-ts.state": await forgeState(broken) }
         })
       )
-      expect(response.status).toBe(401)
+      expect(response.status).toBe(302)
+      expect(callbackError(response)).toBe("invalidState")
     }
   })
 
@@ -472,6 +476,46 @@ describe("oauth callback", () => {
 
     expect(response.status).toBe(302)
     expect(callbackError(response)).toBe("providerRejected")
+  })
+
+  it("returns a failure to the errorRedirect the flow named", async () => {
+    const { authServer } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(authServer, {
+      redirect: "/todos",
+      errorRedirect: "/login"
+    })
+
+    const response = await authServer.handler(
+      request(
+        "GET",
+        `/api/auth/callback/github?error=access_denied&state=${state}`,
+        { cookies: { "auth-ts.state": stateCookie } }
+      )
+    )
+
+    expect(response.status).toBe(302)
+    // Not the success target: a failed sign-in has no business there.
+    expect(response.headers.get("location")).toBe("/login?error=providerDenied")
+  })
+
+  it("answers in JSON when there is nowhere configured to send them", async () => {
+    const { authServer } = await createTestServer({
+      providers: OAUTH_OPTIONS.providers
+    })
+    const { stateCookie, state } = await startSignIn(authServer)
+
+    const response = await authServer.handler(
+      request(
+        "GET",
+        `/api/auth/callback/github?error=access_denied&state=${state}`,
+        { cookies: { "auth-ts.state": stateCookie } }
+      )
+    )
+
+    expect(response.status).toBe(401)
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "providerDenied"
+    )
   })
 
   it("names a cancelled consent as denied, not as a broken sign-in", async () => {
@@ -858,12 +902,11 @@ describe("oauth callback", () => {
           cookies: { "auth-ts.state": forged }
         })
       )
-      expect(response.status, JSON.stringify(forged)).toBe(401)
-      // No verified redirect target, so this one cannot go back to the app.
-      expect(
-        ((await response.json()) as { code: string }).code,
-        JSON.stringify(forged)
-      ).toBe("invalidState")
+      expect(response.status, JSON.stringify(forged)).toBe(302)
+      // No verified state, so the configured baseURL is the target.
+      expect(response.headers.get("location"), JSON.stringify(forged)).toBe(
+        "https://app.example.com/?error=invalidState"
+      )
     }
     expect(db.users()).toHaveLength(0)
   })
@@ -888,7 +931,8 @@ describe("oauth callback", () => {
       })
     )
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("invalidState")
     expect(db.users()).toHaveLength(0)
   })
 
@@ -907,7 +951,8 @@ describe("oauth callback", () => {
       )
     )
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("invalidState")
     expect(db.users()).toHaveLength(0)
   })
 
@@ -919,7 +964,8 @@ describe("oauth callback", () => {
       request("GET", "/api/auth/callback/github?code=abc&state=anything")
     )
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("invalidState")
     expect(db.users()).toHaveLength(0)
   })
 

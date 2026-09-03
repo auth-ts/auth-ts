@@ -36,6 +36,11 @@ export const connectProviderDocs: EndpointDocs<
         type: "string",
         description:
           "Same-origin path to return to; anything else falls back to `/`."
+      },
+      errorRedirect: {
+        type: "string",
+        description:
+          "Same-origin path a failed flow returns to, with the code in `?error=`. Falls back to `baseURL`."
       }
     }
   },
@@ -107,7 +112,10 @@ export const connectProvider = defineEndpoint({
       {
         intent: "connect",
         redirect: validateRedirect(input.redirect),
-        userId: caller.userId
+        userId: caller.userId,
+        ...(input.errorRedirect
+          ? { errorRedirect: validateRedirect(input.errorRedirect) }
+          : {})
       },
       secure
     )

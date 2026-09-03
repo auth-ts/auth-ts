@@ -16,6 +16,7 @@ import { getProvider } from "../../oauth/providers/get-provider"
 import type { ProviderIdentity } from "../../oauth/providers/oauth-provider"
 import { PROVIDER_DEADLINE_MS } from "../../oauth/providers/provider-response"
 import { resolveOAuthUser } from "../../oauth/resolve-oauth-user"
+import type { OAuthStatePayload } from "../../oauth/state-cookie"
 import { clearStateCookie, readStateCookie } from "../../oauth/state-cookie"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { issueSession } from "../../session/issue-session"
@@ -93,17 +94,19 @@ export const callbackProvider = defineEndpoint({
     const secure = shouldUseSecureCookies(input.requestURL)
     const clearState = clearStateCookie(internals, input.provider, secure)
 
-    // Verified before anything else is trusted, and the cookie is cleared
-    // whichever way this goes so a state value is never replayable.
-    const payload = await readStateCookie(
-      internals,
-      input.headers,
-      input.state,
-      input.provider
-    )
-    // Every failure from here on is a redirect back to the app: the state
-    // cookie verified, so the return target is known and trustworthy.
+    // A failure answers where the flow said to, then where the server is
+    // configured to live. Only a server with neither says so in JSON.
+    let payload: OAuthStatePayload | undefined
     try {
+      // Verified before anything else is trusted, and the cookie is cleared
+      // whichever way this goes so a state value is never replayable.
+      payload = await readStateCookie(
+        internals,
+        input.headers,
+        input.state,
+        input.provider
+      )
+
       if (input.providerError || !input.code)
         throw new AuthApiError("providerDenied", 401)
 
@@ -186,7 +189,9 @@ export const callbackProvider = defineEndpoint({
       return { data: undefined, status: 302, headers }
     } catch (error) {
       if (!isAuthApiError(error)) throw error
-      return errorRedirect(error.code, clearState, payload.redirect)
+      const target = payload?.errorRedirect ?? config.baseURL
+      if (!target) throw error
+      return errorRedirect(error.code, clearState, target)
     }
   }
 })
@@ -244,12 +249,15 @@ function errorRedirect(
   clearState: string,
   redirect: string
 ) {
-  // Parsed against a base so an existing query survives; only the path is sent.
+  // Parsed against a base so an existing query survives. A path stays a path;
+  // `baseURL` is absolute and travels whole.
   const target = new URL(redirect, "http://redirect.invalid")
   target.searchParams.set("error", code)
 
   const headers = new Headers({
-    location: `${target.pathname}${target.search}${target.hash}`
+    location: redirect.startsWith("/")
+      ? `${target.pathname}${target.search}${target.hash}`
+      : target.href
   })
   headers.append("set-cookie", clearState)
 

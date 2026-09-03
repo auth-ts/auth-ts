@@ -14,7 +14,22 @@ import { useCountdown } from "../hooks/use-countdown"
 import { useToken } from "../hooks/use-token"
 import { authClient } from "../lib/auth-client"
 
-export const Route = createFileRoute("/login")({ component: LoginPage })
+export const Route = createFileRoute("/login")({
+  component: LoginPage,
+  validateSearch: (search: Record<string, unknown>): { error?: string } =>
+    typeof search.error === "string" ? { error: search.error } : {}
+})
+
+/** A failed provider flow comes back here with its code in `?error=`. */
+const signInFailures: Record<string, string> = {
+  providerDenied: "That sign-in was cancelled.",
+  providerRejected: "That sign-in could not be completed. Please try again.",
+  providerEmailUnverified:
+    "Verify your email address with that provider, then try again.",
+  providerUnavailable: "The provider did not respond. Please try again.",
+  providerConflict: "That account is already connected to a different user.",
+  invalidState: "That sign-in attempt expired. Please start again."
+}
 
 /** Every way in that this demo has configured. */
 function LoginPage() {
@@ -24,7 +39,12 @@ function LoginPage() {
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [stage, setStage] = useState<"email" | "code">("email")
-  const [notice, setNotice] = useState<Notice | null>(null)
+  const { error } = Route.useSearch()
+  const [notice, setNotice] = useState<Notice | null>(
+    error
+      ? { text: signInFailures[error] ?? "That sign-in failed.", tone: "error" }
+      : null
+  )
   const [cooldown, startCooldown] = useCountdown()
 
   const report = (error: unknown) => {
@@ -73,7 +93,8 @@ function LoginPage() {
     try {
       await authClient.signInWithProvider({
         provider: "github",
-        redirect: "/todos"
+        redirect: "/todos",
+        errorRedirect: "/login"
       })
     } catch (error) {
       report(error)

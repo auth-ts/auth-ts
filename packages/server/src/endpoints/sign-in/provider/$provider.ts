@@ -13,6 +13,8 @@ export interface SignInWithProviderInput {
   provider: string
   /** Same-origin path to return to; anything else falls back to `/`. */
   redirect?: string
+  /** Same-origin path a failed flow returns to, with the code in `?error=`. */
+  errorRedirect?: string
   additionalFields?: Record<string, unknown>
   headers?: Headers
   requestURL?: string
@@ -43,6 +45,11 @@ export const signInWithProviderDocs: EndpointDocs<
         type: "string",
         description:
           "Same-origin path to return to; anything else falls back to `/`."
+      },
+      errorRedirect: {
+        type: "string",
+        description:
+          "Same-origin path a failed flow returns to, with the code in `?error=`. Falls back to `baseURL`."
       }
     }
   },
@@ -115,6 +122,9 @@ export const signInWithProvider = defineEndpoint({
       {
         intent: "signIn",
         redirect: validateRedirect(input.redirect),
+        ...(input.errorRedirect
+          ? { errorRedirect: validateRedirect(input.errorRedirect) }
+          : {}),
         ...(Object.keys(additionalFields).length > 0
           ? { additionalFields }
           : {})

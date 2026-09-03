@@ -352,11 +352,15 @@ describe("oauth navigation", () => {
 
     await createAuthClient({ locale: "de" }).signInWithProvider({
       provider: "github",
-      redirect: "/dashboard"
+      redirect: "/dashboard",
+      errorRedirect: "/login"
     })
 
     expect(server.requests[0]?.path).toBe("/api/auth/sign-in/provider/github")
-    expect(server.requests[0]?.body).toEqual({ redirect: "/dashboard" })
+    expect(server.requests[0]?.body).toEqual({
+      redirect: "/dashboard",
+      errorRedirect: "/login"
+    })
     expect(server.requests[0]?.acceptLanguage).toBe("de")
     expect(assign).toHaveBeenCalledWith(
       "https://github.com/login/oauth/authorize?state=abc"

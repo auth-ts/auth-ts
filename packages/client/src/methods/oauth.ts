@@ -6,6 +6,14 @@ export interface OAuthNavigationInput {
   provider: string
   /** Same-origin path to return to after the flow; anything else falls back to `/`. */
   redirect?: string
+  /**
+   * Same-origin path a failed flow returns to, with the code in `?error=`.
+   *
+   * Without it the server sends failures to its configured `baseURL`, and
+   * answers in JSON when it has none. The success `redirect` is never used for
+   * a failure — it is where someone lands once they are signed in.
+   */
+  errorRedirect?: string
 }
 
 /**
@@ -25,7 +33,10 @@ async function startFlow(
   const { url } = await internals.fetchJson<AuthorizeURLResult>({
     method: "POST",
     path: `${path}/${encodeURIComponent(input.provider)}`,
-    body: input.redirect ? { redirect: input.redirect } : {},
+    body: {
+      ...(input.redirect ? { redirect: input.redirect } : {}),
+      ...(input.errorRedirect ? { errorRedirect: input.errorRedirect } : {})
+    },
     authenticated
   })
 

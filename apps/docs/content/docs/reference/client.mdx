@@ -255,6 +255,28 @@ still missing there is the return leg: the callback arrives in the system
 browser, whose cookie jar is not the app's, so deep-link flows remain on the
 roadmap.
 
+## Provider sign-in failures
+
+A provider flow ends in a navigation, so a failure cannot be thrown at the
+caller — the browser is somewhere else by then. The callback sends it back to
+your app with the code in `?error=`:
+
+```ts
+authClient.signInWithProvider({
+  provider: "github",
+  redirect: "/todos",
+  errorRedirect: "/login"
+})
+```
+
+`errorRedirect` is where a failure lands; `redirect` is where success lands, and
+is never used for a failure. Without `errorRedirect` the server falls back to
+its configured `baseURL`, and answers in JSON when it has none.
+
+Read the code from the query string and switch on it — `providerDenied` for a
+cancelled consent, `providerEmailUnverified` when the provider has no verified
+address, `invalidState` for a sign-in attempt that expired.
+
 ## Errors
 
 Every failure is an `AuthError` carrying a stable `code`. Switch on the code,
