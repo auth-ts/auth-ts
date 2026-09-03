@@ -122,7 +122,7 @@ function hintCookie(
   if (domain) attributes.push(`Domain=${domain}`)
   attributes.push(`Max-Age=${maxAgeSeconds}`)
 
-  return `${HINT_COOKIE_NAME}=${value}; ${attributes.join("; ")}`
+  return `${HINT_COOKIE_NAME}=${encodeURIComponent(value)}; ${attributes.join("; ")}`
 }
 
 /**

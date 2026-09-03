@@ -11,6 +11,10 @@ import {
   serializeHintCookie,
   shouldUseSecureCookies
 } from "../../src/lib/serialize-cookie"
+import {
+  readRefreshCookies,
+  refreshCookieName
+} from "../../src/session/session-cookies"
 
 describe("parseCookies", () => {
   it("parses a multi-cookie header", () => {
@@ -208,5 +212,41 @@ describe("shouldUseSecureCookies", () => {
     // `Secure` is a local development origin, and nothing here says it is one.
     expect(shouldUseSecureCookies()).toBe(true)
     expect(shouldUseSecureCookies(undefined)).toBe(true)
+  })
+})
+
+describe("a user id inside a cookie", () => {
+  // `generateId` is the consumer's, so an id is not guaranteed to be a UUID.
+  const hostile = "a;b=c d"
+  const config = {
+    cookie: { name: "auth-ts.refresh", path: "/api/auth" }
+  } as Parameters<typeof refreshCookieName>[0]
+
+  it("survives a name a raw id would have broken", () => {
+    const name = refreshCookieName(config, hostile)
+    expect(name).toBe("auth-ts.refresh.a%3Bb%3Dc%20d")
+
+    const headers = new Headers({
+      cookie: serializeCookie({
+        name,
+        value: "the-token",
+        path: "/api/auth"
+      }).split(";")[0] as string
+    })
+
+    expect(readRefreshCookies({ config } as never, headers).get(hostile)).toBe(
+      "the-token"
+    )
+  })
+
+  it("encodes the hint, which carries the same id as a value", () => {
+    const hint = serializeHintCookie({ value: hostile, maxAge: "1h" })
+    expect(hint.startsWith("auth-ts.hint=a%3Bb%3Dc%20d;")).toBe(true)
+    expect(
+      readCookie(
+        new Headers({ cookie: hint.split(";")[0] as string }),
+        "auth-ts.hint"
+      )
+    ).toBe(hostile)
   })
 })

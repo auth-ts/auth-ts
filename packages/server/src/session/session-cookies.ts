@@ -26,7 +26,30 @@ export interface SessionCookieContext {
  * cookie stops at 4096 bytes. Separate cookies share no such budget.
  */
 export function refreshCookieName(config: AuthServerConfig, userId: string) {
-  return `${config.cookie.name}.${userId}`
+  return `${config.cookie.name}.${encodeSegment(userId)}`
+}
+
+/**
+ * Percent-encodes a user id for use inside a cookie name.
+ *
+ * A cookie name is a token, so a `;` or `=` in it ends the name and starts an
+ * attribute. Ids core generates cannot contain either, but `generateId` is the
+ * consumer's, and `encodeURIComponent` alone still leaves `()` — separators.
+ */
+function encodeSegment(userId: string) {
+  return encodeURIComponent(userId).replace(
+    /[!'()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  )
+}
+
+/** Reverses {@link encodeSegment}, leaving a name it cannot decode as it is. */
+function decodeSegment(segment: string) {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
 }
 
 /** Every refresh token this browser presented, by the user it belongs to. */
@@ -39,7 +62,7 @@ export function readRefreshCookies(
 
   for (const [name, value] of requestCookies(headers)) {
     if (!name.startsWith(prefix) || !value) continue
-    const userId = name.slice(prefix.length)
+    const userId = decodeSegment(name.slice(prefix.length))
     if (userId) tokens.set(userId, value)
   }
 
