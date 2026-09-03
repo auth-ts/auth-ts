@@ -24,11 +24,14 @@ export function resolveAuthClientConfig(
   options: AuthClientOptions = {}
 ): AuthClientConfig {
   const basePath = options.basePath ?? "/api/auth"
+  const withLeadingSlash = basePath.startsWith("/") ? basePath : `/${basePath}`
 
   return {
-    basePath: basePath.startsWith("/")
-      ? basePath.replace(/\/+$/, "")
-      : `/${basePath}`,
+    // A bare "/" is the mount, and stripping its slash would leave nothing.
+    basePath:
+      withLeadingSlash.length > 1
+        ? withLeadingSlash.replace(/\/+$/, "")
+        : withLeadingSlash,
     baseURL: options.baseURL?.replace(/\/+$/, "") ?? "",
     ...(options.locale ? { locale: options.locale } : {}),
     ...(options.cookieStorage ? { cookieStorage: options.cookieStorage } : {}),
