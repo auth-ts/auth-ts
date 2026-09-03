@@ -186,7 +186,7 @@ function Hero() {
           <div className="mt-8 max-w-md">
             <DynamicCodeBlock
               lang="bash"
-              code={`bun add @auth-ts/core @auth-ts/core/client
+              code={`bun add @auth-ts/core
 bun x @auth-ts/cli keygen`}
             />
           </div>

@@ -93,8 +93,7 @@ long-lived npm token once the first release is out.
       shortest lifetime npm allows, add it as the `NPM_TOKEN` repository
       secret, and run **Release** with `dry-run` off and `first-release` on.
 - [ ] **Switch to trusted publishing.** On npmjs.com, for each of
-      `@auth-ts/core`, `@auth-ts/core/client`, and `@auth-ts/cli`: package →
-      Settings → Trusted
+      `@auth-ts/core` and `@auth-ts/cli`: package → Settings → Trusted
       publishing → GitHub Actions, owner `auth-ts`, repository `auth-ts`,
       workflow `release.yml`, environment `npm`, allowed action `npm publish`.
       Then delete the `NPM_TOKEN` secret and revoke the token. Every later
