@@ -82,7 +82,7 @@ export const github: OAuthProvider = {
 
     if (!tokenResponse.ok) throw providerRejected(tokenResponse)
     const token = (await tokenResponse.json().catch(() => ({}))) as GitHubTokens
-    if (!token.access_token) throw new AuthApiError("unauthenticated", 401)
+    if (!token.access_token) throw new AuthApiError("providerRejected", 401)
 
     const authorization = {
       authorization: `Bearer ${token.access_token}`,

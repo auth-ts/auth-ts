@@ -19,6 +19,11 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   staleSession: "Please sign in again to continue.",
   unauthenticated: "You are not signed in.",
   providerConflict: "That account is already connected to a different user.",
+  providerDenied: "That sign-in was cancelled.",
+  providerRejected: "That sign-in could not be completed. Please try again.",
+  providerEmailUnverified:
+    "Verify your email address with that provider, then try again.",
+  invalidState: "That sign-in attempt expired. Please start again.",
   channelNotConfigured: "That sign-in method is not available.",
   invalidField: "Some of the submitted fields are not accepted.",
   notFound: "Not found.",

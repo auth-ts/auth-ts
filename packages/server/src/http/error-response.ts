@@ -18,6 +18,14 @@ export type AuthErrorCode =
   | "unauthenticated"
   /** That provider identity is already linked to a different user. */
   | "providerConflict"
+  /** The provider reported a failure, or sent no code back — usually a cancelled consent. */
+  | "providerDenied"
+  /** The provider refused the exchange, or its response did not verify. */
+  | "providerRejected"
+  /** The provider has no verified email address for the account, so it cannot identify one. */
+  | "providerEmailUnverified"
+  /** The state cookie was missing, forged, expired, or for a different flow. */
+  | "invalidState"
   /** A code was requested for a channel this server has no sender for. */
   | "channelNotConfigured"
   /** A request field was unknown, reserved, or the wrong primitive type. */

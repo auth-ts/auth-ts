@@ -99,7 +99,7 @@ export const google: OAuthProvider = {
 
     if (!tokenResponse.ok) throw providerRejected(tokenResponse)
     const token = (await tokenResponse.json().catch(() => ({}))) as GoogleTokens
-    if (!token.id_token) throw new AuthApiError("unauthenticated", 401)
+    if (!token.id_token) throw new AuthApiError("providerRejected", 401)
 
     // Verified in full — signature against Google's published keys, issuer,
     // audience, and expiry — even though the token just arrived over TLS from
@@ -125,12 +125,12 @@ export const google: OAuthProvider = {
     } catch (error) {
       throw classifyVerifyFailure(error)
     }
-    if (!claims.sub) throw new AuthApiError("unauthenticated", 401)
+    if (!claims.sub) throw new AuthApiError("providerRejected", 401)
 
     // The nonce ties this token to this flow: it went out in the authorize
     // request and must come back in the token, or the token was minted for
     // some other request and is being replayed into this one.
-    if (claims.nonce !== nonce) throw new AuthApiError("unauthenticated", 401)
+    if (claims.nonce !== nonce) throw new AuthApiError("providerRejected", 401)
 
     // Same stakes as GitHub: an unverified address is an account takeover waiting
     // to happen, so it is dropped rather than trusted.
@@ -212,5 +212,5 @@ function classifyVerifyFailure(error: unknown) {
 
   return unreachable
     ? new AuthApiError("providerUnavailable", 502)
-    : new AuthApiError("unauthenticated", 401)
+    : new AuthApiError("providerRejected", 401)
 }
