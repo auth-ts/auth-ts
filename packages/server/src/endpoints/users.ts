@@ -11,7 +11,7 @@ import { readRefreshCookies } from "../session/session-cookies"
 /** How `GET /users` appears in the OpenAPI document. */
 export const listUsersDocs: EndpointDocs<never> = {
   description:
-    "/sessions is one user's devices, /users is this browser's users, /identities is one user's providers.",
+    "Read from this browser's refresh cookies, so parked accounts are listed too, not only the active one.",
   tag: "Users",
   auth: "bearer",
   requires: "multiUser",

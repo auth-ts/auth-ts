@@ -30,7 +30,7 @@ const EXPIRY_SKEW_MS = 60_000
 
 /** Input for reading a live provider access token. */
 export interface GetProviderTokenInput extends CallerInput {
-  /** The identity's own id, from `GET /identities`. */
+  /** The identity's own id, from your `identities` table. */
   id: string
 }
 
@@ -49,7 +49,7 @@ export const getProviderTokenDocs: EndpointDocs<GetProviderTokenInput, "id"> = {
     "Refreshes the token if needed. Reconnect the provider if it answers providerReconnectRequired.",
   tag: "Identities",
   auth: "bearer",
-  params: { id: "The identity's id, from `GET /identities`." },
+  params: { id: "The identity's id, from your `identities` table." },
   responses: {
     200: { description: "A live access token.", schema: "ProviderToken" },
     401: "Unauthenticated",

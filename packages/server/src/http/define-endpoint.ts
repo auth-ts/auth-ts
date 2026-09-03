@@ -39,7 +39,7 @@ export interface EndpointDefinition<Input, Data> {
   method: EndpointMethod
   /**
    * Path under `basePath`, with `$param` for dynamic segments — for example
-   * `/sessions/$id`. Literal paths win over dynamic ones during matching.
+   * `/identities/$id/token`. Literal paths win over dynamic ones during matching.
    */
   path: string
   /**
