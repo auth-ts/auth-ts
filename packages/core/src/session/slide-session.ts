@@ -52,13 +52,13 @@ export async function slideSession(
   if (!waitUntil) {
     return internals.db.update({
       table: "sessions",
-      where: { tokenHash, expiresAt: { gt: new Date() } },
+      where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
       values: values()
     })
   }
 
   const session = await selectOne(internals, "sessions", {
-    tokenHash,
+    tokenHash: { eq: tokenHash },
     expiresAt: { gt: new Date() }
   })
   if (!session) return []
@@ -68,7 +68,7 @@ export async function slideSession(
     internals.db
       .update({
         table: "sessions",
-        where: { tokenHash, expiresAt: { gt: new Date() } },
+        where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
         values: written
       })
       .then(

@@ -651,15 +651,17 @@ describe("oauth callback", () => {
     expect(
       (
         await selectRow(db, "identities", {
-          provider: "github",
-          providerUserId: "4242"
+          provider: { eq: "github" },
+          providerUserId: { eq: "4242" }
         })
       )?.userId
     ).toBe(owner.id)
     expect(
-      (await selectRow(db, "users", { id: guest.id }))?.primaryUserId
+      (await selectRow(db, "users", { id: { eq: guest.id } }))?.primaryUserId
     ).toBe(owner.id)
-    expect(await selectRows(db, "identities", { userId: other.id })).toEqual([])
+    expect(
+      await selectRows(db, "identities", { userId: { eq: other.id } })
+    ).toEqual([])
 
     const whoami = await auth.handler(
       request("POST", "/api/auth/user", {
@@ -715,7 +717,7 @@ describe("oauth callback", () => {
 
     expect(response.status).toBe(302)
     const upgraded = (await selectRow(context.db, "users", {
-      id: guest.id
+      id: { eq: guest.id }
     })) as unknown as Record<string, unknown>
     expect(upgraded.type).toBe("user")
     expect(upgraded.email).toBe("ada@example.com")
@@ -772,13 +774,13 @@ describe("oauth callback", () => {
     expect(response.status).toBe(302)
     expect(readRefreshCookie(response) !== undefined).toBe(true)
     expect(
-      (await selectRow(db, "users", { id: guest.id }))?.primaryUserId
+      (await selectRow(db, "users", { id: { eq: guest.id } }))?.primaryUserId
     ).toBe(owner.id)
     expect(
       (
         await selectRow(db, "identities", {
-          provider: "github",
-          providerUserId: "4242"
+          provider: { eq: "github" },
+          providerUserId: { eq: "4242" }
         })
       )?.userId
     ).toBe(owner.id)
@@ -813,15 +815,15 @@ describe("oauth callback", () => {
     )
 
     expect(response.status).toBe(302)
-    const upgraded = await selectRow(db, "users", { id: guest.id })
+    const upgraded = await selectRow(db, "users", { id: { eq: guest.id } })
     expect(upgraded?.type).toBe("user")
     expect(upgraded?.email).toBe("ada@example.com")
     expect(upgraded?.primaryUserId).toBeNull()
     expect(
       (
         await selectRow(db, "identities", {
-          provider: "github",
-          providerUserId: "5555"
+          provider: { eq: "github" },
+          providerUserId: { eq: "5555" }
         })
       )?.userId
     ).toBe(guest.id)
@@ -1193,7 +1195,7 @@ describe("connect and disconnect", () => {
     expect(callbackError(callbackResponse)).toBe("unauthenticated")
     expect(
       await selectRows(context.db, "identities", {
-        userId: required(context.db.users()[0], "user").id
+        userId: { eq: required(context.db.users()[0], "user").id }
       })
     ).toEqual([])
   })
@@ -1238,8 +1240,8 @@ describe("connect and disconnect", () => {
     expect(callbackResponse.status).toBe(302)
     expect(callbackError(callbackResponse)).toBe("providerConflict")
     const identity = await selectRow(context.db, "identities", {
-      provider: "github",
-      providerUserId: "4242"
+      provider: { eq: "github" },
+      providerUserId: { eq: "4242" }
     })
     expect(identity?.userId).toBe(firstUser.id)
   })

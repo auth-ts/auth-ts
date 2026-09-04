@@ -11,7 +11,9 @@ describe("updateUser", () => {
     const updated = await updateUser(internals, user, { name: "Ada" })
 
     expect(updated.name).toBe("Ada")
-    expect((await selectRow(db, "users", { id: user.id }))?.name).toBe("Ada")
+    expect((await selectRow(db, "users", { id: { eq: user.id } }))?.name).toBe(
+      "Ada"
+    )
   })
 
   it("treats undefined as leave alone rather than as null", async () => {
@@ -52,6 +54,8 @@ describe("updateUser", () => {
     const updated = await updateUser(internals, user, { name: null })
 
     expect(updated.name).toBeNull()
-    expect((await selectRow(db, "users", { id: user.id }))?.name).toBeNull()
+    expect(
+      (await selectRow(db, "users", { id: { eq: user.id } }))?.name
+    ).toBeNull()
   })
 })

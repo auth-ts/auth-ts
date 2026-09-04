@@ -105,7 +105,7 @@ describe("getToken as a function", () => {
     const { refreshToken } = await signIn(context)
     await context.db.delete({
       table: "sessions",
-      where: { userId: required(context.db.users()[0], "user").id }
+      where: { userId: { eq: required(context.db.users()[0], "user").id } }
     })
 
     await expect(
@@ -245,7 +245,7 @@ describe("a token whose session is gone", () => {
 
     await context.db.delete({
       table: "sessions",
-      where: { tokenHash: session.tokenHash }
+      where: { tokenHash: { eq: session.tokenHash } }
     })
 
     // The token still verifies — it is the row its `sid` names that is gone.

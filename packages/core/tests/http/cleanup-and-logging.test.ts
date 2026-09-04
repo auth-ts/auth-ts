@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { AuthDeleteInput } from "../../src/core/auth-db"
+import type { AuthCondition } from "../../src/core/auth-db"
 import { createTestServer } from "../helpers/create-test-server"
 import {
   readRefreshCookie,
@@ -12,13 +12,9 @@ import { required } from "../helpers/required"
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 /** Whether a delete is the sweep — the only delete keyed on an expiry range. */
-const isSweep = (input: AuthDeleteInput) => {
-  const expiresAt = (input.where as Record<string, unknown>).expiresAt
-  return (
-    typeof expiresAt === "object" &&
-    expiresAt !== null &&
-    !(expiresAt instanceof Date)
-  )
+const isSweep = ({ where }: { where: object }) => {
+  const { expiresAt } = where as { expiresAt?: AuthCondition<Date> }
+  return expiresAt !== undefined && "lt" in expiresAt
 }
 
 describe("sweeping", () => {

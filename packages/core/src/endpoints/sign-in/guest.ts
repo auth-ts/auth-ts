@@ -78,7 +78,7 @@ export const signInAsGuest = defineEndpoint({
     const presented = readRefreshToken(internals, headers)
     if (presented) {
       const live = await selectOne(internals, "sessions", {
-        tokenHash: await sha256Hex(presented.token),
+        tokenHash: { eq: await sha256Hex(presented.token) },
         expiresAt: { gt: new Date() }
       })
       if (live) throw new AuthApiError("guestRequiresSignOut", 409)

@@ -6,6 +6,7 @@ export type {
   AdditionalFieldType,
   AdditionalFieldValue,
   AuthAttempt,
+  AuthCondition,
   AuthDB,
   AuthDeleteInput,
   AuthDirection,
@@ -13,7 +14,6 @@ export type {
   AuthInsert,
   AuthInsertInput,
   AuthOrderBy,
-  AuthRange,
   AuthRow,
   AuthSelectInput,
   AuthSession,
@@ -27,7 +27,7 @@ export type {
   UserType,
   VerificationPurpose
 } from "./core/auth-db"
-export { defineAuthDB, isAuthRange } from "./core/auth-db"
+export { defineAuthDB } from "./core/auth-db"
 export type {
   AuthOptions,
   CookieOptions,

@@ -1,7 +1,6 @@
 import type {
   AuthDirection,
   AuthOrderBy,
-  AuthRange,
   AuthTable,
   AuthWhere
 } from "@auth-ts/core"
@@ -17,22 +16,15 @@ const authTables = Object.fromEntries(
   Object.entries(schema).filter(([, value]) => is(value, PgTable))
 ) as Pick<typeof schema, AuthTable>
 
-/** A range, per the contract: an object that is not a Date. */
-const isRange = (value: unknown): value is AuthRange<Date> =>
-  typeof value === "object" && value !== null && !(value instanceof Date)
-
 const buildWhere = (table: AuthTable, where: AuthWhere) => {
   const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
 
   return and(
-    ...Object.entries(where).flatMap(([name, value]) =>
-      isRange(value)
-        ? [
-            value.lt === undefined ? undefined : lt(columns[name], value.lt),
-            value.gt === undefined ? undefined : gt(columns[name], value.gt)
-          ]
-        : [eq(columns[name], value)]
-    )
+    ...Object.entries(where).flatMap(([name, condition]) => [
+      condition.eq !== undefined ? eq(columns[name], condition.eq) : undefined,
+      condition.lt !== undefined ? lt(columns[name], condition.lt) : undefined,
+      condition.gt !== undefined ? gt(columns[name], condition.gt) : undefined
+    ])
   )
 }
 

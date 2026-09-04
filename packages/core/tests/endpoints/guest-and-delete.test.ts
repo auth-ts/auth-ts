@@ -108,7 +108,7 @@ describe("guests and multiUser never mix", () => {
     const { refreshToken, user } = await signInGuest(context)
     await context.db.delete({
       table: "sessions",
-      where: { userId: user.id }
+      where: { userId: { eq: user.id } }
     })
 
     const response = await context.auth.handler(
@@ -224,10 +224,12 @@ describe("guest conversion", () => {
     await context.db.delete({
       table: "sessions",
       where: {
-        tokenHash: required(
-          context.db.sessions().find((row) => row.userId !== second.user.id),
-          "first guest session"
-        ).tokenHash
+        tokenHash: {
+          eq: required(
+            context.db.sessions().find((row) => row.userId !== second.user.id),
+            "first guest session"
+          ).tokenHash
+        }
       }
     })
     expect(refreshToken).not.toBe(second.refreshToken)
@@ -275,7 +277,9 @@ describe("guest conversion", () => {
 
     expect(body.user.id).toBe(existing.id)
 
-    const guestRow = await selectRow(context.db, "users", { id: guest.id })
+    const guestRow = await selectRow(context.db, "users", {
+      id: { eq: guest.id }
+    })
     expect(guestRow?.primaryUserId).toBe(existing.id)
     expect(guestRow?.type).toBe("guest")
 
@@ -396,7 +400,7 @@ describe("account deletion", () => {
     )
     expect(
       await selectRows(context.db, "verifications", {
-        identifier: "ada@example.com"
+        identifier: { eq: "ada@example.com" }
       })
     ).not.toEqual([])
 
@@ -407,7 +411,7 @@ describe("account deletion", () => {
     expect(response.status).toBe(204)
     expect(
       await selectRows(context.db, "verifications", {
-        identifier: "ada@example.com"
+        identifier: { eq: "ada@example.com" }
       })
     ).toEqual([])
   })
@@ -416,7 +420,9 @@ describe("account deletion", () => {
     const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
     const ada = required(
-      await selectRow(context.db, "users", { email: "ada@example.com" }),
+      await selectRow(context.db, "users", {
+        email: { eq: "ada@example.com" }
+      }),
       "ada"
     )
     // A second device of Ada's, and a bystander who must be left alone.
@@ -446,12 +452,14 @@ describe("account deletion", () => {
 
     expect(response.status).toBe(204)
     expect(
-      await selectRows(context.db, "sessions", { userId: ada.id })
+      await selectRows(context.db, "sessions", { userId: { eq: ada.id } })
     ).toEqual([])
     expect(
-      await selectRows(context.db, "sessions", { userId: grace.id })
+      await selectRows(context.db, "sessions", { userId: { eq: grace.id } })
     ).toHaveLength(1)
-    expect(await selectRow(context.db, "users", { id: ada.id })).toBeNull()
+    expect(
+      await selectRow(context.db, "users", { id: { eq: ada.id } })
+    ).toBeNull()
   })
 
   it("refuses a stale session outright, never a 2xx and never a side effect", async () => {

@@ -81,11 +81,13 @@ export async function storeIdentitySecrets(
 ) {
   if (Object.keys(secrets).length === 0) return
 
-  const existing = await selectOne(internals, "identitySecrets", { identityId })
+  const existing = await selectOne(internals, "identitySecrets", {
+    identityId: { eq: identityId }
+  })
   if (existing) {
     await internals.db.update({
       table: "identitySecrets",
-      where: { id: existing.id },
+      where: { id: { eq: existing.id } },
       values: { ...secrets, updatedAt: new Date() }
     })
     return
@@ -116,8 +118,8 @@ export async function linkIdentity(
   { userId, provider, providerUserId, label, tokens }: LinkIdentityInput
 ) {
   const existing = await selectOne(internals, "identities", {
-    provider,
-    providerUserId
+    provider: { eq: provider },
+    providerUserId: { eq: providerUserId }
   })
   const stored = tokens
     ? await encryptTokens(internals.config.secret, tokens)
@@ -133,7 +135,7 @@ export async function linkIdentity(
     if (Object.keys(values).length > 0) {
       await internals.db.update({
         table: "identities",
-        where: { id: existing.id },
+        where: { id: { eq: existing.id } },
         values: { ...values, updatedAt: new Date() }
       })
     }

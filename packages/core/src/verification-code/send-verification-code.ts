@@ -51,7 +51,7 @@ export async function sendVerificationCode(
     const live = await selectOne(
       internals,
       "verifications",
-      { identifier: identifier.value },
+      { identifier: { eq: identifier.value } },
       { expiresAt: "desc" }
     )
     const cooldownRemaining = getCooldownRemaining(
@@ -87,7 +87,7 @@ export async function sendVerificationCode(
   const swept = sweepExpired(internals, "verifications")
   await internals.db.delete({
     table: "verifications",
-    where: { identifier: identifier.value }
+    where: { identifier: { eq: identifier.value } }
   })
   await insertRow(internals, "verifications", {
     identifier: identifier.value,
@@ -113,7 +113,10 @@ export async function sendVerificationCode(
   } catch (error) {
     await internals.db.delete({
       table: "verifications",
-      where: { identifier: identifier.value, codeHash }
+      where: {
+        identifier: { eq: identifier.value },
+        codeHash: { eq: codeHash }
+      }
     })
     internals.log.error("verification code delivery failed", {
       channel: identifier.kind,

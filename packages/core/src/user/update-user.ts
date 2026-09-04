@@ -35,7 +35,7 @@ export async function updateUser<T extends AuthUser>(
   const stamped = { ...defined, updatedAt: new Date() }
   await internals.db.update({
     table: "users",
-    where: { id: user.id },
+    where: { id: { eq: user.id } },
     values: stamped
   })
 

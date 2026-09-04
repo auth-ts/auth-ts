@@ -89,7 +89,7 @@ export const getToken = defineEndpoint({
       const spent = await Promise.all(
         presented.map(async ([userId, rawToken]) => {
           const live = await selectOne(internals, "sessions", {
-            tokenHash: await sha256Hex(rawToken),
+            tokenHash: { eq: await sha256Hex(rawToken) },
             expiresAt: { gt: new Date() }
           })
 

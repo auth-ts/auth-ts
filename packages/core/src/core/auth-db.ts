@@ -264,44 +264,31 @@ export type AuthRow<
 > = AuthTables<S>[T]
 
 /**
- * `{ lt }`, `{ gt }`, or both — an open range on `expiresAt`, and nowhere else.
+ * `{ eq }` on any column; `{ lt }`, `{ gt }`, or both on `expiresAt`.
  *
- * The only comparison the contract has, and it exists because expiry is the one
- * question core cannot ask with equality. Both bounds are exclusive.
+ * Every condition names its operator, so an implementation maps keys to
+ * operators and never has to tell a value from a range by looking at it. Each
+ * member declares all three keys, the absent ones as `never`, so
+ * `condition.lt` is readable on any condition and `{}` is still not one.
  *
- * Confined to `expiresAt` by {@link AuthWhere} rather than offered on every
- * column, so an implementation has one column to think about instead of the
- * whole row: a `where` on anything else is equality, always.
+ * Order is the only comparison the contract has beyond equality, and it exists
+ * because expiry is the one question core cannot ask with `eq`. Both bounds are
+ * exclusive. {@link AuthWhere} confines it to `expiresAt` rather than offering
+ * it on every column, so an implementation has one column to think about
+ * instead of the whole row.
  */
-export interface AuthRange<V> {
-  lt?: V
-  gt?: V
-}
+export type AuthCondition<V> =
+  | { eq: V; lt?: never; gt?: never }
+  | { lt: V; gt?: V; eq?: never }
+  | { gt: V; lt?: V; eq?: never }
 
 /**
- * Tells a range apart from a value, which is the one branch a `where` needs.
+ * A query: column/condition pairs, **all** of which must match.
  *
- * The shape is chosen so this stays a single check: a range is a non-null
- * object that is not a `Date`, and everything else compares for equality. It
- * ships rather than being described because every implementation would
- * otherwise hand-copy the same three conditions, and a column of object type
- * would be misread by each of them separately.
- */
-export function isAuthRange(value: unknown): value is AuthRange<unknown> {
-  return typeof value === "object" && value !== null && !(value instanceof Date)
-}
-
-/**
- * A query: column/value pairs, **all** of which must match.
- *
- * Every column compares for equality, except `expiresAt`, which also accepts an
- * {@link AuthRange}. That one exception is what lets core find a live session —
- * expiry still ahead — in the same statement that updates it, rather than
- * reading first to find out whether it may write.
- *
- * Telling the two apart is one check, and {@link isAuthRange} is that check —
- * an implementation reads anything it refuses as equality, and only ever meets
- * the other case on `expiresAt`.
+ * Every column takes `{ eq }`, and `expiresAt` also takes an order — that one
+ * exception is what lets core find a live session, expiry still ahead, in the
+ * same statement that updates it, rather than reading first to find out
+ * whether it may write.
  *
  * **`null` is not a value here**, though the columns are nullable. Core looks
  * accounts up by an identifier, and an identifier that came back null would
@@ -313,11 +300,19 @@ export function isAuthRange(value: unknown): value is AuthRange<unknown> {
 export type AuthWhere<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
-> = {
-  [K in keyof AuthRow<S, T>]?: K extends "expiresAt"
-    ? NonNullable<AuthRow<S, T>[K]> | AuthRange<NonNullable<AuthRow<S, T>[K]>>
-    : NonNullable<AuthRow<S, T>[K]>
-}
+> = T extends AuthTable
+  ? {
+      // Index signatures make Object.entries infer any.
+      [K in keyof AuthRow<S, T> as string extends K
+        ? never
+        : K]?: K extends "expiresAt"
+        ? AuthCondition<NonNullable<AuthRow<S, T>[K]>>
+        : Extract<
+            AuthCondition<NonNullable<AuthRow<S, T>[K]>>,
+            { eq: NonNullable<AuthRow<S, T>[K]> }
+          >
+    }
+  : never
 
 /** Sort direction, per {@link AuthOrderBy}. */
 export type AuthDirection = "asc" | "desc"

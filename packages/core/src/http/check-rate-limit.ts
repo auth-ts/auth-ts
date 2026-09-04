@@ -35,7 +35,7 @@ export async function countAttempt(
     insertRow(internals, "attempts", { key, expiresAt }),
     internals.db.select({
       table: "attempts",
-      where: { key },
+      where: { key: { eq: key } },
       limit: limit + 1,
       orderBy: { id: "asc" }
     })

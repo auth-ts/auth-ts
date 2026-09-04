@@ -93,14 +93,14 @@ export const getProviderToken = defineEndpoint({
     // no column grants to be safe to read.
     const [session, identity, secrets] = await Promise.all([
       selectOne(internals, "sessions", {
-        id: caller.sessionId,
+        id: { eq: caller.sessionId },
         expiresAt: { gt: new Date() }
       }),
       selectOne(internals, "identities", {
-        id: input.id,
-        userId: caller.userId
+        id: { eq: input.id },
+        userId: { eq: caller.userId }
       }),
-      selectOne(internals, "identitySecrets", { identityId: input.id })
+      selectOne(internals, "identitySecrets", { identityId: { eq: input.id } })
     ])
     if (!session) throw unauthenticated()
     if (!identity) throw notFound()
@@ -179,11 +179,11 @@ async function refreshProviderToken(
       // ciphertext row, and the scope that described what it bought.
       await internals.db.delete({
         table: "identitySecrets",
-        where: { identityId: identity.id }
+        where: { identityId: { eq: identity.id } }
       })
       await internals.db.update({
         table: "identities",
-        where: { id: identity.id },
+        where: { id: { eq: identity.id } },
         values: { scope: null, updatedAt: new Date() }
       })
       internals.log.warn("provider grant is gone, cleared its tokens", {
@@ -201,7 +201,7 @@ async function refreshProviderToken(
   if (Object.keys(stored.identity).length > 0) {
     await internals.db.update({
       table: "identities",
-      where: { id: identity.id },
+      where: { id: { eq: identity.id } },
       values: { ...stored.identity, updatedAt: new Date() }
     })
   }

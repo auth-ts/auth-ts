@@ -218,8 +218,8 @@ async function connectIdentity(
   }
 
   const existing = await selectOne(internals, "identities", {
-    provider: input.provider,
-    providerUserId: identity.providerUserId
+    provider: { eq: input.provider },
+    providerUserId: { eq: identity.providerUserId }
   })
 
   // Never re-point an existing link: that would move someone else's provider

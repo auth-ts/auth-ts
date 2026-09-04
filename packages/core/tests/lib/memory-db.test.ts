@@ -59,7 +59,7 @@ describe("insert", () => {
     const created = await user({ id: "user_ada", email: "ada@example.com" })
 
     expect(created.id).toBe("user_ada")
-    expect(await read("users", { id: "user_ada" })).toHaveLength(1)
+    expect(await read("users", { id: { eq: "user_ada" } })).toHaveLength(1)
   })
 
   it("refuses a duplicate email, the constraint the contract requires", async () => {
@@ -101,7 +101,7 @@ describe("insert", () => {
     await attempt("sendCode:id:ada@example.com:0")
 
     expect(
-      await read("attempts", { key: "sendCode:id:ada@example.com:0" })
+      await read("attempts", { key: { eq: "sendCode:id:ada@example.com:0" } })
     ).toHaveLength(2)
   })
 })
@@ -114,8 +114,12 @@ describe("select", () => {
   })
 
   it("matches on every column given, and only on equality", async () => {
-    expect(await read("users", { name: "Ada", type: "admin" })).toHaveLength(1)
-    expect(await read("users", { name: "Ada", type: "user" })).toHaveLength(0)
+    expect(
+      await read("users", { name: { eq: "Ada" }, type: { eq: "admin" } })
+    ).toHaveLength(1)
+    expect(
+      await read("users", { name: { eq: "Ada" }, type: { eq: "user" } })
+    ).toHaveLength(0)
   })
 
   it("returns every row when the query is empty", async () => {
@@ -173,7 +177,7 @@ describe("select", () => {
 
     const [newest] = await db.select({
       table: "verifications",
-      where: { identifier },
+      where: { identifier: { eq: identifier } },
       limit: 1,
       orderBy: { expiresAt: "desc" }
     })
@@ -182,10 +186,10 @@ describe("select", () => {
   })
 
   it("hands back copies, so a caller cannot edit the table by mutating a row", async () => {
-    const [row] = await read("users", { email: "ada@example.com" })
+    const [row] = await read("users", { email: { eq: "ada@example.com" } })
     if (row) row.name = "mutated"
 
-    const [stored] = await read("users", { email: "ada@example.com" })
+    const [stored] = await read("users", { email: { eq: "ada@example.com" } })
     expect(stored?.name).toBe("Ada")
   })
 })
@@ -196,11 +200,11 @@ describe("update", () => {
 
     await db.update({
       table: "users",
-      where: { id: ada.id },
+      where: { id: { eq: ada.id } },
       values: { name: "Ada Lovelace" }
     })
 
-    const [stored] = await read("users", { id: ada.id })
+    const [stored] = await read("users", { id: { eq: ada.id } })
     expect(stored?.name).toBe("Ada Lovelace")
     expect(stored?.email).toBe("ada@example.com")
   })
@@ -214,7 +218,7 @@ describe("update", () => {
     await expect(
       db.update({
         table: "users",
-        where: { id: ada.id },
+        where: { id: { eq: ada.id } },
         values: { name: undefined }
       })
     ).rejects.toThrow(/no values to set/)
@@ -227,7 +231,7 @@ describe("update", () => {
     await expect(
       db.update({
         table: "users",
-        where: { id: grace.id },
+        where: { id: { eq: grace.id } },
         values: { email: "ada@example.com" }
       })
     ).rejects.toThrow(/unique constraint/)
@@ -238,8 +242,14 @@ describe("delete", () => {
   it("returns what it removed, which is how core answers 404 rather than 204", async () => {
     const ada = await user({ email: "ada@example.com" })
 
-    const removed = await db.delete({ table: "users", where: { id: ada.id } })
-    const missed = await db.delete({ table: "users", where: { id: ada.id } })
+    const removed = await db.delete({
+      table: "users",
+      where: { id: { eq: ada.id } }
+    })
+    const missed = await db.delete({
+      table: "users",
+      where: { id: { eq: ada.id } }
+    })
 
     expect(removed.map((row) => row.id)).toEqual([ada.id])
     expect(missed).toEqual([])
@@ -253,7 +263,7 @@ describe("delete", () => {
 
     const removed = await db.delete({
       table: "attempts",
-      where: { key: "burst" }
+      where: { key: { eq: "burst" } }
     })
 
     expect(removed).toHaveLength(2)
@@ -278,7 +288,10 @@ describe("delete", () => {
 
     const stolen = await db.delete({
       table: "sessions",
-      where: { id: required(session, "inserted session").id, userId: grace.id }
+      where: {
+        id: { eq: required(session, "inserted session").id },
+        userId: { eq: grace.id }
+      }
     })
 
     expect(stolen).toEqual([])

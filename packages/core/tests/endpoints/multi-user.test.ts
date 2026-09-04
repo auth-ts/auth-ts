@@ -86,7 +86,9 @@ describe("multiUser disabled", () => {
     // The displaced session is deleted rather than left live somewhere nobody
     // can revoke it, and its cookie goes with it.
     expect(
-      await selectRows(context.db, "sessions", { userId: first.user.id })
+      await selectRows(context.db, "sessions", {
+        userId: { eq: first.user.id }
+      })
     ).toHaveLength(0)
     expect(usersInCookies(second.cookies)).toEqual([second.user.id])
   })
@@ -191,7 +193,7 @@ describe("multiUser enabled", () => {
 
     await context.db.delete({
       table: "sessions",
-      where: { userId: ada.user.id }
+      where: { userId: { eq: ada.user.id } }
     })
 
     const response = await context.auth.handler(
@@ -239,10 +241,12 @@ describe("multiUser enabled", () => {
     const after = applyCookies(grace.cookies, response)
     expect(usersInCookies(after)).toEqual([grace.user.id])
     expect(
-      await selectRows(context.db, "sessions", { userId: ada.user.id })
+      await selectRows(context.db, "sessions", { userId: { eq: ada.user.id } })
     ).toHaveLength(0)
     expect(
-      await selectRows(context.db, "sessions", { userId: grace.user.id })
+      await selectRows(context.db, "sessions", {
+        userId: { eq: grace.user.id }
+      })
     ).toHaveLength(1)
   })
 
@@ -263,7 +267,7 @@ describe("multiUser enabled", () => {
     expect(after["auth-ts.hint"]).toBe(ada.user.id)
     expect(usersInCookies(after)).toEqual([ada.user.id])
     expect(
-      await selectRows(context.db, "sessions", { userId: ada.user.id })
+      await selectRows(context.db, "sessions", { userId: { eq: ada.user.id } })
     ).toHaveLength(1)
 
     const whoami = await context.auth.handler(
@@ -372,7 +376,7 @@ describe("guest conversion under multiUser", () => {
     expect(await selectRows(context.db, "sessions")).toHaveLength(1)
     expect(
       required(
-        await selectRow(context.db, "users", { id: guest.user.id }),
+        await selectRow(context.db, "users", { id: { eq: guest.user.id } }),
         "converted user"
       ).type
     ).toBe("user")
@@ -454,7 +458,9 @@ describe("a refresh cookie carrying somebody else's name", () => {
       )
 
       expect(
-        await selectRows(context.db, "sessions", { userId: victim.user.id })
+        await selectRows(context.db, "sessions", {
+          userId: { eq: victim.user.id }
+        })
       ).toHaveLength(1)
     }
   })
@@ -473,7 +479,9 @@ describe("a refresh cookie carrying somebody else's name", () => {
     )
 
     expect(
-      await selectRows(context.db, "sessions", { userId: victim.user.id })
+      await selectRows(context.db, "sessions", {
+        userId: { eq: victim.user.id }
+      })
     ).toHaveLength(1)
   })
 })
@@ -487,7 +495,7 @@ describe("retiring a browser's cookies", () => {
     // Grace is active; her session is revoked from another device.
     await context.db.delete({
       table: "sessions",
-      where: { userId: grace.user.id }
+      where: { userId: { eq: grace.user.id } }
     })
 
     const response = await context.auth.handler(
@@ -501,7 +509,7 @@ describe("retiring a browser's cookies", () => {
 
     // Ada's session was never touched, so the next call resolves to her.
     expect(
-      await selectRows(context.db, "sessions", { userId: ada.user.id })
+      await selectRows(context.db, "sessions", { userId: { eq: ada.user.id } })
     ).toHaveLength(1)
     const whoami = await context.auth.handler(
       request("GET", "/api/auth/token", { cookies: after })
@@ -567,7 +575,7 @@ describe("superseding a session", () => {
     })
 
     expect(
-      await selectRows(context.db, "sessions", { userId: ada.user.id })
+      await selectRows(context.db, "sessions", { userId: { eq: ada.user.id } })
     ).toHaveLength(1)
     expect(usersInCookies(again.cookies)).toEqual([ada.user.id])
   })
@@ -588,7 +596,7 @@ describe("superseding a session", () => {
     })
 
     expect(
-      await selectRows(context.db, "sessions", { userId: ada.user.id })
+      await selectRows(context.db, "sessions", { userId: { eq: ada.user.id } })
     ).toHaveLength(1)
     expect(usersInCookies(again.cookies)).toEqual([ada.user.id])
     // Without multiUser, superseding reads no session rows.

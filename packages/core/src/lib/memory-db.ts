@@ -7,7 +7,6 @@ import type {
   AuthTable,
   AuthUser
 } from "../core/auth-db"
-import { isAuthRange } from "../core/auth-db"
 
 /** An in-memory {@link AuthDB} plus a few helpers for inspecting it in tests. */
 export interface MemoryDb extends AuthDB {
@@ -80,21 +79,24 @@ export function createMemoryDb(): MemoryDb {
       ? stored.getTime() - bound.getTime()
       : Number(stored) - Number(bound)
 
+  const operators: Record<
+    string,
+    (stored: unknown, value: unknown) => boolean
+  > = {
+    eq: (stored, value) =>
+      stored instanceof Date && value instanceof Date
+        ? stored.getTime() === value.getTime()
+        : stored === value,
+    lt: (stored, bound) => order(stored, bound) < 0,
+    gt: (stored, bound) => order(stored, bound) > 0
+  }
+
   const matches = (row: StoredRow, where: Record<string, unknown>) =>
-    Object.entries(where).every(([column, value]) => {
-      const stored = row[column]
-
-      if (isAuthRange(value)) {
-        if (value.lt !== undefined && order(stored, value.lt) >= 0) return false
-        if (value.gt !== undefined && order(stored, value.gt) <= 0) return false
-        return true
-      }
-
-      if (stored instanceof Date && value instanceof Date) {
-        return stored.getTime() === value.getTime()
-      }
-      return stored === value
-    })
+    Object.entries(where).every(([column, condition]) =>
+      Object.entries(condition as Record<string, unknown>).every(
+        ([operator, value]) => operators[operator]?.(row[column], value)
+      )
+    )
 
   const find = (table: AuthTable, where: Record<string, unknown>) =>
     [...tableOf(table).values()].filter((row) => matches(row, where))
@@ -177,7 +179,7 @@ export function createMemoryDb(): MemoryDb {
       if (table === "identities") {
         for (const identity of removed) {
           for (const secret of find("identitySecrets", {
-            identityId: identity.id
+            identityId: { eq: identity.id }
           })) {
             tableOf("identitySecrets").delete(secret.id)
           }

@@ -59,10 +59,10 @@ export async function convertGuest(
   identity: GuestIdentity
 ): Promise<GuestConversion> {
   const existing = identity.email
-    ? await selectOne(internals, "users", { email: identity.email })
+    ? await selectOne(internals, "users", { email: { eq: identity.email } })
     : identity.phoneNumber
       ? await selectOne(internals, "users", {
-          phoneNumber: identity.phoneNumber
+          phoneNumber: { eq: identity.phoneNumber }
         })
       : null
 

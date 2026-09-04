@@ -12,13 +12,13 @@ const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 
 /** Every code stored for the identifier. A send replaces them, so normally one. */
 const storedCodes = (db: MemoryDb) =>
-  selectRows(db, "verifications", { identifier: emailIdentifier.value })
+  selectRows(db, "verifications", { identifier: { eq: emailIdentifier.value } })
 
 /** The row a verify would read: the newest by expiry, exactly as core reads it. */
 const liveCode = async (db: MemoryDb) => {
   const [row] = await db.select({
     table: "verifications",
-    where: { identifier: emailIdentifier.value },
+    where: { identifier: { eq: emailIdentifier.value } },
     limit: 1,
     orderBy: { expiresAt: "desc" }
   })
@@ -748,7 +748,7 @@ describe("consumeVerificationCode", () => {
     const stored = required(await liveCode(db), "stored")
     await db.update({
       table: "verifications",
-      where: { id: stored.id },
+      where: { id: { eq: stored.id } },
       values: { expiresAt: new Date(Date.now() - 1000) }
     })
 

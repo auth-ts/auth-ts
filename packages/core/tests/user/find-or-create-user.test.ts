@@ -97,7 +97,9 @@ describe("findOrCreateUser", () => {
     expect(
       results.filter((result) => result.status === "rejected")
     ).not.toHaveLength(2)
-    expect(await selectRows(db, "users", { email: ada.value })).toHaveLength(1)
+    expect(
+      await selectRows(db, "users", { email: { eq: ada.value } })
+    ).toHaveLength(1)
   })
 
   it("keys on the phone number when that is what was proven", async () => {

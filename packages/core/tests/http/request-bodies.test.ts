@@ -41,7 +41,8 @@ describe("what a request body may name", () => {
     expect((await errorBody(response)).code).toBe("invalidField")
     for (const user of [alice, bob]) {
       expect(
-        (await selectRow(context.db, "users", { id: user.user.id }))?.name
+        (await selectRow(context.db, "users", { id: { eq: user.user.id } }))
+          ?.name
       ).toBeNull()
     }
   })
@@ -90,7 +91,7 @@ describe("what a request body may name", () => {
 
     expect(response.status).toBe(200)
     expect(
-      await selectRow(context.db, "users", { id: ada.user.id })
+      await selectRow(context.db, "users", { id: { eq: ada.user.id } })
     ).toMatchObject({ name: "Ada", plan: "pro" })
   })
 })

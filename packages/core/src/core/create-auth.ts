@@ -233,7 +233,7 @@ export function createAuth<
     decodeToken,
     getProviderRefreshToken: async (identityId) => {
       const secrets = await selectOne(internals, "identitySecrets", {
-        identityId
+        identityId: { eq: identityId }
       })
 
       return secrets?.refreshTokenEncrypted

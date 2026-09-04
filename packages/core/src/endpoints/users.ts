@@ -56,7 +56,7 @@ export const listUsers = defineEndpoint({
     const users = await Promise.all(
       presented.map(async ([userId, rawToken]) => {
         const session = await selectOne(internals, "sessions", {
-          tokenHash: await sha256Hex(rawToken),
+          tokenHash: { eq: await sha256Hex(rawToken) },
           expiresAt: { gt: new Date() }
         })
         // The row is read by the session's own owner, never by the name on the
@@ -64,7 +64,7 @@ export const listUsers = defineEndpoint({
         // hand back any user's row to anybody holding a token of their own.
         if (!session || session.userId !== userId) return null
 
-        return selectOne(internals, "users", { id: session.userId })
+        return selectOne(internals, "users", { id: { eq: session.userId } })
       })
     )
 

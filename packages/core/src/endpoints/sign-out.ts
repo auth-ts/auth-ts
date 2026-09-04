@@ -103,7 +103,7 @@ export const signOut = defineEndpoint({
     const fromCookies = await Promise.all(
       presented.map(async ([userId, rawToken]) => {
         const session = await selectOne(internals, "sessions", {
-          tokenHash: await sha256Hex(rawToken),
+          tokenHash: { eq: await sha256Hex(rawToken) },
           expiresAt: { gt: new Date() }
         })
 
@@ -161,7 +161,9 @@ export const signOut = defineEndpoint({
         return internals.db.delete({
           table: "sessions",
           where:
-            scope === "global" ? { userId: target.userId } : { id: sessionId }
+            scope === "global"
+              ? { userId: { eq: target.userId } }
+              : { id: { eq: sessionId } }
         })
       })
     )

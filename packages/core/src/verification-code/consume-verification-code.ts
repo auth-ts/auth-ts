@@ -55,7 +55,7 @@ async function countWrongGuess(
   // is a fresh code with its own budget, and this delete then matches nothing.
   const [burned] = await internals.db.delete({
     table: "verifications",
-    where: { identifier, codeHash: stored.codeHash }
+    where: { identifier: { eq: identifier }, codeHash: { eq: stored.codeHash } }
   })
   if (burned)
     internals.log.warn("verification code burned after too many attempts")
@@ -83,7 +83,7 @@ export async function consumeVerificationCode(
   const stored = await selectOne(
     internals,
     "verifications",
-    { identifier: input.identifier },
+    { identifier: { eq: input.identifier } },
     { expiresAt: "desc" }
   )
 
@@ -95,7 +95,7 @@ export async function consumeVerificationCode(
     // Already in hand, so delete it rather than leave it for the sweep.
     await internals.db.delete({
       table: "verifications",
-      where: { id: stored.id }
+      where: { id: { eq: stored.id } }
     })
     throw new AuthApiError("invalidCode", 401)
   }
@@ -113,7 +113,10 @@ export async function consumeVerificationCode(
   // code issued before a resend can never consume the row the resend created.
   const [consumed] = await internals.db.delete({
     table: "verifications",
-    where: { identifier: input.identifier, codeHash: stored.codeHash }
+    where: {
+      identifier: { eq: input.identifier },
+      codeHash: { eq: stored.codeHash }
+    }
   })
   if (!consumed) throw new AuthApiError("invalidCode", 401)
 }

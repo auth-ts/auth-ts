@@ -90,26 +90,33 @@ describe("the table types the four functions take", () => {
   const usersOrder = (orderBy: AuthOrderBy<Declared, "users">) => orderBy
 
   it("queries a declared field at its declared type", () => {
-    expectTypeOf(usersWhere({ plan: 3 }).plan).toEqualTypeOf<
-      number | undefined
+    expectTypeOf(usersWhere({ plan: { eq: 3 } }).plan).toEqualTypeOf<
+      { eq: number; lt?: never; gt?: never } | undefined
     >()
     // Core fields query the same way.
-    usersWhere({ email: "ada@example.com", type: "guest" })
+    usersWhere({ email: { eq: "ada@example.com" }, type: { eq: "guest" } })
 
     // @ts-expect-error a nullable column is still never queried for null
-    usersWhere({ email: null })
+    usersWhere({ email: { eq: null } })
 
     // @ts-expect-error plan is declared a number, so a string cannot match it
-    usersWhere({ plan: "pro" })
+    usersWhere({ plan: { eq: "pro" } })
     // @ts-expect-error nothing declares `tier`, so nothing can query it
-    usersWhere({ tier: 1 })
+    usersWhere({ tier: { eq: 1 } })
+    // @ts-expect-error a condition names its operator
+    usersWhere({ email: "ada@example.com" })
+    // @ts-expect-error a condition with no operator is not one
+    usersWhere({ email: {} })
   })
 
   it("takes a range on expiresAt, and on nothing else", () => {
     expectTypeOf(
       sessionsWhere({ expiresAt: { gt: new Date() } })
     ).toEqualTypeOf<AuthWhere<Numeric, "sessions">>()
-    sessionsWhere({ expiresAt: new Date() })
+    sessionsWhere({ expiresAt: { eq: new Date() } })
+    sessionsWhere({ expiresAt: { gt: new Date(), lt: new Date() } })
+    // @ts-expect-error a bound has to be given
+    sessionsWhere({ expiresAt: {} })
 
     // @ts-expect-error createdAt compares for equality, like every other column
     sessionsWhere({ createdAt: { gt: new Date() } })

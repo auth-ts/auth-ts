@@ -112,7 +112,9 @@ export const updateUser = defineEndpoint({
       })
     }
 
-    const current = await selectOne(internals, "users", { id: caller.userId })
+    const current = await selectOne(internals, "users", {
+      id: { eq: caller.userId }
+    })
     if (!current) throw unauthenticated()
 
     const user = await updateUserFields(internals, current, {
@@ -187,9 +189,9 @@ export const deleteUser = defineEndpoint({
     // The fresh window is measured from the session, and a session already
     // revoked refuses the delete rather than honouring a token that outlived it.
     const [user, session] = await Promise.all([
-      selectOne(internals, "users", { id: caller.userId }),
+      selectOne(internals, "users", { id: { eq: caller.userId } }),
       selectOne(internals, "sessions", {
-        id: caller.sessionId,
+        id: { eq: caller.sessionId },
         expiresAt: { gt: new Date() }
       })
     ])

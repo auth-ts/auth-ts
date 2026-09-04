@@ -214,7 +214,7 @@ describe("issueSession", () => {
     expect(claims?.role).toBe("authenticated")
     // Both halves of what the token is for, so a claim can be derived from
     // either — the session it was minted from included.
-    const session = await selectRow(db, "sessions", { userId: user.id })
+    const session = await selectRow(db, "sessions", { userId: { eq: user.id } })
     expect(seen).toEqual([
       { userId: user.id, sessionId: required(session, "session").id }
     ])
@@ -242,10 +242,10 @@ describe("issueSession", () => {
     const real = await insertUser(db, { email: "ada@example.com" })
     await db.update({
       table: "users",
-      where: { id: guest.id },
+      where: { id: { eq: guest.id } },
       values: { primaryUserId: real.id }
     })
-    const converted = await selectRow(db, "users", { id: guest.id })
+    const converted = await selectRow(db, "users", { id: { eq: guest.id } })
 
     const issued = await issueSession(internals, {
       user: required(converted, "converted guest"),
@@ -331,7 +331,7 @@ describe("resolveSession", () => {
     const [stored] = db.sessions()
     await db.delete({
       table: "sessions",
-      where: { tokenHash: required(stored, "stored session").tokenHash }
+      where: { tokenHash: { eq: required(stored, "stored session").tokenHash } }
     })
 
     const headers = new Headers({
@@ -358,7 +358,7 @@ describe("resolveSession", () => {
     const [stored] = db.sessions()
     await db.update({
       table: "sessions",
-      where: { id: required(stored, "stored session").id },
+      where: { id: { eq: required(stored, "stored session").id } },
       values: { expiresAt: new Date(Date.now() - 1000) }
     })
 
@@ -387,7 +387,7 @@ describe("resolveSession", () => {
     const [stored] = db.sessions()
     await db.update({
       table: "sessions",
-      where: { id: required(stored, "stored session").id },
+      where: { id: { eq: required(stored, "stored session").id } },
       values: { userId: "vanished-user" }
     })
 
@@ -528,7 +528,7 @@ describe("resolveCallerSession", () => {
     })
     await db.delete({
       table: "sessions",
-      where: { userId: required(db.users()[0], "ada").id }
+      where: { userId: { eq: required(db.users()[0], "ada").id } }
     })
 
     const headers = new Headers({

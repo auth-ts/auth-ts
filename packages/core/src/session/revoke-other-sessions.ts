@@ -28,7 +28,10 @@ export async function revokeOtherSessions(
 
     const deleted = await Promise.all(
       others.map((session) =>
-        internals.db.delete({ table: "sessions", where: { id: session.id } })
+        internals.db.delete({
+          table: "sessions",
+          where: { id: { eq: session.id } }
+        })
       )
     )
     const removed = deleted.reduce((sum, rows) => sum + rows.length, 0)

@@ -18,36 +18,39 @@ import { IDENTITY_PAGE_SIZE } from "../oauth/link-identity"
  * would otherwise sign its next owner into nothing.
  */
 export async function deleteUser(internals: AuthInternals, user: AuthUser) {
-  await internals.db.delete({ table: "sessions", where: { userId: user.id } })
+  await internals.db.delete({
+    table: "sessions",
+    where: { userId: { eq: user.id } }
+  })
 
   // The provider tokens go before the identities that address them. A database
   // cascade would do this too, and should; deleting them here means the
   // guarantee does not rest on a DDL detail core cannot see.
   const identities = await internals.db.select({
     table: "identities",
-    where: { userId: user.id },
+    where: { userId: { eq: user.id } },
     limit: IDENTITY_PAGE_SIZE,
     orderBy: { createdAt: "asc" }
   })
   for (const identity of identities) {
     await internals.db.delete({
       table: "identitySecrets",
-      where: { identityId: identity.id }
+      where: { identityId: { eq: identity.id } }
     })
   }
   await internals.db.delete({
     table: "identities",
-    where: { userId: user.id }
+    where: { userId: { eq: user.id } }
   })
 
   for (const identifier of [user.email, user.phoneNumber]) {
     if (!identifier) continue
     await internals.db.delete({
       table: "verifications",
-      where: { identifier }
+      where: { identifier: { eq: identifier } }
     })
   }
 
-  await internals.db.delete({ table: "users", where: { id: user.id } })
+  await internals.db.delete({ table: "users", where: { id: { eq: user.id } } })
   internals.log.info("user deleted with their sessions and identities")
 }

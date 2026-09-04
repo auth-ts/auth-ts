@@ -47,7 +47,7 @@ export async function findOrCreateUser(
   const { identifier, name, image, additionalFields } = input
 
   const existing = await selectOne(internals, "users", {
-    [identifier.kind]: identifier.value
+    [identifier.kind]: { eq: identifier.value }
   })
   if (existing) return updateUser(internals, existing, { name, image })
 

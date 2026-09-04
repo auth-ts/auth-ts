@@ -99,8 +99,11 @@ export async function issueSession(
             cookieUserId,
             hash,
             ownerId: config.multiUser
-              ? (await selectOne(internals, "sessions", { tokenHash: hash }))
-                  ?.userId
+              ? (
+                  await selectOne(internals, "sessions", {
+                    tokenHash: { eq: hash }
+                  })
+                )?.userId
               : undefined
           }
         }
@@ -119,7 +122,10 @@ export async function issueSession(
   const [token] = await Promise.all([
     mintAccessToken(internals, user, session),
     ...[...superseded].map((hash) =>
-      internals.db.delete({ table: "sessions", where: { tokenHash: hash } })
+      internals.db.delete({
+        table: "sessions",
+        where: { tokenHash: { eq: hash } }
+      })
     )
   ])
   if (superseded.size > 0) internals.log.debug("superseded sessions deleted")

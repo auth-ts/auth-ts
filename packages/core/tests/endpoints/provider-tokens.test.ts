@@ -57,11 +57,13 @@ async function signInWithGitHub(
     "refresh"
   ).value
   const stored = required(
-    await selectRow(context.db, "identities", { provider: "github" }),
+    await selectRow(context.db, "identities", { provider: { eq: "github" } }),
     "identity"
   )
   const secrets = required(
-    await selectRow(context.db, "identitySecrets", { identityId: stored.id }),
+    await selectRow(context.db, "identitySecrets", {
+      identityId: { eq: stored.id }
+    }),
     "identity secrets"
   )
 
@@ -146,7 +148,7 @@ describe("storing a provider grant", () => {
     await signInWithGitHub(context, GRANT)
 
     const identity = required(
-      await selectRow(context.db, "identities", { provider: "github" }),
+      await selectRow(context.db, "identities", { provider: { eq: "github" } }),
       "identity"
     )
 
@@ -212,7 +214,7 @@ describe("GET /identities/:id/token", () => {
     expect(body.token).toBe("refreshed-access-token")
     const stored = required(
       await selectRow(context.db, "identitySecrets", {
-        identityId: identity.id
+        identityId: { eq: identity.id }
       }),
       "identity"
     )
@@ -243,7 +245,7 @@ describe("GET /identities/:id/token", () => {
 
     const stored = required(
       await selectRow(context.db, "identitySecrets", {
-        identityId: identity.id
+        identityId: { eq: identity.id }
       }),
       "identity"
     )
@@ -274,11 +276,11 @@ describe("GET /identities/:id/token", () => {
     // grant it no longer has goes, ciphertext row included.
     expect(
       await selectRow(context.db, "identitySecrets", {
-        identityId: identity.id
+        identityId: { eq: identity.id }
       })
     ).toBeNull()
     const stored = required(
-      await selectRow(context.db, "identities", { id: identity.id }),
+      await selectRow(context.db, "identities", { id: { eq: identity.id } }),
       "identity"
     )
     expect(stored.scope).toBeNull()
@@ -295,7 +297,7 @@ describe("GET /identities/:id/token", () => {
     })
     await context.db.update({
       table: "identitySecrets",
-      where: { identityId: identity.id },
+      where: { identityId: { eq: identity.id } },
       values: { accessTokenEncrypted: null }
     })
 
@@ -309,7 +311,7 @@ describe("GET /identities/:id/token", () => {
     const { refreshToken, identity } = await signInWithGitHub(context, GRANT)
     await context.db.update({
       table: "identitySecrets",
-      where: { identityId: identity.id },
+      where: { identityId: { eq: identity.id } },
       values: {
         accessTokenEncrypted: await encryptSecret(
           "some-other-secret",

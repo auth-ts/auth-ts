@@ -18,7 +18,7 @@ export function listUserSessions(
 ): Promise<AuthRow<AdditionalFieldsSchema, "sessions">[]> {
   return internals.db.select({
     table: "sessions",
-    where: { userId },
+    where: { userId: { eq: userId } },
     limit: SESSION_PAGE_SIZE,
     orderBy: { createdAt: "desc" }
   })

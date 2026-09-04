@@ -108,7 +108,7 @@ export const authDBChecks: AuthDBCheck[] = [
           "the returned row does not carry the value it was given"
         )
       } finally {
-        await db.delete({ table: "users", where: { email } })
+        await db.delete({ table: "users", where: { email: { eq: email } } })
       }
     }
   },
@@ -118,24 +118,24 @@ export const authDBChecks: AuthDBCheck[] = [
       const email = `${unique()}@example.test`
       await create(db, "users", person({ email, name: "Ada" }))
       try {
-        const matching = (where: { email: string; name: string }) =>
+        const matching = (name: string) =>
           db.select({
             table: "users",
-            where,
+            where: { email: { eq: email }, name: { eq: name } },
             limit: 10,
             orderBy: { id: "asc" }
           })
 
         expect(
-          (await matching({ email, name: "Ada" })).length === 1,
+          (await matching("Ada")).length === 1,
           "a where naming two columns did not match the row that has both"
         )
         expect(
-          (await matching({ email, name: "Grace" })).length === 0,
+          (await matching("Grace")).length === 0,
           "every column in a where has to match. This one matched a row on some of them, which would let one person's code verify against another's identifier."
         )
       } finally {
-        await db.delete({ table: "users", where: { email } })
+        await db.delete({ table: "users", where: { email: { eq: email } } })
       }
     }
   },
@@ -158,7 +158,7 @@ export const authDBChecks: AuthDBCheck[] = [
         const page = (direction: "asc" | "desc", limit: number) =>
           db.select({
             table: "attempts",
-            where: { key },
+            where: { key: { eq: key } },
             limit,
             orderBy: { expiresAt: direction }
           })
@@ -182,7 +182,7 @@ export const authDBChecks: AuthDBCheck[] = [
           "limit did not cap from the start of the order"
         )
       } finally {
-        await db.delete({ table: "attempts", where: { key } })
+        await db.delete({ table: "attempts", where: { key: { eq: key } } })
       }
     }
   },
@@ -194,7 +194,7 @@ export const authDBChecks: AuthDBCheck[] = [
       try {
         const changed = await db.update({
           table: "users",
-          where: { id: row.id },
+          where: { id: { eq: row.id } },
           values: { name: "Ada Lovelace" }
         })
 
@@ -206,14 +206,14 @@ export const authDBChecks: AuthDBCheck[] = [
           (
             await db.update({
               table: "users",
-              where: { id: crypto.randomUUID() },
+              where: { id: { eq: crypto.randomUUID() } },
               values: { name: "nobody" }
             })
           ).length === 0,
           "update matched nothing but did not report an empty result"
         )
       } finally {
-        await db.delete({ table: "users", where: { email } })
+        await db.delete({ table: "users", where: { email: { eq: email } } })
       }
     }
   },
@@ -247,27 +247,30 @@ export const authDBChecks: AuthDBCheck[] = [
           ).length
 
         expect(
-          (await count({ key, expiresAt: { gt: second } })) === 1,
+          (await count({ key: { eq: key }, expiresAt: { gt: second } })) === 1,
           "gt must exclude its own bound and everything below it"
         )
         expect(
-          (await count({ key, expiresAt: { lt: second } })) === 1,
+          (await count({ key: { eq: key }, expiresAt: { lt: second } })) === 1,
           "lt must exclude its own bound and everything above it"
         )
         expect(
-          (await count({ key, expiresAt: { gt: first, lt: third } })) === 1,
+          (await count({
+            key: { eq: key },
+            expiresAt: { gt: first, lt: third }
+          })) === 1,
           "lt and gt together must bound both ends"
         )
         expect(
-          (await count({ key, expiresAt: { gt: third } })) === 0,
+          (await count({ key: { eq: key }, expiresAt: { gt: third } })) === 0,
           "a range past every row must match nothing"
         )
         expect(
-          (await count({ key, expiresAt: second })) === 1,
-          "a plain value must still compare for equality, not order"
+          (await count({ key: { eq: key }, expiresAt: { eq: second } })) === 1,
+          "eq on expiresAt must still compare for equality, not order"
         )
       } finally {
-        await db.delete({ table: "attempts", where: { key } })
+        await db.delete({ table: "attempts", where: { key: { eq: key } } })
       }
     }
   },
@@ -279,12 +282,12 @@ export const authDBChecks: AuthDBCheck[] = [
       try {
         await db.update({
           table: "users",
-          where: { id: row.id },
+          where: { id: { eq: row.id } },
           values: { name: "Ada Lovelace" }
         })
         const [updated] = await db.select({
           table: "users",
-          where: { email },
+          where: { email: { eq: email } },
           limit: 10,
           orderBy: { id: "asc" }
         })
@@ -299,7 +302,7 @@ export const authDBChecks: AuthDBCheck[] = [
           "update changed a column it was not given. Core sends only what changed, and expects the rest to survive."
         )
       } finally {
-        await db.delete({ table: "users", where: { email } })
+        await db.delete({ table: "users", where: { email: { eq: email } } })
       }
     }
   },
@@ -309,13 +312,17 @@ export const authDBChecks: AuthDBCheck[] = [
       const email = `${unique()}@example.test`
       await create(db, "users", person({ email }))
 
-      const removed = await db.delete({ table: "users", where: { email } })
+      const removed = await db.delete({
+        table: "users",
+        where: { email: { eq: email } }
+      })
       expect(
         removed.length === 1 && removed[0]?.email === email,
         "delete must return the rows it removed. A single-use code is spent by this, and a revoke answers 404 from it — an empty return makes both fail open."
       )
       expect(
-        (await db.delete({ table: "users", where: { email } })).length === 0,
+        (await db.delete({ table: "users", where: { email: { eq: email } } }))
+          .length === 0,
         "delete matched nothing but did not return an empty result"
       )
     }
@@ -348,15 +355,18 @@ export const authDBChecks: AuthDBCheck[] = [
           (
             await db.delete({
               table: "sessions",
-              where: { id: session.id, userId: stranger.id }
+              where: { id: { eq: session.id }, userId: { eq: stranger.id } }
             })
           ).length === 0,
           "a delete naming both id and userId removed a session belonging to someone else. That pair is what stops one signed-in person revoking another's devices."
         )
       } finally {
-        await db.delete({ table: "sessions", where: { tokenHash } })
-        await db.delete({ table: "users", where: { id: owner.id } })
-        await db.delete({ table: "users", where: { id: stranger.id } })
+        await db.delete({
+          table: "sessions",
+          where: { tokenHash: { eq: tokenHash } }
+        })
+        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
+        await db.delete({ table: "users", where: { id: { eq: stranger.id } } })
       }
     }
   },
@@ -371,7 +381,7 @@ export const authDBChecks: AuthDBCheck[] = [
           "a second user was inserted with the same email. Core reads before it inserts, so this constraint is what decides the race between two first sign-ins — without it they become two accounts for one person."
         )
       } finally {
-        await db.delete({ table: "users", where: { id: first.id } })
+        await db.delete({ table: "users", where: { id: { eq: first.id } } })
       }
     }
   },
@@ -386,7 +396,7 @@ export const authDBChecks: AuthDBCheck[] = [
           "a second user was inserted with the same phone number, so two sign-ins from one number can become two accounts"
         )
       } finally {
-        await db.delete({ table: "users", where: { id: first.id } })
+        await db.delete({ table: "users", where: { id: { eq: first.id } } })
       }
     }
   },
@@ -415,8 +425,11 @@ export const authDBChecks: AuthDBCheck[] = [
           "two sessions were stored with the same token hash. One refresh token would then resolve to two rows, and revoking the session a browser holds would leave it signed in."
         )
       } finally {
-        await db.delete({ table: "sessions", where: { tokenHash } })
-        await db.delete({ table: "users", where: { id: owner.id } })
+        await db.delete({
+          table: "sessions",
+          where: { tokenHash: { eq: tokenHash } }
+        })
+        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
       }
     }
   },
@@ -444,8 +457,11 @@ export const authDBChecks: AuthDBCheck[] = [
           "one provider account was linked twice. Core looks the pair up before it inserts, so two concurrent sign-ins both find nothing — this index is what refuses the loser."
         )
       } finally {
-        await db.delete({ table: "identities", where: { providerUserId } })
-        await db.delete({ table: "users", where: { id: owner.id } })
+        await db.delete({
+          table: "identities",
+          where: { providerUserId: { eq: providerUserId } }
+        })
+        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
       }
     }
   },
@@ -475,11 +491,14 @@ export const authDBChecks: AuthDBCheck[] = [
           updatedAt: new Date()
         })
 
-        await db.delete({ table: "identities", where: { id: identity.id } })
+        await db.delete({
+          table: "identities",
+          where: { id: { eq: identity.id } }
+        })
 
         const orphaned = await db.select({
           table: "identitySecrets",
-          where: { identityId: identity.id },
+          where: { identityId: { eq: identity.id } },
           limit: 1,
           orderBy: { createdAt: "asc" }
         })
@@ -489,8 +508,11 @@ export const authDBChecks: AuthDBCheck[] = [
           )
         }
       } finally {
-        await db.delete({ table: "identities", where: { providerUserId } })
-        await db.delete({ table: "users", where: { id: owner.id } })
+        await db.delete({
+          table: "identities",
+          where: { providerUserId: { eq: providerUserId } }
+        })
+        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
       }
     }
   },
@@ -511,7 +533,10 @@ export const authDBChecks: AuthDBCheck[] = [
       try {
         const removed = await db.delete({
           table: "verifications",
-          where: { identifier, expiresAt: { lt: new Date() } }
+          where: {
+            identifier: { eq: identifier },
+            expiresAt: { lt: new Date() }
+          }
         })
 
         expect(
@@ -523,7 +548,7 @@ export const authDBChecks: AuthDBCheck[] = [
 
         const left = await db.select({
           table: "verifications",
-          where: { identifier },
+          where: { identifier: { eq: identifier } },
           limit: 10,
           orderBy: { id: "asc" }
         })
@@ -534,7 +559,10 @@ export const authDBChecks: AuthDBCheck[] = [
           "the delete removed the row that had not expired yet, signing people out early"
         )
       } finally {
-        await db.delete({ table: "verifications", where: { identifier } })
+        await db.delete({
+          table: "verifications",
+          where: { identifier: { eq: identifier } }
+        })
       }
     }
   }

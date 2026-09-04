@@ -86,20 +86,18 @@ index, because the missing constraint only shows under a race.
 
 ## The rules
 
-- **`where` is column/value pairs, all of which must match.** Every column
-  compares for equality, with one exception: `expiresAt` also takes a `{ lt }`,
-  a `{ gt }`, or both, with exclusive bounds.
+- **`where` is column/condition pairs, all of which must match.** Every column
+  takes `{ eq }`, with one exception: `expiresAt` also takes a `{ lt }`, a
+  `{ gt }`, or both, with exclusive bounds.
 
   ```ts
-  where: { tokenHash, expiresAt: { gt: new Date() } }
+  where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } }
   ```
 
-  Telling the two apart is one check, and the library ships it rather than
-  asking you to write it — a range is a non-null object that is not a `Date`:
-
-  ```ts
-  import { isAuthRange } from "@auth-ts/core"
-  ```
+  A condition names its operator, so your implementation maps keys to
+  operators and never has to tell a value from a range by looking at it. Every
+  condition declares all three keys, the absent ones typed `never`, so reading
+  `condition.lt` on any column is fine and `{}` is still not a condition.
 
   That is the whole operator surface: no `OR`, no `in`, no negation. The
   exception exists because a live session is one whose expiry is still ahead,
@@ -222,9 +220,14 @@ const authTables = Object.fromEntries(
 ) as Pick<typeof schema, AuthTable>
 
 const buildWhere = (table: AuthTable, where: AuthWhere) => {
-  const columns = getColumns(authTables[table])
-  const entries = Object.entries(where) as [keyof typeof columns, never][]
-  return and(...entries.map(([name, value]) => eq(columns[name], value)))
+  const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
+  return and(
+    ...Object.entries(where).flatMap(([name, condition]) => [
+      condition.eq !== undefined ? eq(columns[name], condition.eq) : undefined,
+      condition.lt !== undefined ? lt(columns[name], condition.lt) : undefined,
+      condition.gt !== undefined ? gt(columns[name], condition.gt) : undefined
+    ])
+  )
 }
 
 const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
@@ -276,16 +279,16 @@ table's query is genuinely different. The input narrows with the table name:
 export const authDB = defineAuthDB({
   async select({ table, where, limit }) {
     switch (table) {
-      // `where` is Partial<AuthUser> in this branch,
+      // `where` is AuthWhere<S, "users"> in this branch,
       case "users":
         return run(`select * from users where email = $1 limit $2`, [
-          where.email,
+          where.email?.eq,
           limit
         ])
-      // and Partial<AuthAttempt> in this one.
+      // and AuthWhere<S, "attempts"> in this one.
       case "attempts":
         return run(`select * from attempts where key = $1 limit $2`, [
-          where.key,
+          where.key?.eq,
           limit
         ])
       // ...

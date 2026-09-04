@@ -42,9 +42,11 @@ export const sendDeleteUserCode = defineEndpoint({
   run: async (internals, input: CallerInput) => {
     const headers = input.headers ?? new Headers()
     const caller = await authenticate(internals, input)
-    const user = await selectOne(internals, "users", { id: caller.userId })
+    const user = await selectOne(internals, "users", {
+      id: { eq: caller.userId }
+    })
     const session = await selectOne(internals, "sessions", {
-      id: caller.sessionId
+      id: { eq: caller.sessionId }
     })
     // Core deletes a user's sessions before the user, so a token naming one
     // that is gone means a delete failed part-way. Refuse it rather than trust

@@ -47,13 +47,13 @@ export async function resolveOAuthUser(
   { additionalFields = {}, guest }: ResolveOAuthUserOptions = {}
 ): Promise<AuthUser> {
   const existing = await selectOne(internals, "identities", {
-    provider,
-    providerUserId: identity.providerUserId
+    provider: { eq: provider },
+    providerUserId: { eq: identity.providerUserId }
   })
 
   if (existing) {
     const linked = await selectOne(internals, "users", {
-      id: existing.userId
+      id: { eq: existing.userId }
     })
     if (linked) {
       // Refresh the recorded label, but never re-key on it: the account is

@@ -76,9 +76,8 @@ describe("authDBChecks", () => {
       broken({
         delete: (input) => {
           const where = Object.fromEntries(
-            Object.entries(input.where).filter(
-              ([, value]) =>
-                !value || typeof value !== "object" || value instanceof Date
+            Object.entries(input.where).filter(([, condition]) =>
+              Object.hasOwn(condition, "eq")
             )
           )
           return db.delete({ ...input, where } as typeof input)

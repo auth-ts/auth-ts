@@ -92,7 +92,7 @@ export const switchUser = defineEndpoint({
     // The session's own owner, not the id that was asked for. They are equal
     // by the time this runs, and minting a token is not the place to assume it.
     const user = await selectOne(internals, "users", {
-      id: resolved.session.userId
+      id: { eq: resolved.session.userId }
     })
     if (!user) throw notFound()
 

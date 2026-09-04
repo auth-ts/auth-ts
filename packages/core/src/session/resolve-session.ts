@@ -166,14 +166,16 @@ export async function resolveSession(
   const picked = readRefreshToken(internals, headers)
   const [resolved, named] = await Promise.all([
     liveSession(internals, headers, picked?.token),
-    picked ? selectOne(internals, "users", { id: picked.userId }) : null
+    picked ? selectOne(internals, "users", { id: { eq: picked.userId } }) : null
   ])
   if (!resolved) return null
 
   const user =
     named?.id === resolved.session.userId
       ? named
-      : await selectOne(internals, "users", { id: resolved.session.userId })
+      : await selectOne(internals, "users", {
+          id: { eq: resolved.session.userId }
+        })
   if (!user) {
     // Core deletes a user's sessions before the user, so a session pointing at
     // nothing means a delete failed part-way. Refuse it rather than trust it.
@@ -228,11 +230,11 @@ export async function resolveTokenSession(
   if (!caller) return null
 
   const session = await selectOne(internals, "sessions", {
-    id: caller.sessionId,
+    id: { eq: caller.sessionId },
     expiresAt: { gt: new Date() }
   })
   const user = session
-    ? await selectOne(internals, "users", { id: session.userId })
+    ? await selectOne(internals, "users", { id: { eq: session.userId } })
     : null
 
   return session && user
