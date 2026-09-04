@@ -1,4 +1,4 @@
-import type { AuthUser } from "../core/auth-db"
+import type { AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { IDENTITY_PAGE_SIZE } from "../oauth/link-identity"
 

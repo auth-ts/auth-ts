@@ -7,8 +7,8 @@ description: Every option, its default, and why it defaults that way.
 import { createAuth } from "@auth-ts/core"
 
 export const auth = createAuth({
-  db: {
-    /* four functions — see the AuthDB reference */
+  database: {
+    /* four functions — see the AuthDatabase reference */
   },
   email: { sendCode: async ({ email, code }) => {} }
 })
@@ -36,7 +36,7 @@ back, so the library reads the id it was given rather than assuming one.
 
 ```ts
 createAuth({
-  db: authDB,
+  database: authDatabase,
   generateId: (table) => `${table}_${crypto.randomUUID()}`
 })
 ```
@@ -49,7 +49,7 @@ row's `id`.
 ## Cleanup
 
 There is no cleanup schedule to own. The library sweeps expired rows itself,
-through your own [`AuthDB.delete`](/docs/reference/auth-db), on the requests
+through your own [`AuthDatabase.delete`](/docs/reference/auth-database), on the requests
 that create new ones: a sign-in sweeps `sessions`, a code send sweeps
 `verifications`, and the first attempt of each rate-limit window sweeps
 `attempts`. Garbage accrues only through inserts, so sweeping at insert time
@@ -234,7 +234,7 @@ them; optional and never null on the way in, because core only writes a value
 that validated against its declared type. Requests that send an undeclared key
 or the wrong primitive are rejected with `invalidField`, and declared fields are
 applied on insert only — signing in cannot overwrite an existing profile. Typing
-your `AuthDB` against the same schema is covered in [AuthDB](/docs/reference/auth-db#typing-your-implementation).
+your `AuthDatabase` against the same schema is covered in [AuthDatabase](/docs/reference/auth-database#typing-your-implementation).
 
 ## Client IP
 

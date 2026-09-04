@@ -1,4 +1,4 @@
-import type { AdditionalFieldsSchema, AuthRow } from "../core/auth-db"
+import type { AdditionalFieldsSchema, AuthRow } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 
 /**

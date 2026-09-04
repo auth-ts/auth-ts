@@ -1,4 +1,4 @@
-import type { AuthSession, AuthUser } from "../core/auth-db"
+import type { AuthSession, AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { sha256Hex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"

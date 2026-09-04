@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createAuth } from "@auth-ts/core"
-import { createMemoryDb } from "@auth-ts/core/testing"
+import { createMemoryDatabase } from "@auth-ts/core/testing"
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify } from "jose"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { Jwks } from "../src/keygen"
@@ -27,7 +27,7 @@ function serverFor(
   alg: "RS256" | "ES256" = "RS256"
 ) {
   return createAuth({
-    db: createMemoryDb(),
+    database: createMemoryDatabase(),
     guest: true,
     secret,
     jwt: { privateKey: privateKeyPem, alg },

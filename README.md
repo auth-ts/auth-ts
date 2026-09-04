@@ -35,8 +35,8 @@ written to `public/jwks.json`, which your framework serves at `/jwks.json`.
 import { createAuth } from "@auth-ts/core"
 
 export const auth = createAuth({
-  db: {
-    /* four functions — see the AuthDB reference */
+  database: {
+    /* four functions — see the AuthDatabase reference */
   },
   email: {
     sendCode: async ({ email, code }) => {

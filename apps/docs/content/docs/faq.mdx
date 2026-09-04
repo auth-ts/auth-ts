@@ -70,7 +70,7 @@ A guest's session is their only credential, so a guest with no sessions is
 unreachable forever. The library leaves that row alone: deleting from your
 `users` table on a retention policy it invented is not its call, and the same
 rule already applies to a merged guest's data. Collect them on your own
-schedule — [the reference](/docs/reference/auth-db) has the one statement that
+schedule — [the reference](/docs/reference/auth-database) has the one statement that
 does it. Guests also never coexist with real users in one browser:
 `sign-in/guest` answers 409 while any session is live, and a guest cannot
 switch users — they convert.

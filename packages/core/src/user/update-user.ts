@@ -1,4 +1,4 @@
-import type { AuthUser } from "../core/auth-db"
+import type { AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 
 /** The columns core is writing to a user row. */

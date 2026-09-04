@@ -1,4 +1,4 @@
-import type { AuthUser } from "../core/auth-db"
+import type { AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { selectOne } from "../lib/select-one"

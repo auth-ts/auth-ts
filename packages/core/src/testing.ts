@@ -1,4 +1,4 @@
-export type { AuthDBCheck } from "./lib/conformance"
-export { authDBChecks } from "./lib/conformance"
-export type { MemoryDb } from "./lib/memory-db"
-export { createMemoryDb } from "./lib/memory-db"
+export type { AuthDatabaseCheck } from "./lib/conformance"
+export { authDatabaseChecks } from "./lib/conformance"
+export type { MemoryDatabase } from "./lib/memory-database"
+export { createMemoryDatabase } from "./lib/memory-database"

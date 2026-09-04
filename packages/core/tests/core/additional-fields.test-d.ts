@@ -1,17 +1,17 @@
 import { describe, expectTypeOf, it } from "vitest"
 import type {
   AdditionalFieldsSchema,
-  AuthDB,
+  AuthDatabase,
   AuthInsert,
   AuthOrderBy,
   AuthRow,
   AuthSession,
   AuthUser,
   AuthWhere
-} from "../../src/core/auth-db"
+} from "../../src/core/auth-database"
 import type { WithUserFields } from "../../src/core/create-auth"
 import { createAuth } from "../../src/core/create-auth"
-import { createMemoryDb } from "../../src/lib/memory-db"
+import { createMemoryDatabase } from "../../src/lib/memory-database"
 
 // Never executed — vitest typechecks this file and runs nothing in it — so the
 // options only have to satisfy the types.
@@ -143,26 +143,26 @@ describe("the table types the four functions take", () => {
   })
 })
 
-describe("AuthDB measures the schema it is typed with", () => {
+describe("AuthDatabase measures the schema it is typed with", () => {
   it("takes a bare implementation as any server's store", () => {
     // No schema declared, so nothing is claimed about the columns and every
     // server accepts it — including one that declares fields of its own.
-    const bare: AuthDB = createMemoryDb()
-    const declared: AuthDB<{ plan: "number" }> = createMemoryDb()
+    const bare: AuthDatabase = createMemoryDatabase()
+    const declared: AuthDatabase<{ plan: "number" }> = createMemoryDatabase()
 
-    expectTypeOf(bare).toMatchTypeOf<AuthDB>()
-    expectTypeOf(declared).toMatchTypeOf<AuthDB<{ plan: "number" }>>()
+    expectTypeOf(bare).toMatchTypeOf<AuthDatabase>()
+    expectTypeOf(declared).toMatchTypeOf<AuthDatabase<{ plan: "number" }>>()
   })
 
   it("keeps two declared schemas apart, which is what __schema is for", () => {
-    const stringly: AuthDB<{ plan: "string" }> = createMemoryDb()
+    const stringly: AuthDatabase<{ plan: "string" }> = createMemoryDatabase()
 
     // Without the phantom member the schema would count as unused and these
     // two would be the same type, so a store that writes strings would satisfy
     // a server that declared numbers.
     // @ts-expect-error plan is a string there and a number here
-    const numeric: AuthDB<{ plan: "number" }> = stringly
-    expectTypeOf(numeric).toMatchTypeOf<AuthDB<{ plan: "number" }>>()
+    const numeric: AuthDatabase<{ plan: "number" }> = stringly
+    expectTypeOf(numeric).toMatchTypeOf<AuthDatabase<{ plan: "number" }>>()
   })
 })
 
@@ -170,7 +170,7 @@ describe("createAuth infers the schema and types everything it returns", () => {
   it("from user.additionalFields, with the adapter checked against it rather than inferred from it", async () => {
     const server = createAuth({
       ...base,
-      db: createMemoryDb(),
+      database: createMemoryDatabase(),
       user: { additionalFields }
     })
 
@@ -185,23 +185,23 @@ describe("createAuth infers the schema and types everything it returns", () => {
   })
 
   it("refuses an adapter typed against a different schema", () => {
-    const typed: AuthDB<{ plan: "number" }> = createMemoryDb()
+    const typed: AuthDatabase<{ plan: "number" }> = createMemoryDatabase()
 
     createAuth({
       ...base,
       // @ts-expect-error the adapter says plan is a number; the schema says string
-      db: typed,
+      database: typed,
       user: { additionalFields: { plan: "string" } }
     })
   })
 
   it("accepts a bare adapter into a server that declares fields", () => {
-    const bare: AuthDB = createMemoryDb()
-    createAuth({ ...base, db: bare, user: { additionalFields } })
+    const bare: AuthDatabase = createMemoryDatabase()
+    createAuth({ ...base, database: bare, user: { additionalFields } })
   })
 
   it("stays open when nothing is declared", async () => {
-    const server = createAuth({ ...base, db: createMemoryDb() })
+    const server = createAuth({ ...base, database: createMemoryDatabase() })
     const user = await server.updateUser({
       headers: new Headers(),
       anything: 1

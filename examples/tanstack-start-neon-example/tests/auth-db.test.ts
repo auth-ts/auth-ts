@@ -1,10 +1,10 @@
-import { authDBChecks } from "@auth-ts/core/testing"
+import { authDatabaseChecks } from "@auth-ts/core/testing"
 import { describe, it } from "vitest"
-import { authDB } from "../src/lib/auth-db"
+import { authDatabase } from "../src/lib/auth-database"
 
 // The file people copy, held to the contract it claims to implement.
-describe("authDB", () => {
-  for (const check of authDBChecks) {
-    it(check.name, () => check.run(authDB))
+describe("authDatabase", () => {
+  for (const check of authDatabaseChecks) {
+    it(check.name, () => check.run(authDatabase))
   }
 })

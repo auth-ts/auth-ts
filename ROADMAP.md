@@ -193,15 +193,15 @@ has to do the things that are easy to skip:
 
 ### A conformance suite for the four functions
 
-**Shipped.** `authDBChecks` in `@auth-ts/core/testing` is the contract as a
+**Shipped.** `authDatabaseChecks` in `@auth-ts/core/testing` is the contract as a
 list of checks, each `{ name, run(db) }`, throwing on failure so it fits any
 runner without dragging a test framework into the package's dependencies:
 
 ```ts
-import { authDBChecks } from "@auth-ts/core/testing"
+import { authDatabaseChecks } from "@auth-ts/core/testing"
 
-for (const check of authDBChecks) {
-  it(check.name, () => check.run(authDB)) // your four functions, your database
+for (const check of authDatabaseChecks) {
+  it(check.name, () => check.run(authDatabase)) // your four functions, your database
 }
 ```
 
@@ -209,18 +209,18 @@ Every check tags its rows and cleans up after itself, so it runs against a real
 database — which is the point, since the two things most likely to be wrong are
 whether the unique constraints exist and whether `delete` returns what it
 removed, and neither is observable against a mock. It deviates from the earlier
-`testAuthDB(() => authDB)` sketch for that reason: a function that registers
+`testAuthDB(() => authDatabase)` sketch for that reason: a function that registers
 tests has to import a runner.
 
 Verified against the reference application's Neon database, every check
-passing, and the library's own suite runs them against `createMemoryDb` plus a
+passing, and the library's own suite runs them against `createMemoryDatabase` plus a
 set of deliberately broken stores — a `delete` that returns nothing, a `where`
 that matches on any column rather than all of them, a `select` that ignores
 `limit`, a `delete` that ignores ranges — so the checks are known to fail when
 the contract is broken, not merely to pass when it is not.
 
 They also run in CI, from the reference application, against its own
-`src/lib/auth-db.ts` — the file people copy — so it stays proven rather than
+`src/lib/auth-database.ts` — the file people copy — so it stays proven rather than
 believed. No connection string: PGlite is Postgres 18 compiled to WebAssembly,
 running in the test process, and the schema is real enough to matter because the
 DDL is generated from `schema.ts` rather than written out again. The unique
@@ -233,7 +233,7 @@ Two things that setup does not cover, worth saying rather than implying:
   schema and the four functions, not the transport.
 - **Row-level security.** The auth tables are created without the policies, and
   `todos` is left out entirely. RLS is what the Data API enforces against
-  application queries, and nothing in `AuthDB` depends on it.
+  application queries, and nothing in `AuthDatabase` depends on it.
 
 One limit is stated in the docs and worth repeating: a duplicate-insert check
 proves a constraint exists by inserting twice in sequence. The failure it
@@ -406,7 +406,7 @@ are the same code an adapter would generate, except you can read them and they
 are already written against your own tables.
 
 **The database contract is the product.** That is where the semver discipline
-goes, and why `authDBChecks` ships beside it: a contract you are asked to
+goes, and why `authDatabaseChecks` ships beside it: a contract you are asked to
 implement yourself owes you a way to check your work.
 
 ### Rotating the refresh token on every use

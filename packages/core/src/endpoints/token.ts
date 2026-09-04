@@ -1,4 +1,4 @@
-import type { AuthUser } from "../core/auth-db"
+import type { AuthUser } from "../core/auth-database"
 import { defineEndpoint } from "../http/define-endpoint"
 import { sha256Hex } from "../lib/hash"
 import { selectOne } from "../lib/select-one"

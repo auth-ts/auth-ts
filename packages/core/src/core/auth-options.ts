@@ -5,11 +5,11 @@ import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
 import type {
   AdditionalFieldsSchema,
-  AuthDB,
+  AuthDatabase,
   AuthSession,
   AuthTable,
   AuthUser
-} from "./auth-db"
+} from "./auth-database"
 
 // The shapes `createAuth` accepts — and nothing else. Options are the
 // partial, human-written input; what they resolve to is `AuthConfig`, in
@@ -307,14 +307,14 @@ export interface RateLimitOptions {
  * Options accepted by `createAuth`.
  *
  * `S` is inferred from `user.additionalFields` and is what every user the server
- * hands back is typed with; `db` is checked against it rather than inferred
+ * hands back is typed with; `database` is checked against it rather than inferred
  * from it, so the schema you declare is the one source of truth.
  */
 export interface AuthOptions<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > {
   /** The four table functions that read and write your database. */
-  db: AuthDB<NoInfer<S>>
+  database: AuthDatabase<NoInfer<S>>
   /**
    * Generates the primary key for a row core is about to insert.
    *

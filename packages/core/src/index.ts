@@ -7,7 +7,8 @@ export type {
   AdditionalFieldValue,
   AuthAttempt,
   AuthCondition,
-  AuthDB,
+  AuthDatabase,
+  AuthDatabaseOperator,
   AuthDeleteInput,
   AuthDirection,
   AuthIdentity,
@@ -26,8 +27,8 @@ export type {
   CoreUserFields,
   UserType,
   VerificationPurpose
-} from "./core/auth-db"
-export { authTables, defineAuthDB } from "./core/auth-db"
+} from "./core/auth-database"
+export { authTables, defineAuthDatabase } from "./core/auth-database"
 export type {
   AuthOptions,
   CookieOptions,

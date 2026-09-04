@@ -1,6 +1,6 @@
 import type { JWK, JWTVerifyGetKey } from "jose"
 import { createLocalJWKSet, errors, jwtVerify } from "jose"
-import type { UserType } from "../core/auth-db"
+import type { UserType } from "../core/auth-database"
 import type { JwtAlgorithm } from "./import-signing-key"
 
 /**

@@ -1,5 +1,5 @@
 import { SignJWT } from "jose"
-import type { UserType } from "../core/auth-db"
+import type { UserType } from "../core/auth-database"
 import type { Duration } from "../lib/parse-duration"
 import { parseDurationSeconds } from "../lib/parse-duration"
 import type { JwtAlgorithm } from "./import-signing-key"

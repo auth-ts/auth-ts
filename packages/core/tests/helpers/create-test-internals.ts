@@ -3,8 +3,8 @@ import type { AuthInternals } from "../../src/core/auth-internals"
 import { createAuthInternals } from "../../src/core/auth-internals"
 import type { AuthOptions } from "../../src/core/auth-options"
 import type { LogLevel } from "../../src/lib/logger"
-import type { MemoryDb } from "../../src/lib/memory-db"
-import { createMemoryDb } from "../../src/lib/memory-db"
+import type { MemoryDatabase } from "../../src/lib/memory-database"
+import { createMemoryDatabase } from "../../src/lib/memory-database"
 import { generateTestKeys } from "./generate-test-keys"
 
 /** A code captured from an email or SMS send, so tests never guess at one. */
@@ -20,7 +20,7 @@ export interface CapturedCode {
 /** A server wired to in-memory storage, with everything a test needs to inspect. */
 export interface TestInternals {
   internals: AuthInternals
-  db: MemoryDb
+  db: MemoryDatabase
   /** Every code "delivered", in order. */
   sentCodes: CapturedCode[]
   /** Every call made to the log sink. */
@@ -43,20 +43,21 @@ function testKeys() {
 }
 
 /**
- * Builds internals backed by {@link createMemoryDb}, capturing sends and logs.
+ * Builds internals backed by {@link createMemoryDatabase}, capturing sends and logs.
  *
- * @param overrides - Any server option; `db`, `email`, and the key default here.
+ * @param overrides - Any server option; `database`, `email`, and the key default here.
  */
 export async function createTestInternals(
   overrides: Partial<AuthOptions> & { logLevel?: LogLevel } = {}
 ): Promise<TestInternals> {
   const { privateKeyPem } = await testKeys()
-  const db = (overrides.db as MemoryDb | undefined) ?? createMemoryDb()
+  const db =
+    (overrides.database as MemoryDatabase | undefined) ?? createMemoryDatabase()
   const sentCodes: CapturedCode[] = []
   const logCalls: TestInternals["logCalls"] = []
 
   const config = resolveAuthConfig({
-    db,
+    database: db,
     email: {
       sendCode: ({ email, code, locale, purpose, headers }) => {
         sentCodes.push({

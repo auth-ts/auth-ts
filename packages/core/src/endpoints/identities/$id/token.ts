@@ -1,4 +1,7 @@
-import type { AuthIdentity, AuthIdentitySecret } from "../../../core/auth-db"
+import type {
+  AuthIdentity,
+  AuthIdentitySecret
+} from "../../../core/auth-database"
 import type { AuthInternals } from "../../../core/auth-internals"
 import {
   AuthApiError,

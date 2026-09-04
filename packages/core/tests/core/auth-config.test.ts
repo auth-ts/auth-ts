@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import type { AdditionalFieldsSchema } from "../../src/core/auth-db"
+import type { AdditionalFieldsSchema } from "../../src/core/auth-database"
 import { createAuth } from "../../src/core/create-auth"
 import { AuthConfigError } from "../../src/http/auth-config-error"
-import { createMemoryDb } from "../../src/lib/memory-db"
+import { createMemoryDatabase } from "../../src/lib/memory-database"
 import { generateTestKeys } from "../helpers/generate-test-keys"
 
 const keys = await generateTestKeys("RS256")
@@ -39,7 +39,7 @@ afterEach(() => {
 
 const previousEnvironment: Record<string, string | undefined> = {}
 const baseOptions = () => ({
-  db: createMemoryDb(),
+  database: createMemoryDatabase(),
   email: { sendCode: () => {} },
   jwt: { privateKey: keys.privateKeyPem },
   secret: "server-secret-long-enough-to-pass-the-floor"

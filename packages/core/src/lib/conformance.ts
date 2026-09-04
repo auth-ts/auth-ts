@@ -1,16 +1,16 @@
 import type {
   AdditionalFieldsSchema,
-  AuthDB,
+  AuthDatabase,
   AuthInsert,
   AuthRow,
   AuthTable,
   AuthWhere
-} from "../core/auth-db"
+} from "../core/auth-database"
 
 /** One requirement of the contract, and a way to find out whether it holds. */
-export interface AuthDBCheck {
+export interface AuthDatabaseCheck {
   name: string
-  run(db: AuthDB): Promise<void>
+  run(db: AuthDatabase): Promise<void>
 }
 
 /** Fails the check, saying what the contract asked for and why it matters. */
@@ -20,7 +20,7 @@ function expect(condition: unknown, message: string): asserts condition {
 
 /** Inserts, and holds the store to its side of the bargain: it returns the row. */
 async function create<T extends AuthTable>(
-  db: AuthDB,
+  db: AuthDatabase,
   table: T,
   values: AuthInsert<AdditionalFieldsSchema, T>
 ): Promise<AuthRow<AdditionalFieldsSchema, T>> {
@@ -82,17 +82,17 @@ function ordered(rows: { expiresAt: Date }[], times: number[]) {
  * rather than dragging a test framework into your dependencies:
  *
  * ```ts
- * import { authDBChecks } from "@auth-ts/core/testing"
- * import { authDB } from "./auth-db"
+ * import { authDatabaseChecks } from "@auth-ts/core/testing"
+ * import { authDatabase } from "./auth-database"
  *
- * describe("authDB", () => {
- *   for (const check of authDBChecks) {
- *     it(check.name, () => check.run(authDB))
+ * describe("authDatabase", () => {
+ *   for (const check of authDatabaseChecks) {
+ *     it(check.name, () => check.run(authDatabase))
  *   }
  * })
  * ```
  */
-export const authDBChecks: AuthDBCheck[] = [
+export const authDatabaseChecks: AuthDatabaseCheck[] = [
   {
     name: "insert returns the row as stored, with an id",
     async run(db) {

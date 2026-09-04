@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import type { MemoryDb } from "../../src/lib/memory-db"
-import { createMemoryDb } from "../../src/lib/memory-db"
+import type { MemoryDatabase } from "../../src/lib/memory-database"
+import { createMemoryDatabase } from "../../src/lib/memory-database"
 import { required } from "../helpers/required"
 
-let db: MemoryDb
+let db: MemoryDatabase
 
 beforeEach(() => {
-  db = createMemoryDb()
+  db = createMemoryDatabase()
 })
 
 const user = async (fields: Record<string, unknown> = {}) => {

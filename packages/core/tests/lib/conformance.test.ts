@@ -1,31 +1,31 @@
 import { describe, expect, it } from "vitest"
-import type { AuthDB } from "../../src/core/auth-db"
-import { createMemoryDb } from "../../src/lib/memory-db"
-import { authDBChecks } from "../../src/testing"
+import type { AuthDatabase } from "../../src/core/auth-database"
+import { createMemoryDatabase } from "../../src/lib/memory-database"
+import { authDatabaseChecks } from "../../src/testing"
 
 /** Which checks a store fails, in the order they run. */
-async function failures(db: AuthDB) {
+async function failures(db: AuthDatabase) {
   const failed: string[] = []
-  for (const check of authDBChecks) {
+  for (const check of authDatabaseChecks) {
     await check.run(db).catch(() => failed.push(check.name))
   }
   return failed
 }
 
 /** The reference implementation, with one part of the contract broken. */
-function broken(patch: Partial<AuthDB>): AuthDB {
-  return { ...createMemoryDb(), ...patch }
+function broken(patch: Partial<AuthDatabase>): AuthDatabase {
+  return { ...createMemoryDatabase(), ...patch }
 }
 
-describe("authDBChecks", () => {
+describe("authDatabaseChecks", () => {
   // The reference implementation has to pass the checks it ships beside, or
   // they are measuring something other than the contract.
-  for (const check of authDBChecks) {
-    it(`passes: ${check.name}`, () => check.run(createMemoryDb()))
+  for (const check of authDatabaseChecks) {
+    it(`passes: ${check.name}`, () => check.run(createMemoryDatabase()))
   }
 
   it("catches a delete that does not return what it removed", async () => {
-    const db = createMemoryDb()
+    const db = createMemoryDatabase()
     const failed = await failures(
       broken({
         delete: async (input) => {
@@ -41,7 +41,7 @@ describe("authDBChecks", () => {
   })
 
   it("catches a where that matches on any column instead of all of them", async () => {
-    const db = createMemoryDb()
+    const db = createMemoryDatabase()
     const failed = await failures(
       broken({
         select: (input) => {
@@ -58,7 +58,7 @@ describe("authDBChecks", () => {
   })
 
   it("catches a select that ignores limit", async () => {
-    const db = createMemoryDb()
+    const db = createMemoryDatabase()
     const failed = await failures(
       broken({
         select: (input) => db.select({ ...input, limit: 100 })
@@ -71,7 +71,7 @@ describe("authDBChecks", () => {
   })
 
   it("catches a delete that ignores a range and removes every match", async () => {
-    const db = createMemoryDb()
+    const db = createMemoryDatabase()
     const failed = await failures(
       broken({
         delete: (input) => {

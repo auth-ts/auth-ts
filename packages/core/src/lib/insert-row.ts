@@ -3,7 +3,7 @@ import type {
   AuthInsert,
   AuthRow,
   AuthTable
-} from "../core/auth-db"
+} from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 
 /**

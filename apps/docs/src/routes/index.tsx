@@ -57,8 +57,8 @@ const FEATURES = [
 const SERVER_SNIPPET = `import { createAuth } from "@auth-ts/core"
 
 export const auth = createAuth({
-  db: {
-    /* four functions — see the AuthDB reference */
+  database: {
+    /* four functions — see the AuthDatabase reference */
   },
   email: {
     sendCode: async ({ email, code }) => {

@@ -28,6 +28,6 @@ export type {
   SignInResult,
   SignInWithCodeInput
 } from "./client/methods/sign-in"
-export type { AuthUser } from "./core/auth-db"
+export type { AuthUser } from "./core/auth-database"
 export type { TokenResult } from "./endpoints/token"
 export type { AuthErrorCode } from "./http/error-response"

@@ -1,4 +1,4 @@
-import type { AuthVerification } from "../core/auth-db"
+import type { AuthVerification } from "../core/auth-database"
 import type { Duration } from "../lib/parse-duration"
 import { parseDuration } from "../lib/parse-duration"
 

@@ -14,7 +14,7 @@ bun add @auth-ts/core
 import { createAuth } from "@auth-ts/core"
 
 export const auth = createAuth({
-  db: {
+  database: {
     /* select, insert, update, delete — written against your own tables */
   },
   email: { sendCode: async ({ email, code }) => {} }
@@ -30,14 +30,14 @@ Check your own four functions against the contract — point it at the database
 you actually use, since each check cleans up after itself:
 
 ```ts
-import { authDBChecks } from "@auth-ts/core/testing"
+import { authDatabaseChecks } from "@auth-ts/core/testing"
 
-for (const check of authDBChecks) {
-  it(check.name, () => check.run(authDB))
+for (const check of authDatabaseChecks) {
+  it(check.name, () => check.run(authDatabase))
 }
 ```
 
-`createMemoryDb` is exported from the same entry, for testing the code above
-`AuthDB` rather than `AuthDB` itself.
+`createMemoryDatabase` is exported from the same entry, for testing the code above
+`AuthDatabase` rather than `AuthDatabase` itself.
 
 Full documentation: [authts.dev](https://authts.dev)

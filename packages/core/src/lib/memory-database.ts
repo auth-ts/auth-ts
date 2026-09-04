@@ -1,15 +1,15 @@
 import type {
   AdditionalFieldsSchema,
-  AuthDB,
+  AuthDatabase,
   AuthDirection,
   AuthRow,
   AuthSession,
   AuthTable,
   AuthUser
-} from "../core/auth-db"
+} from "../core/auth-database"
 
-/** An in-memory {@link AuthDB} plus a few helpers for inspecting it in tests. */
-export interface MemoryDb extends AuthDB {
+/** An in-memory {@link AuthDatabase} plus a few helpers for inspecting it in tests. */
+export interface MemoryDatabase extends AuthDatabase {
   /** Every stored row of a table, in insertion order. */
   rows<T extends AuthTable>(table: T): AuthRow<AdditionalFieldsSchema, T>[]
   /** Every stored user, in insertion order. */
@@ -62,7 +62,7 @@ function compare(left: unknown, right: unknown) {
  * matching, and the uniqueness the contract requires. Everything that used to
  * be easy to get wrong in an implementation now lives in core, tested once.
  */
-export function createMemoryDb(): MemoryDb {
+export function createMemoryDatabase(): MemoryDatabase {
   const tables = new Map<AuthTable, Map<string, StoredRow>>()
 
   const tableOf = (table: AuthTable) => {
@@ -175,7 +175,7 @@ export function createMemoryDb(): MemoryDb {
       for (const row of removed) tableOf(table).delete(row.id)
 
       // The one cascade the contract asks a real database for, honoured here so
-      // `authDBChecks` runs against this store the way it runs against yours.
+      // `authDatabaseChecks` runs against this store the way it runs against yours.
       if (table === "identities") {
         for (const identity of removed) {
           for (const secret of find("identitySecrets", {

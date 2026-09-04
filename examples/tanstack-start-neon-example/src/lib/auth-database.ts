@@ -1,6 +1,11 @@
-import type { AuthOrderBy, AuthTable, AuthWhere } from "@auth-ts/core"
-import { defineAuthDB } from "@auth-ts/core"
-import { and, asc, desc, eq, getColumns, gt, lt } from "drizzle-orm"
+import type {
+  AuthDatabaseOperator,
+  AuthOrderBy,
+  AuthTable,
+  AuthWhere
+} from "@auth-ts/core"
+import { defineAuthDatabase } from "@auth-ts/core"
+import { and, getColumns, operators, orderByOperators } from "drizzle-orm"
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core"
 
 import { db } from "../db/db"
@@ -26,11 +31,11 @@ const buildWhere = (table: AuthTable, where: AuthWhere) => {
   const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
 
   return and(
-    ...Object.entries(where).flatMap(([name, condition]) => [
-      "eq" in condition ? eq(columns[name], condition.eq) : undefined,
-      "lt" in condition ? lt(columns[name], condition.lt) : undefined,
-      "gt" in condition ? gt(columns[name], condition.gt) : undefined
-    ])
+    ...Object.entries(where).flatMap(([name, condition]) =>
+      Object.entries(condition).map(([operator, value]) =>
+        operators[operator as AuthDatabaseOperator](columns[name], value)
+      )
+    )
   )
 }
 
@@ -38,11 +43,11 @@ const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
   const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
 
   return Object.entries(orderBy).map(([name, direction]) =>
-    (direction === "asc" ? asc : desc)(columns[name])
+    orderByOperators[direction](columns[name])
   )
 }
 
-export const authDB = defineAuthDB({
+export const authDatabase = defineAuthDatabase({
   select: ({ table, where, limit, orderBy }) =>
     db
       .select()

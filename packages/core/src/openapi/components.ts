@@ -1,4 +1,4 @@
-import type { CoreUserFields } from "../core/auth-db"
+import type { CoreUserFields } from "../core/auth-database"
 import type { ProviderTokenResult } from "../endpoints/identities/$id/token"
 import type { TokenResult } from "../endpoints/token"
 import type { AuthErrorBody } from "../http/error-response"

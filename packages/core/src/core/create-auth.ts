@@ -19,7 +19,7 @@ import {
 } from "../session/resolve-session"
 import type { AuthConfig } from "./auth-config"
 import { resolveAuthConfig } from "./auth-config"
-import type { AdditionalFieldsSchema, AuthUser } from "./auth-db"
+import type { AdditionalFieldsSchema, AuthUser } from "./auth-database"
 import type { AuthInternals } from "./auth-internals"
 import { createAuthInternals } from "./auth-internals"
 import type { AuthOptions } from "./auth-options"

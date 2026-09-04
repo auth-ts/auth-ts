@@ -43,8 +43,8 @@ verification-code HMAC, and they have different blast radiuses.
 import { createAuth } from "@auth-ts/core"
 
 export const auth = createAuth({
-  db: {
-    /* select, insert, update, delete — see the AuthDB reference */
+  database: {
+    /* select, insert, update, delete — see the AuthDatabase reference */
   },
   email: {
     sendCode: async ({ email, code }) => {

@@ -1,5 +1,5 @@
 import { requireOwnedClaimsAbsent } from "../core/auth-config"
-import type { AuthSession, AuthUser } from "../core/auth-db"
+import type { AuthSession, AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { signToken } from "../jwt/sign-token"
 import { randomBytesBase64url } from "../lib/generate-random"

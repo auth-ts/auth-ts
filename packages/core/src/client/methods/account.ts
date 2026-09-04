@@ -1,4 +1,4 @@
-import type { AuthUser } from "../../core/auth-db"
+import type { AuthUser } from "../../core/auth-database"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
 import { reviveUser } from "../lib/revive-user"

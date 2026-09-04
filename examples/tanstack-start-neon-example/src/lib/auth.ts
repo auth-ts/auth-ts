@@ -1,9 +1,9 @@
 import { waitUntil } from "cloudflare:workers"
 import { createAuth } from "@auth-ts/core"
-import { authDB } from "./auth-db"
+import { authDatabase } from "./auth-database"
 
 export const auth = createAuth({
-  db: authDB,
+  database: authDatabase,
   waitUntil,
   email: {
     sendCode: ({ email, code, purpose }) => {

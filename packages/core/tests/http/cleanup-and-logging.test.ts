@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import type { AuthCondition } from "../../src/core/auth-db"
+import type { AuthCondition } from "../../src/core/auth-database"
 import { createTestServer } from "../helpers/create-test-server"
 import {
   readRefreshCookie,

@@ -1,4 +1,4 @@
-import type { VerificationPurpose } from "../core/auth-db"
+import type { VerificationPurpose } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"

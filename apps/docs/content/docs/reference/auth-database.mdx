@@ -1,5 +1,5 @@
 ---
-title: AuthDB
+title: AuthDatabase
 description: The four functions that connect this library to your database.
 ---
 
@@ -19,7 +19,7 @@ spoofable authentication bypass, and non-HTTP callers — tests, migrations, the
 in-memory fixture — drive this contract directly. For multi-tenancy, close over
 the tenant when you construct the server.
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthDB" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthDatabase" />
 
 ## The tables
 
@@ -60,7 +60,7 @@ token sent to a provider.
 
 **`identitySecrets` must cascade from `identities`.** Disconnecting a provider
 deletes the identity, and an orphaned row here is a stored credential nothing
-points at. `authDBChecks` proves the cascade against your own database.
+points at. `authDatabaseChecks` proves the cascade against your own database.
 
 See [the Neon guide](/docs/guides/neon) for the SQL, and
 `examples/tanstack-start-neon-example/tests/privileges.test.ts` for the rule as
@@ -199,7 +199,7 @@ regardless — nothing in front of this server can enforce it.
 
 ## Writing your implementation
 
-Wrap it in `defineAuthDB` and write it either of two ways. Both are free of
+Wrap it in `defineAuthDatabase` and write it either of two ways. Both are free of
 casts, and the helper is what makes that true: a union-typed implementation
 cannot be *proven* to satisfy a generic signature, only asserted — the same
 reason an overload has an implementation signature. The helper holds that one
@@ -209,7 +209,7 @@ A **table dictionary** is one query per function, whatever the table. This is
 the whole read path from the reference application:
 
 ```ts
-import { defineAuthDB } from "@auth-ts/core"
+import { defineAuthDatabase } from "@auth-ts/core"
 
 import { attempts, identities, identitySecrets, sessions, users, verifications } from "./db/schema"
 
@@ -227,22 +227,22 @@ const authSchema = {
 const buildWhere = (table: AuthTable, where: AuthWhere) => {
   const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
   return and(
-    ...Object.entries(where).flatMap(([name, condition]) => [
-      "eq" in condition ? eq(columns[name], condition.eq) : undefined,
-      "lt" in condition ? lt(columns[name], condition.lt) : undefined,
-      "gt" in condition ? gt(columns[name], condition.gt) : undefined
-    ])
+    ...Object.entries(where).flatMap(([name, condition]) =>
+      Object.entries(condition).map(([operator, value]) =>
+        operators[operator as AuthDatabaseOperator](columns[name], value)
+      )
+    )
   )
 }
 
 const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
   const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
   return Object.entries(orderBy).map(([name, direction]) =>
-    (direction === "asc" ? asc : desc)(columns[name])
+    orderByOperators[direction](columns[name])
   )
 }
 
-export const authDB = defineAuthDB({
+export const authDatabase = defineAuthDatabase({
   select: ({ table, where, limit, orderBy }) =>
     db
       .select()
@@ -277,7 +277,7 @@ A **`switch` per table** is the shape to reach for with raw SQL, where each
 table's query is genuinely different. The input narrows with the table name:
 
 ```ts
-export const authDB = defineAuthDB({
+export const authDatabase = defineAuthDatabase({
   async select({ table, where, limit }) {
     switch (table) {
       // `where` is AuthWhere<S, "users"> in this branch,
@@ -301,19 +301,19 @@ export const authDB = defineAuthDB({
 
 ## Typing your implementation
 
-`AuthDB` takes your declared additional fields as a type parameter. Declare the
+`AuthDatabase` takes your declared additional fields as a type parameter. Declare the
 schema once, and both sides agree:
 
 ```ts
 import type { AdditionalFieldsSchema } from "@auth-ts/core"
-import { defineAuthDB } from "@auth-ts/core"
+import { defineAuthDatabase } from "@auth-ts/core"
 
 export const additionalFields = {
   plan: "string",
   seats: "number"
 } satisfies AdditionalFieldsSchema
 
-export const authDB = defineAuthDB<typeof additionalFields>({
+export const authDatabase = defineAuthDatabase<typeof additionalFields>({
   async insert({ table, values }) {
     switch (table) {
       case "users":
@@ -326,11 +326,11 @@ export const authDB = defineAuthDB<typeof additionalFields>({
   // ...
 })
 
-createAuth({ db: authDB, user: { additionalFields } })
+createAuth({ database: authDatabase, user: { additionalFields } })
 ```
 
 Your declared fields ride flat on the `users` row, beside the core ones, so
-`values(row)` is the whole insert. The bare `AuthDB` is accepted by any server:
+`values(row)` is the whole insert. The bare `AuthDatabase` is accepted by any server:
 it sees those fields as an open map, which is what a `select *` returns anyway.
 A server checks a typed implementation against the schema it was given rather
 than inferring the schema from it, so `user.additionalFields` stays the one
@@ -341,15 +341,15 @@ source of truth.
 The core fields of a user. Your declared additional fields sit beside them on
 `AuthUser`, typed from the schema you declare.
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="CoreUserFields" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="CoreUserFields" />
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthSession" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthSession" />
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthVerification" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthVerification" />
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthAttempt" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthAttempt" />
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-db.ts" name="AuthIdentity" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthIdentity" />
 
 ## Testing your implementation
 
@@ -357,12 +357,12 @@ The core fields of a user. Your declared additional fields sit beside them on
 you can run against your own four functions:
 
 ```ts
-import { authDBChecks } from "@auth-ts/core/testing"
-import { authDB } from "./auth-db"
+import { authDatabaseChecks } from "@auth-ts/core/testing"
+import { authDatabase } from "./auth-database"
 
-describe("authDB", () => {
-  for (const check of authDBChecks) {
-    it(check.name, () => check.run(authDB))
+describe("authDatabase", () => {
+  for (const check of authDatabaseChecks) {
+    it(check.name, () => check.run(authDatabase))
   }
 })
 ```
@@ -422,11 +422,11 @@ reason to run the checks against your real database at least once as well.
 The store the library's own suite runs against is public too:
 
 ```ts
-import { createMemoryDb } from "@auth-ts/core/testing"
+import { createMemoryDatabase } from "@auth-ts/core/testing"
 
-const db = createMemoryDb()
+const db = createMemoryDatabase()
 ```
 
 It enforces the same unique constraints, so it is a fixture for testing code
-that sits *above* `AuthDB` rather than a substitute for running the checks
+that sits *above* `AuthDatabase` rather than a substitute for running the checks
 against your database.

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { hmacSha256Hex } from "../../src/lib/hash"
-import type { MemoryDb } from "../../src/lib/memory-db"
+import type { MemoryDatabase } from "../../src/lib/memory-database"
 import { consumeVerificationCode } from "../../src/verification-code/consume-verification-code"
 import { resolveCodeIdentifier } from "../../src/verification-code/resolve-code-identifier"
 import { sendVerificationCode } from "../../src/verification-code/send-verification-code"
@@ -11,11 +11,11 @@ import { selectRows } from "../helpers/rows"
 const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 
 /** Every code stored for the identifier. A send replaces them, so normally one. */
-const storedCodes = (db: MemoryDb) =>
+const storedCodes = (db: MemoryDatabase) =>
   selectRows(db, "verifications", { identifier: { eq: emailIdentifier.value } })
 
 /** The row a verify would read: the newest by expiry, exactly as core reads it. */
-const liveCode = async (db: MemoryDb) => {
+const liveCode = async (db: MemoryDatabase) => {
   const [row] = await db.select({
     table: "verifications",
     where: { identifier: { eq: emailIdentifier.value } },
@@ -33,7 +33,7 @@ const liveCode = async (db: MemoryDb) => {
  * counter, so the count is a row count — and a window key carries the aligned
  * window start as a suffix, which is why this matches on a prefix.
  */
-const countAttempts = async (db: MemoryDb, prefix: string) => {
+const countAttempts = async (db: MemoryDatabase, prefix: string) => {
   const rows = await selectRows(db, "attempts")
 
   return rows.filter((row) => row.key.startsWith(prefix)).length

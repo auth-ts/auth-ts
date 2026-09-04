@@ -5,7 +5,7 @@ import { createVerificationKeySet } from "../jwt/verify-token"
 import type { LeveledLogger } from "../lib/logger"
 import { createLogger } from "../lib/logger"
 import type { AuthConfig } from "./auth-config"
-import type { AuthDB } from "./auth-db"
+import type { AuthDatabase } from "./auth-database"
 
 /** Key material, imported once on first use. */
 export interface KeyMaterial extends SigningKeyMaterial {
@@ -29,7 +29,7 @@ export interface KeyMaterial extends SigningKeyMaterial {
 export interface AuthInternals {
   /** The resolved configuration — options after defaults and validation. */
   config: AuthConfig
-  db: AuthDB
+  db: AuthDatabase
   log: LeveledLogger
   /**
    * Logs a warning the first time each `key` is seen, and never again.

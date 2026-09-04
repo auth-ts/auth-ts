@@ -4,7 +4,7 @@ import type {
   AuthRow,
   AuthTable,
   AuthWhere
-} from "../core/auth-db"
+} from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 
 /**

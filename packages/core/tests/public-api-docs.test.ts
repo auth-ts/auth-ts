@@ -52,13 +52,16 @@ describe("public API documentation", () => {
   })
 
   it("documents every field of the database contract, which consumers implement by hand", () => {
-    const source = readFileSync(join(sourceRoot, "core/auth-db.ts"), "utf8")
-    // Stop at `defineAuthDB`: its implementation object restates the same four
+    const source = readFileSync(
+      join(sourceRoot, "core/auth-database.ts"),
+      "utf8"
+    )
+    // Stop at `defineAuthDatabase`: its implementation object restates the same four
     // functions, documented once above rather than again on each line.
     const contract = sliceBetweenMarkers(
       source,
-      "export interface AuthDB<",
-      "export function defineAuthDB<"
+      "export interface AuthDatabase<",
+      "export function defineAuthDatabase<"
     )
     const lines = contract.split("\n")
 
@@ -157,22 +160,30 @@ describe("public API documentation", () => {
   })
 
   it("fails loudly when a sentinel is renamed, instead of scanning nothing", () => {
-    const source = "export interface AuthDB {\n  getUser(): void\n}\n"
+    const source = "export interface AuthDatabase {\n  getUser(): void\n}\n"
 
     // Without the guard this returns "\n" and every check below it passes.
     expect(() =>
       sliceBetweenMarkers(source, "export interface Renamed {")
     ).toThrow(/Renamed/)
     expect(() =>
-      sliceBetweenMarkers(source, "export interface AuthDB {", "/** reworded")
+      sliceBetweenMarkers(
+        source,
+        "export interface AuthDatabase {",
+        "/** reworded"
+      )
     ).toThrow(/reworded/)
 
     // And the happy path still returns the block it was asked for.
-    expect(sliceBetweenMarkers(source, "export interface AuthDB {")).toContain(
-      "getUser"
-    )
     expect(
-      sliceBetweenMarkers(source, "export interface AuthDB {", "  getUser")
-    ).toBe("export interface AuthDB {\n")
+      sliceBetweenMarkers(source, "export interface AuthDatabase {")
+    ).toContain("getUser")
+    expect(
+      sliceBetweenMarkers(
+        source,
+        "export interface AuthDatabase {",
+        "  getUser"
+      )
+    ).toBe("export interface AuthDatabase {\n")
   })
 })

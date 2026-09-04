@@ -1,15 +1,15 @@
 import type { AuthOptions } from "../../src/core/auth-options"
 import type { Auth } from "../../src/core/create-auth"
 import { createAuth } from "../../src/core/create-auth"
-import type { MemoryDb } from "../../src/lib/memory-db"
-import { createMemoryDb } from "../../src/lib/memory-db"
+import type { MemoryDatabase } from "../../src/lib/memory-database"
+import { createMemoryDatabase } from "../../src/lib/memory-database"
 import type { CapturedCode } from "./create-test-internals"
 import { generateTestKeys } from "./generate-test-keys"
 
 /** A real server wired to in-memory storage, with sends and logs captured. */
 export interface TestServer {
   auth: Auth
-  db: MemoryDb
+  db: MemoryDatabase
   sentCodes: CapturedCode[]
   logCalls: Array<{
     level: string
@@ -37,12 +37,13 @@ export async function createTestServer(
   overrides: Partial<AuthOptions> = {}
 ): Promise<TestServer> {
   const { privateKeyPem } = await testKeys()
-  const db = (overrides.db as MemoryDb | undefined) ?? createMemoryDb()
+  const db =
+    (overrides.database as MemoryDatabase | undefined) ?? createMemoryDatabase()
   const sentCodes: CapturedCode[] = []
   const logCalls: TestServer["logCalls"] = []
 
   const auth = createAuth({
-    db,
+    database: db,
     email: {
       sendCode: ({ email, code, locale, purpose, headers }) => {
         sentCodes.push({

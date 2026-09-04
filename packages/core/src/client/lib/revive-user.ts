@@ -1,4 +1,4 @@
-import type { AuthUser } from "../../core/auth-db"
+import type { AuthUser } from "../../core/auth-database"
 
 /**
  * Turns a user's timestamps into the `Date`s its type says they are.

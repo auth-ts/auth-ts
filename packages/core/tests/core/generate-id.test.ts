@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { AuthTable } from "../../src/core/auth-db"
+import type { AuthTable } from "../../src/core/auth-database"
 import { createTestServer } from "../helpers/create-test-server"
 import { request } from "../helpers/request"
 import { selectRows } from "../helpers/rows"

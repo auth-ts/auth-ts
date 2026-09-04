@@ -7,7 +7,11 @@ import type { Logger, LogLevel } from "../lib/logger"
 import type { Duration } from "../lib/parse-duration"
 import { parseDuration } from "../lib/parse-duration"
 import { normalizeBasePath } from "../shared/base-path"
-import type { AdditionalFieldsSchema, AuthDB, AuthTable } from "./auth-db"
+import type {
+  AdditionalFieldsSchema,
+  AuthDatabase,
+  AuthTable
+} from "./auth-database"
 import type {
   AuthOptions,
   EmailOptions,
@@ -33,7 +37,7 @@ import type {
  * downstream of construction ever re-derives a default or re-checks a value.
  */
 export interface AuthConfig {
-  db: AuthDB
+  db: AuthDatabase
   generateId?: (table: AuthTable) => string | Promise<string>
   email?: EmailOptions
   sms?: SmsOptions
@@ -382,7 +386,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
   const cookieName = options.cookie?.name ?? "auth-ts.refresh"
 
   return {
-    db: options.db,
+    db: options.database,
     ...(options.generateId ? { generateId: options.generateId } : {}),
     ...(options.email ? { email: options.email } : {}),
     ...(options.sms ? { sms: options.sms } : {}),

@@ -1,4 +1,7 @@
-import type { AuthVerification, VerificationPurpose } from "../core/auth-db"
+import type {
+  AuthVerification,
+  VerificationPurpose
+} from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { countAttempt } from "../http/check-rate-limit"

@@ -27,7 +27,7 @@ export type AdditionalFieldValue<T extends AdditionalFieldType> =
  * Declared fields as they come **out** of your table — each optional and
  * nullable, because nothing guarantees a row has set them.
  *
- * A schema with no statically known keys — the bare `AuthDB`, the client —
+ * A schema with no statically known keys — the bare `AuthDatabase`, the client —
  * declares nothing about the row, so the row is an open map: your columns
  * are there, whatever they are, and TypeScript is not told otherwise.
  */
@@ -203,7 +203,7 @@ export interface AuthIdentity {
  *
  * **This table must cascade from `identities`.** Disconnecting a provider
  * deletes the identity, and an orphaned row here is a stored credential nothing
- * points at. `authDBChecks` proves the cascade against your own database.
+ * points at. `authDatabaseChecks` proves the cascade against your own database.
  */
 export interface AuthIdentitySecret {
   id: string
@@ -266,6 +266,9 @@ export type AuthRow<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
 > = AuthTables<S>[T]
+
+/** The operators a condition may name. */
+export type AuthDatabaseOperator = "eq" | "lt" | "gt"
 
 /**
  * `{ eq }` on any column; `{ lt }`, `{ gt }`, or both on `expiresAt`.
@@ -353,7 +356,7 @@ export type AuthOrderBy<
  *
  * `id` is present only when `generateId` is configured on the server; otherwise
  * it is omitted and your column default (`uuidv7()`, a `$defaultFn`, an
- * identity column) fills it. Either way {@link AuthDB.insert} returns the
+ * identity column) fills it. Either way {@link AuthDatabase.insert} returns the
  * stored row, which is how core learns the id.
  */
 export type AuthInsert<
@@ -363,7 +366,7 @@ export type AuthInsert<
   ? Omit<CoreUserFields, "id"> & { id?: string } & AdditionalFieldsInput<S>
   : Omit<AuthRow<S, T>, "id"> & { id?: string }
 
-/** {@link AuthDB.select}'s input as a union over the tables — see `defineAuthDB`. */
+/** {@link AuthDatabase.select}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthSelectInput<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = {
@@ -375,12 +378,12 @@ export type AuthSelectInput<
   }
 }[AuthTable]
 
-/** {@link AuthDB.insert}'s input as a union over the tables — see `defineAuthDB`. */
+/** {@link AuthDatabase.insert}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthInsertInput<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = { [K in AuthTable]: { table: K; values: AuthInsert<S, K> } }[AuthTable]
 
-/** {@link AuthDB.update}'s input as a union over the tables — see `defineAuthDB`. */
+/** {@link AuthDatabase.update}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthUpdateInput<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = {
@@ -391,7 +394,7 @@ export type AuthUpdateInput<
   }
 }[AuthTable]
 
-/** {@link AuthDB.delete}'s input as a union over the tables — see `defineAuthDB`. */
+/** {@link AuthDatabase.delete}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthDeleteInput<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = { [K in AuthTable]: { table: K; where: AuthWhere<S, K> } }[AuthTable]
@@ -421,7 +424,7 @@ export type AuthDeleteInput<
  * what turns that race into a failed request instead of two accounts for one
  * person. The same holds for `(provider, providerUserId)`.
  *
- * The one concurrency property core requires is that {@link AuthDB.delete} is
+ * The one concurrency property core requires is that {@link AuthDatabase.delete} is
  * atomic and returns what it removed: that is what makes a verification code usable
  * exactly once, since two verifiers can both read the row but only one deletes
  * it.
@@ -433,11 +436,11 @@ export type AuthDeleteInput<
  * the server instead.
  *
  * `S` is your declared `additionalFields`. Type an implementation as
- * `AuthDB<typeof additionalFields>` and every `users` row and write carries them
- * typed; the bare `AuthDB` sees them as an open map of primitives, and any
+ * `AuthDatabase<typeof additionalFields>` and every `users` row and write carries them
+ * typed; the bare `AuthDatabase` sees them as an open map of primitives, and any
  * server accepts it.
  */
-export interface AuthDB<
+export interface AuthDatabase<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > {
   /**
@@ -485,7 +488,7 @@ export interface AuthDB<
    * implementation needs a guard against the empty `SET` that most query
    * builders reject.
    *
-   * Returns the rows it wrote, as {@link AuthDB.delete} does. That is what lets
+   * Returns the rows it wrote, as {@link AuthDatabase.delete} does. That is what lets
    * one statement both find and touch a row: core asks for a session whose
    * `expiresAt` is still ahead, and learns from what comes back whether there
    * was one — rather than reading to find out if it may write, then writing.
@@ -514,7 +517,7 @@ export interface AuthDB<
    *
    * `S` appears only inside generic methods, and TypeScript measures a type
    * parameter used that way as unused — which would let
-   * `AuthDB<{ plan: "string" }>` satisfy `AuthDB<{ plan: "number" }>`. One
+   * `AuthDatabase<{ plan: "string" }>` satisfy `AuthDatabase<{ plan: "number" }>`. One
    * parameter position is enough to make it count. It has to be a method
    * rather than a property, and no `in`/`out` annotation would do instead:
    * both are strict, and what is wanted here is the bivariance a method
@@ -532,13 +535,13 @@ export interface AuthDB<
 /**
  * Types an implementation of this contract, so that yours needs no casts.
  *
- * Core's own calls are precise because {@link AuthDB} is generic, but a generic
+ * Core's own calls are precise because {@link AuthDatabase} is generic, but a generic
  * signature cannot be *proven* by a union-typed implementation, only asserted —
  * the same reason an overload has an implementation signature. This helper
  * holds that assertion, once, so your code has no casts in it:
  *
  * ```ts
- * export const authDB = defineAuthDB({
+ * export const authDatabase = defineAuthDatabase({
  *   async select({ table, where, limit }) {
  *     switch (table) {
  *       // `where` narrows with `table`: Partial<AuthUser> here,
@@ -554,13 +557,13 @@ export interface AuthDB<
  * A table map needs no switch, but it does want this helper for the same
  * reason — see the reference.
  */
-export function defineAuthDB<
+export function defineAuthDatabase<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 >(implementation: {
   select(input: AuthSelectInput<S>): Promise<AuthRow<S, AuthTable>[]>
   insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable> | undefined>
   update(input: AuthUpdateInput<S>): Promise<AuthRow<S, AuthTable>[]>
   delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
-}): AuthDB<S> {
-  return implementation as unknown as AuthDB<S>
+}): AuthDatabase<S> {
+  return implementation as unknown as AuthDatabase<S>
 }
