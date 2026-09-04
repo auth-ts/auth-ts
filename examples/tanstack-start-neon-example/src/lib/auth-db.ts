@@ -1,9 +1,4 @@
-import type {
-  AuthDirection,
-  AuthOrderBy,
-  AuthTable,
-  AuthWhere
-} from "@auth-ts/core"
+import type { AuthOrderBy, AuthTable, AuthWhere } from "@auth-ts/core"
 import { defineAuthDB } from "@auth-ts/core"
 import { and, asc, desc, eq, getColumns, gt, is, lt } from "drizzle-orm"
 import type { AnyPgColumn } from "drizzle-orm/pg-core"
@@ -21,21 +16,17 @@ const buildWhere = (table: AuthTable, where: AuthWhere) => {
 
   return and(
     ...Object.entries(where).flatMap(([name, condition]) => [
-      condition.eq !== undefined ? eq(columns[name], condition.eq) : undefined,
-      condition.lt !== undefined ? lt(columns[name], condition.lt) : undefined,
-      condition.gt !== undefined ? gt(columns[name], condition.gt) : undefined
+      "eq" in condition ? eq(columns[name], condition.eq) : undefined,
+      "lt" in condition ? lt(columns[name], condition.lt) : undefined,
+      "gt" in condition ? gt(columns[name], condition.gt) : undefined
     ])
   )
 }
 
 const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
-  const columns = getColumns(authTables[table])
-  const entries = Object.entries(orderBy) as [
-    keyof typeof columns,
-    AuthDirection
-  ][]
+  const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
 
-  return entries.map(([name, direction]) =>
+  return Object.entries(orderBy).map(([name, direction]) =>
     (direction === "asc" ? asc : desc)(columns[name])
   )
 }

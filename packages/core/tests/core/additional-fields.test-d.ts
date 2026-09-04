@@ -91,7 +91,7 @@ describe("the table types the four functions take", () => {
 
   it("queries a declared field at its declared type", () => {
     expectTypeOf(usersWhere({ plan: { eq: 3 } }).plan).toEqualTypeOf<
-      { eq: number; lt?: never; gt?: never } | undefined
+      { eq: number } | undefined
     >()
     // Core fields query the same way.
     usersWhere({ email: { eq: "ada@example.com" }, type: { eq: "guest" } })

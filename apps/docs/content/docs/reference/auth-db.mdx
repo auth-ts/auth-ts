@@ -95,9 +95,9 @@ index, because the missing constraint only shows under a race.
   ```
 
   A condition names its operator, so your implementation maps keys to
-  operators and never has to tell a value from a range by looking at it. Every
-  condition declares all three keys, the absent ones typed `never`, so reading
-  `condition.lt` on any column is fine and `{}` is still not a condition.
+  operators and never has to tell a value from a range by looking at it. The
+  keys are required: a key that is present has a value, and `{}` is not a
+  condition, so mapping over `Object.entries` is the whole job.
 
   That is the whole operator surface: no `OR`, no `in`, no negation. The
   exception exists because a live session is one whose expiry is still ahead,
@@ -223,20 +223,16 @@ const buildWhere = (table: AuthTable, where: AuthWhere) => {
   const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
   return and(
     ...Object.entries(where).flatMap(([name, condition]) => [
-      condition.eq !== undefined ? eq(columns[name], condition.eq) : undefined,
-      condition.lt !== undefined ? lt(columns[name], condition.lt) : undefined,
-      condition.gt !== undefined ? gt(columns[name], condition.gt) : undefined
+      "eq" in condition ? eq(columns[name], condition.eq) : undefined,
+      "lt" in condition ? lt(columns[name], condition.lt) : undefined,
+      "gt" in condition ? gt(columns[name], condition.gt) : undefined
     ])
   )
 }
 
 const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
-  const columns = getColumns(authTables[table])
-  const entries = Object.entries(orderBy) as [
-    keyof typeof columns,
-    AuthDirection
-  ][]
-  return entries.map(([name, direction]) =>
+  const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
+  return Object.entries(orderBy).map(([name, direction]) =>
     (direction === "asc" ? asc : desc)(columns[name])
   )
 }

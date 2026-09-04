@@ -267,9 +267,9 @@ export type AuthRow<
  * `{ eq }` on any column; `{ lt }`, `{ gt }`, or both on `expiresAt`.
  *
  * Every condition names its operator, so an implementation maps keys to
- * operators and never has to tell a value from a range by looking at it. Each
- * member declares all three keys, the absent ones as `never`, so
- * `condition.lt` is readable on any condition and `{}` is still not one.
+ * operators and never has to tell a value from a range by looking at it. The
+ * members are required rather than optional: a key that is present has a value,
+ * and `{}` is not a condition, so `Object.entries` is the whole of a `where`.
  *
  * Order is the only comparison the contract has beyond equality, and it exists
  * because expiry is the one question core cannot ask with `eq`. Both bounds are
@@ -278,9 +278,10 @@ export type AuthRow<
  * instead of the whole row.
  */
 export type AuthCondition<V> =
-  | { eq: V; lt?: never; gt?: never }
-  | { lt: V; gt?: V; eq?: never }
-  | { gt: V; lt?: V; eq?: never }
+  | { eq: V }
+  | { lt: V }
+  | { gt: V }
+  | { lt: V; gt: V }
 
 /**
  * A query: column/condition pairs, **all** of which must match.
@@ -307,10 +308,7 @@ export type AuthWhere<
         ? never
         : K]?: K extends "expiresAt"
         ? AuthCondition<NonNullable<AuthRow<S, T>[K]>>
-        : Extract<
-            AuthCondition<NonNullable<AuthRow<S, T>[K]>>,
-            { eq: NonNullable<AuthRow<S, T>[K]> }
-          >
+        : { eq: NonNullable<AuthRow<S, T>[K]> }
     }
   : never
 
