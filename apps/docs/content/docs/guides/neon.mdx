@@ -1,0 +1,180 @@
+---
+title: Neon Data API
+description: Pointing Neon at your own JWKS, and the grant that will surprise you.
+---
+
+Neon's Data API is PostgREST. It verifies a JWT against a JWKS URL and runs the
+query as the `authenticated` role, so your policies decide what comes back.
+
+## 1. Point Neon at your keys
+
+In the Neon console, set the JWKS URL to:
+
+```
+https://your.app/jwks.json
+```
+
+That is the `public/jwks.json` written by `bun x @auth-ts/cli keygen`, deployed
+with your app as a static file. Localhost is not reachable from Neon, so for
+local development host the same file somewhere public — a gist works — and use
+that URL. It is a copy of the file: upload it again whenever you run `keygen`.
+
+Leave the audience blank unless you set `jwt.audience`. This library omits `aud`
+by default precisely so there is nothing to mismatch.
+
+## 2. Derive the owner from the token, never from the client
+
+```sql
+create table "todos" (
+  "id" uuid primary key default uuidv7(),
+  "userId" uuid not null default (auth.user_id()::uuid),
+  "title" text not null
+);
+```
+
+The default comes from the verified token, so a client that sends its own
+`userId` is simply overwritten.
+
+## 3. Write the policy
+
+```sql
+alter table "todos" enable row level security;
+alter table "todos" force row level security;
+
+create policy "own todos" on "todos" to authenticated
+  using ("userId" = (auth.user_id())::uuid)
+  with check ("userId" = (auth.user_id())::uuid);
+
+grant select, insert, update, delete on "todos" to authenticated;
+```
+
+`force` matters because policies do not apply to the table owner. Without it, a
+query on your owner connection silently sees everything.
+
+## 4. Protect the auth tables — this one bites
+
+**Neon grants the `authenticated` role full access to everything in `public` when
+the Data API is enabled.** Your `users`, `sessions`, and `verifications` tables are
+not private by default, which means any signed-in user could read every account
+and every code straight from the REST endpoint.
+
+The rule is per table, not per column:
+
+> `users`, `sessions`, and `identities` are yours to query.
+> `verifications`, `attempts`, and `identitySecrets` are never granted.
+
+Enable row-level security everywhere. Three of the tables get **no policy**,
+which denies every role but the owner — your server connects as the owner and
+keeps working, and the Data API sees nothing:
+
+```sql
+alter table "verifications" enable row level security;
+alter table "attempts" enable row level security;
+alter table "identitySecrets" enable row level security;
+```
+
+The other three get ownership policies, because your account page reads them:
+
+```sql
+alter table "users" enable row level security;
+alter table "sessions" enable row level security;
+alter table "identities" enable row level security;
+
+create policy "selectOwnSessions" on "sessions" for select to authenticated
+  using ("userId" = (auth.user_id())::uuid);
+create policy "deleteOwnSessions" on "sessions" for delete to authenticated
+  using ("userId" = (auth.user_id())::uuid);
+```
+
+`users` and `identities` take the same shape — see the reference application's
+`src/db/schema.ts` for all six.
+
+Do not force row-level security here — the server connects as the owner and must
+still read every one of these.
+
+Nothing in those three tables can authenticate anybody, which is what makes
+reading them whole safe. `sessions.tokenHash` is a SHA-256 of thirty-two random
+bytes: knowing it does not let you present the token it came from. The provider
+tokens live in `identitySecrets`, which nothing grants.
+
+That is the point of the split. Protection is a table nobody writes a policy
+for, not a column somebody has to remember to revoke — forget a policy and you
+leak nothing, forget a revoke and you leaked ciphertext.
+
+Verify rather than assume:
+
+```sql
+set local role authenticated;
+select count(*) from "identitySecrets";  -- must be 0
+```
+
+### The one grant that is not a policy
+
+Row-level security says which *rows* a role may touch, never which columns.
+Neon's default grants UPDATE on every column of `users`, so a signed-in user can
+set their own `type` to `admin` or repoint `email` at somebody else's account.
+Policies do not stop that. Narrow the grant:
+
+```sql
+revoke update on table "users" from authenticated;
+grant update ("name", "image", "updatedAt") on table "users" to authenticated;
+```
+
+This is the only column grant the schema needs, and it is load bearing.
+`examples/tanstack-start-neon-example/tests/privileges.test.ts` asserts all of
+the above against a real Postgres, so the rule is executable rather than
+remembered.
+
+## 5. Set the allowed origins
+
+Set the Data API's allowed origins to your own domain — and know precisely what
+that buys, because it is easy to overestimate.
+
+Allowed origins are enforced by **browsers**, not by the Data API. They stop
+another website's JavaScript from calling the API with your visitor's
+credentials. That is worth having, and it is the whole of it.
+
+They do nothing about a token that has leaked. curl, a server, a script, a
+mobile app — anything that is not a browser ignores CORS entirely, and the
+request succeeds no matter what the origin list says. So this is not token
+protection, and it is not a substitute for the policy.
+
+What actually contains a leaked token is the rest of the design: it lives in
+memory rather than storage, it expires in ten minutes, and row-level security
+still decides what it can read. A stolen token reads the rows of whoever it
+belongs to and nothing else.
+
+## Using it
+
+```ts
+const token = await authClient.getToken()
+if (!token) return // Signed out — `null` rather than a token to send.
+
+const response = await fetch(`${DATA_API_URL}/todos`, {
+  headers: { authorization: `Bearer ${token}` }
+})
+```
+
+Note what is missing: any filter on the user. The query asks for every row and
+the database returns only yours.
+
+## If you are on Postgres 17
+
+`uuidv7()` is native in Postgres 18. On 17, install the `pg_uuidv7` extension —
+Neon supports it — or use `gen_random_uuid()`. Either works: the library does not
+generate ids unless you hand it `generateId`, and never assumes they sort — it
+reads back whatever your column default produced. Time-sortable ids are worth having anyway, for the
+index locality rather than for anything the library does with them.
+
+## If you use drizzle-kit push
+
+Constrain it to your own schema:
+
+```ts
+export default defineConfig({
+  schemaFilter: ["public"]
+})
+```
+
+Without this it compares against the whole database and proposes dropping Neon's
+`auth` schema — the one providing `auth.user_id()` to your policies.

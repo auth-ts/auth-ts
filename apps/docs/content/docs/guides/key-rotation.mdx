@@ -1,0 +1,32 @@
+---
+title: Rotating keys
+description: Generate a new key and deploy it with its jwks.json.
+---
+
+A signing key and its `public/jwks.json` travel together, so rotating is the
+setup step again:
+
+```bash
+bun x @auth-ts/cli keygen
+```
+
+Set the new `JWT_PRIVATE_KEY` in the environment, keep the new `public/jwks.json`
+it wrote, and deploy. From that deploy on, tokens are signed with the new key and
+`/jwks.json` names only it.
+
+## Tokens already out there
+
+An access token signed by the old key stops verifying once the verifier picks up
+the new key set — Neon and Supabase cache it briefly, and in-process
+`verifyToken` switches with the deploy. The client refreshes and gets a token
+under the new key, so the visible effect is one failed request at most, inside a
+window no longer than the access-token lifetime: ten minutes by default.
+
+The new key carries a new `kid` — its thumbprint — which is what makes a
+verifier holding a cached `jwks.json` fetch it again rather than check new
+tokens against the key it knows by the old name.
+
+## Sessions survive
+
+Rotation affects access tokens only. Refresh tokens are random bytes checked
+against your own table, so nobody is signed out.

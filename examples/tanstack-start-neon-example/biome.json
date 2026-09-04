@@ -1,0 +1,47 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+  "files": {
+    "includes": ["**", "!**/routeTree.gen.ts", "!**/worker-configuration.d.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space"
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "trailingCommas": "none",
+      "quoteStyle": "double"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "noUnusedImports": {
+          "fix": "safe",
+          "level": "warn",
+          "options": {}
+        }
+      }
+    },
+    "domains": {
+      "react": "recommended"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "root": false
+}

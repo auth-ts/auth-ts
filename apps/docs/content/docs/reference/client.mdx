@@ -1,0 +1,389 @@
+---
+title: createAuthClient
+description: The client. Zero dependencies, token in memory only.
+---
+
+```ts
+import { createAuthClient } from "@auth-ts/core/client"
+
+export const authClient = createAuthClient()
+```
+
+The `/client` entry is the load-bearing detail: it is built separately from the
+issuer, so a browser bundle that imports it carries no server code and no `jose`.
+Importing `@auth-ts/core` in browser-reachable code is what undoes that.
+
+Construction performs no network request and touches no storage, so importing the
+module is free and safe during server-side rendering. Everything reconciles on
+the first read.
+
+Every method here has an identically named callable on the server —
+`signInWithCode` dispatches `POST /sign-in/code` on both `authClient` and
+`auth`. Moving a call between a loader and a component is changing
+`auth` to `authClient` and nothing else.
+
+<auto-type-table path="../../../../../packages/core/src/client/core/auth-client-options.ts" name="AuthClientOptions" />
+
+## The two reads
+
+`getToken()` returns a valid access token from its cache, or `null` when nobody
+is signed in. Approaching expiry it hands back the cached one and refreshes
+behind you; only a token too close to expiry to outlive the request it would be
+used for makes you wait. Concurrent callers share a single refresh, so a page
+mounting ten components makes one round-trip and they all see the same token.
+
+Hand it to your PostgREST client as its access token: Neon's `fetchWithToken`
+takes exactly this shape and raises its own error on `null`, so a query made
+while signed out fails as a data-plane error rather than an auth one. It also
+means "is anyone signed in" is a question you can ask without a `try`.
+
+A browser that has never signed in, or has signed out, answers `null` without a
+request. The server writes a readable `auth-ts.hint` cookie beside the refresh
+cookie and retires the two together, so the client can tell "no session" from
+"unknown" locally — a signed-out page costs no round trip on load and none on
+every tab focus. A `baseURL` on another origin is the exception: the hint only
+reaches a sibling host when the browser accepts the domain they share, so there
+the client asks and reads the answer.
+
+`refresh()` exchanges the refresh cookie for a token now and hands back
+`{ token, user }`, or `null` when nobody is signed in. It is the cheapest way to
+learn who is here: `GET /token` reads that row to mint, so the user arrives with
+the token and a cold boot costs one request. Unlike `getToken()` it always asks,
+ignoring whatever is in memory — a reload, not a read.
+
+It is not how you keep a name on screen current. That row is yours: query
+`users` through your data plane, where a rename in another tab arrives without a
+token being reminted. See [building an account
+page](/docs/guides/account-page).
+
+`null` means the server said the session is gone, and the stored token is dropped
+with it. Every other failure throws — a 502 from a proxy is not a statement about
+whether anyone is signed in.
+
+Which session this browser is on needs no request at all: the token names it, and
+`decodeToken(token)?.claims.sid` reads it locally.
+
+The client keeps no user state at all. No mirror, no `localStorage`, no cross-tab
+listener. Caching, persistence, retry, and refetch-on-focus are what a query
+library already does well, and doing them here would only give you two sources of
+truth to keep in step.
+
+## Where tokens come from
+
+Two places, both a body. `GET /token` exchanges the refresh cookie for one — or
+answers `null` with a 200, because nobody signed in is an answer — and
+a sign-in returns one with the user it signed in — verification code, guest,
+and account switch. Nothing arrives
+in a response header, so there is nothing for a framework's response plumbing to
+lose and nothing for CORS to expose.
+
+Every authenticated method calls `getToken()` before it sends, because the server
+authenticates from the token and refuses anything else. That is invisible from
+the outside: the token is served from cache, so a page that already holds a live
+one costs no extra round trip, and ten methods called at once share one refresh
+if they need it.
+
+`getToken()` serves from that cache. Approaching expiry it hands back the cached
+token and refreshes behind you; only a token too close to expiry to outlive the
+request it would be used for makes you wait.
+
+### Catching the user a refresh minted
+
+Minting reads the user row — that is where the token's `type` claim comes from —
+so `/token` returns it, and `onRefresh` is how you get it without asking again:
+
+```ts
+const token = await authClient.getToken({
+  onRefresh: ({ user }) => queryClient.setQueryData(["user"], user)
+})
+```
+
+<auto-type-table path="../../../../../packages/core/src/client/methods/get-token.ts" name="GetTokenOptions" />
+
+It fires only when that call actually minted. A token served from memory read
+nothing, and the user it could report would be as old as the token — so a warm
+call costs no request and reports nothing, which is what makes this safe to put
+on the call every authenticated method already makes.
+
+It is a per-call option rather than a client-wide one because the cache to seed
+belongs to whoever is asking. A framework that builds one query client per
+request has nothing a module-level client could hold.
+
+A 401 is retried once with a fresh token before it is believed. Refresh-ahead
+covers the ordinary case, but a key rotated between mint and use, or a device
+clock far enough off that the window never fired, both look like a refusal on a
+token the client had every reason to trust. A second refusal is the session
+genuinely being gone.
+
+**Your data plane gets the same treatment, but you have to write it.** PostgREST
+talks to Neon directly and never passes through your server, so an expired token
+there is a hard 401 with nothing to rescue it:
+
+```ts
+const token = await authClient.getToken()
+if (!token) return // Signed out; there is nothing to ask the data plane for.
+
+let response = await fetch(url, { headers: { authorization: `Bearer ${token}` } })
+
+if (response.status === 401) {
+  authClient.clearToken()
+  const fresh = await authClient.getToken()
+  response = await fetch(url, { headers: { authorization: `Bearer ${fresh}` } })
+}
+```
+
+Once, never in a loop: if the second attempt is also refused, the session is
+genuinely gone.
+
+The client's own methods are the other side of this. They need a credential
+rather than an answer, so a call made without a session throws
+`unauthenticated` — `refresh()` and `signOut()` excepted, which resolve to
+`null` because "nobody" is a real answer to what they ask.
+
+## React
+
+Nothing bridges into your cache, so the query is the only source of truth:
+
+```tsx
+export function useToken() {
+  return useQuery({
+    queryKey: ["token"],
+    queryFn: authClient.getToken,
+    refetchOnWindowFocus: true,
+    staleTime: 60_000
+  })
+}
+```
+
+`data` is the token, or `null` when nobody is signed in — which is also the
+answer to "is anyone here". The user is a row in *your* table, so it is read the
+way every other row is; see [Reading the user from your own
+database](#reading-the-user-from-your-own-database) below, and [building an
+account page](/docs/guides/account-page) for the rest of the screen.
+
+A device list tells which entry is this device
+by comparing each row's `id` to the token's `sid` — the list does not carry a
+flag saying so, and the token is already in hand:
+
+```ts
+const currentSessionId = authClient.decodeToken(token)?.claims.sid
+```
+
+### Reading the user from your own database
+
+Row-level security already answers "which user", so the row can come from your
+data plane like everything else and the auth server can be asked one question
+per load. Seed it from the refresh, or the two reads are serial — anything keyed
+by the user waits on its id:
+
+```tsx
+export function useToken() {
+  const queryClient = useQueryClient()
+
+  return useQuery({
+    queryKey: ["token"],
+    queryFn: () =>
+      authClient.getToken({
+        onRefresh: ({ user }) => queryClient.setQueryData(["user"], user)
+      })
+  })
+}
+
+export function useUser() {
+  const { data: token, isPending } = useToken()
+
+  return useQuery({
+    queryKey: ["user"],
+    queryFn: isPending
+      ? skipToken
+      : async () => {
+          if (!token) return null
+
+          const { data } = await postgrest.from("users").select().single()
+          return data
+        }
+  })
+}
+```
+
+Signed out has to resolve to `null` rather than skip. A query disabled while
+there is no session stays pending forever, and a page branching on `isPending`
+would spin instead of offering a way in.
+
+Anything that changes who is signed in has to invalidate that key, because
+nothing else will:
+
+```tsx
+await authClient.signInWithCode({ email, code })
+await refetch()          // or queryClient.invalidateQueries(...)
+
+await authClient.signOut()
+queryClient.clear()
+```
+
+Persistence across a cold load, if you want it, is your query client's persister
+— the same one you would use for any other data.
+
+## Native
+
+A browser holds the refresh cookie itself and never shows it to JavaScript. A
+native app has no such jar, so the client can be one: pass `cookieStorage` and it
+keeps whatever the server sets in the storage you give it, sends it back as the
+`Cookie` header on every auth request, and drops what the server clears. The
+server is none the wiser, and the refresh token still travels nowhere but the
+cookie header.
+
+```ts
+import * as SecureStore from "expo-secure-store"
+
+export const authClient = createAuthClient({
+  baseURL: "https://app.example.com",
+  cookieStorage: {
+    getItem: (key) => SecureStore.getItemAsync(key),
+    setItem: (key, value) => SecureStore.setItemAsync(key, value),
+    removeItem: (key) => SecureStore.deleteItemAsync(key)
+  }
+})
+```
+
+The shape is the web `Storage` interface, so a store that already has
+`getItem`/`setItem`/`removeItem` passes straight through. Use one the platform
+protects — the keychain or keystore — because what lands in it is the session.
+
+Everything else is unchanged: `getToken()` still serves the JWT from memory for
+your data client, and the app never touches the cookie. `signInWithProvider` and
+`connectProvider` fetch the provider's authorize URL and then assign `location`, so a
+native shell can call the same endpoints and open the URL in the system browser
+instead — which is what RFC 8252 requires and what Google enforces. What is
+still missing there is the return leg: the callback arrives in the system
+browser, whose cookie jar is not the app's, so deep-link flows remain on the
+roadmap.
+
+## Provider sign-in failures
+
+A provider flow ends in a navigation, so a failure cannot be thrown at the
+caller — the browser is somewhere else by then. The callback sends it back to
+your app with the code in `?error=`:
+
+```ts
+authClient.signInWithProvider({
+  provider: "github",
+  redirect: "/todos",
+  errorRedirect: "/login"
+})
+```
+
+`errorRedirect` is where a failure lands; `redirect` is where success lands, and
+is never used for a failure. Without `errorRedirect` the server falls back to
+its configured `baseURL`, and answers in JSON when it has none.
+
+Read the code from the query string and switch on it — `providerDenied` for a
+cancelled consent, `providerEmailUnverified` when the provider has no verified
+address, `invalidState` for a sign-in attempt that expired.
+
+## Errors
+
+Every failure is an `AuthError` carrying a stable `code`. Switch on the code,
+never on the message — messages are localized and free to change.
+
+```ts
+import { isAuthError } from "@auth-ts/core/client"
+
+try {
+  await authClient.sendSignInCode({ email })
+} catch (error) {
+  if (isAuthError(error) && error.code === "cooldown") {
+    // error.retryAfter is in seconds. Render a countdown; "try again later"
+    // with no number is the least useful message in software.
+  }
+}
+```
+
+A dropped connection raises `AuthNetworkError` instead, because only one of those
+two should clear local state.
+
+The wire body is throwable as-is. Every non-2xx response is a flat
+`{ name: "AuthError", code, message, retryAfter? }` — `name` and `message` make
+it a complete structural `Error`, so code that talks to the API with raw
+`fetch` can hand the body to anything typed `Error` without wrapping it:
+
+```ts
+useQuery({
+  queryFn: async () => {
+    const response = await fetch("/api/auth/session")
+    if (!response.ok) throw await response.json()
+    return response.json()
+  }
+})
+```
+
+Reading `error.code` off a value typed `Error` needs one of two things. Inside a
+`catch`, narrow with `isAuthError(error)`. In TanStack Query, register the error
+type once and every `error` in the app carries `code` without a guard:
+
+```ts
+import type { AuthError } from "@auth-ts/core/client"
+
+declare module "@tanstack/react-query" {
+  interface Register {
+    defaultError: AuthError
+  }
+}
+```
+
+## Retrying a data request
+
+On a 401 from your data API, drop the token, fetch a new one, and retry **once**.
+Never loop: if the second attempt is refused too, the session is genuinely gone.
+
+```ts
+if (response.status === 401) {
+  authClient.clearToken()
+  response = await send()
+}
+```
+
+## Calling a connected account's API
+
+`connectProvider` links a provider; `getProviderToken` is what makes the link worth
+keeping. It returns a live access token for one connected account, refreshing it
+server-side first when the stored one is spent:
+
+```ts
+const { data: google } = await postgrest
+  .from("identities")
+  .select()
+  .eq("provider", "google")
+  .single()
+
+const { token } = await authClient.getProviderToken({ id: google.id })
+const events = await fetch(
+  "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+  { headers: { authorization: `Bearer ${token}` } }
+).then((response) => response.json())
+```
+
+Ask for it per use and hold it in a variable — never in storage. It expires, and
+it belongs to a service this library does not control. The refresh token behind
+it never leaves your server.
+
+The identity comes from your own `identities` table — there is nothing to strip,
+since the provider tokens live in `identitySecrets`, which nothing grants. It is
+addressed by `id` rather than by provider name, because one account can have two
+of the same provider connected — a personal and a work Google. Disconnecting is
+a delete of that row; see [building an account
+page](/docs/guides/account-page).
+
+Catch `providerReconnectRequired`: the grant is gone — revoked at the provider,
+expired, or never durable — and only sending them through `connectProvider` again
+restores it.
+
+```ts
+try {
+  const { token } = await authClient.getProviderToken({ id: google.id })
+} catch (error) {
+  if (isAuthError(error) && error.code === "providerReconnectRequired") {
+    authClient.connectProvider({ provider: "google", redirect: "/account" })
+  }
+}
+```

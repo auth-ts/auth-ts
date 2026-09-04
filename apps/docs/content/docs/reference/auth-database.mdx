@@ -1,0 +1,432 @@
+---
+title: AuthDatabase
+description: The four functions that connect this library to your database.
+---
+
+This interface is the product. You write these functions against your own tables,
+and in exchange the library never owns your schema, your migrations, or your data.
+
+There are four of them — `select`, `insert`, `update`, `delete`.
+Every query the library makes is one of those four against
+one of six tables, filtered on named columns by equality or, for the one
+question equality cannot ask, by order. There is no operator language beyond
+that: no `OR`, no joins, no expressions. That is the property that makes the
+same four functions trivial against Drizzle, raw SQL, a data API, or a document
+store.
+
+Nothing here receives request headers. Header-dependent session resolution is a
+spoofable authentication bypass, and non-HTTP callers — tests, migrations, the
+in-memory fixture — drive this contract directly. For multi-tenancy, close over
+the tenant when you construct the server.
+
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthDatabase" />
+
+## The tables
+
+The library names the tables and the columns it reads. If your schema names them
+differently, map them inside your four functions — that mapping is the entire
+cost of not having an adapter package.
+
+| table | columns | unique | indexed | swept |
+| --- | --- | --- | --- | --- |
+| `users` | `id`, `email`, `phoneNumber`, `name`, `image`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
+| `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
+| `verifications` | `id`, `identifier`, `codeHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
+| `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
+| `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
+| `identitySecrets` | `id`, `identityId`, `accessTokenEncrypted`, `accessTokenExpiresAt`, `refreshTokenEncrypted`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |
+
+**Three of these tables are yours to query. Three are not.**
+
+> `users`, `sessions`, and `identities` are yours to query.
+> `verifications`, `attempts`, and `identitySecrets` are never granted.
+
+Nothing in the first three can authenticate anyone. `sessions.tokenHash` is a
+SHA-256 of thirty-two random bytes, so it cannot be replayed and does not need
+hiding. The second three hold either a credential or the identifier somebody is
+signing in with, and no application needs to read them.
+
+That split is why the provider tokens sit in `identitySecrets` rather than in
+columns on `identities`: protection becomes a table nobody writes a policy for,
+instead of a column grant everybody has to remember. Forget a policy and you
+leak nothing; forget a revoke and you leaked ciphertext.
+
+`accessTokenEncrypted` and `refreshTokenEncrypted` hold the grant a connected
+account gave you, encrypted with AES-256-GCM under a key derived from your
+`secret` before they ever reach your `insert`. Store them as text and let them
+be — the library is the only thing that reads them back. Rotating `secret` makes
+them unreadable, which surfaces as "reconnect this account" and never as a wrong
+token sent to a provider.
+
+**`identitySecrets` must cascade from `identities`.** Disconnecting a provider
+deletes the identity, and an orphaned row here is a stored credential nothing
+points at. `authDatabaseChecks` proves the cascade against your own database.
+
+See [the Neon guide](/docs/guides/neon) for the SQL, and
+`examples/tanstack-start-neon-example/tests/privileges.test.ts` for the rule as
+an executable test.
+
+**`createdAt` and `updatedAt` are written by core**, on every insert and on
+every update it makes, so nothing is required of your columns for the library's
+own writes to be stamped correctly.
+
+Defaults and triggers are yours to add, and a trigger wins where you have one —
+it runs after the value core sent. Add one when something other than the
+library writes the table: a browser reaching your data plane directly is not a
+path core is on, and only the database can stamp those rows.
+
+**The unique constraints are a requirement, not hygiene.** The library reads
+before it writes — that is what a generic contract can express — so two first
+sign-ins for one email both find nothing and both insert. The unique index is
+what turns that race into one failed request instead of two accounts for the
+same person, and the same is true of `(provider, providerUserId)` for
+provider links. Nothing else in the design defends against it, and no test can
+stand in for it: inserting twice and reading one row passes with or without the
+index, because the missing constraint only shows under a race.
+
+## The rules
+
+- **`where` is column/condition pairs, all of which must match.** Every column
+  takes `{ eq }`, with one exception: `expiresAt` also takes a `{ lt }`, a
+  `{ gt }`, or both, with exclusive bounds.
+
+  ```ts
+  where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } }
+  ```
+
+  A condition names its operator, so your implementation maps keys to
+  operators and never has to tell a value from a range by looking at it. The
+  keys are required: a key that is present has a value, and `{}` is not a
+  condition, so mapping over `Object.entries` is the whole job.
+
+  That is the whole operator surface: no `OR`, no `in`, no negation. The
+  exception exists because a live session is one whose expiry is still ahead,
+  and asking that in the same statement that touches the row is what makes
+  resolving a session a single round trip — instead of reading to find out
+  whether it may write, then writing. The type confines it to `expiresAt`, so
+  that is the only column your implementation has to handle both ways.
+
+  **`null` is never a value here**, even though the columns are nullable, so
+  your implementation needs no `IS NULL` branch. That is deliberate rather than
+  an omission: the library looks accounts up by an identifier, and an identifier
+  that arrived null would otherwise ask for "the first row that has none" —
+  some arbitrary guest. Excluding it from the type makes that a compile error in
+  the library instead of a rule its own call sites have to remember.
+- **`update` returns the rows it wrote**, as `delete` does. That is the other
+  half of the single round trip: the library asks for a session that has not
+  expired and learns from what comes back whether there was one.
+- **`select` takes `limit` and `orderBy`, always.** Neither is optional, so
+  there is no `undefined` to branch on and your implementation has one code
+  path. `orderBy` is one column and a direction — `{ createdAt: "desc" }` —
+  which is enough for "newest" and the smallest ordering every store can
+  express. Read it the same way you read `where`, by mapping over its entries;
+  there is no reason to pull the single key out by hand.
+
+  There is no `offset`, because the library never pages that way. The one place
+  it walks more than a page — signing out every other device — deletes what it
+  read and re-reads from the start, so the next page is whatever is left.
+- **`insert` returns the row as stored**, or `undefined`. Stores hand it back
+  differently — `RETURNING` gives a set to pick from, a document store gives the
+  document, some give nothing — so return what you have and let the library
+  decide what having nothing means. What comes back is how it learns anything
+  your database decided, the `id` above all. A unique violation must throw rather than merge: the library reads
+  before it inserts, and the constraint is deliberately the arbiter of the race
+  between the two.
+- **Ids are yours.** The row arrives without one unless you set
+  [`generateId`](/docs/reference/create-auth#generating-ids), so your `uuidv7()` default,
+  `$defaultFn`, or identity column fills it as it always would.
+- **`update` never receives an empty set.** The library composes the fields
+  itself and skips the call entirely when a request changes nothing, so you need
+  no guard against the `UPDATE … SET` with no columns that most query builders
+  reject. Whatever it resolves to is ignored, so handing back your driver's own
+  promise is enough — the library already holds the row it is updating.
+- **`delete` returns what it removed**, as an array. Those rows are proof: they
+  are how a revoke answers 404 rather than 204 without a second query, and how a
+  verification code becomes usable exactly once. Two verifiers can both read a code and
+  both pass the check; only one of them deletes the row, and the other gets an
+  empty array. That single atomic conditional delete is the one concurrency
+  property this contract asks of your store.
+- **`delete` with a range is the sweep.** The library cleans up after itself by
+  issuing `delete` where `expiresAt` is `{ lt: now }`, on the requests that
+  insert new rows: a sign-in sweeps `sessions`, a code send sweeps
+  `verifications`, the first attempt of each rate-limit window sweeps
+  `attempts`. There is nothing extra to implement and no schedule to own — but
+  it does mean an index on `expiresAt` is load-bearing for those tables, not
+  just for reads. Pass `waitUntil` to
+  [`createAuth`](/docs/reference/create-auth) and the sweep runs
+  behind the response instead of ahead of it.
+- **Nothing sweeps `users`.** A guest's session is their only credential, so a
+  guest left with no sessions is unreachable — but collecting that row is a
+  retention decision, and retention decisions on your `users` table are yours.
+  The library never deletes a user it did not delete on purpose, which is the
+  same rule `primaryUserId` already states for a merged guest's data.
+
+  Collect them on whatever schedule suits you. In SQL that is one statement,
+  and the `where` is the safety — `type` spares real accounts, and the null
+  `primaryUserId` spares a merged guest whose pointer you have not migrated yet:
+
+  ```sql
+  delete from "users" u
+   where u."type" = 'guest'
+     and u."primaryUserId" is null
+     and not exists (select 1 from "sessions" s where s."userId" = u."id");
+  ```
+
+## Rate limiting is a log, not a counter
+
+The `attempts` table holds one row per counted request, under a key that
+contains the window: `sendCode:ip:203.0.113.7:1755864000000`. Counting is an
+insert and a read capped at `max + 1`; a window that has passed is simply a set
+of old rows, and the first attempt of each fresh window is what sweeps them —
+once per key per window, never once per request, so a flood cannot amplify its
+own bookkeeping. Nothing is read-modify-written, so no attempt
+can be lost and no atomic increment is required of your store — which is what
+lets rate limiting stay inside these four functions instead of needing a
+special-purpose fifth.
+
+The honest trade: this is not exact. Each request's read sees every insert
+committed before it ran, so requests that are genuinely simultaneous can each
+read a number below the cap in the instant before the others land. The overshoot
+is bounded by that burst's concurrency and cannot be repeated — once it settles,
+the rest of the window is refused. For a six-digit code that is roughly twenty
+guesses instead of five, once, against a million values.
+
+If you want exactness, put it in front: a rule at your edge on `/sign-in/send-code`
+and `/sign-in/code` counts a burst more precisely than any database round trip, and
+you can then set `rateLimit: false`. The five-guess cap on each individual code
+is not a rate limit, is keyed on the code rather than the caller, and stays on
+regardless — nothing in front of this server can enforce it.
+
+## Writing your implementation
+
+Wrap it in `defineAuthDatabase` and write it either of two ways. Both are free of
+casts, and the helper is what makes that true: a union-typed implementation
+cannot be *proven* to satisfy a generic signature, only asserted — the same
+reason an overload has an implementation signature. The helper holds that one
+assertion, so your code holds none.
+
+A **table dictionary** is one query per function, whatever the table. This is
+the whole read path from the reference application:
+
+```ts
+import { defineAuthDatabase } from "@auth-ts/core"
+
+import { attempts, identities, identitySecrets, sessions, users, verifications } from "./db/schema"
+
+// Checked, not widened: a missing table fails here, and each table keeps its
+// own type. This is also where a schema whose names differ gets mapped.
+const authSchema = {
+  users,
+  sessions,
+  verifications,
+  attempts,
+  identities,
+  identitySecrets
+} satisfies Record<AuthTable, AnyPgTable>
+
+const buildWhere = (table: AuthTable, where: AuthWhere) => {
+  const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
+  return and(
+    ...Object.entries(where).flatMap(([name, condition]) =>
+      Object.entries(condition).map(([operator, value]) =>
+        operators[operator as AuthDatabaseOperator](columns[name], value)
+      )
+    )
+  )
+}
+
+const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
+  const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
+  return Object.entries(orderBy).map(([name, direction]) =>
+    orderByOperators[direction](columns[name])
+  )
+}
+
+export const authDatabase = defineAuthDatabase({
+  select: ({ table, where, limit, orderBy }) =>
+    db
+      .select()
+      .from(authSchema[table])
+      .where(buildWhere(table, where))
+      .orderBy(...buildOrderBy(table, orderBy))
+      .limit(limit),
+
+  insert: ({ table, values }) =>
+    db
+      .insert(authSchema[table])
+      .values(values)
+      .returning()
+      .then((rows) => rows[0]),
+
+  update: ({ table, where, values }) =>
+    db.update(authSchema[table]).set(values).where(buildWhere(table, where)),
+
+  delete: ({ table, where }) =>
+    db.delete(authSchema[table]).where(buildWhere(table, where)).returning()
+  // ...
+})
+```
+
+Keep the tables' own types. It is tempting to widen them — an annotation of
+`Record<AuthTable, AnyPgTable>`, or a `tableOf()` helper returning `AnyPgTable`
+— and that is what forces casts back into every function: an erased table type
+means an erased row type, so the query no longer returns anything the contract
+recognizes. `satisfies` checks the same shape without erasing anything.
+
+A **`switch` per table** is the shape to reach for with raw SQL, where each
+table's query is genuinely different. The input narrows with the table name:
+
+```ts
+export const authDatabase = defineAuthDatabase({
+  async select({ table, where, limit }) {
+    switch (table) {
+      // `where` is AuthWhere<S, "users"> in this branch,
+      case "users":
+        return run(`select * from users where email = $1 limit $2`, [
+          where.email?.eq,
+          limit
+        ])
+      // and AuthWhere<S, "attempts"> in this one.
+      case "attempts":
+        return run(`select * from attempts where key = $1 limit $2`, [
+          where.key?.eq,
+          limit
+        ])
+      // ...
+    }
+  }
+  // ...
+})
+```
+
+## Typing your implementation
+
+`AuthDatabase` takes your declared additional fields as a type parameter. Declare the
+schema once, and both sides agree:
+
+```ts
+import type { AdditionalFieldsSchema } from "@auth-ts/core"
+import { defineAuthDatabase } from "@auth-ts/core"
+
+export const additionalFields = {
+  plan: "string",
+  seats: "number"
+} satisfies AdditionalFieldsSchema
+
+export const authDatabase = defineAuthDatabase<typeof additionalFields>({
+  async insert({ table, values }) {
+    switch (table) {
+      case "users":
+        // row.plan is string | undefined here, and the row you hand back
+        // is checked for plan?: string | null
+        return run(`insert into users … returning *`, [row.plan, row.seats])
+      // ...
+    }
+  }
+  // ...
+})
+
+createAuth({ database: authDatabase, user: { additionalFields } })
+```
+
+Your declared fields ride flat on the `users` row, beside the core ones, so
+`values(row)` is the whole insert. The bare `AuthDatabase` is accepted by any server:
+it sees those fields as an open map, which is what a `select *` returns anyway.
+A server checks a typed implementation against the schema it was given rather
+than inferring the schema from it, so `user.additionalFields` stays the one
+source of truth.
+
+## The rows
+
+The core fields of a user. Your declared additional fields sit beside them on
+`AuthUser`, typed from the schema you declare.
+
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="CoreUserFields" />
+
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthSession" />
+
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthVerification" />
+
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthAttempt" />
+
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthIdentity" />
+
+## Testing your implementation
+
+`@auth-ts/core/testing` exports the contract on this page as a list of checks
+you can run against your own four functions:
+
+```ts
+import { authDatabaseChecks } from "@auth-ts/core/testing"
+import { authDatabase } from "./auth-database"
+
+describe("authDatabase", () => {
+  for (const check of authDatabaseChecks) {
+    it(check.name, () => check.run(authDatabase))
+  }
+})
+```
+
+Each check is `{ name, run(db) }`, and `run` throws on failure and resolves on
+success — so it wires into any runner, and the package still depends on `jose`
+and nothing else.
+
+**Point it at a real database.** Every check cleans up after itself and tags its
+rows, so it is safe to run against the database you actually use, and that is
+where it earns its keep: the two things most likely to be wrong are whether your
+unique constraints are really there, and whether your `delete` really returns
+what it removed. Neither is observable against a mock, because a mock agrees
+with whatever you assumed.
+
+The checks cover `insert` returning the stored row with its id, `where` matching
+by equality and by an expiry range, `update` returning what it changed, `where` matching
+on one column and on several, `limit`, `orderBy` in both directions,
+`update` applying only what it was given, `delete` returning what it removed and
+matching on every column, a duplicate insert being refused for each unique set
+above, and `delete` honouring a range — removing what has expired while keeping
+what has not, which is the delete the sweep is made of.
+
+One limit, stated plainly: a duplicate check proves the constraint exists by
+inserting twice in sequence. The failure it prevents only shows under a race,
+which no test can stage reliably — the constraint is the fix, and this is only
+evidence that you have one.
+
+### Running them without a connection string
+
+CI usually has no database, and pointing it at a shared one makes the checks
+race each other. The reference application solves this with
+[PGlite](https://pglite.dev) — Postgres 18 compiled to WebAssembly, running in
+the test process:
+
+```ts
+import { PGlite } from "@electric-sql/pglite"
+import { drizzle } from "drizzle-orm/pglite"
+
+const client = new PGlite()
+// Pass the client: `drizzle(client)` reads it as connection config and starts a
+// second, empty database instead.
+export const db = drizzle({ client })
+```
+
+Generate the tables from your schema rather than writing the DDL out again, and
+the database the checks run against cannot drift from the one you deploy. With
+Drizzle that is `generateMigration` from `drizzle-kit/api-postgres`. The
+constraints are real, so the duplicate checks are testing something.
+
+What this does not cover is your driver: the SQL is the same, the transport is
+not. That is a fair trade for a suite that runs on every commit, but it is a
+reason to run the checks against your real database at least once as well.
+
+### The in-memory implementation
+
+The store the library's own suite runs against is public too:
+
+```ts
+import { createMemoryDatabase } from "@auth-ts/core/testing"
+
+const db = createMemoryDatabase()
+```
+
+It enforces the same unique constraints, so it is a fixture for testing code
+that sits *above* `AuthDatabase` rather than a substitute for running the checks
+against your database.

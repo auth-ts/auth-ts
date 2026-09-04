@@ -1,0 +1,60 @@
+{
+  "name": "@auth-ts/core",
+  "version": "0.1.0",
+  "description": "Free forever JWT auth in TypeScript.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
+  },
+  "scripts": {
+    "build": "vite build && bun scripts/check-bundles.ts",
+    "dev": "vite build --watch",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "jose": "6.2.9"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/auth-ts/auth-ts.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://authts.dev",
+  "bugs": "https://github.com/auth-ts/auth-ts/issues",
+  "keywords": [
+    "auth",
+    "authentication",
+    "jwt",
+    "jwks",
+    "postgrest",
+    "rls",
+    "neon",
+    "supabase"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

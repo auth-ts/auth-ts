@@ -1,0 +1,213 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@import "fumadocs-openapi/css/preset.css";
+
+/**
+ * Indigo accent over the neutral preset. Only the primary tokens move — the
+ * background, foreground, and muted greys stay as `neutral.css` set them, so
+ * body copy is unchanged.
+ *
+ * The fill lightens in dark mode so it stays legible either way — as a solid
+ * fill (the hero and closing buttons) and as text (active sidebar and TOC
+ * markers, the logo, highlighted code lines).
+ *
+ * Its label is the page background, which is the inverse of the foreground the
+ * rest of the page is drawn in. One declaration covers both themes: `.dark`
+ * lands on `<html>`, the same element as `:root`, so the `var()` resolves
+ * against whichever background is in play rather than needing a second copy.
+ */
+:root {
+  --color-fd-primary: oklch(58.5% 0.233 277.117); /* indigo-500 */
+  --color-fd-primary-foreground: var(--color-fd-background);
+  --color-fd-ring: oklch(58.5% 0.233 277.117);
+}
+
+.dark {
+  --color-fd-primary: oklch(67.3% 0.182 276.935); /* indigo-400 */
+  --color-fd-ring: oklch(67.3% 0.182 276.935);
+}
+
+/**
+ * Tailwind v4's Preflight gives buttons `cursor: default`, matching the browser
+ * rather than v3. This restores the pointer, which is what every control on the
+ * site is built to expect. Disabled controls keep the default cursor — both
+ * the native `disabled` attribute and `aria-disabled="true"`, which is how a
+ * non-button element with `role="button"` says it is unavailable.
+ *
+ * https://tailwindcss.com/docs/upgrade-guide#buttons-use-the-default-cursor
+ */
+@layer base {
+  button:not(:disabled, [aria-disabled="true"]),
+  [role="button"]:not(:disabled, [aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+/**
+ * Hero backdrop.
+ *
+ * Two drifting glows and two parallax star layers, all painted with
+ * `background-image` and moved with `transform` only — no blur filter and no
+ * canvas, so the whole thing composites on the GPU and costs nothing on the
+ * main thread. The glows are radial gradients with a soft falloff, which is
+ * what a `filter: blur()` would have been faking anyway.
+ *
+ * Each star layer drifts by exactly one tile over its cycle, so the loop is
+ * seamless rather than snapping back at the end.
+ *
+ * The glows carry six stops on an eased falloff rather than two. A two-stop
+ * ramp this wide and this faint changes by less than one 8-bit step per several
+ * pixels, which is what makes a gradient show concentric rings; the extra stops
+ * put the change where the eye expects it and mix in oklab so the ramp is even.
+ * `.hero-noise` finishes the job — a static grain that dithers whatever banding
+ * survives, the same trick print uses to hide a coarse screen.
+ */
+:root {
+  --hero-glow-near: oklch(58.5% 0.233 277.117 / 0.16); /* indigo-500 */
+  --hero-glow-far: oklch(62% 0.2 305 / 0.11);
+  --hero-star: oklch(50% 0.06 277 / 0.34);
+}
+
+.dark {
+  --hero-glow-near: oklch(58.5% 0.233 277.117 / 0.3);
+  --hero-glow-far: oklch(62% 0.2 305 / 0.2);
+  --hero-star: oklch(95% 0.012 277 / 0.72);
+}
+
+.hero-backdrop {
+  /* Fades out before the content so nothing competes with the heading. */
+  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 92%);
+}
+
+.hero-glow {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.hero-glow-near {
+  top: -55%;
+  left: -5%;
+  width: 55rem;
+  height: 55rem;
+  background: radial-gradient(
+    circle closest-side,
+    var(--hero-glow-near) 0%,
+    color-mix(in oklab, var(--hero-glow-near) 72%, transparent) 28%,
+    color-mix(in oklab, var(--hero-glow-near) 40%, transparent) 48%,
+    color-mix(in oklab, var(--hero-glow-near) 18%, transparent) 66%,
+    color-mix(in oklab, var(--hero-glow-near) 6%, transparent) 82%,
+    color-mix(in oklab, var(--hero-glow-near) 0%, transparent) 100%
+  );
+  animation: hero-glow-near 26s ease-in-out infinite;
+}
+
+.hero-glow-far {
+  top: -35%;
+  right: -10%;
+  width: 42rem;
+  height: 42rem;
+  background: radial-gradient(
+    circle closest-side,
+    var(--hero-glow-far) 0%,
+    color-mix(in oklab, var(--hero-glow-far) 72%, transparent) 28%,
+    color-mix(in oklab, var(--hero-glow-far) 40%, transparent) 48%,
+    color-mix(in oklab, var(--hero-glow-far) 18%, transparent) 66%,
+    color-mix(in oklab, var(--hero-glow-far) 6%, transparent) 82%,
+    color-mix(in oklab, var(--hero-glow-far) 0%, transparent) 100%
+  );
+  animation: hero-glow-far 34s ease-in-out infinite;
+}
+
+.hero-stars {
+  position: absolute;
+  inset: -20%;
+  will-change: transform;
+}
+
+.hero-stars-near {
+  background-image:
+    radial-gradient(1.7px 1.7px at 18% 21%, var(--hero-star), transparent 100%),
+    radial-gradient(1.4px 1.4px at 71% 57%, var(--hero-star), transparent 100%),
+    radial-gradient(1.2px 1.2px at 43% 79%, var(--hero-star), transparent 100%),
+    radial-gradient(1.6px 1.6px at 88% 11%, var(--hero-star), transparent 100%);
+  background-size: 320px 320px;
+  animation:
+    hero-stars-near 150s linear infinite,
+    hero-twinkle 6s ease-in-out infinite;
+}
+
+.hero-stars-far {
+  background-image:
+    radial-gradient(1.1px 1.1px at 62% 14%, var(--hero-star), transparent 100%),
+    radial-gradient(1px 1px at 27% 63%, var(--hero-star), transparent 100%),
+    radial-gradient(1.2px 1.2px at 84% 82%, var(--hero-star), transparent 100%);
+  background-size: 540px 540px;
+  /* Slower and dimmer, so the two layers read as different depths. */
+  opacity: 0.6;
+  animation:
+    hero-stars-far 260s linear infinite,
+    hero-twinkle 9s ease-in-out infinite reverse;
+}
+
+.hero-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.dark .hero-noise {
+  opacity: 0.05;
+}
+
+@keyframes hero-glow-near {
+  0%,
+  100% {
+    transform: translate3d(-3%, -2%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(5%, 4%, 0) scale(1.16);
+  }
+}
+
+@keyframes hero-glow-far {
+  0%,
+  100% {
+    transform: translate3d(3%, 3%, 0) scale(1.12);
+  }
+  50% {
+    transform: translate3d(-5%, -3%, 0) scale(1);
+  }
+}
+
+@keyframes hero-stars-near {
+  to {
+    transform: translate3d(-320px, -320px, 0);
+  }
+}
+
+@keyframes hero-stars-far {
+  to {
+    transform: translate3d(-540px, -540px, 0);
+  }
+}
+
+@keyframes hero-twinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-glow,
+  .hero-stars {
+    animation: none;
+  }
+}
