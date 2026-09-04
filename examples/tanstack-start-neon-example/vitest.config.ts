@@ -3,8 +3,6 @@ import { defineConfig } from "vitest/config"
 
 const stub = (file: string) => resolve(import.meta.dirname, "tests", file)
 
-// Not vite.config.ts: that one loads the Cloudflare and TanStack Start plugins
-// to build an application, and these tests only need the database layer.
 export default defineConfig({
   test: { environment: "node" },
   resolve: {
