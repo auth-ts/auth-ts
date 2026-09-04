@@ -58,7 +58,7 @@ function compare(left: unknown, right: unknown) {
  * library's own suite runs against this exact object, so when you test your auth
  * flows against it you are testing against the same semantics the library
  * verifies itself with — not a simplified mock that agrees with your
- * assumptions. It is deliberately generic: five maps of rows, equality
+ * assumptions. It is deliberately generic: six maps of rows, equality
  * matching, and the uniqueness the contract requires. Everything that used to
  * be easy to get wrong in an implementation now lives in core, tested once.
  */

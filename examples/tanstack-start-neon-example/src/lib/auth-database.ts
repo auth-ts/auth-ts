@@ -1,10 +1,10 @@
-import type {
-  AuthDatabaseOperator,
-  AuthOrderBy,
-  AuthTable,
-  AuthWhere
+import {
+  type AuthDatabaseOperator,
+  type AuthOrderBy,
+  type AuthTable,
+  type AuthWhere,
+  defineAuthDatabase
 } from "@auth-ts/core"
-import { defineAuthDatabase } from "@auth-ts/core"
 import { and, getColumns, operators, orderByOperators } from "drizzle-orm"
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core"
 
