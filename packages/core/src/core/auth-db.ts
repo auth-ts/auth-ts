@@ -237,13 +237,17 @@ export interface AuthIdentitySecret {
 }
 
 /** The tables core reads and writes. */
-export type AuthTable =
-  | "users"
-  | "sessions"
-  | "verifications"
-  | "attempts"
-  | "identities"
-  | "identitySecrets"
+export const authTables = [
+  "users",
+  "sessions",
+  "verifications",
+  "attempts",
+  "identities",
+  "identitySecrets"
+] as const
+
+/** One of {@link authTables}. */
+export type AuthTable = (typeof authTables)[number]
 
 /** Table name → the row it holds. Your declared fields ride flat on `users`. */
 export interface AuthTables<

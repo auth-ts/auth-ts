@@ -211,16 +211,21 @@ the whole read path from the reference application:
 ```ts
 import { defineAuthDB } from "@auth-ts/core"
 
-import * as schema from "./db/schema"
+import { attempts, identities, identitySecrets, sessions, users, verifications } from "./db/schema"
 
-// The schema module is already the dictionary. Filtering keeps tables and
-// nothing else, so it is free to export a helper or a relation alongside them.
-const authTables = Object.fromEntries(
-  Object.entries(schema).filter(([, value]) => is(value, PgTable))
-) as Pick<typeof schema, AuthTable>
+// Checked, not widened: a missing table fails here, and each table keeps its
+// own type. This is also where a schema whose names differ gets mapped.
+const authSchema = {
+  users,
+  sessions,
+  verifications,
+  attempts,
+  identities,
+  identitySecrets
+} satisfies Record<AuthTable, AnyPgTable>
 
 const buildWhere = (table: AuthTable, where: AuthWhere) => {
-  const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
+  const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
   return and(
     ...Object.entries(where).flatMap(([name, condition]) => [
       "eq" in condition ? eq(columns[name], condition.eq) : undefined,
@@ -231,7 +236,7 @@ const buildWhere = (table: AuthTable, where: AuthWhere) => {
 }
 
 const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
-  const columns: Record<string, AnyPgColumn> = getColumns(authTables[table])
+  const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
   return Object.entries(orderBy).map(([name, direction]) =>
     (direction === "asc" ? asc : desc)(columns[name])
   )
@@ -241,32 +246,32 @@ export const authDB = defineAuthDB({
   select: ({ table, where, limit, orderBy }) =>
     db
       .select()
-      .from(authTables[table])
+      .from(authSchema[table])
       .where(buildWhere(table, where))
       .orderBy(...buildOrderBy(table, orderBy))
       .limit(limit),
 
   insert: ({ table, values }) =>
     db
-      .insert(authTables[table])
+      .insert(authSchema[table])
       .values(values)
       .returning()
       .then((rows) => rows[0]),
 
   update: ({ table, where, values }) =>
-    db.update(authTables[table]).set(values).where(buildWhere(table, where)),
+    db.update(authSchema[table]).set(values).where(buildWhere(table, where)),
 
   delete: ({ table, where }) =>
-    db.delete(authTables[table]).where(buildWhere(table, where)).returning()
+    db.delete(authSchema[table]).where(buildWhere(table, where)).returning()
   // ...
 })
 ```
 
-Keep the tables' own types. It is tempting to widen them — `satisfies
-Record<AuthTable, AnyPgTable>`, or a `tableOf()` helper returning `AnyPgTable`
+Keep the tables' own types. It is tempting to widen them — an annotation of
+`Record<AuthTable, AnyPgTable>`, or a `tableOf()` helper returning `AnyPgTable`
 — and that is what forces casts back into every function: an erased table type
 means an erased row type, so the query no longer returns anything the contract
-recognizes.
+recognizes. `satisfies` checks the same shape without erasing anything.
 
 A **`switch` per table** is the shape to reach for with raw SQL, where each
 table's query is genuinely different. The input narrows with the table name:

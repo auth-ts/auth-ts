@@ -27,7 +27,7 @@ export type {
   UserType,
   VerificationPurpose
 } from "./core/auth-db"
-export { defineAuthDB } from "./core/auth-db"
+export { authTables, defineAuthDB } from "./core/auth-db"
 export type {
   AuthOptions,
   CookieOptions,
