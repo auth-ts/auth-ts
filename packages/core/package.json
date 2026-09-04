@@ -26,8 +26,8 @@
     }
   },
   "scripts": {
-    "build": "vite build && bun scripts/check-bundles.ts && tsc -p tsconfig.build.json && bun ../../tools/build/dts-extensions.ts dist",
-    "dev": "vite build --watch & tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "build": "vite build && bun scripts/check-bundles.ts",
+    "dev": "vite build --watch",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },
