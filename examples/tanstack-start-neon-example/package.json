@@ -16,8 +16,8 @@
   "dependencies": {
     "@auth-ts/core": "workspace:*",
     "@heroicons/react": "^2.2.0",
-    "@neondatabase/postgrest-js": "^0.2.0-beta",
     "@neondatabase/serverless": "1.1.0",
+    "@supabase/postgrest-js": "2.116.0",
     "@tanstack/react-query": "5.101.4",
     "@tanstack/react-router": "1.170.31",
     "@tanstack/react-start": "1.168.48",

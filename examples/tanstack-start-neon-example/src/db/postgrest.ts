@@ -1,4 +1,4 @@
-import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
+import { PostgrestClient } from "@supabase/postgrest-js"
 import type { InferInsertModel, InferSelectModel } from "drizzle-orm"
 import type { PgTable } from "drizzle-orm/pg-core"
 import { authClient } from "../lib/auth-client"
@@ -26,20 +26,6 @@ type DrizzlePostgrest<Schema> = {
   }
 }
 
-const withToken = fetchWithToken(authClient.getToken)
-
-/**
- * Retries a refused request once with a fresh token, and never more: if the
- * second attempt is also refused the session is genuinely gone.
- */
-const withRetry: typeof fetch = async (input, init) => {
-  const response = await withToken(input, init)
-  if (response.status !== 401) return response
-
-  authClient.clearToken()
-  return withToken(input, init)
-}
-
 /** Revives JSON date strings into Dates. */
 export function reviveDates<K extends string, Row extends Record<K, Date>>(
   row: Row,
@@ -51,9 +37,7 @@ export function reviveDates<K extends string, Row extends Record<K, Date>>(
 }
 
 /** The data plane: PostgREST over Neon, authenticated by our access token. */
-export const postgrest = new NeonPostgrestClient<
-  DrizzlePostgrest<typeof schema>
->({
-  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL as string,
-  options: { global: { fetch: withRetry } }
-})
+export const postgrest = new PostgrestClient<DrizzlePostgrest<typeof schema>>(
+  import.meta.env.VITE_NEON_DATA_API_URL as string,
+  { fetch: authClient.fetchWithAuth }
+)

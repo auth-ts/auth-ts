@@ -72,8 +72,8 @@ export const authClient = createAuthClient()
 await authClient.sendSignInCode({ email })
 await authClient.signInWithCode({ email, code })
 
-// Hand this to your PostgREST client.
-const token = await authClient.getToken()
+// Your PostgREST client's `fetch`, with the access token attached.
+new PostgrestClient(DATA_API_URL, { fetch: authClient.fetchWithAuth })
 ```
 
 ## Why no adapter packages
