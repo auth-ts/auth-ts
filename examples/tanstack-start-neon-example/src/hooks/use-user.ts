@@ -6,22 +6,18 @@ import { useToken } from "./use-token"
 export const userQueryKey = ["user"] as const
 
 export function useUser() {
-  const { data: token, isPending: isTokenPending } = useToken()
+  const { data: token } = useToken()
 
   return useQuery({
     queryKey: userQueryKey,
-    queryFn: isTokenPending
+    queryFn: !token
       ? skipToken
-      : async () => {
-          if (!token) return null
-
-          const { data } = await postgrest
+      : async () =>
+          postgrest
             .from("users")
             .select()
             .single()
             .throwOnError()
-
-          return data
-        }
+            .then(({ data }) => data)
   })
 }

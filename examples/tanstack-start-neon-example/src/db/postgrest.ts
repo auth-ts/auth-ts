@@ -1,12 +1,13 @@
-import { PostgrestClient } from "@supabase/postgrest-js"
-import { authClient } from "../lib/auth-client"
-import { createDrizzlePostgrest } from "./drizzle-postgrest"
-import * as schema from "./schema"
+import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
 
-/** The data plane: PostgREST over Neon, authenticated by our access token. */
-export const postgrest = createDrizzlePostgrest(
-  schema,
-  new PostgrestClient(import.meta.env.VITE_NEON_DATA_API_URL, {
-    fetch: authClient.fetchWithAuth
-  })
-)
+import { authClient } from "../lib/auth-client"
+import type { Database } from "../types/database"
+
+export const postgrest = new NeonPostgrestClient<Database>({
+  dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
+  options: {
+    global: {
+      fetch: fetchWithToken(authClient.getToken)
+    }
+  }
+})

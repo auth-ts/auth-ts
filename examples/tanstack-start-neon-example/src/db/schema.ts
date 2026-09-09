@@ -32,13 +32,13 @@ export const users = pgTable.withRLS(
         onDelete: "cascade"
       }
     ),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
     index("usersPrimaryUserIdIndex").on(table.primaryUserId),
@@ -65,17 +65,20 @@ export const sessions = pgTable.withRLS(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text("tokenHash").notNull().unique(),
-    expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expiresAt", {
+      withTimezone: true,
+      mode: "string"
+    }).notNull(),
     userAgent: text("userAgent"),
     ipAddress: text("ipAddress"),
     amr: text("amr").array(),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
     index("sessionsUserIdIndex").on(table.userId),
@@ -99,18 +102,21 @@ export const verifications = pgTable.withRLS(
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     identifier: text("identifier").notNull(),
     codeHash: text("codeHash").notNull(),
-    expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expiresAt", {
+      withTimezone: true,
+      mode: "string"
+    }).notNull(),
     purpose: text("purpose")
       .$type<VerificationPurpose>()
       .notNull()
       .default("signIn"),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
     index("verificationsIdentifierIndex").on(table.identifier),
@@ -128,14 +134,17 @@ export const attempts = pgTable.withRLS(
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     key: text("key").notNull(),
-    expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    expiresAt: timestamp("expiresAt", {
+      withTimezone: true,
+      mode: "string"
+    }).notNull(),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
     index("attemptsKeyIndex").on(table.key),
@@ -154,13 +163,13 @@ export const identities = pgTable.withRLS(
     providerUserId: text("providerUserId").notNull(),
     label: text("label"),
     scope: text("scope"),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
     index("identitiesUserIdIndex").on(table.userId),
@@ -191,19 +200,21 @@ export const identitySecrets = pgTable.withRLS(
       .references(() => identities.id, { onDelete: "cascade" }),
     accessTokenEncrypted: text("accessTokenEncrypted"),
     accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
-      withTimezone: true
+      withTimezone: true,
+      mode: "string"
     }),
     refreshTokenEncrypted: text("refreshTokenEncrypted"),
     refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
-      withTimezone: true
+      withTimezone: true,
+      mode: "string"
     }),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [uniqueIndex("identitySecretsIdentityIndex").on(table.identityId)]
 )
@@ -218,13 +229,13 @@ export const todos = pgTable.withRLS(
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     completed: boolean("completed").notNull().default(false),
-    createdAt: timestamp("createdAt", { withTimezone: true })
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updatedAt", { withTimezone: true })
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow()
-      .$onUpdate(() => new Date())
+      .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
     index("todosUserIdIndex").on(table.userId),

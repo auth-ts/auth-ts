@@ -10,7 +10,7 @@ export function useSessions(userId?: string) {
   return useQuery({
     queryKey: sessionsQueryKey(userId),
     queryFn: userId
-      ? () =>
+      ? async () =>
           postgrest
             .from("sessions")
             .select()

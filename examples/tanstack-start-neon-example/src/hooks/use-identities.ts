@@ -10,7 +10,7 @@ export function useIdentities(userId?: string) {
   return useQuery({
     queryKey: identitiesQueryKey(userId),
     queryFn: userId
-      ? () =>
+      ? async () =>
           postgrest
             .from("identities")
             .select()

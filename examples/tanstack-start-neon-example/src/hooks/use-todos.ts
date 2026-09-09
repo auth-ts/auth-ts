@@ -15,7 +15,7 @@ export function useTodos(userId?: string) {
   return useQuery({
     queryKey: todosQueryKey(userId),
     queryFn: userId
-      ? () =>
+      ? async () =>
           postgrest
             .from("todos")
             .select()
@@ -45,7 +45,7 @@ export function useInsertTodo(userId?: string) {
     onMutate: async (values) => {
       if (!userId) return
       await queryClient.cancelQueries({ queryKey })
-      const now = new Date()
+      const now = new Date().toISOString()
 
       queryClient.setQueryData<Todo[]>(queryKey, (todos) =>
         todos
@@ -78,7 +78,7 @@ export function useUpdateTodo(userId?: string) {
       if (!userId) throw new Error("Cannot update a todo while signed out.")
       const { data } = await postgrest
         .from("todos")
-        .update({ updatedAt: new Date(), ...values })
+        .update({ updatedAt: new Date().toISOString(), ...values })
         .eq("id", id)
         .select()
         .single()
@@ -93,7 +93,7 @@ export function useUpdateTodo(userId?: string) {
       queryClient.setQueryData<Todo[]>(queryKey, (todos) =>
         todos?.map((todo) =>
           todo.id === values.id
-            ? { ...todo, updatedAt: new Date(), ...values }
+            ? { ...todo, updatedAt: new Date().toISOString(), ...values }
             : todo
         )
       )
