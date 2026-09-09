@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query"
 import { v7 as uuidv7 } from "uuid"
 
-import { postgrest, reviveDates } from "../db/postgrest"
+import { postgrest } from "../db/postgrest"
 import type { Todo, TodoInsert } from "../db/schema"
 
 export const todosQueryKey = (userId?: string) => ["todos", userId]
@@ -15,15 +15,13 @@ export function useTodos(userId?: string) {
   return useQuery({
     queryKey: todosQueryKey(userId),
     queryFn: userId
-      ? async () => {
-          const { data } = await postgrest
+      ? () =>
+          postgrest
             .from("todos")
             .select()
             .order("createdAt", { ascending: false })
             .throwOnError()
-
-          return data.map((todo) => reviveDates(todo, "createdAt", "updatedAt"))
-        }
+            .then(({ data }) => data)
       : skipToken
   })
 }
@@ -42,7 +40,7 @@ export function useInsertTodo(userId?: string) {
         .single()
         .throwOnError()
 
-      return reviveDates(data, "createdAt", "updatedAt")
+      return data
     },
     onMutate: async (values) => {
       if (!userId) return
@@ -86,7 +84,7 @@ export function useUpdateTodo(userId?: string) {
         .single()
         .throwOnError()
 
-      return reviveDates(data, "createdAt", "updatedAt")
+      return data
     },
     onMutate: async (values) => {
       if (!userId) return
