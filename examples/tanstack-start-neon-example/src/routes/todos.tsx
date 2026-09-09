@@ -3,28 +3,34 @@ import {
   PlusIcon,
   TrashIcon
 } from "@heroicons/react/24/outline"
+import {
+  useDeleteMutation,
+  useInsertMutation,
+  useQuery,
+  useUpdateMutation
+} from "@supabase-cache-helpers/postgrest-react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 
 import { PendingSpinner } from "../components/pending-spinner"
 import { SignedOutCard } from "../components/signed-out-card"
-import {
-  useDeleteTodo,
-  useInsertTodo,
-  useTodos,
-  useUpdateTodo
-} from "../hooks/use-todos"
+import { useToken } from "../hooks/use-token"
 import { useUser } from "../hooks/use-user"
+import { client } from "../lib/client"
 
 export const Route = createFileRoute("/todos")({ component: TodosPage })
 
 /** The todo list — the whole point of the demo. */
 function TodosPage() {
+  const { data: token } = useToken()
   const { data: user, isPending } = useUser()
-  const todos = useTodos(user?.id)
-  const add = useInsertTodo(user?.id)
-  const toggle = useUpdateTodo(user?.id)
-  const remove = useDeleteTodo(user?.id)
+  const todos = useQuery(
+    client.from("todos").select().order("createdAt", { ascending: false }),
+    { enabled: !!token }
+  )
+  const add = useInsertMutation(client.from("todos"), ["id"], null)
+  const toggle = useUpdateMutation(client.from("todos"), ["id"], null)
+  const remove = useDeleteMutation(client.from("todos"), ["id"], null)
   const [title, setTitle] = useState("")
 
   if (isPending) return <PendingSpinner />
@@ -60,7 +66,7 @@ function TodosPage() {
         onSubmit={(event) => {
           event.preventDefault()
           if (!title.trim()) return
-          add.mutate({ title: title.trim() })
+          add.mutate([{ title: title.trim() }])
           setTitle("")
         }}
       >
@@ -114,7 +120,7 @@ function TodosPage() {
             </span>
             <button
               type="button"
-              onClick={() => remove.mutate(todo.id)}
+              onClick={() => remove.mutate({ id: todo.id })}
               aria-label={`Delete ${todo.title}`}
               className="btn btn-ghost btn-square btn-sm text-base-content/60"
             >

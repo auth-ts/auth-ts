@@ -1,23 +1,17 @@
-import { skipToken, useQuery } from "@tanstack/react-query"
+import { useQuery } from "@supabase-cache-helpers/postgrest-react-query"
 
-import { postgrest } from "../db/postgrest"
+import { client } from "../lib/client"
 import { useToken } from "./use-token"
-
-export const userQueryKey = ["user"] as const
 
 export function useUser() {
   const { data: token } = useToken()
 
-  return useQuery({
-    queryKey: userQueryKey,
-    queryFn: !token
-      ? skipToken
-      : async () =>
-          postgrest
-            .from("users")
-            .select()
-            .single()
-            .throwOnError()
-            .then(({ data }) => data)
+  const user = useQuery(client.from("users").select().single(), {
+    enabled: !!token
   })
+
+  return {
+    data: token ? user.data : null,
+    isPending: !token || user.isPending
+  }
 }

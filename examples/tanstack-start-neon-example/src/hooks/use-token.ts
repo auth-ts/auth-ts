@@ -1,11 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { authClient } from "../lib/auth-client"
 
-export const tokenQueryKey = ["token"] as const
-
 export function useToken() {
   return useQuery({
-    queryKey: tokenQueryKey,
+    queryKey: ["token"],
     queryFn: () => authClient.getToken()
   })
 }

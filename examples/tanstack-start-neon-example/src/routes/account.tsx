@@ -8,7 +8,16 @@ import {
   TrashIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useDeleteMutation,
+  useQuery,
+  useRevalidateTables,
+  useUpdateMutation
+} from "@supabase-cache-helpers/postgrest-react-query"
+import {
+  useQueryClient,
+  useQuery as useReactQuery
+} from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/github-icon"
@@ -16,13 +25,11 @@ import type { Notice } from "../components/notice"
 import { NoticeAlert } from "../components/notice"
 import { PendingSpinner } from "../components/pending-spinner"
 import { SignedOutCard } from "../components/signed-out-card"
-import { postgrest } from "../db/postgrest"
 import { useCountdown } from "../hooks/use-countdown"
-import { identitiesQueryKey, useIdentities } from "../hooks/use-identities"
-import { sessionsQueryKey, useSessions } from "../hooks/use-sessions"
 import { useToken } from "../hooks/use-token"
-import { userQueryKey, useUser } from "../hooks/use-user"
+import { useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
+import { client } from "../lib/client"
 
 export const Route = createFileRoute("/account")({ component: AccountPage })
 
@@ -68,8 +75,8 @@ function AccountPage() {
 
       {notice ? <NoticeAlert notice={notice} /> : null}
 
-      <ProfileCard name={user.name} setNotice={setNotice} />
-      <ProvidersCard userId={user.id} setNotice={setNotice} />
+      <ProfileCard userId={user.id} name={user.name} setNotice={setNotice} />
+      <ProvidersCard setNotice={setNotice} />
       <SessionsCard userId={user.id} signOut={signOut} setNotice={setNotice} />
       <SwitchUserCard userId={user.id} />
       <SignOutButtons
@@ -83,26 +90,22 @@ function AccountPage() {
 }
 
 function ProfileCard({
+  userId,
   name,
   setNotice
 }: {
+  userId: string
   name: string | null
   setNotice: SetNotice
 }) {
-  const queryClient = useQueryClient()
   // `null` until the user edits, so the input shows the stored name and Save
   // cannot send an empty or unchanged value over it.
   const [draftName, setDraftName] = useState<string | null>(null)
 
-  const rename = useMutation({
-    // No `eq`: updateOwnUser already narrows the write to the caller's row.
-    mutationFn: async (name: string) => {
-      await postgrest.from("users").update({ name }).throwOnError()
-    },
-    onSuccess: async () => {
+  const rename = useUpdateMutation(client.from("users"), ["id"], null, {
+    onSuccess: () => {
       setDraftName(null)
       setNotice({ text: "Saved.", tone: "success" })
-      await queryClient.invalidateQueries({ queryKey: userQueryKey })
     },
     onError: () => setNotice({ text: "Could not save.", tone: "error" })
   })
@@ -120,7 +123,7 @@ function ProfileCard({
           className="join w-full"
           onSubmit={(event) => {
             event.preventDefault()
-            if (draftName) rename.mutate(draftName.trim())
+            if (draftName) rename.mutate({ id: userId, name: draftName.trim() })
           }}
         >
           <input
@@ -143,29 +146,21 @@ function ProfileCard({
   )
 }
 
-function ProvidersCard({
-  userId,
-  setNotice
-}: {
-  userId: string
-  setNotice: SetNotice
-}) {
-  const queryClient = useQueryClient()
-  const identities = useIdentities(userId)
+function ProvidersCard({ setNotice }: { setNotice: SetNotice }) {
+  const identities = useQuery(
+    client.from("identities").select().order("provider", { ascending: true })
+  )
 
   // By id, not by provider: two accounts at the same provider can be connected
-  // at once, and disconnecting one must not take the other. No userId filter —
-  // deleteOwnIdentities narrows the delete to this user's rows.
-  const disconnect = useMutation({
-    mutationFn: async (id: string) => {
-      await postgrest.from("identities").delete().eq("id", id).throwOnError()
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: identitiesQueryKey(userId)
-      }),
-    onError: () => setNotice({ text: "Could not disconnect.", tone: "error" })
-  })
+  // at once, and disconnecting one must not take the other.
+  const disconnect = useDeleteMutation(
+    client.from("identities"),
+    ["id"],
+    null,
+    {
+      onError: () => setNotice({ text: "Could not disconnect.", tone: "error" })
+    }
+  )
 
   const linkGitHub = async () => {
     setNotice(null)
@@ -210,7 +205,7 @@ function ProvidersCard({
                 </span>
                 <button
                   type="button"
-                  onClick={() => disconnect.mutate(identity.id)}
+                  onClick={() => disconnect.mutate({ id: identity.id })}
                   className="btn btn-ghost btn-sm"
                 >
                   <LinkSlashIcon className="size-4" />
@@ -234,8 +229,9 @@ function SessionsCard({
   signOut: SignOut
   setNotice: SetNotice
 }) {
-  const queryClient = useQueryClient()
-  const sessions = useSessions(userId)
+  const sessions = useQuery(
+    client.from("sessions").select().order("createdAt", { ascending: false })
+  )
   // Which entry is this device: the token names its own session, so no request.
   const { data: token } = useToken()
   const currentSessionId = token
@@ -244,12 +240,7 @@ function SessionsCard({
 
   // Another device's session is a row this user owns, so the data plane
   // deletes it. This device's is a sign-out, because the cookie has to go too.
-  const revoke = useMutation({
-    mutationFn: async (id: string) => {
-      await postgrest.from("sessions").delete().eq("id", id).throwOnError()
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey(userId) }),
+  const revoke = useDeleteMutation(client.from("sessions"), ["id"], null, {
     onError: () => setNotice({ text: "Could not revoke.", tone: "error" })
   })
 
@@ -292,7 +283,7 @@ function SessionsCard({
               ) : (
                 <button
                   type="button"
-                  onClick={() => revoke.mutate(session.id)}
+                  onClick={() => revoke.mutate({ id: session.id })}
                   className="btn btn-ghost btn-sm"
                 >
                   <XMarkIcon className="size-4" />
@@ -313,7 +304,7 @@ function SessionsCard({
 
 function SwitchUserCard({ userId }: { userId: string }) {
   const queryClient = useQueryClient()
-  const users = useQuery({
+  const users = useReactQuery({
     queryKey: ["users"],
     queryFn: authClient.listUsers,
     // 404 means multiUser is off on the server; that is a configuration
@@ -367,7 +358,9 @@ function SignOutButtons({
   signOut: SignOut
   setNotice: SetNotice
 }) {
-  const sessions = useSessions(userId)
+  const revalidateSessions = useRevalidateTables([
+    { schema: "public", table: "sessions" }
+  ])
 
   const buttons: {
     label: string
@@ -407,7 +400,7 @@ function SignOutButtons({
               text: "Signed out on your other devices.",
               tone: "success"
             })
-            await sessions.refetch()
+            await revalidateSessions()
           }}
           className="btn btn-outline btn-sm"
         >

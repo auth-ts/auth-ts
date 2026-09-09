@@ -1,9 +1,8 @@
 import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
-
-import { authClient } from "../lib/auth-client"
 import type { Database } from "../types/database"
+import { authClient } from "./auth-client"
 
-export const postgrest = new NeonPostgrestClient<Database>({
+export const client = new NeonPostgrestClient<Database>({
   dataApiUrl: import.meta.env.VITE_NEON_DATA_API_URL,
   options: {
     global: {

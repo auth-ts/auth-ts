@@ -247,6 +247,3 @@ export const todos = pgTable.withRLS(
     })
   ]
 )
-
-export type Todo = typeof todos.$inferSelect
-export type TodoInsert = typeof todos.$inferInsert
