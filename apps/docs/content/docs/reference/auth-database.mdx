@@ -280,13 +280,13 @@ table's query is genuinely different. The input narrows with the table name:
 export const authDatabase = defineAuthDatabase({
   async select({ table, where, limit }) {
     switch (table) {
-      // `where` is AuthWhere<S, "users"> in this branch,
+      // `where` is AuthWhere<"date", S, "users"> in this branch,
       case "users":
         return run(`select * from users where email = $1 limit $2`, [
           where.email?.eq,
           limit
         ])
-      // and AuthWhere<S, "attempts"> in this one.
+      // and AuthWhere<"date", S, "attempts"> in this one.
       case "attempts":
         return run(`select * from attempts where key = $1 limit $2`, [
           where.key?.eq,
@@ -313,7 +313,7 @@ export const additionalFields = {
   seats: "number"
 } satisfies AdditionalFieldsSchema
 
-export const authDatabase = defineAuthDatabase<typeof additionalFields>({
+export const authDatabase = defineAuthDatabase<"date", typeof additionalFields>({
   async insert({ table, values }) {
     switch (table) {
       case "users":
@@ -335,6 +335,34 @@ it sees those fields as an open map, which is what a `select *` returns anyway.
 A server checks a typed implementation against the schema it was given rather
 than inferring the schema from it, so `user.additionalFields` stays the one
 source of truth.
+
+## Timestamps
+
+Core thinks in `Date`: it compares `expiresAt` to now and writes `new Date()`.
+Some stores hold a timestamp as text instead — drizzle with `mode: "string"`,
+PostgREST, most document stores. Rather than parse in every function, name the
+mode once and the helper converts at the boundary:
+
+```ts
+export const authDatabase = defineAuthDatabase({
+  timestamps: "string",
+  select: ({ table, where, limit, orderBy }) =>
+    db.select().from(authSchema[table]).where(buildWhere(table, where)) // …
+  // ...
+})
+```
+
+Under `"string"` the four functions are typed in ISO 8601 strings: rows come
+back with `createdAt: string`, and the `Date`s core writes — a value, or a
+bound on `expiresAt` — arrive as strings. What the functions return is parsed
+back to `Date` before core sees it, so the contract on this page is unchanged.
+The strings must carry a zone, which `timestamptz` does; a bare `timestamp` is
+read as local time.
+
+Every type on this page that carries a timestamp takes the mode as its first
+parameter, so a helper of your own reads `AuthWhere<"string">`. An
+implementation that also declares additional fields names both:
+`defineAuthDatabase<"string", typeof additionalFields>`.
 
 ## The rows
 

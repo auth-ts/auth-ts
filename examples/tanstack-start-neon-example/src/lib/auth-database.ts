@@ -27,7 +27,7 @@ const authSchema = {
   identitySecrets
 } satisfies Record<AuthTable, AnyPgTable>
 
-const buildWhere = (table: AuthTable, where: AuthWhere) => {
+const buildWhere = (table: AuthTable, where: AuthWhere<"string">) => {
   const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
 
   return and(
@@ -48,6 +48,7 @@ const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
 }
 
 export const authDatabase = defineAuthDatabase({
+  timestamps: "string",
   select: ({ table, where, limit, orderBy }) =>
     db
       .select()

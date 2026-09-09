@@ -15,7 +15,7 @@ export const SESSION_PAGE_SIZE = 100
 export function listUserSessions(
   internals: AuthInternals,
   userId: string
-): Promise<AuthRow<AdditionalFieldsSchema, "sessions">[]> {
+): Promise<AuthRow<"date", AdditionalFieldsSchema, "sessions">[]> {
   return internals.db.select({
     table: "sessions",
     where: { userId: { eq: userId } },

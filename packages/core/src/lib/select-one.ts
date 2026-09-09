@@ -19,9 +19,9 @@ import type { AuthInternals } from "../core/auth-internals"
 export async function selectOne<T extends AuthTable>(
   internals: AuthInternals,
   table: T,
-  where: AuthWhere<AdditionalFieldsSchema, T>,
+  where: AuthWhere<"date", AdditionalFieldsSchema, T>,
   orderBy?: AuthOrderBy<AdditionalFieldsSchema, T>
-): Promise<AuthRow<AdditionalFieldsSchema, T> | null> {
+): Promise<AuthRow<"date", AdditionalFieldsSchema, T> | null> {
   const [row] = await internals.db.select({
     table,
     where,

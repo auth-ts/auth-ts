@@ -45,19 +45,19 @@ describe("AuthUser carries the declared fields", () => {
   })
 
   it("types them optional and never null on the way in", () => {
-    expectTypeOf<AuthInsert<Declared, "users">["plan"]>().toEqualTypeOf<
+    expectTypeOf<AuthInsert<"date", Declared, "users">["plan"]>().toEqualTypeOf<
       string | undefined
     >()
-    expectTypeOf<AuthInsert<Declared, "users">["seats"]>().toEqualTypeOf<
-      number | undefined
-    >()
+    expectTypeOf<
+      AuthInsert<"date", Declared, "users">["seats"]
+    >().toEqualTypeOf<number | undefined>()
     // `id` is optional on the way in, because the store fills it unless
     // `generateId` is configured — and required on the way out, because by then
     // it exists.
-    expectTypeOf<AuthInsert<Declared, "users">["id"]>().toEqualTypeOf<
+    expectTypeOf<AuthInsert<"date", Declared, "users">["id"]>().toEqualTypeOf<
       string | undefined
     >()
-    expectTypeOf<AuthRow<Declared, "users">>().toEqualTypeOf<
+    expectTypeOf<AuthRow<"date", Declared, "users">>().toEqualTypeOf<
       AuthUser<Declared>
     >()
   })
@@ -85,8 +85,8 @@ describe("the table types the four functions take", () => {
   /** A schema whose one declared field is deliberately not a string. */
   type Numeric = { plan: "number" }
 
-  const usersWhere = (where: AuthWhere<Numeric, "users">) => where
-  const sessionsWhere = (where: AuthWhere<Numeric, "sessions">) => where
+  const usersWhere = (where: AuthWhere<"date", Numeric, "users">) => where
+  const sessionsWhere = (where: AuthWhere<"date", Numeric, "sessions">) => where
   const usersOrder = (orderBy: AuthOrderBy<Declared, "users">) => orderBy
 
   it("queries a declared field at its declared type", () => {
@@ -112,7 +112,7 @@ describe("the table types the four functions take", () => {
   it("takes a range on expiresAt, and on nothing else", () => {
     expectTypeOf(
       sessionsWhere({ expiresAt: { gt: new Date() } })
-    ).toEqualTypeOf<AuthWhere<Numeric, "sessions">>()
+    ).toEqualTypeOf<AuthWhere<"date", Numeric, "sessions">>()
     sessionsWhere({ expiresAt: { eq: new Date() } })
     sessionsWhere({ expiresAt: { gt: new Date(), lt: new Date() } })
     // @ts-expect-error a bound has to be given

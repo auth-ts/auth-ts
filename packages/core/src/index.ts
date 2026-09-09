@@ -20,6 +20,7 @@ export type {
   AuthSession,
   AuthTable,
   AuthTables,
+  AuthTimestampMode,
   AuthUpdateInput,
   AuthUser,
   AuthVerification,

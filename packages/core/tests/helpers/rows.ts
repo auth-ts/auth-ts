@@ -35,8 +35,8 @@ export async function insertUser(
 export function selectRows<T extends AuthTable>(
   db: MemoryDatabase,
   table: T,
-  where: AuthWhere<AdditionalFieldsSchema, T> = {} as never
-): Promise<AuthRow<AdditionalFieldsSchema, T>[]> {
+  where: AuthWhere<"date", AdditionalFieldsSchema, T> = {} as never
+): Promise<AuthRow<"date", AdditionalFieldsSchema, T>[]> {
   return db.select({
     table,
     where,
@@ -49,8 +49,8 @@ export function selectRows<T extends AuthTable>(
 export async function selectRow<T extends AuthTable>(
   db: MemoryDatabase,
   table: T,
-  where: AuthWhere<AdditionalFieldsSchema, T> = {} as never
-): Promise<AuthRow<AdditionalFieldsSchema, T> | null> {
+  where: AuthWhere<"date", AdditionalFieldsSchema, T> = {} as never
+): Promise<AuthRow<"date", AdditionalFieldsSchema, T> | null> {
   const [row] = await selectRows(db, table, where)
   return row ?? null
 }

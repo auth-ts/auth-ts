@@ -22,8 +22,8 @@ function expect(condition: unknown, message: string): asserts condition {
 async function create<T extends AuthTable>(
   db: AuthDatabase,
   table: T,
-  values: AuthInsert<AdditionalFieldsSchema, T>
-): Promise<AuthRow<AdditionalFieldsSchema, T>> {
+  values: AuthInsert<"date", AdditionalFieldsSchema, T>
+): Promise<AuthRow<"date", AdditionalFieldsSchema, T>> {
   const row = await db.insert({ table, values })
   expect(
     row,
@@ -235,7 +235,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
       const [first, second, third] = times as [Date, Date, Date]
       try {
         const count = async (
-          where: AuthWhere<AdditionalFieldsSchema, "attempts">
+          where: AuthWhere<"date", AdditionalFieldsSchema, "attempts">
         ) =>
           (
             await db.select({

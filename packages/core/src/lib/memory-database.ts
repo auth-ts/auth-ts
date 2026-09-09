@@ -11,7 +11,9 @@ import type {
 /** An in-memory {@link AuthDatabase} plus a few helpers for inspecting it in tests. */
 export interface MemoryDatabase extends AuthDatabase {
   /** Every stored row of a table, in insertion order. */
-  rows<T extends AuthTable>(table: T): AuthRow<AdditionalFieldsSchema, T>[]
+  rows<T extends AuthTable>(
+    table: T
+  ): AuthRow<"date", AdditionalFieldsSchema, T>[]
   /** Every stored user, in insertion order. */
   users(): AuthUser[]
   /** Every stored session, in insertion order. */

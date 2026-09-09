@@ -1,9 +1,7 @@
 import { createAuthClient } from "@auth-ts/core/client"
-import { PostgrestClient } from "@supabase/postgrest-js"
-import { defineRelations } from "drizzle-orm"
+import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { createDrizzlePostgrest } from "../src/db/drizzle-postgrest"
-import * as schema from "../src/db/schema"
+import type { Database } from "../src/types/database"
 
 const dataApiUrl =
   process.env.VITE_NEON_DATA_API_URL ?? import.meta.env.VITE_NEON_DATA_API_URL
@@ -19,23 +17,10 @@ const authClient = createAuthClient({
   }
 })
 
-const relations = defineRelations(schema, (r) => ({
-  todos: {
-    owner: r.one.users({
-      from: r.todos.userId,
-      to: r.users.id,
-      optional: false
-    })
-  },
-  users: {
-    todos: r.many.todos({ from: r.users.id, to: r.todos.userId })
-  }
-}))
-
-const postgrest = createDrizzlePostgrest(
-  relations,
-  new PostgrestClient(dataApiUrl ?? "", { fetch: authClient.fetchWithAuth })
-)
+const postgrest = new NeonPostgrestClient<Database>({
+  dataApiUrl: dataApiUrl ?? "",
+  options: { global: { fetch: fetchWithToken(authClient.getToken) } }
+})
 
 /** Runs a guest session against the real Data API and cleans up after itself. */
 describe.skipIf(!live)("Neon Data API", () => {
@@ -54,7 +39,7 @@ describe.skipIf(!live)("Neon Data API", () => {
     if (userId) await authClient.deleteUser()
   })
 
-  it("inserts with keys and gets rows back with Dates", async () => {
+  it("inserts with camelCase keys and gets rows back as stored", async () => {
     const { data } = await postgrest
       .from("todos")
       .insert([
@@ -66,26 +51,22 @@ describe.skipIf(!live)("Neon Data API", () => {
 
     ids.push(...data.map((todo) => todo.id))
     expect(data).toHaveLength(2)
-    expect(data[0]?.createdAt).toBeInstanceOf(Date)
+    expect(typeof data[0]?.createdAt).toBe("string")
     expect(data[0]?.userId).toBe(userId)
   })
 
-  it("embeds by relation name, FK key, spread, and filters on the alias", async () => {
+  it("embeds the owner and spreads its columns", async () => {
     const { data } = await postgrest
       .from("todos")
-      .select(
-        "id, title, createdAt, owner(id, name), userId(id), ...users(email)"
-      )
+      .select("id, title, createdAt, users(id, name), ...users(email)")
       .in("id", ids)
-      .eq("owner.id", userId)
+      .eq("users.id", userId)
       .order("title", { ascending: false })
       .throwOnError()
 
     expect(data).toHaveLength(2)
     expect(data[0]?.title).toBe("live b")
-    expect(data[0]?.createdAt).toBeInstanceOf(Date)
-    expect(data[0]?.owner).toEqual({ id: userId, name: null })
-    expect(data[0]?.userId).toEqual({ id: userId })
+    expect(data[0]?.users).toEqual({ id: userId, name: null })
     expect(data[0]).toHaveProperty("email", null)
   })
 
@@ -101,22 +82,22 @@ describe.skipIf(!live)("Neon Data API", () => {
 
     expect(data.todos).toHaveLength(1)
     expect(data.todos[0]?.title).toBe("live b")
-    expect(data.todos[0]?.updatedAt).toBeInstanceOf(Date)
+    expect(typeof data.todos[0]?.updatedAt).toBe("string")
   })
 
-  it("translates or(), match, and Date filters", async () => {
+  it("filters with or(), match, and ISO timestamps", async () => {
     const { data } = await postgrest
       .from("todos")
       .select("id, completed")
       .in("id", ids)
       .or("completed.eq.true,title.ilike.%nomatch%")
-      .gt("createdAt", new Date(Date.now() - 60_000))
+      .gt("createdAt", new Date(Date.now() - 60_000).toISOString())
       .throwOnError()
     expect(data).toEqual([{ id: ids[1], completed: true }])
 
     const { data: matched } = await postgrest
       .from("todos")
-      .update({ completed: true, updatedAt: new Date() })
+      .update({ completed: true, updatedAt: new Date().toISOString() })
       .match({ userId, completed: false })
       .select("id, completed")
       .throwOnError()
@@ -135,6 +116,6 @@ describe.skipIf(!live)("Neon Data API", () => {
       return
     }
     expect(data.count).toBe(2)
-    expect(data.max).toBeInstanceOf(Date)
+    expect(typeof data.max).toBe("string")
   })
 })

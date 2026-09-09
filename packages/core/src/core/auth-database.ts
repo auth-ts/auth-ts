@@ -261,11 +261,36 @@ export interface AuthTables<
   identitySecrets: AuthIdentitySecret
 }
 
+/**
+ * How your store holds a timestamp.
+ *
+ * Core thinks in `Date`. A driver that types `timestamptz` as text — drizzle
+ * with `mode: "string"`, PostgREST, a document store — thinks in ISO 8601.
+ * Name `"string"` on {@link defineAuthDatabase} and the helper converts at the
+ * boundary: the implementation is typed in strings, and core still reads
+ * `Date`s. `"date"` is the default and converts nothing.
+ *
+ * Every type on this page that carries a timestamp takes the mode as its first
+ * parameter, so `AuthWhere<"string">` is the shape a string-mode helper reads.
+ */
+export type AuthTimestampMode = "date" | "string"
+
+type StoredValue<V> = V extends Date
+  ? string
+  : V extends object
+    ? { [K in keyof V]: StoredValue<V[K]> }
+    : V
+
+type Stored<M extends AuthTimestampMode, T> = M extends "date"
+  ? T
+  : StoredValue<T>
+
 /** A row of `T`, with your declared fields where they apply. */
 export type AuthRow<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
-> = AuthTables<S>[T]
+> = Stored<M, AuthTables<S>[T]>
 
 /** The operators a condition may name. */
 export type AuthDatabaseOperator = "eq" | "lt" | "gt"
@@ -306,16 +331,17 @@ export type AuthCondition<V> =
  * with one comparison rather than an `IS NULL` branch it will never reach.
  */
 export type AuthWhere<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
 > = T extends AuthTable
   ? {
       // Index signatures make Object.entries infer any.
-      [K in keyof AuthRow<S, T> as string extends K
+      [K in keyof AuthRow<M, S, T> as string extends K
         ? never
         : K]?: K extends "expiresAt"
-        ? AuthCondition<NonNullable<AuthRow<S, T>[K]>>
-        : { eq: NonNullable<AuthRow<S, T>[K]> }
+        ? AuthCondition<NonNullable<AuthRow<M, S, T>[K]>>
+        : { eq: NonNullable<AuthRow<M, S, T>[K]> }
     }
   : never
 
@@ -346,8 +372,8 @@ export type AuthOrderBy<
   T extends AuthTable = AuthTable
 > = T extends AuthTable
   ? {
-      [K in keyof AuthRow<S, T>]-?: { [P in K]: AuthDirection }
-    }[keyof AuthRow<S, T>]
+      [K in keyof AuthRow<"date", S, T>]-?: { [P in K]: AuthDirection }
+    }[keyof AuthRow<"date", S, T>]
   : never
 
 /**
@@ -360,19 +386,23 @@ export type AuthOrderBy<
  * stored row, which is how core learns the id.
  */
 export type AuthInsert<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
   T extends AuthTable = AuthTable
 > = T extends "users"
-  ? Omit<CoreUserFields, "id"> & { id?: string } & AdditionalFieldsInput<S>
-  : Omit<AuthRow<S, T>, "id"> & { id?: string }
+  ? Stored<M, Omit<CoreUserFields, "id">> & {
+      id?: string
+    } & AdditionalFieldsInput<S>
+  : Omit<AuthRow<M, S, T>, "id"> & { id?: string }
 
 /** {@link AuthDatabase.select}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthSelectInput<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = {
   [K in AuthTable]: {
     table: K
-    where: AuthWhere<S, K>
+    where: AuthWhere<M, S, K>
     limit: number
     orderBy: AuthOrderBy<S, K>
   }
@@ -380,24 +410,27 @@ export type AuthSelectInput<
 
 /** {@link AuthDatabase.insert}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthInsertInput<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
-> = { [K in AuthTable]: { table: K; values: AuthInsert<S, K> } }[AuthTable]
+> = { [K in AuthTable]: { table: K; values: AuthInsert<M, S, K> } }[AuthTable]
 
 /** {@link AuthDatabase.update}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthUpdateInput<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = {
   [K in AuthTable]: {
     table: K
-    where: AuthWhere<S, K>
-    values: Partial<AuthRow<S, K>>
+    where: AuthWhere<M, S, K>
+    values: Partial<AuthRow<M, S, K>>
   }
 }[AuthTable]
 
 /** {@link AuthDatabase.delete}'s input as a union over the tables — see `defineAuthDatabase`. */
 export type AuthDeleteInput<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
-> = { [K in AuthTable]: { table: K; where: AuthWhere<S, K> } }[AuthTable]
+> = { [K in AuthTable]: { table: K; where: AuthWhere<M, S, K> } }[AuthTable]
 
 /**
  * The integration surface: four table functions and an optional sweep.
@@ -456,10 +489,10 @@ export interface AuthDatabase<
    */
   select<T extends AuthTable>(input: {
     table: T
-    where: AuthWhere<S, T>
+    where: AuthWhere<"date", S, T>
     limit: number
     orderBy: AuthOrderBy<S, T>
-  }): Promise<AuthRow<S, T>[]>
+  }): Promise<AuthRow<"date", S, T>[]>
 
   /**
    * Inserts one row and returns it as stored.
@@ -477,8 +510,8 @@ export interface AuthDatabase<
    */
   insert<T extends AuthTable>(input: {
     table: T
-    values: AuthInsert<S, T>
-  }): Promise<AuthRow<S, T> | undefined>
+    values: AuthInsert<"date", S, T>
+  }): Promise<AuthRow<"date", S, T> | undefined>
 
   /**
    * Applies `fields` to every row matching `where`.
@@ -495,9 +528,9 @@ export interface AuthDatabase<
    */
   update<T extends AuthTable>(input: {
     table: T
-    where: AuthWhere<S, T>
-    values: Partial<AuthRow<S, T>>
-  }): Promise<AuthRow<S, T>[]>
+    where: AuthWhere<"date", S, T>
+    values: Partial<AuthRow<"date", S, T>>
+  }): Promise<AuthRow<"date", S, T>[]>
 
   /**
    * Deletes every row matching `where` and returns what it removed.
@@ -509,8 +542,8 @@ export interface AuthDatabase<
    */
   delete<T extends AuthTable>(input: {
     table: T
-    where: AuthWhere<S, T>
-  }): Promise<AuthRow<S, T>[]>
+    where: AuthWhere<"date", S, T>
+  }): Promise<AuthRow<"date", S, T>[]>
 
   /**
    * Pins `S` so a schema mismatch is caught.
@@ -556,14 +589,103 @@ export interface AuthDatabase<
  *
  * A table map needs no switch, but it does want this helper for the same
  * reason — see the reference.
+ *
+ * `timestamps: "string"` types the implementation in ISO 8601 strings instead
+ * of `Date`s and converts both ways here, so a store that holds timestamps as
+ * text needs no parsing of its own. See {@link AuthTimestampMode}.
  */
 export function defineAuthDatabase<
+  M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 >(implementation: {
-  select(input: AuthSelectInput<S>): Promise<AuthRow<S, AuthTable>[]>
-  insert(input: AuthInsertInput<S>): Promise<AuthRow<S, AuthTable> | undefined>
-  update(input: AuthUpdateInput<S>): Promise<AuthRow<S, AuthTable>[]>
-  delete(input: AuthDeleteInput<S>): Promise<AuthRow<S, AuthTable>[]>
+  timestamps?: M
+  select(input: AuthSelectInput<M, S>): Promise<AuthRow<M, S>[]>
+  insert(input: AuthInsertInput<M, S>): Promise<AuthRow<M, S> | undefined>
+  update(input: AuthUpdateInput<M, S>): Promise<AuthRow<M, S>[]>
+  delete(input: AuthDeleteInput<M, S>): Promise<AuthRow<M, S>[]>
 }): AuthDatabase<S> {
-  return implementation as unknown as AuthDatabase<S>
+  if (implementation.timestamps !== "string") {
+    return implementation as unknown as AuthDatabase<S>
+  }
+
+  const store = implementation as unknown as {
+    select(input: Loose): Promise<Loose[]>
+    insert(input: Loose): Promise<Loose | undefined>
+    update(input: Loose): Promise<Loose[]>
+    delete(input: Loose): Promise<Loose[]>
+  }
+  const load = (table: AuthTable) => (rows: Loose[]) =>
+    rows.map((row) => mapTimestamps(table, row, loaded))
+
+  const database = {
+    select: ({ table, where, limit, orderBy }: AuthSelectInput) =>
+      store
+        .select({
+          table,
+          where: mapTimestamps(table, where, storedCondition),
+          limit,
+          orderBy
+        })
+        .then(load(table)),
+    insert: ({ table, values }: AuthInsertInput) =>
+      store
+        .insert({ table, values: mapTimestamps(table, values, stored) })
+        .then((row) => row && mapTimestamps(table, row, loaded)),
+    update: ({ table, where, values }: AuthUpdateInput) =>
+      store
+        .update({
+          table,
+          where: mapTimestamps(table, where, storedCondition),
+          values: mapTimestamps(table, values, stored)
+        })
+        .then(load(table)),
+    delete: ({ table, where }: AuthDeleteInput) =>
+      store
+        .delete({ table, where: mapTimestamps(table, where, storedCondition) })
+        .then(load(table))
+  }
+
+  return database as unknown as AuthDatabase<S>
 }
+
+type Loose = Record<string, unknown>
+
+const timestampColumns: Record<AuthTable, string[]> = {
+  users: ["createdAt", "updatedAt"],
+  sessions: ["createdAt", "updatedAt", "expiresAt"],
+  verifications: ["createdAt", "updatedAt", "expiresAt"],
+  attempts: ["createdAt", "updatedAt", "expiresAt"],
+  identities: ["createdAt", "updatedAt"],
+  identitySecrets: [
+    "createdAt",
+    "updatedAt",
+    "accessTokenExpiresAt",
+    "refreshTokenExpiresAt"
+  ]
+}
+
+const mapTimestamps = (
+  table: AuthTable,
+  record: Loose,
+  map: (value: unknown) => unknown
+) => {
+  const mapped = { ...record }
+  for (const column of timestampColumns[table]) {
+    if (mapped[column] != null) mapped[column] = map(mapped[column])
+  }
+  return mapped
+}
+
+const stored = (value: unknown) =>
+  value instanceof Date ? value.toISOString() : value
+
+const storedCondition = (condition: unknown) =>
+  Object.fromEntries(
+    Object.entries(condition as Loose).map(([operator, value]) => [
+      operator,
+      stored(value)
+    ])
+  )
+
+const loaded = (value: unknown) =>
+  typeof value === "string" ? new Date(value) : value

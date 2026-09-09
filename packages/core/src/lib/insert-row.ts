@@ -23,8 +23,11 @@ import type { AuthInternals } from "../core/auth-internals"
 export async function insertRow<T extends AuthTable>(
   internals: AuthInternals,
   table: T,
-  values: Omit<AuthInsert<AdditionalFieldsSchema, T>, "createdAt" | "updatedAt">
-): Promise<AuthRow<AdditionalFieldsSchema, T>> {
+  values: Omit<
+    AuthInsert<"date", AdditionalFieldsSchema, T>,
+    "createdAt" | "updatedAt"
+  >
+): Promise<AuthRow<"date", AdditionalFieldsSchema, T>> {
   const id = await internals.config.generateId?.(table)
   const now = new Date()
   const stamped = { ...values, createdAt: now, updatedAt: now }
@@ -32,6 +35,7 @@ export async function insertRow<T extends AuthTable>(
   const row = await internals.db.insert({
     table,
     values: (id === undefined ? stamped : { ...stamped, id }) as AuthInsert<
+      "date",
       AdditionalFieldsSchema,
       T
     >
