@@ -251,60 +251,6 @@ describe("getToken", () => {
   })
 })
 
-describe("fetchWithAuth", () => {
-  it("sends the held token as the bearer, refreshing first when there is none", async () => {
-    const token = fakeAccessToken()
-    server.on("GET", "/api/auth/token", { body: { user }, token })
-    server.on("GET", "/data/todos", { body: [] })
-    const client = createAuthClient()
-
-    const response = await client.fetchWithAuth("http://localhost/data/todos")
-
-    expect(response.ok).toBe(true)
-    expect(server.requests.map((request) => request.path)).toEqual([
-      "/api/auth/token",
-      "/data/todos"
-    ])
-    expect(server.requests[1]?.authorization).toBe(`Bearer ${token}`)
-
-    await client.fetchWithAuth("http://localhost/data/todos")
-    expect(server.requests).toHaveLength(3)
-  })
-
-  it("keeps the caller's own headers, including an Authorization already set", async () => {
-    server.on("GET", "/api/auth/token", {
-      body: { user },
-      token: fakeAccessToken()
-    })
-    server.on("POST", "/data/todos", { body: {} })
-    const client = createAuthClient()
-
-    await client.fetchWithAuth("http://localhost/data/todos", {
-      method: "POST",
-      headers: { "accept-language": "fr", authorization: "Bearer theirs" },
-      body: JSON.stringify({ title: "x" })
-    })
-
-    expect(server.requests).toHaveLength(1)
-    expect(server.requests[0]).toMatchObject({
-      method: "POST",
-      acceptLanguage: "fr",
-      authorization: "Bearer theirs",
-      body: { title: "x" }
-    })
-  })
-
-  it("throws unauthenticated when nobody is signed in, before sending anything", async () => {
-    setSessionHint(undefined)
-    const client = createAuthClient()
-
-    await expect(
-      client.fetchWithAuth("http://localhost/data/todos")
-    ).rejects.toMatchObject({ code: "unauthenticated" })
-    expect(server.requests).toHaveLength(0)
-  })
-})
-
 describe("the session hint", () => {
   it("costs a signed-out browser no request at all", async () => {
     setSessionHint(undefined)

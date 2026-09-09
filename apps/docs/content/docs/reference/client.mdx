@@ -32,13 +32,13 @@ behind you; only a token too close to expiry to outlive the request it would be
 used for makes you wait. Concurrent callers share a single refresh, so a page
 mounting ten components makes one round-trip and they all see the same token.
 
-You rarely call it yourself. `fetchWithAuth` is `fetch` with this token
-attached as the bearer, resolved per request through the same cache, and it is
-what your data plane takes:
+You rarely call it yourself. Your data plane's fetch wrapper asks for it on
+every request, and the cache is what makes that free:
 
 ```ts
-export const postgrest = new PostgrestClient<Database>(DATA_API_URL, {
-  fetch: authClient.fetchWithAuth
+export const postgrest = new NeonPostgrestClient<Database>({
+  dataApiUrl: DATA_API_URL,
+  options: { global: { fetch: fetchWithToken(authClient.getToken) } }
 })
 ```
 
@@ -128,11 +128,13 @@ talks to Neon directly and never passes through your server, so an expired token
 there is a hard 401 with nothing to rescue it:
 
 ```ts
-let response = await authClient.fetchWithAuth(url)
+const send = fetchWithToken(authClient.getToken)
+
+let response = await send(url)
 
 if (response.status === 401) {
   authClient.clearToken()
-  response = await authClient.fetchWithAuth(url)
+  response = await send(url)
 }
 ```
 

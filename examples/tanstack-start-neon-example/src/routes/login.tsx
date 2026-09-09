@@ -5,13 +5,14 @@ import {
   EnvelopeIcon,
   UserIcon
 } from "@heroicons/react/24/outline"
+import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { GitHubIcon } from "../components/github-icon"
 import type { Notice } from "../components/notice"
 import { NoticeAlert } from "../components/notice"
 import { useCountdown } from "../hooks/use-countdown"
-import { useToken } from "../hooks/use-token"
+import { useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 
 export const Route = createFileRoute("/login")({
@@ -34,8 +35,8 @@ const signInFailures: Record<string, string> = {
 /** Every way in that this demo has configured. */
 function LoginPage() {
   const navigate = useNavigate()
-  // The token gates the user query, so refetching it pulls the rest through.
-  const { data: token, refetch: refetchToken } = useToken()
+  const queryClient = useQueryClient()
+  const { data: user } = useUser()
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [stage, setStage] = useState<"email" | "code">("email")
@@ -80,8 +81,8 @@ function LoginPage() {
     setNotice(null)
     try {
       await authClient.signInWithCode({ email, code })
-      // Nothing pushes the new session into the cache, so ask for it.
-      await refetchToken()
+      // Every query failed while signed out, so ask for them again.
+      await queryClient.invalidateQueries()
       await navigate({ to: "/todos" })
     } catch (error) {
       report(error)
@@ -105,7 +106,7 @@ function LoginPage() {
     setNotice(null)
     try {
       await authClient.signInAsGuest()
-      await refetchToken()
+      await queryClient.invalidateQueries()
       await navigate({ to: "/todos" })
     } catch (error) {
       report(error)
@@ -212,7 +213,7 @@ function LoginPage() {
             </button>
             {/* A guest needs a signed-out browser, so a signed-in visitor —
                 here to add another account — is not offered one. */}
-            {token ? null : (
+            {user ? null : (
               <button
                 type="button"
                 onClick={() => void continueAsGuest()}

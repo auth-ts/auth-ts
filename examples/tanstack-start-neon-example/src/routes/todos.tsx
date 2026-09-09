@@ -14,7 +14,6 @@ import { useState } from "react"
 
 import { PendingSpinner } from "../components/pending-spinner"
 import { SignedOutCard } from "../components/signed-out-card"
-import { useToken } from "../hooks/use-token"
 import { useUser } from "../hooks/use-user"
 import { client } from "../lib/client"
 
@@ -22,11 +21,9 @@ export const Route = createFileRoute("/todos")({ component: TodosPage })
 
 /** The todo list — the whole point of the demo. */
 function TodosPage() {
-  const { data: token } = useToken()
   const { data: user, isPending } = useUser()
   const todos = useQuery(
-    client.from("todos").select().order("createdAt", { ascending: false }),
-    { enabled: !!token }
+    client.from("todos").select().order("createdAt", { ascending: false })
   )
   const add = useInsertMutation(client.from("todos"), ["id"], null)
   const toggle = useUpdateMutation(client.from("todos"), ["id"], null)

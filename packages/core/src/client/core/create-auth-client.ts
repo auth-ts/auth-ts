@@ -39,8 +39,9 @@ export interface AuthClient {
   /**
    * A valid access token, refreshed when needed, or `null` when signed out.
    *
-   * `fetchWithAuth` sends it for you. Read it directly when the token itself
-   * is what you need, or to ask "is anyone signed in" without a `try`.
+   * Hand it to your data plane's fetch wrapper, which asks for it per request.
+   * Read it directly when the token itself is what you need, or to ask "is
+   * anyone signed in" without a `try`.
    *
    * Only a token too close to expiry to be worth handing out makes a caller
    * wait. Approaching that point the cached token is returned immediately and
@@ -176,19 +177,6 @@ export interface AuthClient {
   signOut: ReturnType<typeof createSignOut>
   /** Changes the locale sent on subsequent requests. */
   setLocale: (locale: string | undefined) => void
-  /**
-   * `fetch`, with the access token attached as the bearer.
-   *
-   * Hand it to whatever talks to your data plane: `{ fetch: authClient.fetchWithAuth }`
-   * on a PostgREST client, or call it directly. A token is resolved per request
-   * through `getToken`'s cache, so the one already held is sent and a spent one
-   * is refreshed first. An `Authorization` header set by the caller is left as
-   * it is.
-   *
-   * @throws {AuthError} `unauthenticated` when nobody is signed in — before
-   * the request is sent, since there is no credential to send it with.
-   */
-  fetchWithAuth: typeof fetch
   /** Drops the in-memory token only — the 401-retry helper. Leaves the session alone. */
   clearToken: () => void
   /**
@@ -215,15 +203,6 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   const { getToken, requireToken, refresh } = createGetToken(internals)
   internals.requireToken = requireToken
 
-  const fetchWithAuth: typeof fetch = async (input, init) => {
-    const headers = new Headers(init?.headers)
-    if (!headers.has("authorization")) {
-      headers.set("authorization", `Bearer ${await requireToken()}`)
-    }
-
-    return fetch(input, { ...init, headers })
-  }
-
   return {
     getToken,
     refresh,
@@ -242,7 +221,6 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     setLocale: (locale) => {
       internals.locale = locale
     },
-    fetchWithAuth,
     clearToken: () => internals.tokenStore.clear(),
     decodeToken
   }

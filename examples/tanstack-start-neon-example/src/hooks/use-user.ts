@@ -1,17 +1,12 @@
+import { AuthRequiredError } from "@neondatabase/postgrest-js"
 import { useQuery } from "@supabase-cache-helpers/postgrest-react-query"
 
 import { client } from "../lib/client"
-import { useToken } from "./use-token"
 
 export function useUser() {
-  const { data: token } = useToken()
+  const { data, error, isPending } = useQuery(
+    client.from("users").select().single()
+  )
 
-  const user = useQuery(client.from("users").select().single(), {
-    enabled: !!token
-  })
-
-  return {
-    data: token ? user.data : null,
-    isPending: !token || user.isPending
-  }
+  return { data: error instanceof AuthRequiredError ? null : data, isPending }
 }

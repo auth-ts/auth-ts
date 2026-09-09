@@ -147,12 +147,19 @@ belongs to and nothing else.
 ## Using it
 
 ```ts
-const response = await authClient.fetchWithAuth(`${DATA_API_URL}/todos`)
+import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
+
+const postgrest = new NeonPostgrestClient<Database>({
+  dataApiUrl: DATA_API_URL,
+  options: { global: { fetch: fetchWithToken(authClient.getToken) } }
+})
+
+const { data } = await postgrest.from("todos").select()
 ```
 
-`fetchWithAuth` is `fetch` with the access token attached, so a PostgREST
-client takes it as its `fetch` and needs nothing else. Signed out, it throws
-`unauthenticated` before sending.
+`fetchWithToken` asks `getToken` for the bearer on every request, and the
+client's cache decides whether that costs anything: a held token is returned
+from memory. Signed out, it throws before sending.
 
 Note what is missing: any filter on the user. The query asks for every row and
 the database returns only yours.

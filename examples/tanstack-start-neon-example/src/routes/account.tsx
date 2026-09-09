@@ -26,7 +26,6 @@ import { NoticeAlert } from "../components/notice"
 import { PendingSpinner } from "../components/pending-spinner"
 import { SignedOutCard } from "../components/signed-out-card"
 import { useCountdown } from "../hooks/use-countdown"
-import { useToken } from "../hooks/use-token"
 import { useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 import { client } from "../lib/client"
@@ -45,7 +44,7 @@ function AccountPage() {
 
   const signOut: SignOut = async (input) => {
     await authClient.signOut(input)
-    queryClient.clear()
+    await queryClient.resetQueries()
     await navigate({ to: "/login" })
   }
 
@@ -77,7 +76,7 @@ function AccountPage() {
 
       <ProfileCard userId={user.id} name={user.name} setNotice={setNotice} />
       <ProvidersCard setNotice={setNotice} />
-      <SessionsCard userId={user.id} signOut={signOut} setNotice={setNotice} />
+      <SessionsCard setNotice={setNotice} />
       <SwitchUserCard userId={user.id} />
       <SignOutButtons
         userId={user.id}
@@ -220,26 +219,11 @@ function ProvidersCard({ setNotice }: { setNotice: SetNotice }) {
   )
 }
 
-function SessionsCard({
-  userId,
-  signOut,
-  setNotice
-}: {
-  userId: string
-  signOut: SignOut
-  setNotice: SetNotice
-}) {
+function SessionsCard({ setNotice }: { setNotice: SetNotice }) {
   const sessions = useQuery(
     client.from("sessions").select().order("createdAt", { ascending: false })
   )
-  // Which entry is this device: the token names its own session, so no request.
-  const { data: token } = useToken()
-  const currentSessionId = token
-    ? authClient.decodeToken(token)?.claims.sid
-    : undefined
 
-  // Another device's session is a row this user owns, so the data plane
-  // deletes it. This device's is a sign-out, because the cookie has to go too.
   const revoke = useDeleteMutation(client.from("sessions"), ["id"], null, {
     onError: () => setNotice({ text: "Could not revoke.", tone: "error" })
   })
@@ -261,35 +245,19 @@ function SessionsCard({
                   >
                     {session.userAgent ?? "Unknown device"}
                   </span>
-                  {session.id === currentSessionId ? (
-                    <span className="badge badge-soft badge-success badge-sm shrink-0">
-                      this device
-                    </span>
-                  ) : null}
                 </div>
                 <div className="text-xs text-base-content/60">
                   {session.ipAddress ?? "no ip"}
                 </div>
               </div>
-              {session.id === currentSessionId ? (
-                <button
-                  type="button"
-                  onClick={() => void signOut({ userId })}
-                  className="btn btn-ghost btn-sm"
-                >
-                  <ArrowRightStartOnRectangleIcon className="size-4" />
-                  Sign out
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => revoke.mutate({ id: session.id })}
-                  className="btn btn-ghost btn-sm"
-                >
-                  <XMarkIcon className="size-4" />
-                  Revoke
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => revoke.mutate({ id: session.id })}
+                className="btn btn-ghost btn-sm"
+              >
+                <XMarkIcon className="size-4" />
+                Revoke
+              </button>
             </li>
           ))}
         </ul>
@@ -333,7 +301,7 @@ function SwitchUserCard({ userId }: { userId: string }) {
                     await authClient.switchUser({
                       userId: signedIn.id
                     })
-                    queryClient.clear()
+                    await queryClient.resetQueries()
                   }}
                   className="btn btn-outline btn-sm"
                 >
@@ -443,7 +411,7 @@ function DeleteCard() {
         return
       }
 
-      queryClient.clear()
+      await queryClient.resetQueries()
       await navigate({ to: "/login" })
     } catch (error) {
       // Sending the code, or confirming inside its cooldown, both answer

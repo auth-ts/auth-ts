@@ -91,6 +91,9 @@ export const authClient = createAuthClient()
 await authClient.sendSignInCode({ email })
 await authClient.signInWithCode({ email, code })
 
-// Your PostgREST client's `fetch`, with the access token attached.
-new PostgrestClient(DATA_API_URL, { fetch: authClient.fetchWithAuth })
+// Your PostgREST client asks for the token on every request.
+new NeonPostgrestClient({
+  dataApiUrl: DATA_API_URL,
+  options: { global: { fetch: fetchWithToken(authClient.getToken) } }
+})
 ```
