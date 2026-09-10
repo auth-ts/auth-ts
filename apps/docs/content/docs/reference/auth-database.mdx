@@ -125,11 +125,11 @@ index, because the missing constraint only shows under a race.
   There is no `offset`, because the library never pages that way. The one place
   it walks more than a page — signing out every other device — deletes what it
   read and re-reads from the start, so the next page is whatever is left.
-- **`insert` returns the row as stored**, or `undefined`. Stores hand it back
-  differently — `RETURNING` gives a set to pick from, a document store gives the
-  document, some give nothing — so return what you have and let the library
-  decide what having nothing means. What comes back is how it learns anything
-  your database decided, the `id` above all. A unique violation must throw rather than merge: the library reads
+- **`insert` returns the row as stored.** Stores hand it back differently —
+  `RETURNING` gives a set to pick from, a document store gives the document —
+  so return what you have; `undefined` fails the request, because what comes
+  back is how the library learns anything your database decided, the `id`
+  above all. A unique violation must throw rather than merge: the library reads
   before it inserts, and the constraint is deliberately the arbiter of the race
   between the two.
 - **Ids are yours.** The row arrives without one unless you set
