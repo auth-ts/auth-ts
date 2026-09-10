@@ -207,15 +207,21 @@ export async function resolveTokenSession(
   const { caller } = await verifyBearer(internals, input)
   if (!caller) return null
 
-  const session = await selectOne(internals, "sessions", {
-    id: { eq: caller.sessionId },
-    expiresAt: { gt: new Date() }
-  })
-  const user = session
-    ? await selectOne(internals, "users", { id: { eq: session.userId } })
-    : null
+  // The user is read beside the session, keyed by the token's `sub`; the
+  // row's own `userId` settles a mismatch.
+  const [session, named] = await Promise.all([
+    selectOne(internals, "sessions", {
+      id: { eq: caller.sessionId },
+      expiresAt: { gt: new Date() }
+    }),
+    selectOne(internals, "users", { id: { eq: caller.userId } })
+  ])
+  if (!session) return null
 
-  return session && user
-    ? { session, user, tokenHash: session.tokenHash }
-    : null
+  const user =
+    named?.id === session.userId
+      ? named
+      : await selectOne(internals, "users", { id: { eq: session.userId } })
+
+  return user ? { session, user, tokenHash: session.tokenHash } : null
 }

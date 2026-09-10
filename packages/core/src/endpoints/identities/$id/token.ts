@@ -184,15 +184,17 @@ async function refreshProviderToken(
     ) {
       // The grant is gone at the provider, so what recorded it goes: the
       // ciphertext row, and the scope that described what it bought.
-      await internals.db.delete({
-        table: "identitySecrets",
-        where: { identityId: { eq: identity.id } }
-      })
-      await internals.db.update({
-        table: "identities",
-        where: { id: { eq: identity.id } },
-        values: { scope: null, updatedAt: new Date() }
-      })
+      await Promise.all([
+        internals.db.delete({
+          table: "identitySecrets",
+          where: { identityId: { eq: identity.id } }
+        }),
+        internals.db.update({
+          table: "identities",
+          where: { id: { eq: identity.id } },
+          values: { scope: null, updatedAt: new Date() }
+        })
+      ])
       internals.log.warn("provider grant is gone, cleared its tokens", {
         provider: identity.provider
       })
@@ -205,14 +207,16 @@ async function refreshProviderToken(
   }
 
   const stored = await encryptTokens(internals.config.secret, tokens)
-  if (Object.keys(stored.identity).length > 0) {
-    await internals.db.update({
-      table: "identities",
-      where: { id: { eq: identity.id } },
-      values: { ...stored.identity, updatedAt: new Date() }
-    })
-  }
-  await storeIdentitySecrets(internals, identity.id, stored.secrets)
+  await Promise.all([
+    Object.keys(stored.identity).length > 0
+      ? internals.db.update({
+          table: "identities",
+          where: { id: { eq: identity.id } },
+          values: { ...stored.identity, updatedAt: new Date() }
+        })
+      : undefined,
+    storeIdentitySecrets(internals, identity.id, stored.secrets, secrets)
+  ])
 
   return {
     token: tokens.accessToken,

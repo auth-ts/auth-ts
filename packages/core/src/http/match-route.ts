@@ -17,6 +17,11 @@ interface CompiledRoute {
   isDynamic: boolean
 }
 
+/** A route path as its non-empty segments. */
+export function pathSegments(path: string) {
+  return path.split("/").filter((segment) => segment.length > 0)
+}
+
 /**
  * Precompiles the endpoint registry into a matchable table.
  *
@@ -26,9 +31,7 @@ interface CompiledRoute {
 export function compileRoutes(registry: Readonly<Record<string, AnyEndpoint>>) {
   return Object.values(registry)
     .map<CompiledRoute>((endpoint) => {
-      const segments = endpoint.path
-        .split("/")
-        .filter((segment) => segment.length > 0)
+      const segments = pathSegments(endpoint.path)
       return {
         endpoint,
         segments,
@@ -110,13 +113,11 @@ function matchSegments(routeSegments: string[], requestSegments: string[]) {
 export function matchEndpointParams(
   internals: AuthInternals,
   request: Request,
-  path: string
+  routeSegments: string[]
 ) {
   const { pathname } = new URL(request.url)
   const requestSegments = splitPathSegments(pathname, internals.config.basePath)
   if (!requestSegments) return {}
-
-  const routeSegments = path.split("/").filter((segment) => segment.length > 0)
 
   return matchSegments(routeSegments, requestSegments) ?? {}
 }

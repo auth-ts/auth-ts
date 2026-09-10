@@ -61,21 +61,30 @@ export async function encryptTokens(
   }
 }
 
-/** Writes a grant's encrypted halves, creating the row on first connect. */
+/**
+ * Writes a grant's encrypted halves, creating the row on first connect.
+ *
+ * `existing` is the secrets row when the caller has already read it, `null`
+ * when it knows there is none, and omitted to read it here.
+ */
 export async function storeIdentitySecrets(
   internals: AuthInternals,
   identityId: string,
-  secrets: Partial<AuthIdentitySecret>
+  secrets: Partial<AuthIdentitySecret>,
+  existing?: AuthIdentitySecret | null
 ) {
   if (Object.keys(secrets).length === 0) return
 
-  const existing = await selectOne(internals, "identitySecrets", {
-    identityId: { eq: identityId }
-  })
-  if (existing) {
+  const row =
+    existing === undefined
+      ? await selectOne(internals, "identitySecrets", {
+          identityId: { eq: identityId }
+        })
+      : existing
+  if (row) {
     await internals.db.update({
       table: "identitySecrets",
-      where: { id: { eq: existing.id } },
+      where: { id: { eq: row.id } },
       values: { ...secrets, updatedAt: new Date() }
     })
     return
@@ -107,13 +116,15 @@ export async function linkIdentity(
   provider: string,
   { providerUserId, label, tokens }: ProviderIdentity
 ) {
-  const existing = await selectOne(internals, "identities", {
-    provider: { eq: provider },
-    providerUserId: { eq: providerUserId }
-  })
-  const stored = tokens
-    ? await encryptTokens(internals.config.secret, tokens)
-    : { identity: {}, secrets: {} }
+  const [existing, stored] = await Promise.all([
+    selectOne(internals, "identities", {
+      provider: { eq: provider },
+      providerUserId: { eq: providerUserId }
+    }),
+    tokens
+      ? encryptTokens(internals.config.secret, tokens)
+      : { identity: {}, secrets: {} }
+  ])
 
   if (existing) {
     // Both halves, not just the label: a sign-in that changes nothing about the
@@ -122,14 +133,16 @@ export async function linkIdentity(
       ...(label && label !== existing.label ? { label } : {}),
       ...stored.identity
     }
-    if (Object.keys(values).length > 0) {
-      await internals.db.update({
-        table: "identities",
-        where: { id: { eq: existing.id } },
-        values: { ...values, updatedAt: new Date() }
-      })
-    }
-    await storeIdentitySecrets(internals, existing.id, stored.secrets)
+    await Promise.all([
+      Object.keys(values).length > 0
+        ? internals.db.update({
+            table: "identities",
+            where: { id: { eq: existing.id } },
+            values: { ...values, updatedAt: new Date() }
+          })
+        : undefined,
+      storeIdentitySecrets(internals, existing.id, stored.secrets)
+    ])
     return
   }
 
@@ -140,5 +153,5 @@ export async function linkIdentity(
     label: label || null,
     ...stored.identity
   })
-  await storeIdentitySecrets(internals, identity.id, stored.secrets)
+  await storeIdentitySecrets(internals, identity.id, stored.secrets, null)
 }

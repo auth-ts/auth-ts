@@ -120,9 +120,8 @@ export const callbackProvider = defineEndpoint({
         payload.additionalFields
       )
 
-      let identity: ProviderIdentity
-      try {
-        identity = await configured.provider.exchangeCode({
+      const exchange = configured.provider
+        .exchangeCode({
           credentials: configured.credentials,
           redirectURI: getCallbackURL(
             config,
@@ -135,18 +134,20 @@ export const callbackProvider = defineEndpoint({
           nonce: payload.nonce,
           signal: AbortSignal.timeout(PROVIDER_DEADLINE_MS)
         })
-      } catch (error) {
-        // A rejected code is the provider's verdict; anything else — the
-        // deadline, a DNS failure — is the provider being unreachable.
-        if (isAuthApiError(error)) throw error
-        internals.log.error("oauth provider request failed", {
-          provider: input.provider,
-          error: String(error)
+        .catch((error: unknown) => {
+          // A rejected code is the provider's verdict; anything else — the
+          // deadline, a DNS failure — is the provider being unreachable.
+          if (isAuthApiError(error)) throw error
+          internals.log.error("oauth provider request failed", {
+            provider: input.provider,
+            error: String(error)
+          })
+          throw new AuthApiError("providerUnavailable")
         })
-        throw new AuthApiError("providerUnavailable")
-      }
-
-      const active = await resolveCallerSession(internals, input)
+      const [identity, active] = await Promise.all([
+        exchange,
+        resolveCallerSession(internals, input)
+      ])
 
       // Linking only means linking for a real user. A guest who "connects" a
       // provider is really signing in: the identity decides whether they upgrade

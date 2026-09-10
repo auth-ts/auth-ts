@@ -5,7 +5,7 @@ import type { AnyEndpoint } from "./define-endpoint"
 import { requirementMet } from "./endpoint-requirement"
 import { ERROR_STATUS, errorResponse } from "./error-response"
 import { getErrorMessage } from "./get-error-message"
-import { matchEndpointParams } from "./match-route"
+import { matchEndpointParams, pathSegments } from "./match-route"
 import { resolveLocale } from "./resolve-locale"
 
 /** A mounted endpoint: what the consumer's framework calls. */
@@ -37,12 +37,15 @@ export function createHandler(
   internals: AuthInternals,
   endpoint: AnyEndpoint
 ): AuthHandler {
+  const segments = pathSegments(endpoint.path)
+  const dynamic = segments.some((segment) => segment.startsWith("$"))
+
   return (request) =>
     handleRequest(
       internals,
       endpoint,
       request,
-      matchEndpointParams(internals, request, endpoint.path)
+      dynamic ? matchEndpointParams(internals, request, segments) : {}
     )
 }
 

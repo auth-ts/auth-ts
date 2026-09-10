@@ -45,26 +45,36 @@ function originOf(url: string) {
  * configured, and every entry in `trustedOrigins` because that option exists to
  * say so.
  */
-function allowedOrigins(config: AuthConfig, request: Request) {
-  const allowed = new Set<string>()
-  const self = originOf(request.url)
-  if (self) allowed.add(self)
-  const forwarded = getRequestOrigin(
-    request.url,
-    request.headers,
-    config.trustedProxyHeaders
+function isAllowedOrigin(config: AuthConfig, request: Request, origin: string) {
+  return (
+    origin === originOf(request.url) ||
+    origin ===
+      getRequestOrigin(
+        request.url,
+        request.headers,
+        config.trustedProxyHeaders
+      ) ||
+    configuredOrigins(config).has(origin)
   )
-  if (forwarded) allowed.add(forwarded)
-  if (config.baseURL) {
-    const base = originOf(config.baseURL)
-    if (base) allowed.add(base)
-  }
+}
+
+const configuredOriginsByConfig = new WeakMap<AuthConfig, Set<string>>()
+
+/** The origins fixed by configuration, built once per server. */
+function configuredOrigins(config: AuthConfig) {
+  const cached = configuredOriginsByConfig.get(config)
+  if (cached) return cached
+
+  const origins = new Set<string>()
+  const base = config.baseURL ? originOf(config.baseURL) : null
+  if (base) origins.add(base)
   for (const trusted of config.trustedOrigins) {
-    allowed.add(trusted)
+    origins.add(trusted)
     const parsed = originOf(trusted)
-    if (parsed) allowed.add(parsed)
+    if (parsed) origins.add(parsed)
   }
-  return allowed
+  configuredOriginsByConfig.set(config, origins)
+  return origins
 }
 
 /**
@@ -108,10 +118,7 @@ export function assertAllowedOrigin(
   const origin =
     request.headers.get("origin") ??
     originOf(request.headers.get("referer") ?? "")
-  if (
-    origin !== null &&
-    !allowedOrigins(internals.config, request).has(origin)
-  ) {
+  if (origin !== null && !isAllowedOrigin(internals.config, request, origin)) {
     internals.log.warn("refused a request from a disallowed origin", {
       origin
     })

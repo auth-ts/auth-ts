@@ -505,6 +505,27 @@ describe("resolveCallerSession", () => {
     }
   }
 
+  it("reads the session and its user in one wave", async () => {
+    const { internals, db, token } = await signedIn()
+    const tables: string[] = []
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const originalSelect = db.select.bind(db)
+    db.select = async (input) => {
+      tables.push(input.table)
+      if (tables.length === 2) release()
+      await gate
+      return originalSelect(input)
+    }
+
+    const resolved = await resolveCallerSession(internals, { token })
+
+    expect(resolved?.session).toBeDefined()
+    expect(tables.slice(0, 2).sort()).toEqual(["sessions", "users"])
+  })
+
   it("reads the session the token names, without touching it", async () => {
     const { internals, db, user, token } = await signedIn()
     const before = required(db.sessions()[0], "session").updatedAt
