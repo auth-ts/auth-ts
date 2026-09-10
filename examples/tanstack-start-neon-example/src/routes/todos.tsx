@@ -19,7 +19,6 @@ import { client } from "../lib/client"
 
 export const Route = createFileRoute("/todos")({ component: TodosPage })
 
-/** The todo list — the whole point of the demo. */
 function TodosPage() {
   const { data: user, isPending } = useUser()
   const todos = useQuery(
@@ -103,7 +102,11 @@ function TodosPage() {
               className="checkbox checkbox-primary"
               checked={todo.completed}
               onChange={() =>
-                toggle.mutate({ id: todo.id, completed: !todo.completed })
+                toggle.mutate({
+                  id: todo.id,
+                  completed: !todo.completed,
+                  updatedAt: new Date().toISOString()
+                })
               }
             />
             <span
