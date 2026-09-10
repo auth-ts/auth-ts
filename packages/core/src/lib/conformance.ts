@@ -62,6 +62,45 @@ const person = (fields: Record<string, unknown> = {}) => ({
 const unique = () =>
   `conformance-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
+/** Runs a check against a fresh user, removed afterwards whatever happens. */
+async function withUser(
+  db: AuthDatabase,
+  run: (
+    user: AuthRow<"date", AdditionalFieldsSchema, "users">
+  ) => Promise<void>,
+  fields: Record<string, unknown> = {}
+) {
+  const user = await create(
+    db,
+    "users",
+    person({ email: `${unique()}@example.test`, ...fields })
+  )
+  try {
+    await run(user)
+  } finally {
+    await db.delete({ table: "users", where: { id: { eq: user.id } } })
+  }
+}
+
+const session = (userId: string, tokenHash: string) => ({
+  userId,
+  tokenHash,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  expiresAt: future(),
+  userAgent: null,
+  ipAddress: null
+})
+
+const identity = (userId: string, providerUserId: string) => ({
+  userId,
+  provider: "github",
+  providerUserId,
+  label: null,
+  createdAt: new Date(),
+  updatedAt: new Date()
+})
+
 /** Whether these rows came back at exactly these times, in exactly this order. */
 function ordered(rows: { expiresAt: Date }[], times: number[]) {
   return (
@@ -116,27 +155,28 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
     name: "select matches on every column given, and only on equality",
     async run(db) {
       const email = `${unique()}@example.test`
-      await create(db, "users", person({ email, name: "Ada" }))
-      try {
-        const matching = (name: string) =>
-          db.select({
-            table: "users",
-            where: { email: { eq: email }, name: { eq: name } },
-            limit: 10,
-            orderBy: { id: "asc" }
-          })
+      await withUser(
+        db,
+        async () => {
+          const matching = (name: string) =>
+            db.select({
+              table: "users",
+              where: { email: { eq: email }, name: { eq: name } },
+              limit: 10,
+              orderBy: { id: "asc" }
+            })
 
-        expect(
-          (await matching("Ada")).length === 1,
-          "a where naming two columns did not match the row that has both"
-        )
-        expect(
-          (await matching("Grace")).length === 0,
-          "every column in a where has to match. This one matched a row on some of them, which would let one person's code verify against another's identifier."
-        )
-      } finally {
-        await db.delete({ table: "users", where: { email: { eq: email } } })
-      }
+          expect(
+            (await matching("Ada")).length === 1,
+            "a where naming two columns did not match the row that has both"
+          )
+          expect(
+            (await matching("Grace")).length === 0,
+            "every column in a where has to match. This one matched a row on some of them, which would let one person's code verify against another's identifier."
+          )
+        },
+        { email, name: "Ada" }
+      )
     }
   },
   {
@@ -188,34 +228,33 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
   },
   {
     name: "update returns the rows it changed",
-    async run(db) {
-      const email = `${unique()}@example.test`
-      const row = await create(db, "users", person({ email, name: "Ada" }))
-      try {
-        const changed = await db.update({
-          table: "users",
-          where: { id: { eq: row.id } },
-          values: { name: "Ada Lovelace" }
-        })
+    run: (db) =>
+      withUser(
+        db,
+        async (row) => {
+          const changed = await db.update({
+            table: "users",
+            where: { id: { eq: row.id } },
+            values: { name: "Ada Lovelace" }
+          })
 
-        expect(
-          changed.length === 1 && changed[0]?.name === "Ada Lovelace",
-          "update must return what it wrote, as delete does. Core finds and touches a session in one statement and learns from the result whether there was a live one — an empty return there is an authenticated request refused."
-        )
-        expect(
-          (
-            await db.update({
-              table: "users",
-              where: { id: { eq: crypto.randomUUID() } },
-              values: { name: "nobody" }
-            })
-          ).length === 0,
-          "update matched nothing but did not report an empty result"
-        )
-      } finally {
-        await db.delete({ table: "users", where: { email: { eq: email } } })
-      }
-    }
+          expect(
+            changed.length === 1 && changed[0]?.name === "Ada Lovelace",
+            "update must return what it wrote, as delete does. Core finds and touches a session in one statement and learns from the result whether there was a live one — an empty return there is an authenticated request refused."
+          )
+          expect(
+            (
+              await db.update({
+                table: "users",
+                where: { id: { eq: crypto.randomUUID() } },
+                values: { name: "nobody" }
+              })
+            ).length === 0,
+            "update matched nothing but did not report an empty result"
+          )
+        },
+        { name: "Ada" }
+      )
   },
   {
     name: "a range matches on order, and only within its bounds",
@@ -278,32 +317,33 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
     name: "update applies the values it is given, and touches nothing else",
     async run(db) {
       const email = `${unique()}@example.test`
-      const row = await create(db, "users", person({ email, name: "Ada" }))
-      try {
-        await db.update({
-          table: "users",
-          where: { id: { eq: row.id } },
-          values: { name: "Ada Lovelace" }
-        })
-        const [updated] = await db.select({
-          table: "users",
-          where: { email: { eq: email } },
-          limit: 10,
-          orderBy: { id: "asc" }
-        })
+      await withUser(
+        db,
+        async (row) => {
+          await db.update({
+            table: "users",
+            where: { id: { eq: row.id } },
+            values: { name: "Ada Lovelace" }
+          })
+          const [updated] = await db.select({
+            table: "users",
+            where: { email: { eq: email } },
+            limit: 10,
+            orderBy: { id: "asc" }
+          })
 
-        expect(updated, "the row disappeared during an update")
-        expect(
-          updated?.name === "Ada Lovelace",
-          "update did not apply its values"
-        )
-        expect(
-          updated?.email === email,
-          "update changed a column it was not given. Core sends only what changed, and expects the rest to survive."
-        )
-      } finally {
-        await db.delete({ table: "users", where: { email: { eq: email } } })
-      }
+          expect(updated, "the row disappeared during an update")
+          expect(
+            updated?.name === "Ada Lovelace",
+            "update did not apply its values"
+          )
+          expect(
+            updated?.email === email,
+            "update changed a column it was not given. Core sends only what changed, and expects the rest to survive."
+          )
+        },
+        { email, name: "Ada" }
+      )
     }
   },
   {
@@ -329,192 +369,153 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
   },
   {
     name: "delete matches on every column, so someone else's id matches nothing",
-    async run(db) {
-      const owner = await create(
-        db,
-        "users",
-        person({ email: `${unique()}@example.test` })
-      )
-      const stranger = await create(
-        db,
-        "users",
-        person({ email: `${unique()}@example.test` })
-      )
-      const tokenHash = unique()
-      const session = await create(db, "sessions", {
-        userId: owner.id,
-        tokenHash,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        expiresAt: future(),
-        userAgent: null,
-        ipAddress: null
-      })
-      try {
-        expect(
-          (
+    run: (db) =>
+      withUser(db, (owner) =>
+        withUser(db, async (stranger) => {
+          const tokenHash = unique()
+          const held = await create(
+            db,
+            "sessions",
+            session(owner.id, tokenHash)
+          )
+          try {
+            expect(
+              (
+                await db.delete({
+                  table: "sessions",
+                  where: { id: { eq: held.id }, userId: { eq: stranger.id } }
+                })
+              ).length === 0,
+              "a delete naming both id and userId removed a session belonging to someone else. That pair is what stops one signed-in person revoking another's devices."
+            )
+          } finally {
             await db.delete({
               table: "sessions",
-              where: { id: { eq: session.id }, userId: { eq: stranger.id } }
+              where: { tokenHash: { eq: tokenHash } }
             })
-          ).length === 0,
-          "a delete naming both id and userId removed a session belonging to someone else. That pair is what stops one signed-in person revoking another's devices."
-        )
-      } finally {
-        await db.delete({
-          table: "sessions",
-          where: { tokenHash: { eq: tokenHash } }
+          }
         })
-        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
-        await db.delete({ table: "users", where: { id: { eq: stranger.id } } })
-      }
-    }
+      )
   },
   {
     name: "users.email is unique",
     async run(db) {
       const email = `${unique()}@example.test`
-      const first = await create(db, "users", person({ email }))
-      try {
-        await refuses(
-          () => db.insert({ table: "users", values: person({ email }) }),
-          "a second user was inserted with the same email. Core reads before it inserts, so this constraint is what decides the race between two first sign-ins — without it they become two accounts for one person."
-        )
-      } finally {
-        await db.delete({ table: "users", where: { id: { eq: first.id } } })
-      }
+      await withUser(
+        db,
+        () =>
+          refuses(
+            () => db.insert({ table: "users", values: person({ email }) }),
+            "a second user was inserted with the same email. Core reads before it inserts, so this constraint is what decides the race between two first sign-ins — without it they become two accounts for one person."
+          ),
+        { email }
+      )
     }
   },
   {
     name: "users.phoneNumber is unique",
     async run(db) {
       const phoneNumber = `+1555${Math.floor(Math.random() * 9_000_000) + 1_000_000}`
-      const first = await create(db, "users", person({ phoneNumber }))
-      try {
-        await refuses(
-          () => db.insert({ table: "users", values: person({ phoneNumber }) }),
-          "a second user was inserted with the same phone number, so two sign-ins from one number can become two accounts"
-        )
-      } finally {
-        await db.delete({ table: "users", where: { id: { eq: first.id } } })
-      }
+      await withUser(
+        db,
+        () =>
+          refuses(
+            () =>
+              db.insert({ table: "users", values: person({ phoneNumber }) }),
+            "a second user was inserted with the same phone number, so two sign-ins from one number can become two accounts"
+          ),
+        { phoneNumber }
+      )
     }
   },
   {
     name: "sessions.tokenHash is unique",
-    async run(db) {
-      const owner = await create(
-        db,
-        "users",
-        person({ email: `${unique()}@example.test` })
-      )
-      const tokenHash = unique()
-      const session = () => ({
-        userId: owner.id,
-        tokenHash,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        expiresAt: future(),
-        userAgent: null,
-        ipAddress: null
+    run: (db) =>
+      withUser(db, async (owner) => {
+        const tokenHash = unique()
+        try {
+          await create(db, "sessions", session(owner.id, tokenHash))
+          await refuses(
+            () =>
+              db.insert({
+                table: "sessions",
+                values: session(owner.id, tokenHash)
+              }),
+            "two sessions were stored with the same token hash. One refresh token would then resolve to two rows, and revoking the session a browser holds would leave it signed in."
+          )
+        } finally {
+          await db.delete({
+            table: "sessions",
+            where: { tokenHash: { eq: tokenHash } }
+          })
+        }
       })
-      try {
-        await create(db, "sessions", session())
-        await refuses(
-          () => db.insert({ table: "sessions", values: session() }),
-          "two sessions were stored with the same token hash. One refresh token would then resolve to two rows, and revoking the session a browser holds would leave it signed in."
-        )
-      } finally {
-        await db.delete({
-          table: "sessions",
-          where: { tokenHash: { eq: tokenHash } }
-        })
-        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
-      }
-    }
   },
   {
     name: "identities are unique on (provider, providerUserId)",
-    async run(db) {
-      const owner = await create(
-        db,
-        "users",
-        person({ email: `${unique()}@example.test` })
-      )
-      const providerUserId = unique()
-      const identity = () => ({
-        userId: owner.id,
-        provider: "github",
-        providerUserId,
-        label: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
+    run: (db) =>
+      withUser(db, async (owner) => {
+        const providerUserId = unique()
+        try {
+          await create(db, "identities", identity(owner.id, providerUserId))
+          await refuses(
+            () =>
+              db.insert({
+                table: "identities",
+                values: identity(owner.id, providerUserId)
+              }),
+            "one provider account was linked twice. Core looks the pair up before it inserts, so two concurrent sign-ins both find nothing — this index is what refuses the loser."
+          )
+        } finally {
+          await db.delete({
+            table: "identities",
+            where: { providerUserId: { eq: providerUserId } }
+          })
+        }
       })
-      try {
-        await create(db, "identities", identity())
-        await refuses(
-          () => db.insert({ table: "identities", values: identity() }),
-          "one provider account was linked twice. Core looks the pair up before it inserts, so two concurrent sign-ins both find nothing — this index is what refuses the loser."
-        )
-      } finally {
-        await db.delete({
-          table: "identities",
-          where: { providerUserId: { eq: providerUserId } }
-        })
-        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
-      }
-    }
   },
   {
     name: "identitySecrets cascade when their identity is deleted",
-    async run(db) {
-      const owner = await create(
-        db,
-        "users",
-        person({ email: `${unique()}@example.test` })
-      )
-      const providerUserId = unique()
-      try {
-        const identity = await create(db, "identities", {
-          userId: owner.id,
-          provider: "github",
-          providerUserId,
-          label: null,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-        await create(db, "identitySecrets", {
-          identityId: identity.id,
-          accessTokenEncrypted: "v1.ciphertext",
-          refreshTokenEncrypted: "v1.ciphertext",
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-
-        await db.delete({
-          table: "identities",
-          where: { id: { eq: identity.id } }
-        })
-
-        const orphaned = await db.select({
-          table: "identitySecrets",
-          where: { identityId: { eq: identity.id } },
-          limit: 1,
-          orderBy: { createdAt: "asc" }
-        })
-        if (orphaned.length > 0) {
-          throw new Error(
-            "a provider's encrypted tokens outlived the identity that addressed them. Core deletes them itself, so this only fails where something else removes an identity — but an orphaned row is a stored credential nothing points at, and no policy can scope it."
+    run: (db) =>
+      withUser(db, async (owner) => {
+        const providerUserId = unique()
+        try {
+          const linked = await create(
+            db,
+            "identities",
+            identity(owner.id, providerUserId)
           )
+          await create(db, "identitySecrets", {
+            identityId: linked.id,
+            accessTokenEncrypted: "v1.ciphertext",
+            refreshTokenEncrypted: "v1.ciphertext",
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+
+          await db.delete({
+            table: "identities",
+            where: { id: { eq: linked.id } }
+          })
+
+          const orphaned = await db.select({
+            table: "identitySecrets",
+            where: { identityId: { eq: linked.id } },
+            limit: 1,
+            orderBy: { createdAt: "asc" }
+          })
+          if (orphaned.length > 0) {
+            throw new Error(
+              "a provider's encrypted tokens outlived the identity that addressed them. Core deletes them itself, so this only fails where something else removes an identity — but an orphaned row is a stored credential nothing points at, and no policy can scope it."
+            )
+          }
+        } finally {
+          await db.delete({
+            table: "identities",
+            where: { providerUserId: { eq: providerUserId } }
+          })
         }
-      } finally {
-        await db.delete({
-          table: "identities",
-          where: { providerUserId: { eq: providerUserId } }
-        })
-        await db.delete({ table: "users", where: { id: { eq: owner.id } } })
-      }
-    }
+      })
   },
   {
     name: "delete honours a range, removing what has expired and keeping what has not",
