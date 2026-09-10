@@ -6,44 +6,35 @@ import {
   defineAuthDatabase
 } from "@auth-ts/core"
 import { and, getColumns, operators, orderByOperators } from "drizzle-orm"
-import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core"
+import type { AnyPgTable } from "drizzle-orm/pg-core"
 
 import { db } from "../db/db"
-import {
-  attempts,
-  identities,
-  identitySecrets,
-  sessions,
-  users,
-  verifications
-} from "../db/schema"
+import * as schema from "../db/schema"
 
-const authSchema = {
-  users,
-  sessions,
-  verifications,
-  attempts,
-  identities,
-  identitySecrets
-} satisfies Record<AuthTable, AnyPgTable>
+const authSchema = schema satisfies Record<AuthTable, AnyPgTable>
 
 const buildWhere = (table: AuthTable, where: AuthWhere<"string">) => {
-  const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
+  const columns = getColumns(authSchema[table])
+  type ColumnName = keyof typeof columns
 
   return and(
     ...Object.entries(where).flatMap(([name, condition]) =>
       Object.entries(condition).map(([operator, value]) =>
-        operators[operator as AuthDatabaseOperator](columns[name], value)
+        operators[operator as AuthDatabaseOperator](
+          columns[name as ColumnName],
+          value
+        )
       )
     )
   )
 }
 
 const buildOrderBy = (table: AuthTable, orderBy: AuthOrderBy) => {
-  const columns: Record<string, AnyPgColumn> = getColumns(authSchema[table])
+  const columns = getColumns(authSchema[table])
+  type ColumnName = keyof typeof columns
 
   return Object.entries(orderBy).map(([name, direction]) =>
-    orderByOperators[direction](columns[name])
+    orderByOperators[direction](columns[name as ColumnName])
   )
 }
 
