@@ -1,25 +1,41 @@
+import type { AuthUser } from "../../core/auth-database"
+import type { ProviderTokenResult } from "../../endpoints/identities/$id/token"
 import { decodeToken } from "../lib/decode-token"
+import type {
+  DeleteUserInput,
+  DeleteUserResult,
+  SignOutInput,
+  UpdateUserInput
+} from "../methods/account"
 import {
-  createDeleteUser,
-  createSendDeleteUserCode,
-  createSignOut,
-  createUpdateUser
+  deleteUser,
+  sendDeleteUserCode,
+  signOut,
+  updateUser
 } from "../methods/account"
 import type { GetTokenOptions, RefreshToken } from "../methods/get-token"
 import { createGetToken } from "../methods/get-token"
-import {
-  createGetProviderToken,
-  createListUsers,
-  createSwitchUser
+import type {
+  GetProviderTokenInput,
+  SwitchUserInput
 } from "../methods/identities-and-users"
 import {
-  createConnectProvider,
-  createSignInWithProvider
-} from "../methods/oauth"
+  getProviderToken,
+  listUsers,
+  switchUser
+} from "../methods/identities-and-users"
+import type { OAuthNavigationInput } from "../methods/oauth"
+import { connectProvider, signInWithProvider } from "../methods/oauth"
+import type {
+  SendSignInCodeInput,
+  SignInAsGuestInput,
+  SignInResult,
+  SignInWithCodeInput
+} from "../methods/sign-in"
 import {
-  createSendSignInCode,
-  createSignInAsGuest,
-  createSignInWithCode
+  sendSignInCode,
+  signInAsGuest,
+  signInWithCode
 } from "../methods/sign-in"
 import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
@@ -82,7 +98,7 @@ export interface AuthClient {
    * @throws {AuthError} `cooldown` or `rateLimited`, both carrying
    * `retryAfter`. Render the countdown rather than only disabling the button.
    */
-  sendSignInCode: ReturnType<typeof createSendSignInCode>
+  sendSignInCode: (input: SendSignInCodeInput) => Promise<void>
   /**
    * Verifies a code and starts a session.
    *
@@ -90,7 +106,7 @@ export interface AuthClient {
    * sign-in and the first render cost one round trip between them rather than a
    * sign-in followed by a refresh.
    */
-  signInWithCode: ReturnType<typeof createSignInWithCode>
+  signInWithCode: (input: SignInWithCodeInput) => Promise<SignInResult>
   /**
    * Signs in anonymously.
    *
@@ -99,7 +115,7 @@ export interface AuthClient {
    * is what lets them keep everything when they later add an email or connect a
    * provider.
    */
-  signInAsGuest: ReturnType<typeof createSignInAsGuest>
+  signInAsGuest: (input?: SignInAsGuestInput) => Promise<SignInResult>
   /**
    * Starts an OAuth sign-in, sending the browser to the provider.
    *
@@ -112,9 +128,9 @@ export interface AuthClient {
    * Signing in while already signed in never links accounts. Use
    * `connectProvider` for that.
    */
-  signInWithProvider: ReturnType<typeof createSignInWithProvider>
+  signInWithProvider: (input: OAuthNavigationInput) => Promise<void>
   /** Starts linking a provider to the currently signed-in user. */
-  connectProvider: ReturnType<typeof createConnectProvider>
+  connectProvider: (input: OAuthNavigationInput) => Promise<void>
   /**
    * Gets a live access token for one connected account, so this browser can
    * call that provider's API directly.
@@ -129,9 +145,11 @@ export interface AuthClient {
    * revoked at the provider, expired, or never durable. Send them through
    * `connectProvider` again.
    */
-  getProviderToken: ReturnType<typeof createGetProviderToken>
+  getProviderToken: (
+    input: GetProviderTokenInput
+  ) => Promise<ProviderTokenResult>
   /** Lists every user signed in to this browser. Requires `multiUser` server-side. */
-  listUsers: ReturnType<typeof createListUsers>
+  listUsers: () => Promise<AuthUser[]>
   /**
    * Switches to another user already signed in to this browser.
    *
@@ -139,9 +157,9 @@ export interface AuthClient {
    * and the whole interface flips at the same moment rather than briefly
    * showing one user's name above another's data.
    */
-  switchUser: ReturnType<typeof createSwitchUser>
+  switchUser: (input: SwitchUserInput) => Promise<AuthUser>
   /** Updates the signed-in user and returns the row as stored. */
-  updateUser: ReturnType<typeof createUpdateUser>
+  updateUser: (input: UpdateUserInput) => Promise<AuthUser>
   /**
    * Deletes the account, in one or two steps.
    *
@@ -154,7 +172,7 @@ export interface AuthClient {
    * @throws {AuthError} For a wrong code, or when a guest has no way to receive
    * one.
    */
-  deleteUser: ReturnType<typeof createDeleteUser>
+  deleteUser: (input?: DeleteUserInput) => Promise<DeleteUserResult>
   /**
    * Sends the code that confirms account deletion.
    *
@@ -164,7 +182,7 @@ export interface AuthClient {
    * @throws {AuthError} `cooldown` or `rateLimited`, or
    * `guestCannotReceiveCode` for a guest with no email or phone number on file.
    */
-  sendDeleteUserCode: ReturnType<typeof createSendDeleteUserCode>
+  sendDeleteUserCode: () => Promise<void>
   /**
    * Signs out.
    *
@@ -174,7 +192,7 @@ export interface AuthClient {
    * A session that is already gone resolves rather than throwing: the caller
    * asked to end up signed out, and they are.
    */
-  signOut: ReturnType<typeof createSignOut>
+  signOut: (input?: SignOutInput) => Promise<void>
   /** Changes the locale sent on subsequent requests. */
   setLocale: (locale: string | undefined) => void
   /** Drops the in-memory token only — the 401-retry helper. Leaves the session alone. */
@@ -206,18 +224,18 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
   return {
     getToken,
     refresh,
-    sendSignInCode: createSendSignInCode(internals),
-    signInWithCode: createSignInWithCode(internals),
-    signInAsGuest: createSignInAsGuest(internals),
-    signInWithProvider: createSignInWithProvider(internals),
-    connectProvider: createConnectProvider(internals),
-    getProviderToken: createGetProviderToken(internals),
-    listUsers: createListUsers(internals),
-    switchUser: createSwitchUser(internals),
-    updateUser: createUpdateUser(internals),
-    deleteUser: createDeleteUser(internals),
-    sendDeleteUserCode: createSendDeleteUserCode(internals),
-    signOut: createSignOut(internals),
+    sendSignInCode: (input) => sendSignInCode(internals, input),
+    signInWithCode: (input) => signInWithCode(internals, input),
+    signInAsGuest: (input) => signInAsGuest(internals, input),
+    signInWithProvider: (input) => signInWithProvider(internals, input),
+    connectProvider: (input) => connectProvider(internals, input),
+    getProviderToken: (input) => getProviderToken(internals, input),
+    listUsers: () => listUsers(internals),
+    switchUser: (input) => switchUser(internals, input),
+    updateUser: (input) => updateUser(internals, input),
+    deleteUser: (input) => deleteUser(internals, input),
+    sendDeleteUserCode: () => sendDeleteUserCode(internals),
+    signOut: (input) => signOut(internals, input),
     setLocale: (locale) => {
       internals.locale = locale
     },

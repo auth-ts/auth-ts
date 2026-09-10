@@ -9,11 +9,9 @@ export interface ClientCall {
   path: string
 }
 
-// The factory's name is the mapping: `createListUsers` provides
-// `authClient.listUsers`. Reading it here rather than the name of whatever
-// the factory returns is what makes the object-of-arrows shape in `get-token.ts`
-// resolve the same way as the plain functions everywhere else.
-const FACTORY = /export function create(\w+)\s*\(/g
+// An exported function is a client method under its own name; a `createX`
+// factory such as `createGetToken` provides `authClient.getToken`.
+const EXPORTED_FUNCTION = /export (?:async )?function (\w+)\s*\(/g
 const NAMED_FUNCTION = /(?:async )?function (\w+)\s*\(/g
 const FETCH_METHOD = /method:\s*"(GET|POST|DELETE)"/
 const FETCH_PATH = /path:\s*(?:"([^"]*)"|`([^`]*)`)/
@@ -111,11 +109,13 @@ export function clientCallsInSource(source: string) {
   }
 
   const calls: ClientCall[] = []
-  FACTORY.lastIndex = 0
-  for (const match of source.matchAll(FACTORY)) {
+  EXPORTED_FUNCTION.lastIndex = 0
+  for (const match of source.matchAll(EXPORTED_FUNCTION)) {
     const captured = match[1]
     if (captured === undefined) continue
-    const name = captured.charAt(0).toLowerCase() + captured.slice(1)
+    const name = captured.startsWith("create")
+      ? captured.charAt(6).toLowerCase() + captured.slice(7)
+      : captured
 
     const body = functionBody(source, match.index + match[0].length - 1)
     const direct = requestIn(body)

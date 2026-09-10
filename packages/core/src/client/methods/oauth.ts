@@ -43,18 +43,18 @@ async function startFlow(
   globalThis.location.assign(url)
 }
 
-/** Builds `signInWithProvider`. */
-export function createSignInWithProvider(internals: AuthClientInternals) {
-  return function signInWithProvider(
-    input: OAuthNavigationInput
-  ): Promise<void> {
-    return startFlow(internals, "/sign-in/provider", input, false)
-  }
+/** `POST /sign-in/provider/:provider`, then navigates there. */
+export function signInWithProvider(
+  internals: AuthClientInternals,
+  input: OAuthNavigationInput
+): Promise<void> {
+  return startFlow(internals, "/sign-in/provider", input, false)
 }
 
-/** Builds `connectProvider`. */
-export function createConnectProvider(internals: AuthClientInternals) {
-  return function connectProvider(input: OAuthNavigationInput): Promise<void> {
-    return startFlow(internals, "/identities/connect", input, true)
-  }
+/** `POST /identities/connect/:provider`, then navigates there. */
+export function connectProvider(
+  internals: AuthClientInternals,
+  input: OAuthNavigationInput
+): Promise<void> {
+  return startFlow(internals, "/identities/connect", input, true)
 }

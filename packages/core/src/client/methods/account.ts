@@ -9,17 +9,18 @@ export type UpdateUserInput = {
   image?: string
 } & Record<string, string | number | boolean | undefined>
 
-/** Builds `updateUser`. */
-export function createUpdateUser(internals: AuthClientInternals) {
-  return async function updateUser(input: UpdateUserInput): Promise<AuthUser> {
-    const user = await internals.fetchJson<AuthUser>({
-      method: "POST",
-      path: "/user",
-      body: input,
-      authenticated: true
-    })
-    return reviveUser(user)
-  }
+/** `POST /user`: the signed-in user, as stored after the update. */
+export async function updateUser(
+  internals: AuthClientInternals,
+  input: UpdateUserInput
+): Promise<AuthUser> {
+  const user = await internals.fetchJson<AuthUser>({
+    method: "POST",
+    path: "/user",
+    body: input,
+    authenticated: true
+  })
+  return reviveUser(user)
 }
 
 /** How far a sign-out reaches, for each account it applies to. */
@@ -38,27 +39,28 @@ export interface SignOutInput {
   userId?: string
 }
 
-/** Builds `signOut`. */
-export function createSignOut(internals: AuthClientInternals) {
-  return async function signOut(input: SignOutInput = {}): Promise<void> {
-    const scope = input.scope ?? "local"
-    try {
-      await internals.fetchJson({
-        method: "POST",
-        path: "/sign-out",
-        body: { scope, ...(input.userId ? { userId: input.userId } : {}) },
-        authenticated: true
-      })
-    } catch (error) {
-      // Nothing to sign out of is the outcome this asked for, not a failure to
-      // report to someone who has already clicked the button.
-      if (!(error instanceof AuthError && error.code === "unauthenticated")) {
-        throw error
-      }
+/** `POST /sign-out`, then forgets the token unless only other devices went. */
+export async function signOut(
+  internals: AuthClientInternals,
+  input: SignOutInput = {}
+): Promise<void> {
+  const scope = input.scope ?? "local"
+  try {
+    await internals.fetchJson({
+      method: "POST",
+      path: "/sign-out",
+      body: { scope, ...(input.userId ? { userId: input.userId } : {}) },
+      authenticated: true
+    })
+  } catch (error) {
+    // Nothing to sign out of is the outcome this asked for, not a failure to
+    // report to someone who has already clicked the button.
+    if (!(error instanceof AuthError && error.code === "unauthenticated")) {
+      throw error
     }
-
-    if (scope !== "others") internals.tokenStore.clear()
   }
+
+  if (scope !== "others") internals.tokenStore.clear()
 }
 
 /** What a deletion attempt resolved to. */
@@ -72,37 +74,36 @@ export interface DeleteUserInput {
   code?: string
 }
 
-/** Builds `deleteUser`. */
-export function createDeleteUser(internals: AuthClientInternals) {
-  return async function deleteUser(
-    input: DeleteUserInput = {}
-  ): Promise<DeleteUserResult> {
-    try {
-      await internals.fetchJson({
-        method: "DELETE",
-        path: "/user",
-        body: input,
-        authenticated: true
-      })
-    } catch (error) {
-      if (error instanceof AuthError && error.code === "staleSession")
-        return { status: "staleSession" }
-      throw error
-    }
-
-    internals.tokenStore.clear()
-
-    return { status: "deleted" }
-  }
-}
-
-/** Builds `sendDeleteUserCode`. */
-export function createSendDeleteUserCode(internals: AuthClientInternals) {
-  return async function sendDeleteUserCode(): Promise<void> {
+/** `DELETE /user`; a stale session is reported as a result, not thrown. */
+export async function deleteUser(
+  internals: AuthClientInternals,
+  input: DeleteUserInput = {}
+): Promise<DeleteUserResult> {
+  try {
     await internals.fetchJson({
-      method: "POST",
-      path: "/user/send-delete-code",
+      method: "DELETE",
+      path: "/user",
+      body: input,
       authenticated: true
     })
+  } catch (error) {
+    if (error instanceof AuthError && error.code === "staleSession")
+      return { status: "staleSession" }
+    throw error
   }
+
+  internals.tokenStore.clear()
+
+  return { status: "deleted" }
+}
+
+/** `POST /user/send-delete-code`. */
+export async function sendDeleteUserCode(
+  internals: AuthClientInternals
+): Promise<void> {
+  await internals.fetchJson({
+    method: "POST",
+    path: "/user/send-delete-code",
+    authenticated: true
+  })
 }
