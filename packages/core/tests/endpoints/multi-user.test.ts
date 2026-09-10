@@ -126,7 +126,7 @@ describe("multiUser enabled", () => {
     )
   })
 
-  it("holds more than the five a single packed cookie used to allow", async () => {
+  it("holds more than five accounts at once", async () => {
     const context = await server()
     let cookies: Cookies = {}
     const ids: string[] = []

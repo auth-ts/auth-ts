@@ -52,10 +52,7 @@ describe("checkRateLimit", () => {
   })
 
   it("loses no attempt under concurrency, because attempts are only ever appended", async () => {
-    // The failure this replaces: a counter read, incremented, and written back
-    // lets ten parallel requests all read the same value and each store one
-    // more, so ten requests register as one. Inserts cannot collide, so ten
-    // parallel requests leave ten rows however slow the store is.
+    // A read-increment-write counter loses parallel attempts.
     const { internals, db } = await createTestInternals()
     const originalInsert = db.insert.bind(db)
     db.insert = async (input) => {

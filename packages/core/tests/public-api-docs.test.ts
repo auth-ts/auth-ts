@@ -108,7 +108,6 @@ describe("public API documentation", () => {
   })
 
   it("accepts only a doc comment, not any comment, above an export", () => {
-    // Each of these used to pass because the line above ended with `*/`.
     expect(
       undocumentedExportsInSource(
         [

@@ -452,7 +452,7 @@ export type AuthDeleteInput<
  * | `identities` | `(provider, providerUserId)` | `userId` | |
  *
  * **The uniqueness column is not hygiene, it is the design.** Core composes a
- * read and a write where it used to hand your store an upsert, so two first
+ * read and a write rather than asking your store for an upsert, so two first
  * sign-ins for one email both find nothing and both insert. The constraint is
  * what turns that race into a failed request instead of two accounts for one
  * person. The same holds for `(provider, providerUserId)`.

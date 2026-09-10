@@ -10,8 +10,6 @@ describe("basePath", () => {
     expect(of()).toBe("/api/auth")
     expect(of("/api/auth")).toBe("/api/auth")
     expect(of("api/auth")).toBe("/api/auth")
-    // A trailing slash used to survive the no-leading-slash branch, and every
-    // request built from it carried a doubled separator.
     expect(of("api/auth/")).toBe("/api/auth")
     expect(of("/api/auth///")).toBe("/api/auth")
   })

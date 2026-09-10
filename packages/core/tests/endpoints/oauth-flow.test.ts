@@ -108,8 +108,6 @@ describe("oauth start", () => {
   })
 
   it("carries declared additionalFields through the body into the state", async () => {
-    // They used to ride the query string as URL-encoded JSON, which meant a
-    // parse step of their own and a trip through access logs and history.
     const { auth } = await createTestServer({
       ...OAUTH_OPTIONS,
       user: { additionalFields: { plan: "string" } }
@@ -139,9 +137,7 @@ describe("oauth start", () => {
   })
 
   it("404s an unconfigured provider and every prototype key", async () => {
-    // `guest` is in the list because it is no longer special: providers live
-    // under /sign-in/provider/:provider, so nothing they could be called
-    // shadows a literal route, and this 404 is the ordinary "not configured".
+    // guest is just another unconfigured provider name.
     const { auth } = await createTestServer(OAUTH_OPTIONS)
 
     for (const name of [
@@ -1147,9 +1143,7 @@ describe("connect and disconnect", () => {
   })
 
   it("insists on the access token, like every other authenticated route", async () => {
-    // It used to take the cookie, because a top-level `location.assign` carries
-    // no Authorization header. Now that it answers with a URL instead of a
-    // redirect, the caller is making an ordinary request and can present one.
+    // An ordinary fetch, not a navigation.
     const context = await createTestServer(OAUTH_OPTIONS)
     const refreshToken = await signInWithCode(context)
 

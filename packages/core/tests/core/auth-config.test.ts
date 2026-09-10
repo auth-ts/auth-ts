@@ -269,9 +269,7 @@ describe("construction failures", () => {
   })
 
   it("rejects a negative duration, which parses but expires everything at birth", () => {
-    // The duration grammar accepts a leading `-`, so these are well-formed and
-    // used to pass. A negative TTL hands out sessions and tokens that expired
-    // before they were issued; a negative window starts in the future.
+    // The duration grammar accepts a leading minus.
     expect(() =>
       createAuth({ ...baseOptions(), session: { ttl: "-30d" } })
     ).toThrow(/session\.ttl/)

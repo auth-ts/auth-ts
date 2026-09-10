@@ -8,10 +8,9 @@ export type UserValues = Partial<Record<string, unknown>>
  * Applies the defined columns of `values` to a user, and returns the row as it
  * now stands.
  *
- * `undefined` means "leave alone" — the rule every implementation used to be
- * asked to honour, now honoured once, here. Stripping it is not cosmetic: a set
- * whose every value was dropped is an `UPDATE` with nothing to `SET`, which
- * most query builders refuse outright. When nothing is left the write is
+ * `undefined` means "leave alone", honoured once, here. Stripping it is not
+ * cosmetic: a set whose every value was dropped is an `UPDATE` with nothing to
+ * `SET`, which most query builders refuse outright. When nothing is left the write is
  * skipped entirely and the existing row is handed straight back, so "this
  * request changed nothing" costs no round trip and cannot fail.
  *

@@ -28,9 +28,7 @@ describe("findOrCreateUser", () => {
   })
 
   it("writes nothing when the sign-in carries no profile fields", async () => {
-    // A verification code carries neither a name nor a picture, so this is the common
-    // path — and an update with nothing to set is an error in most query
-    // builders, which is exactly how this used to fail against a real database.
+    // Most query builders refuse an empty update.
     const { internals, db } = await createTestInternals()
     await findOrCreateUser(internals, { identifier: ada })
     const update = vi.spyOn(db, "update")

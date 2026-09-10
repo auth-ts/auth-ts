@@ -23,9 +23,8 @@ export interface FindOrCreateUserInput {
 /**
  * Resolves the user behind a proven identifier, creating them on first sign-in.
  *
- * This is the read-then-write that used to be an upsert delegated to the store,
- * and the semantics that made that upsert subtle now live here, in one place,
- * tested once:
+ * A read then a write, not an upsert delegated to the store; the semantics
+ * that make it subtle live here, in one place, tested once:
  *
  * - **`type` is insert-only.** A sign-in that could rewrite it would demote an
  *   administrator every time they logged in.

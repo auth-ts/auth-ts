@@ -219,10 +219,7 @@ describe("additionalFields on update", () => {
   })
 
   it("answers 400 for a body that changes nothing, without touching the database", async () => {
-    // An UPDATE with no SET columns is an error in most query builders — the
-    // in-memory store throws "no values to set", as a real one would — so an
-    // an empty update used to surface as a 500. It is the client's mistake, and it
-    // never reaches the store now.
+    // Most query builders refuse an empty SET.
     const context = await createTestServer(options)
     const signInResponse = await verifyWith(context, "ada@example.com")
     const { token } = (await signInResponse.json()) as { token: string }
