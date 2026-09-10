@@ -95,77 +95,52 @@ function isIPv4(value: string): boolean {
   })
 }
 
+const IPV6_GROUP = /^[0-9a-fA-F]{1,4}$/
+
 /**
- * True for a well-formed IPv6 address, including `::` compression and an
- * optional IPv4-mapped tail (`::ffff:1.2.3.4`).
+ * A well-formed IPv6 address as its eight 16-bit groups, or `null`. Accepts
+ * `::` compression and an IPv4 tail only to the right of it (`::ffff:1.2.3.4`).
  *
  * Web-standard `Request` gives no socket address, so `node:net`'s `isIP` is off
  * the table on edge runtimes — this is the check, kept deliberately strict.
  */
-function isIPv6(value: string): boolean {
+function parseIPv6(value: string): number[] | null {
   const halves = value.split("::")
-  if (halves.length > 2) return false
+  if (halves.length > 2) return null
 
-  const isGroup = (group: string) => /^[0-9a-fA-F]{1,4}$/.test(group)
+  const left = parseGroups(halves[0] ?? "", halves.length === 1)
+  if (!left) return null
+  if (halves.length === 1) return left.length === 8 ? left : null
 
-  const parseSide = (side: string, allowTail: boolean): number | null => {
-    if (side === "") return 0
-    const groups = side.split(":")
+  const right = parseGroups(halves[1] ?? "", true)
+  // The compressed run must stand for at least one omitted group.
+  if (!right || left.length + right.length >= 8) return null
 
-    // An IPv4-mapped tail counts as two 16-bit groups.
-    const tail = groups[groups.length - 1]
-    if (tail?.includes(".")) {
-      if (!allowTail || !isIPv4(tail)) return null
-      const head = groups.slice(0, -1)
-      if (!head.every(isGroup)) return null
-      return head.length + 2
-    }
+  const omitted = Array<number>(8 - left.length - right.length).fill(0)
+  return [...left, ...omitted, ...right]
+}
 
-    if (!groups.every(isGroup)) return null
-    return groups.length
-  }
+function parseGroups(side: string, allowTail: boolean): number[] | null {
+  if (side === "") return []
+  const groups = side.split(":")
+  const tail = groups[groups.length - 1] ?? ""
+  const dotted = tail.includes(".")
+  if (dotted && (!allowTail || !isIPv4(tail))) return null
 
-  if (halves.length === 2) {
-    const left = parseSide(halves[0] ?? "", false)
-    const right = parseSide(halves[1] ?? "", true)
-    if (left === null || right === null) return false
-    // The compressed run must stand for at least one omitted group.
-    return left + right < 8
-  }
+  const head = dotted ? groups.slice(0, -1) : groups
+  if (!head.every((group) => IPV6_GROUP.test(group))) return null
 
-  return parseSide(value, true) === 8
+  const parsed = head.map((group) => Number.parseInt(group, 16))
+  if (!dotted) return parsed
+
+  // An IPv4-mapped tail is two groups: `1.2.3.4` is `0102:0304`.
+  const [a = 0, b = 0, c = 0, d = 0] = tail.split(".").map(Number)
+  return [...parsed, (a << 8) | b, (c << 8) | d]
 }
 
 /** True when the value is a syntactically valid IPv4 or IPv6 address. */
 export function isIpAddress(value: string): boolean {
-  return isIPv4(value) || isIPv6(value)
-}
-
-/** A valid IPv6 address as its eight 16-bit groups, or `null` if it is not one. */
-function expandIPv6(value: string): number[] | null {
-  if (!isIPv6(value)) return null
-
-  const parseSide = (side: string): number[] => {
-    if (side === "") return []
-
-    return side.split(":").flatMap((group) => {
-      if (!group.includes(".")) return [Number.parseInt(group, 16)]
-      // An IPv4-mapped tail is two groups: `1.2.3.4` is `0102:0304`.
-      const octets = group.split(".").map(Number)
-      return [
-        ((octets[0] ?? 0) << 8) | (octets[1] ?? 0),
-        ((octets[2] ?? 0) << 8) | (octets[3] ?? 0)
-      ]
-    })
-  }
-
-  const halves = value.split("::")
-  const left = parseSide(halves[0] ?? "")
-  if (halves.length === 1) return left
-
-  const right = parseSide(halves[1] ?? "")
-  const omitted = Array<number>(8 - left.length - right.length).fill(0)
-  return [...left, ...omitted, ...right]
+  return isIPv4(value) || parseIPv6(value) !== null
 }
 
 /**
@@ -210,7 +185,7 @@ function formatIPv6(groups: number[]): string {
 export function normalizeIpAddress(address: string): string {
   if (isIPv4(address)) return address
 
-  const groups = expandIPv6(address)
+  const groups = parseIPv6(address)
   if (!groups) return address
 
   const mapped =
@@ -233,7 +208,7 @@ export function getIpAddressKey(
   address: string,
   config: IpAddressConfig
 ): string {
-  const groups = expandIPv6(address)
+  const groups = parseIPv6(address)
   if (!groups || config.ipv6Subnet >= 128) return address
 
   const masked = groups.map((group, index) => {
@@ -250,7 +225,7 @@ function ipToBytes(address: string): Uint8Array | null {
     return Uint8Array.from(address.split(".").map(Number))
   }
 
-  const groups = expandIPv6(address)
+  const groups = parseIPv6(address)
   if (!groups) return null
 
   const bytes = new Uint8Array(16)

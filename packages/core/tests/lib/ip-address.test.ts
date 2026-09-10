@@ -31,7 +31,8 @@ describe("isIpAddress", () => {
       "::1",
       "::",
       "2001:db8::1",
-      "::ffff:1.2.3.4"
+      "::ffff:1.2.3.4",
+      "64:ff9b::1.2.3.4"
     ]) {
       expect(isIpAddress(valid), valid).toBe(true)
     }
@@ -48,6 +49,8 @@ describe("isIpAddress", () => {
       "::1::2",
       "1.2.3.4::",
       "1.2.3.4::5",
+      "1:2:3:4:5:6:7:1.2.3.4",
+      "::1.2.3",
       "x".repeat(60)
     ]) {
       expect(isIpAddress(invalid), invalid).toBe(false)
