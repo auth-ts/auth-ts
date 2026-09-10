@@ -3,12 +3,10 @@ import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { readBody } from "../../http/read-body"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
-import { sha256Hex } from "../../lib/hash"
 import { insertRow } from "../../lib/insert-row"
-import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { issueSession } from "../../session/issue-session"
-import { readRefreshCookies } from "../../session/session-cookies"
+import { presentedSessions } from "../../session/presented-sessions"
 
 /** Body accepted by `POST /sign-in/guest`. */
 export interface SignInAsGuestInput {
@@ -72,16 +70,10 @@ export const signInAsGuest = defineEndpoint({
     // A browser that is signed in never becomes a guest on top of it: the
     // guest would displace or park a real account, and a guest parked behind
     // one is a row nothing will ever convert. A dead cookie does not count.
-    const presented = [...readRefreshCookies(internals, headers)]
-    const live = await Promise.all(
-      presented.map(async ([, rawToken]) =>
-        selectOne(internals, "sessions", {
-          tokenHash: { eq: await sha256Hex(rawToken) },
-          expiresAt: { gt: new Date() }
-        })
-      )
-    )
-    if (live.some(Boolean)) throw new AuthApiError("guestRequiresSignOut")
+    const presented = await presentedSessions(internals, headers)
+    if (presented.some(({ session }) => session)) {
+      throw new AuthApiError("guestRequiresSignOut")
+    }
 
     const additionalFields = validateAdditionalFields(
       config.user.additionalFields,

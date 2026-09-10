@@ -47,9 +47,9 @@ export interface GuestConversion {
  * only the application knows what a guest's rows mean or whether merging them is
  * even desirable.
  *
- * In both cases the guest's session is replaced rather than parked: callers pass
- * its token hash as `issueSession`'s `replaces`, which deletes the row and keeps
- * it out of the account switcher. A stranded anonymous account in a switcher
+ * In both cases the guest's session is replaced rather than parked: callers hand
+ * `issueSession` the caller's session, which deletes the row and keeps it out
+ * of the account switcher. A stranded anonymous account in a switcher
  * helps nobody, and a still-valid refresh token for it is a session nobody can
  * see to revoke.
  */

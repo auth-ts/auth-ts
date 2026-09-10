@@ -12,6 +12,7 @@ import { clearedRefreshCookies } from "../session/session-cookies"
 import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
 import { consumeVerificationCode } from "../verification-code/consume-verification-code"
+import { accountIdentifier } from "../verification-code/resolve-code-identifier"
 
 /**
  * The flat body accepted by `POST /user`.
@@ -212,12 +213,12 @@ export const deleteUser = defineEndpoint({
       return { data: undefined, status: 204, headers: responseHeaders }
     }
 
+    const identifier = accountIdentifier(user)
     if (input.code) {
-      const identifier = user.email ?? user.phoneNumber
       if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
 
       await consumeVerificationCode(internals, {
-        identifier,
+        identifier: identifier.value,
         code: input.code,
         purpose: "deleteUser"
       })
@@ -233,9 +234,7 @@ export const deleteUser = defineEndpoint({
     }
 
     // A guest with no identifier still can't be challenged at all.
-    if (!user.email && !user.phoneNumber) {
-      throw new AuthApiError("guestCannotReceiveCode")
-    }
+    if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
 
     throw new AuthApiError("staleSession")
   }

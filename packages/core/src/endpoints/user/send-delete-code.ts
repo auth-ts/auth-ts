@@ -5,6 +5,7 @@ import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
+import { accountIdentifier } from "../../verification-code/resolve-code-identifier"
 import { sendVerificationCode } from "../../verification-code/send-verification-code"
 
 /** How `POST /user/send-delete-code` appears in the OpenAPI document. */
@@ -55,12 +56,7 @@ export const sendDeleteUserCode = defineEndpoint({
     // signed-out token would keep putting codes in flight.
     if (!user || !session) throw unauthenticated()
 
-    const identifier = user.email
-      ? ({ kind: "email", value: user.email } as const)
-      : user.phoneNumber
-        ? ({ kind: "phoneNumber", value: user.phoneNumber } as const)
-        : null
-
+    const identifier = accountIdentifier(user)
     if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
 
     await sendVerificationCode(internals, {

@@ -1,16 +1,12 @@
 import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import { readBody } from "../http/read-body"
-import { sha256Hex } from "../lib/hash"
-import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
+import { presentedSessions } from "../session/presented-sessions"
 import { revokeOtherSessions } from "../session/revoke-other-sessions"
-import {
-  clearedRefreshCookies,
-  readRefreshCookies
-} from "../session/session-cookies"
+import { clearedRefreshCookies } from "../session/session-cookies"
 
 /**
  * How far a sign-out reaches, for each user it applies to.
@@ -99,18 +95,10 @@ export const signOut = defineEndpoint({
     // The row's own userId settles whose it is, exactly as the resolver would;
     // a cookie under a name its row does not carry — or whose session is gone —
     // contributes nothing to revoke but still has a cookie worth clearing.
-    const presented = [...readRefreshCookies(internals, headers)]
-    const fromCookies = await Promise.all(
-      presented.map(async ([userId, rawToken]) => {
-        const session = await selectOne(internals, "sessions", {
-          tokenHash: { eq: await sha256Hex(rawToken) },
-          expiresAt: { gt: new Date() }
-        })
-
-        return {
-          userId,
-          session: session?.userId === userId ? session : undefined
-        }
+    const fromCookies = (await presentedSessions(internals, headers)).map(
+      ({ userId, session }) => ({
+        userId,
+        session: session?.userId === userId ? session : undefined
       })
     )
     // The caller always counts, cookie or not: a bearer-only client — a native

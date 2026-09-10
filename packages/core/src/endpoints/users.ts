@@ -1,11 +1,10 @@
 import type { AuthUser } from "../core/auth-database"
 import { defineEndpoint } from "../http/define-endpoint"
-import { sha256Hex } from "../lib/hash"
 import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
-import { readRefreshCookies } from "../session/session-cookies"
+import { presentedSessions } from "../session/presented-sessions"
 
 /** How `GET /users` appears in the OpenAPI document. */
 export const listUsersDocs: EndpointDocs<never> = {
@@ -48,20 +47,16 @@ export const listUsers = defineEndpoint({
 
     // Concurrently: this is one round trip per signed-in user, bounded by how
     // many cookies a browser will hold for one host.
-    const presented = [...readRefreshCookies(internals, headers)]
+    // The row is read by the session's own owner, never by the name on the
+    // cookie: a name is written by whoever sent it, so trusting one would
+    // hand back any user's row to anybody holding a token of their own.
+    const presented = await presentedSessions(internals, headers)
     const users = await Promise.all(
-      presented.map(async ([userId, rawToken]) => {
-        const session = await selectOne(internals, "sessions", {
-          tokenHash: { eq: await sha256Hex(rawToken) },
-          expiresAt: { gt: new Date() }
-        })
-        // The row is read by the session's own owner, never by the name on the
-        // cookie: a name is written by whoever sent it, so trusting one would
-        // hand back any user's row to anybody holding a token of their own.
-        if (!session || session.userId !== userId) return null
-
-        return selectOne(internals, "users", { id: { eq: session.userId } })
-      })
+      presented.map(({ userId, session }) =>
+        session?.userId === userId
+          ? selectOne(internals, "users", { id: { eq: session.userId } })
+          : null
+      )
     )
 
     return { data: users.filter((user): user is AuthUser => user !== null) }

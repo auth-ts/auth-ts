@@ -1,3 +1,4 @@
+import type { AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { normalizeEmail, normalizePhone } from "../lib/normalize-identifiers"
@@ -79,4 +80,13 @@ export function resolveCodeIdentifier(
       message: (error as Error).message
     })
   }
+}
+
+/** The channel a code can reach this user on, or `null` for a guest with neither. */
+export function accountIdentifier(
+  user: Pick<AuthUser, "email" | "phoneNumber">
+): CodeIdentifier | null {
+  if (user.email) return { kind: "email", value: user.email }
+  if (user.phoneNumber) return { kind: "phoneNumber", value: user.phoneNumber }
+  return null
 }

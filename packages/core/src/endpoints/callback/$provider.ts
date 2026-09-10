@@ -184,8 +184,7 @@ export const callbackProvider = defineEndpoint({
         headers: input.headers,
         amr: ["fed"],
         requestURL: input.requestURL,
-        // The guest's session has done its job either way — see `convertGuest`.
-        ...(active?.user.type === "guest" ? { replaces: active.tokenHash } : {})
+        caller: active
       })
 
       const headers = new Headers(issued.headers)

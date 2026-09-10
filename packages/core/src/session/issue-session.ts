@@ -6,14 +6,11 @@ import { randomBytesBase64url } from "../lib/generate-random"
 import { sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
-import { selectOne } from "../lib/select-one"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { sweepExpired } from "../lib/sweep-expired"
-import {
-  readRefreshCookies,
-  refreshCookieName,
-  refreshCookies
-} from "./session-cookies"
+import { presentedSessions } from "./presented-sessions"
+import type { ResolvedSession } from "./resolve-session"
+import { refreshCookieName, refreshCookies } from "./session-cookies"
 import { sessionStamp } from "./slide-session"
 
 /** What issuing a session produced. */
@@ -42,14 +39,14 @@ export interface IssueSessionInput {
    */
   requestURL?: string
   /**
-   * Token hash of a session this one supersedes.
+   * The session the caller signed in from, if any.
    *
-   * That session is deleted rather than left live. Used when a guest completes
-   * a sign-in: whether they were upgraded in place or merged into an existing
-   * user, the anonymous session has served its purpose, and a stranded guest in
-   * the switcher — or a still-valid refresh token for one — helps nobody.
+   * A guest's is deleted rather than left live: whether they were upgraded in
+   * place or merged into an existing user, the anonymous session has served
+   * its purpose, and a stranded guest in the switcher — or a still-valid
+   * refresh token for one — helps nobody.
    */
-  replaces?: string
+  caller?: ResolvedSession | null
 }
 
 /**
@@ -66,7 +63,7 @@ export interface IssueSessionInput {
  */
 export async function issueSession(
   internals: AuthInternals,
-  { user, headers, requestURL, replaces, amr }: IssueSessionInput
+  { user, headers, requestURL, caller, amr }: IssueSessionInput
 ): Promise<IssueResult> {
   const { config } = internals
   const rawToken = randomBytesBase64url(32)
@@ -90,31 +87,16 @@ export async function issueSession(
       ...sessionStamp(internals, headers)
     }),
     sweepExpired(internals, "sessions"),
-    Promise.all(
-      [...readRefreshCookies(internals, headers)].map(
-        async ([cookieUserId, rawToken]) => {
-          const hash = await sha256Hex(rawToken)
-
-          return {
-            cookieUserId,
-            hash,
-            ownerId: config.multiUser
-              ? (
-                  await selectOne(internals, "sessions", {
-                    tokenHash: { eq: hash }
-                  })
-                )?.userId
-              : undefined
-          }
-        }
-      )
-    )
+    presentedSessions(internals, headers, {
+      live: false,
+      read: config.multiUser
+    })
   ])
   const stranded = held.filter(
-    ({ ownerId }) => !config.multiUser || ownerId === user.id
+    ({ session }) => !config.multiUser || session?.userId === user.id
   )
-  const superseded = new Set(stranded.map(({ hash }) => hash))
-  if (replaces) superseded.add(replaces)
+  const superseded = new Set(stranded.map(({ tokenHash }) => tokenHash))
+  if (caller?.user.type === "guest") superseded.add(caller.tokenHash)
   // Only once the replacement exists: if creating it had failed, the caller
   // would still hold a working session rather than none.
   superseded.delete(tokenHash)
@@ -134,15 +116,11 @@ export async function issueSession(
   internals.log.debug("session issued", { userType: user.type })
 
   const secure = shouldUseSecureCookies(requestURL)
-  for (const { cookieUserId } of stranded) {
-    if (cookieUserId === user.id) continue
+  for (const { userId } of stranded) {
+    if (userId === user.id) continue
     responseHeaders.append(
       "set-cookie",
-      clearCookie(
-        refreshCookieName(config, cookieUserId),
-        config.cookie.path,
-        secure
-      )
+      clearCookie(refreshCookieName(config, userId), config.cookie.path, secure)
     )
   }
   for (const cookie of refreshCookies(internals, {

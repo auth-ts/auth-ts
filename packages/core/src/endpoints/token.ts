@@ -1,14 +1,13 @@
 import type { AuthUser } from "../core/auth-database"
 import { defineEndpoint } from "../http/define-endpoint"
-import { sha256Hex } from "../lib/hash"
 import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import { mintAccessToken } from "../session/issue-session"
+import { presentedSessions } from "../session/presented-sessions"
 import type { HeadersInput } from "../session/resolve-session"
 import { readRefreshToken, resolveSession } from "../session/resolve-session"
 import {
   clearedRefreshCookies,
-  readRefreshCookies,
   refreshCookies
 } from "../session/session-cookies"
 
@@ -85,13 +84,9 @@ export const getToken = defineEndpoint({
       // is about the one cookie the hint named; a browser holding another
       // user's live session must not be signed out of it, and a cookie cleared
       // while its row lives on strands a session nobody can reach.
-      const presented = [...readRefreshCookies(internals, input.headers)]
+      const presented = await presentedSessions(internals, input.headers)
       const spent = await Promise.all(
-        presented.map(async ([userId, rawToken]) => {
-          const live = await selectOne(internals, "sessions", {
-            tokenHash: { eq: await sha256Hex(rawToken) },
-            expiresAt: { gt: new Date() }
-          })
+        presented.map(async ({ userId, session: live }) => {
           if (live?.userId !== userId) return userId
 
           // Orphaned session: its user row is gone
