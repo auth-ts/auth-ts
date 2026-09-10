@@ -22,7 +22,6 @@ const postgrest = new NeonPostgrestClient<Database>({
   options: { global: { fetch: fetchWithToken(authClient.getToken) } }
 })
 
-/** Runs a guest session against the real Data API and cleans up after itself. */
 describe.skipIf(!live)("Neon Data API", () => {
   let userId = ""
   const ids: string[] = []

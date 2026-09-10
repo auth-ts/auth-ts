@@ -11,10 +11,7 @@ export default defineConfig({
     tanstackStart(),
     react()
   ],
-  // Vite answers CORS preflights itself, permissively for any localhost origin
-  // and without Allow-Credentials, which shadows the auth handler and makes dev
-  // disagree with production. Off in both servers, so `auth.handler`
-  // answers OPTIONS everywhere.
+  // Vite's own CORS would shadow start.ts
   server: { port: 3000, cors: false },
   preview: { cors: false }
 })

@@ -10,18 +10,7 @@ import * as schema from "../src/db/schema"
 
 const client = new PGlite()
 
-/**
- * The row-ownership policies, against a real Postgres.
- *
- * `privileges.test.ts` proves which tables and columns the Data API role may
- * touch at all; this proves it only ever reaches its own rows. The two are
- * separate because they fail separately: a grant that is too wide hands over a
- * whole table, and a policy that is too wide hands over one column of everyone's.
- *
- * It matters more since revoking a device became a delete through the data
- * plane rather than an endpoint. The `where` that used to name both the session
- * id and the user id now lives here, as `using`.
- */
+/** Policies scope rows; privileges.test.ts scopes tables. */
 const asUser = async <Result>(
   userId: string,
   run: () => Promise<Result>
@@ -53,8 +42,7 @@ beforeAll(async () => {
   )) {
     await client.exec(statement)
   }
-  // The grants live here, not in the schema: without them the role reaches no
-  // table at all and a policy is never consulted.
+  // Without grants no policy is consulted
   await client.exec(
     readFileSync(join(import.meta.dirname, "../src/db/privileges.sql"), "utf8")
   )
@@ -103,8 +91,6 @@ describe("row ownership", () => {
   )
 
   it("deletes nothing when the id belongs to somebody else", async () => {
-    // The replacement for the endpoint check that used to answer 404 here: the
-    // policy makes another user's id match no row rather than the wrong one.
     const theirs = await client.query<{ id: string }>(
       `select "id" from "sessions" where "userId" = $1`,
       [grace]

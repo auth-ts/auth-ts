@@ -21,7 +21,7 @@ export const Route = createFileRoute("/login")({
     typeof search.error === "string" ? { error: search.error } : {}
 })
 
-/** A failed provider flow comes back here with its code in `?error=`. */
+/** Messages for `?error=` codes. */
 const signInFailures: Record<string, string> = {
   providerDenied: "That sign-in was cancelled.",
   providerRejected: "That sign-in could not be completed. Please try again.",
@@ -32,7 +32,6 @@ const signInFailures: Record<string, string> = {
   invalidState: "That sign-in attempt expired. Please start again."
 }
 
-/** Every way in that this demo has configured. */
 function LoginPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -49,8 +48,6 @@ function LoginPage() {
   const [cooldown, startCooldown] = useCountdown()
 
   const report = (error: unknown) => {
-    // Errors are switched on by code, never by message text: the message is
-    // localized and free to change, the code is the contract.
     if (isAuthError(error) && error.retryAfter) {
       startCooldown(error.retryAfter)
       setNotice({ text: error.message, tone: "error" })
@@ -81,7 +78,6 @@ function LoginPage() {
     setNotice(null)
     try {
       await authClient.signInWithCode({ email, code })
-      // Every query failed while signed out, so ask for them again.
       await queryClient.invalidateQueries()
       await navigate({ to: "/todos" })
     } catch (error) {
@@ -144,9 +140,6 @@ function LoginPage() {
                   className="input w-full"
                 />
               </fieldset>
-              {/* The countdown lives on the button, not in the message: the
-                  server's text already says how long, and a disabled button
-                  that counts down is what turns that into something actionable. */}
               <button
                 type="submit"
                 disabled={cooldown > 0}
@@ -211,8 +204,7 @@ function LoginPage() {
               <GitHubIcon className="size-4" />
               Continue with GitHub
             </button>
-            {/* A guest needs a signed-out browser, so a signed-in visitor —
-                here to add another account — is not offered one. */}
+            {/* Guests need a signed-out browser. */}
             {user ? null : (
               <button
                 type="button"

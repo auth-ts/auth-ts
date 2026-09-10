@@ -5,8 +5,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set in the .env file")
 }
 
-// The WebSocket pool takes each file whole: the HTTP driver runs one statement
-// at a time, and the function bodies in triggers.sql rule out splitting them.
+// HTTP driver runs one statement per query
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 try {
   for (const file of ["privileges.sql", "triggers.sql"]) {

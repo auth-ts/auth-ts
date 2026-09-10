@@ -1,15 +1,6 @@
 import type { SVGProps } from "react"
 
-/**
- * The Auth.ts mark, painted with `currentColor` so it takes whatever text
- * colour surrounds it.
- *
- * A copy of the docs app's component rather than a shared import: the examples
- * are meant to be lifted out of the repo whole, so nothing here reaches across
- * workspaces. The viewBox is cropped to the artwork so `size-*` means the same
- * thing on the mark as on the icons beside it — see `apps/docs` for why it is
- * cropped the way it is.
- */
+// Copied from apps/docs: examples stay self-contained
 export function Logo(props: SVGProps<SVGSVGElement>) {
   return (
     <svg

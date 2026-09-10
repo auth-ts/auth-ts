@@ -20,8 +20,7 @@ await client.exec(`
   create function auth.user_id() returns text as $$ select null::text $$ language sql;
 `)
 
-// DDL generated from schema.ts, so the tables cannot drift from the deployed
-// ones. Auth tables only: todos carries a Neon-specific default.
+// Auth tables only; todos defaults to auth.user_id()
 const statements = await generateMigration(
   await generateDrizzleJson({}),
   await generateDrizzleJson({
@@ -35,5 +34,5 @@ const statements = await generateMigration(
 )
 for (const statement of statements) await client.exec(statement)
 
-// Explicit: `drizzle(client)` reads it as config and starts a second, empty one.
+// drizzle(client) would start a second database
 export const db = drizzle({ client })

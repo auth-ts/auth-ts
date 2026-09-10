@@ -35,7 +35,6 @@ export const Route = createFileRoute("/account")({ component: AccountPage })
 type SetNotice = (notice: Notice | null) => void
 type SignOut = (input?: SignOutInput) => Promise<void>
 
-/** Profile, linked providers, sessions, account switching, and deletion. */
 function AccountPage() {
   const { data: user, isPending } = useUser()
   const queryClient = useQueryClient()
@@ -97,8 +96,7 @@ function ProfileCard({
   name: string | null
   setNotice: SetNotice
 }) {
-  // `null` until the user edits, so the input shows the stored name and Save
-  // cannot send an empty or unchanged value over it.
+  // null until the user edits
   const [draftName, setDraftName] = useState<string | null>(null)
 
   const rename = useUpdateMutation(client.from("users"), ["id"], null, {
@@ -150,8 +148,7 @@ function ProvidersCard({ setNotice }: { setNotice: SetNotice }) {
     client.from("identities").select().order("provider", { ascending: true })
   )
 
-  // By id, not by provider: two accounts at the same provider can be connected
-  // at once, and disconnecting one must not take the other.
+  // By id: one provider, many identities
   const disconnect = useDeleteMutation(
     client.from("identities"),
     ["id"],
@@ -237,8 +234,6 @@ function SessionsCard({ setNotice }: { setNotice: SetNotice }) {
             <li key={session.id} className="list-row items-center">
               <div className="list-col-grow min-w-0">
                 <div className="flex items-center gap-2">
-                  {/* User agents run long; truncation keeps the row on one line
-                      and the Revoke button in view. */}
                   <span
                     className="truncate text-sm"
                     title={session.userAgent ?? undefined}
@@ -275,8 +270,7 @@ function SwitchUserCard({ userId }: { userId: string }) {
   const users = useReactQuery({
     queryKey: ["users"],
     queryFn: authClient.listUsers,
-    // 404 means multiUser is off on the server; that is a configuration
-    // answer, not a failure worth retrying.
+    // 404 means multiUser is off
     retry: false
   })
 
@@ -335,9 +329,6 @@ function SignOutButtons({
     input?: SignOutInput
     navigates: boolean
   }[] = [
-    // Every account in this browser — the default, as in Clerk.
-    // "Sign out this account" below is the switcher's narrower
-    // version.
     { label: "Sign out", navigates: true },
     { label: "Sign out this account", input: { userId }, navigates: true },
     {
@@ -384,9 +375,7 @@ function DeleteCard() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [deletionCode, setDeletionCode] = useState<string | null>(null)
-  // Deletion gets its own notice, rendered inside its card: the page-level
-  // alert sits at the top, and the Delete button is at the bottom, so an error
-  // reported up there is invisible from where the click happened.
+  // Own notice: the page alert is offscreen
   const [deletionNotice, setDeletionNotice] = useState<Notice | null>(null)
   const [deletionCooldown, startDeletionCooldown] = useCountdown()
 
@@ -397,9 +386,6 @@ function DeleteCard() {
         deletionCode ? { code: deletionCode } : {}
       )
 
-      // Two-phase deletion reports the challenge as a value, because it is an
-      // expected branch of a working flow rather than a failure. Deletion never
-      // sends a code itself, so a stale session asks for one explicitly.
       if (result.status === "staleSession") {
         // Show the field even if sending fails.
         setDeletionCode("")
@@ -414,8 +400,6 @@ function DeleteCard() {
       await queryClient.resetQueries()
       await navigate({ to: "/login" })
     } catch (error) {
-      // Sending the code, or confirming inside its cooldown, both answer
-      // `cooldown` with a retryAfter; the button counts it down.
       if (isAuthError(error) && error.retryAfter) {
         startDeletionCooldown(error.retryAfter)
       }
@@ -450,8 +434,7 @@ function DeleteCard() {
           </fieldset>
         ) : null}
         <div className="card-actions">
-          {/* The cooldown only gates sending a fresh code, so a typed code
-              can still be confirmed while the button counts down. */}
+          {/* Cooldown gates sending, not confirming */}
           <button
             type="button"
             onClick={removeAccount}

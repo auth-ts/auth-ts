@@ -15,9 +15,7 @@ export const auth = createAuth({
   guest: true,
   multiUser: true,
   openapi: true,
-  // Allowed to make state-changing requests. CORS headers are not this
-  // server's business — see `src/start.ts`, which answers them for the whole
-  // application. Development only: the docs site's API playground.
+  // Docs playground; CORS lives in start.ts
   ...(process.env.NODE_ENV === "development"
     ? { trustedOrigins: ["http://localhost:3001"] }
     : {}),

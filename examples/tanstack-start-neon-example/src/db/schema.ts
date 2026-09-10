@@ -128,7 +128,7 @@ export const verifications = pgTable.withRLS(
   ]
 )
 
-// No policy, and never one: `key` embeds an email, phone, or IP address.
+// No policy: key holds emails and IPs
 export const attempts = pgTable.withRLS(
   "attempts",
   {
@@ -190,7 +190,7 @@ export const identities = pgTable.withRLS(
   ]
 )
 
-// No policy, so nothing but the owner reads it. Never add one.
+// No policy, ever: these are secrets
 export const identitySecrets = pgTable.withRLS(
   "identitySecrets",
   {
