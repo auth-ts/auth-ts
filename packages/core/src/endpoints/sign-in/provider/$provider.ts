@@ -2,11 +2,8 @@ import { notFound } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
 import { readBody } from "../../../http/read-body"
 import { validateAdditionalFields } from "../../../http/validate-additional-fields"
-import { shouldUseSecureCookies } from "../../../lib/serialize-cookie"
-import { validateRedirect } from "../../../lib/validate-redirect"
-import { getCallbackURL } from "../../../oauth/callback-url"
 import { getProvider } from "../../../oauth/providers/get-provider"
-import { createStateCookie } from "../../../oauth/state-cookie"
+import { startProviderFlow } from "../../../oauth/start-provider-flow"
 import type { EndpointDocs } from "../../../openapi/endpoint-docs"
 
 /** Input for starting an OAuth sign-in. */
@@ -109,43 +106,10 @@ export const signInWithProvider = defineEndpoint({
       config.user.additionalFields,
       input.additionalFields
     )
-    const secure = shouldUseSecureCookies(input.requestURL)
-    const redirectURI = getCallbackURL(
-      config,
-      input.provider,
-      input.requestURL,
-      input.headers
-    )
 
-    const { state, codeChallenge, nonce, setCookie } = await createStateCookie(
-      internals,
-      input.provider,
-      {
-        intent: "signIn",
-        redirect: validateRedirect(input.redirect),
-        ...(input.errorRedirect
-          ? { errorRedirect: validateRedirect(input.errorRedirect) }
-          : {}),
-        ...(Object.keys(additionalFields).length > 0
-          ? { additionalFields }
-          : {})
-      },
-      secure
-    )
-
-    const responseHeaders = new Headers()
-    responseHeaders.append("set-cookie", setCookie)
-
-    const data: AuthorizeURLResult = {
-      url: configured.provider.authorizeURL({
-        credentials: configured.credentials,
-        redirectURI,
-        state,
-        codeChallenge,
-        nonce
-      })
-    }
-
-    return { data, headers: responseHeaders }
+    return startProviderFlow(internals, configured, input, {
+      intent: "signIn",
+      ...(Object.keys(additionalFields).length > 0 ? { additionalFields } : {})
+    })
   }
 })

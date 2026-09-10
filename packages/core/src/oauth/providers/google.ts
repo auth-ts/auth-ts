@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, errors, jwtVerify } from "jose"
 import { AuthApiError } from "../../http/auth-api-error"
-import { expiresAt, requestedScopes } from "./grant"
+import type { TokenResponse } from "./grant"
+import { readTokenResponse, readTokens, requestedScopes } from "./grant"
 import type {
   AuthorizeURLInput,
   ExchangeCodeInput,
@@ -9,7 +10,6 @@ import type {
   ProviderTokens,
   RefreshAccessTokenInput
 } from "./oauth-provider"
-import { providerRejected } from "./provider-response"
 
 interface GoogleIdTokenClaims {
   sub?: string
@@ -97,8 +97,7 @@ export const google: OAuthProvider = {
       signal
     })
 
-    if (!tokenResponse.ok) throw providerRejected(tokenResponse)
-    const token = (await tokenResponse.json().catch(() => ({}))) as GoogleTokens
+    const token = await readTokenResponse<GoogleTokens>(tokenResponse)
     if (!token.id_token) throw new AuthApiError("providerRejected")
 
     // Verified in full — signature against Google's published keys, issuer,
@@ -169,32 +168,15 @@ export const google: OAuthProvider = {
     if (response.status === 400) {
       throw new AuthApiError("providerReconnectRequired")
     }
-    if (!response.ok) throw providerRejected(response)
-
     // A refresh response carries no `refresh_token` — the original stays valid,
     // and `readTokens` leaving the field out is what preserves it downstream.
-    return readTokens((await response.json().catch(() => ({}))) as GoogleTokens)
+    return readTokens(await readTokenResponse(response))
   }
 }
 
 /** The token endpoint's response, in both the exchange and refresh directions. */
-interface GoogleTokens {
+interface GoogleTokens extends TokenResponse {
   id_token?: string
-  access_token?: string
-  refresh_token?: string
-  expires_in?: number
-  scope?: string
-}
-
-function readTokens(token: GoogleTokens): ProviderTokens {
-  return {
-    ...(token.access_token ? { accessToken: token.access_token } : {}),
-    ...(token.refresh_token ? { refreshToken: token.refresh_token } : {}),
-    ...(typeof token.expires_in === "number"
-      ? { accessTokenExpiresAt: expiresAt(token.expires_in) }
-      : {}),
-    ...(token.scope ? { scope: token.scope } : {})
-  }
 }
 
 /**

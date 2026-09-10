@@ -59,13 +59,7 @@ export async function resolveOAuthUser(
       // Refresh the recorded label, but never re-key on it: the account is
       // found by the provider's stable id, so a renamed handle is the same
       // link with a new name on it.
-      await linkIdentity(internals, {
-        userId: linked.id,
-        provider,
-        providerUserId: identity.providerUserId,
-        ...(identity.label ? { label: identity.label } : {}),
-        ...(identity.tokens ? { tokens: identity.tokens } : {})
-      })
+      await linkIdentity(internals, linked.id, provider, identity)
 
       if (guest && guest.id !== linked.id) {
         return (await mergeGuestInto(internals, guest, linked)).user
@@ -101,13 +95,7 @@ export async function resolveOAuthUser(
         additionalFields
       })
 
-  await linkIdentity(internals, {
-    userId: user.id,
-    provider,
-    providerUserId: identity.providerUserId,
-    ...(identity.label ? { label: identity.label } : {}),
-    ...(identity.tokens ? { tokens: identity.tokens } : {})
-  })
+  await linkIdentity(internals, user.id, provider, identity)
 
   return user
 }

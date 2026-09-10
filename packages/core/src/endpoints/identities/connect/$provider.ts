@@ -1,18 +1,12 @@
 import { notFound } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
 import { readBody } from "../../../http/read-body"
-import { shouldUseSecureCookies } from "../../../lib/serialize-cookie"
-import { validateRedirect } from "../../../lib/validate-redirect"
-import { getCallbackURL } from "../../../oauth/callback-url"
 import { getProvider } from "../../../oauth/providers/get-provider"
-import { createStateCookie } from "../../../oauth/state-cookie"
+import { startProviderFlow } from "../../../oauth/start-provider-flow"
 import type { EndpointDocs } from "../../../openapi/endpoint-docs"
 import type { CallerInput } from "../../../session/authenticate"
 import { authenticate } from "../../../session/authenticate"
-import type {
-  AuthorizeURLResult,
-  SignInWithProviderInput
-} from "../../sign-in/provider/$provider"
+import type { SignInWithProviderInput } from "../../sign-in/provider/$provider"
 
 /** Input for connecting a provider. */
 export interface ConnectProviderInput
@@ -91,49 +85,13 @@ export const connectProvider = defineEndpoint({
     }
   },
   run: async (internals, input: ConnectProviderInput) => {
-    const { config } = internals
-    const headers = input.headers ?? new Headers()
-
     const caller = await authenticate(internals, input)
-
-    const configured = getProvider(config.providers, input.provider)
+    const configured = getProvider(internals.config.providers, input.provider)
     if (!configured) throw notFound()
 
-    const secure = shouldUseSecureCookies(input.requestURL)
-    const redirectURI = getCallbackURL(
-      config,
-      input.provider,
-      input.requestURL,
-      headers
-    )
-
-    const { state, codeChallenge, nonce, setCookie } = await createStateCookie(
-      internals,
-      input.provider,
-      {
-        intent: "connect",
-        redirect: validateRedirect(input.redirect),
-        userId: caller.userId,
-        ...(input.errorRedirect
-          ? { errorRedirect: validateRedirect(input.errorRedirect) }
-          : {})
-      },
-      secure
-    )
-
-    const responseHeaders = new Headers()
-    responseHeaders.append("set-cookie", setCookie)
-
-    const data: AuthorizeURLResult = {
-      url: configured.provider.authorizeURL({
-        credentials: configured.credentials,
-        redirectURI,
-        state,
-        codeChallenge,
-        nonce
-      })
-    }
-
-    return { data, headers: responseHeaders }
+    return startProviderFlow(internals, configured, input, {
+      intent: "connect",
+      userId: caller.userId
+    })
   }
 })

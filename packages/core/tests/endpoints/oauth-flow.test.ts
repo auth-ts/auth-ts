@@ -1112,6 +1112,14 @@ describe("connect and disconnect", () => {
     ).toBe(401)
   })
 
+  it("checks the session before the provider, so a stranger learns nothing", async () => {
+    const { auth } = await createTestServer(OAUTH_OPTIONS)
+    expect(
+      (await auth.handler(request("POST", "/api/auth/identities/connect/nope")))
+        .status
+    ).toBe(401)
+  })
+
   it("links a provider to the current user without creating one", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)
     const refreshToken = await signInWithCode(context)

@@ -1,5 +1,5 @@
 import { AuthApiError } from "../../http/auth-api-error"
-import { expiresAt, requestedScopes } from "./grant"
+import { readTokenResponse, readTokens, requestedScopes } from "./grant"
 import type {
   AuthorizeURLInput,
   ExchangeCodeInput,
@@ -80,8 +80,7 @@ export const github: OAuthProvider = {
       }
     )
 
-    if (!tokenResponse.ok) throw providerRejected(tokenResponse)
-    const token = (await tokenResponse.json().catch(() => ({}))) as GitHubTokens
+    const token = await readTokenResponse(tokenResponse)
     if (!token.access_token) throw new AuthApiError("providerRejected")
 
     const authorization = {
@@ -149,8 +148,7 @@ export const github: OAuthProvider = {
       }
     )
 
-    if (!response.ok) throw providerRejected(response)
-    const token = (await response.json().catch(() => ({}))) as GitHubTokens
+    const token = await readTokenResponse(response)
 
     // GitHub reports a dead grant as a 200 with an `error` body rather than a
     // status, so the refusal has to be read out of the payload.
@@ -159,35 +157,5 @@ export const github: OAuthProvider = {
     }
 
     return readTokens(token)
-  }
-}
-
-/**
- * The token endpoint's response.
- *
- * A classic OAuth App issues a bare, non-expiring `access_token` and nothing
- * else; a GitHub App with expiring tokens issues all five, and rotates the
- * refresh token on every use — which is why a refresh writes back whatever it
- * returns rather than only the access token.
- */
-interface GitHubTokens {
-  access_token?: string
-  refresh_token?: string
-  expires_in?: number
-  refresh_token_expires_in?: number
-  scope?: string
-}
-
-function readTokens(token: GitHubTokens): ProviderTokens {
-  return {
-    ...(token.access_token ? { accessToken: token.access_token } : {}),
-    ...(token.refresh_token ? { refreshToken: token.refresh_token } : {}),
-    ...(typeof token.expires_in === "number"
-      ? { accessTokenExpiresAt: expiresAt(token.expires_in) }
-      : {}),
-    ...(typeof token.refresh_token_expires_in === "number"
-      ? { refreshTokenExpiresAt: expiresAt(token.refresh_token_expires_in) }
-      : {}),
-    ...(token.scope ? { scope: token.scope } : {})
   }
 }

@@ -3,7 +3,10 @@ import type { AuthInternals } from "../core/auth-internals"
 import { encryptSecret } from "../lib/encrypt"
 import { insertRow } from "../lib/insert-row"
 import { selectOne } from "../lib/select-one"
-import type { ProviderTokens } from "./providers/oauth-provider"
+import type {
+  ProviderIdentity,
+  ProviderTokens
+} from "./providers/oauth-provider"
 
 /**
  * How many linked providers core reads at a time.
@@ -13,21 +16,6 @@ import type { ProviderTokens } from "./providers/oauth-provider"
  * identities screen is not going to solve.
  */
 export const IDENTITY_PAGE_SIZE = 100
-
-/** A provider identity to record against a user. */
-export interface LinkIdentityInput {
-  userId: string
-  provider: string
-  providerUserId: string
-  /** Display only. Recorded when present, left alone when the provider sent none. */
-  label?: string
-  /**
-   * The grant this flow produced. Each field is recorded when present and left
-   * alone when absent — a refresh that returns no new refresh token must not
-   * erase the one on file.
-   */
-  tokens?: ProviderTokens
-}
 
 /**
  * The stored form of a grant, split across the two tables that hold it.
@@ -115,7 +103,9 @@ export async function storeIdentitySecrets(
  */
 export async function linkIdentity(
   internals: AuthInternals,
-  { userId, provider, providerUserId, label, tokens }: LinkIdentityInput
+  userId: string,
+  provider: string,
+  { providerUserId, label, tokens }: ProviderIdentity
 ) {
   const existing = await selectOne(internals, "identities", {
     provider: { eq: provider },
@@ -129,7 +119,7 @@ export async function linkIdentity(
     // Both halves, not just the label: a sign-in that changes nothing about the
     // name still arrives with a fresh grant, and that is the write worth making.
     const values = {
-      ...(label !== undefined && label !== existing.label ? { label } : {}),
+      ...(label && label !== existing.label ? { label } : {}),
       ...stored.identity
     }
     if (Object.keys(values).length > 0) {
@@ -147,7 +137,7 @@ export async function linkIdentity(
     userId,
     provider,
     providerUserId,
-    label: label ?? null,
+    label: label || null,
     ...stored.identity
   })
   await storeIdentitySecrets(internals, identity.id, stored.secrets)

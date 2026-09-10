@@ -248,13 +248,7 @@ async function connectIdentity(
     throw new AuthApiError("providerConflict")
   }
 
-  await linkIdentity(internals, {
-    userId: resolved.user.id,
-    provider: input.provider,
-    providerUserId: identity.providerUserId,
-    ...(identity.label ? { label: identity.label } : {}),
-    ...(identity.tokens ? { tokens: identity.tokens } : {})
-  })
+  await linkIdentity(internals, resolved.user.id, input.provider, identity)
 
   const headers = new Headers({ location: redirect })
   headers.append("set-cookie", clearState)
