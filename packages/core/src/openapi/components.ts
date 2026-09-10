@@ -1,7 +1,8 @@
 import type { CoreUserFields } from "../core/auth-database"
 import type { ProviderTokenResult } from "../endpoints/identities/$id/token"
 import type { TokenResult } from "../endpoints/token"
-import type { AuthErrorBody } from "../http/error-response"
+import type { AuthErrorBody, AuthErrorCode } from "../http/error-response"
+import { ERROR_STATUS } from "../http/error-response"
 import type {
   ComponentName,
   ComponentResponseName,
@@ -48,36 +49,8 @@ const tokenResult: ObjectSchemaFor<TokenResult> = {
   required: ["token", "user"]
 }
 
-/**
- * Every value `code` can take, for the schema's enum.
- *
- * Listed rather than derived: a union of string literals has no runtime form to
- * read. A type test asserts it against {@link AuthErrorCode} in both directions,
- * so adding a code without adding it here fails the build.
- */
-export const ERROR_CODES = [
-  "cooldown",
-  "rateLimited",
-  "invalidCode",
-  "staleSession",
-  "unauthenticated",
-  "providerConflict",
-  "providerDenied",
-  "providerRejected",
-  "providerEmailUnverified",
-  "invalidState",
-  "channelNotConfigured",
-  "invalidField",
-  "notFound",
-  "methodNotAllowed",
-  "forbiddenOrigin",
-  "unsupportedMediaType",
-  "guestCannotReceiveCode",
-  "guestRequiresSignOut",
-  "providerUnavailable",
-  "providerReconnectRequired",
-  "internalError"
-] as const
+/** Every value `code` can take, for the schema's enum. */
+export const ERROR_CODES = Object.keys(ERROR_STATUS) as AuthErrorCode[]
 
 const authError: ObjectSchemaFor<AuthErrorBody> = {
   type: "object",

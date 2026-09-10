@@ -167,7 +167,7 @@ async function refreshProviderToken(
     (secrets?.refreshTokenExpiresAt &&
       secrets.refreshTokenExpiresAt.getTime() <= Date.now())
   ) {
-    throw new AuthApiError("providerReconnectRequired", 403)
+    throw new AuthApiError("providerReconnectRequired")
   }
 
   let tokens: ProviderTokens
@@ -201,7 +201,7 @@ async function refreshProviderToken(
   }
 
   if (!tokens.accessToken) {
-    throw new AuthApiError("providerReconnectRequired", 403)
+    throw new AuthApiError("providerReconnectRequired")
   }
 
   const stored = await encryptTokens(internals.config.secret, tokens)

@@ -61,7 +61,7 @@ export async function sendVerificationCode(
       config.rateLimit.sendCodeCooldown
     )
     if (cooldownRemaining > 0) {
-      throw new AuthApiError("cooldown", 429, { retryAfter: cooldownRemaining })
+      throw new AuthApiError("cooldown", { retryAfter: cooldownRemaining })
     }
 
     const perIdentifier =
@@ -145,7 +145,7 @@ async function deliver(
   const { config } = internals
 
   if (identifier.kind === "email") {
-    if (!config.email) throw new AuthApiError("channelNotConfigured", 400)
+    if (!config.email) throw new AuthApiError("channelNotConfigured")
     await config.email.sendCode({
       email: identifier.value,
       code,
@@ -156,7 +156,7 @@ async function deliver(
     return
   }
 
-  if (!config.sms) throw new AuthApiError("channelNotConfigured", 400)
+  if (!config.sms) throw new AuthApiError("channelNotConfigured")
   await config.sms.sendCode({
     phoneNumber: identifier.value,
     code,

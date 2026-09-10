@@ -194,22 +194,22 @@ export async function readStateCookie(
   provider: string
 ) {
   const raw = readCookie(headers, internals.config.cookie.stateName)
-  if (!raw || !stateParameter) throw new AuthApiError("invalidState", 401)
+  if (!raw || !stateParameter) throw new AuthApiError("invalidState")
 
   const payload = await verifyStatePayload(raw, internals.config.secret)
   if (!payload) {
     internals.log.warn("oauth state cookie failed signature check")
-    throw new AuthApiError("invalidState", 401)
+    throw new AuthApiError("invalidState")
   }
 
   if (typeof payload.state !== "string" || payload.state !== stateParameter) {
     internals.log.warn("oauth state mismatch")
-    throw new AuthApiError("invalidState", 401)
+    throw new AuthApiError("invalidState")
   }
 
   if (payload.provider !== provider) {
     internals.log.warn("oauth state presented at another provider's callback")
-    throw new AuthApiError("invalidState", 401)
+    throw new AuthApiError("invalidState")
   }
 
   const age =
@@ -219,7 +219,7 @@ export async function readStateCookie(
     age < -ISSUED_AT_TOLERANCE_MS
   ) {
     internals.log.warn("oauth state expired")
-    throw new AuthApiError("invalidState", 401)
+    throw new AuthApiError("invalidState")
   }
 
   if (
@@ -229,7 +229,7 @@ export async function readStateCookie(
     payload.nonce.length === 0
   ) {
     internals.log.warn("oauth state is missing its verifier or nonce")
-    throw new AuthApiError("invalidState", 401)
+    throw new AuthApiError("invalidState")
   }
 
   return payload

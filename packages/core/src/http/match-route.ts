@@ -57,7 +57,7 @@ export function matchRoute(
 ): RouteMatch {
   const { pathname } = new URL(request.url)
   const requestSegments = splitPathSegments(pathname, internals.config.basePath)
-  if (!requestSegments) throw new AuthApiError("notFound", 404)
+  if (!requestSegments) throw new AuthApiError("notFound")
 
   let pathMatchedWithOtherMethod = false
 
@@ -74,8 +74,7 @@ export function matchRoute(
   }
 
   throw new AuthApiError(
-    pathMatchedWithOtherMethod ? "methodNotAllowed" : "notFound",
-    pathMatchedWithOtherMethod ? 405 : 404
+    pathMatchedWithOtherMethod ? "methodNotAllowed" : "notFound"
   )
 }
 

@@ -108,7 +108,7 @@ export const callbackProvider = defineEndpoint({
       )
 
       if (input.providerError || !input.code)
-        throw new AuthApiError("providerDenied", 401)
+        throw new AuthApiError("providerDenied")
 
       // Validated again here, not trusted from the cookie. The signature proves
       // the payload came from this server; it does not prove the fields are
@@ -143,7 +143,7 @@ export const callbackProvider = defineEndpoint({
           provider: input.provider,
           error: String(error)
         })
-        throw new AuthApiError("providerUnavailable", 502)
+        throw new AuthApiError("providerUnavailable")
       }
 
       const active = await resolveCallerSession(internals, input)
@@ -203,9 +203,10 @@ export const callbackProvider = defineEndpoint({
       const headers = new Headers({ "set-cookie": clearState })
       if (!isAuthApiError(error)) {
         internals.log.error("oauth callback failed", { error: String(error) })
-        throw new AuthApiError("internalError", 500, { headers })
+        throw new AuthApiError("internalError", { headers })
       }
-      throw new AuthApiError(error.code, error.status, {
+      throw new AuthApiError(error.code, {
+        status: error.status,
         message: error.message,
         headers,
         ...(error.retryAfter === undefined
@@ -245,7 +246,7 @@ async function connectIdentity(
   // Never re-point an existing link: that would move someone else's provider
   // identity onto this account.
   if (existing && existing.userId !== resolved.user.id) {
-    throw new AuthApiError("providerConflict", 409)
+    throw new AuthApiError("providerConflict")
   }
 
   await linkIdentity(internals, {

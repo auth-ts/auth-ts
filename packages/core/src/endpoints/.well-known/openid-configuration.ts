@@ -33,7 +33,7 @@ export const getDiscovery = defineEndpoint({
   path: "/.well-known/openid-configuration",
   run: async (internals) => {
     const { issuer, basePath, baseURL, jwks } = internals.config
-    if (!issuer || !baseURL) throw new AuthApiError("notFound", 404)
+    if (!issuer || !baseURL) throw new AuthApiError("notFound")
 
     // Where the key set actually is: a configured URL first; the `/jwks`
     // endpoint when there is a document to serve from it; otherwise the

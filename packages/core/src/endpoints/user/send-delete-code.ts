@@ -61,7 +61,7 @@ export const sendDeleteUserCode = defineEndpoint({
         ? ({ kind: "phoneNumber", value: user.phoneNumber } as const)
         : null
 
-    if (!identifier) throw new AuthApiError("guestCannotReceiveCode", 409)
+    if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
 
     await sendVerificationCode(internals, {
       identifier,

@@ -48,27 +48,26 @@ export function resolveCodeIdentifier(
     typeof body.phoneNumber === "string" && body.phoneNumber.trim().length > 0
 
   if (hasEmail === hasPhone) {
-    throw new AuthApiError("invalidField", 400, {
+    throw new AuthApiError("invalidField", {
       message: "Provide exactly one of email or phoneNumber."
     })
   }
 
   if (hasEmail) {
-    if (!internals.config.email)
-      throw new AuthApiError("channelNotConfigured", 400)
+    if (!internals.config.email) throw new AuthApiError("channelNotConfigured")
     const value = normalizeEmail(body.email as string)
     if (
       value.length > MAX_EMAIL_LENGTH ||
       !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value)
     ) {
-      throw new AuthApiError("invalidField", 400, {
+      throw new AuthApiError("invalidField", {
         message: "Provide a valid email address."
       })
     }
     return { kind: "email", value }
   }
 
-  if (!internals.config.sms) throw new AuthApiError("channelNotConfigured", 400)
+  if (!internals.config.sms) throw new AuthApiError("channelNotConfigured")
 
   try {
     return {
@@ -76,7 +75,7 @@ export function resolveCodeIdentifier(
       value: normalizePhone(body.phoneNumber as string)
     }
   } catch (error) {
-    throw new AuthApiError("invalidField", 400, {
+    throw new AuthApiError("invalidField", {
       message: (error as Error).message
     })
   }

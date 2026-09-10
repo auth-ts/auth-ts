@@ -1,4 +1,5 @@
 import type { AuthErrorCode } from "./error-response"
+import { ERROR_STATUS } from "./error-response"
 import { getErrorMessage } from "./get-error-message"
 
 /**
@@ -19,7 +20,7 @@ import { getErrorMessage } from "./get-error-message"
 export class AuthApiError extends Error {
   /** The stable, machine-readable reason. */
   readonly code: AuthErrorCode
-  /** HTTP status the handler should use. */
+  /** HTTP status the handler should use, derived from the code unless overridden. */
   readonly status: number
   /** Seconds to wait, for the throttling codes. */
   readonly retryAfter?: number
@@ -28,8 +29,12 @@ export class AuthApiError extends Error {
 
   constructor(
     code: AuthErrorCode,
-    status: number,
-    options: { retryAfter?: number; message?: string; headers?: Headers } = {}
+    options: {
+      status?: number
+      retryAfter?: number
+      message?: string
+      headers?: Headers
+    } = {}
   ) {
     super(
       options.message ??
@@ -44,7 +49,7 @@ export class AuthApiError extends Error {
     )
     this.name = "AuthApiError"
     this.code = code
-    this.status = status
+    this.status = options.status ?? ERROR_STATUS[code]
     if (options.retryAfter !== undefined) this.retryAfter = options.retryAfter
     if (options.headers) this.headers = options.headers
   }
@@ -57,10 +62,10 @@ export function isAuthApiError(error: unknown): error is AuthApiError {
 
 /** 401 with the `unauthenticated` code — the most common failure by far. */
 export function unauthenticated() {
-  return new AuthApiError("unauthenticated", 401)
+  return new AuthApiError("unauthenticated")
 }
 
 /** 404 with the `notFound` code. */
 export function notFound() {
-  return new AuthApiError("notFound", 404)
+  return new AuthApiError("notFound")
 }

@@ -57,6 +57,31 @@ export type AuthErrorCode =
   /** Something threw that this library did not anticipate. */
   | "internalError"
 
+/** The status each code answers with. Complete by construction, like the messages. */
+export const ERROR_STATUS: Record<AuthErrorCode, number> = {
+  cooldown: 429,
+  rateLimited: 429,
+  invalidCode: 401,
+  staleSession: 403,
+  unauthenticated: 401,
+  providerConflict: 409,
+  providerDenied: 401,
+  providerRejected: 401,
+  providerEmailUnverified: 403,
+  invalidState: 401,
+  channelNotConfigured: 400,
+  invalidField: 400,
+  notFound: 404,
+  methodNotAllowed: 405,
+  forbiddenOrigin: 403,
+  unsupportedMediaType: 415,
+  guestCannotReceiveCode: 409,
+  guestRequiresSignOut: 409,
+  providerUnavailable: 502,
+  providerReconnectRequired: 403,
+  internalError: 500
+}
+
 /**
  * The single shape of every non-2xx JSON body.
  *

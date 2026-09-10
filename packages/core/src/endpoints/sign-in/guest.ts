@@ -62,7 +62,7 @@ export const signInAsGuest = defineEndpoint({
     const { config } = internals
     // Not merely disabled: absent. An endpoint that is off should look like an
     // endpoint that does not exist.
-    if (!config.guest) throw new AuthApiError("notFound", 404)
+    if (!config.guest) throw new AuthApiError("notFound")
 
     const headers = input.headers ?? new Headers()
 
@@ -84,7 +84,7 @@ export const signInAsGuest = defineEndpoint({
         })
       )
     )
-    if (live.some(Boolean)) throw new AuthApiError("guestRequiresSignOut", 409)
+    if (live.some(Boolean)) throw new AuthApiError("guestRequiresSignOut")
 
     const additionalFields = validateAdditionalFields(
       config.user.additionalFields,

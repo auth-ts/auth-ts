@@ -74,7 +74,7 @@ export const updateUser = defineEndpoint({
       ["image", image]
     ] as const) {
       if (value !== undefined && typeof value !== "string") {
-        throw new AuthApiError("invalidField", 400, {
+        throw new AuthApiError("invalidField", {
           message: `${field} must be a string.`
         })
       }
@@ -87,7 +87,7 @@ export const updateUser = defineEndpoint({
       "primaryUserId"
     ]) {
       if (rejected in rest) {
-        throw new AuthApiError("invalidField", 400, {
+        throw new AuthApiError("invalidField", {
           message: `${rejected} cannot be changed here.`
         })
       }
@@ -107,7 +107,7 @@ export const updateUser = defineEndpoint({
       image === undefined &&
       Object.keys(additionalFields).length === 0
     ) {
-      throw new AuthApiError("invalidField", 400, {
+      throw new AuthApiError("invalidField", {
         message: "Provide at least one field to update."
       })
     }
@@ -214,7 +214,7 @@ export const deleteUser = defineEndpoint({
 
     if (input.code) {
       const identifier = user.email ?? user.phoneNumber
-      if (!identifier) throw new AuthApiError("guestCannotReceiveCode", 409)
+      if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
 
       await consumeVerificationCode(internals, {
         identifier,
@@ -234,9 +234,9 @@ export const deleteUser = defineEndpoint({
 
     // A guest with no identifier still can't be challenged at all.
     if (!user.email && !user.phoneNumber) {
-      throw new AuthApiError("guestCannotReceiveCode", 409)
+      throw new AuthApiError("guestCannotReceiveCode")
     }
 
-    throw new AuthApiError("staleSession", 403)
+    throw new AuthApiError("staleSession")
   }
 })

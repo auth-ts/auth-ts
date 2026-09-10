@@ -21,7 +21,7 @@ export const getReference = defineEndpoint({
   method: "GET",
   path: "/reference",
   run: async (internals) => {
-    if (!internals.config.openapi) throw new AuthApiError("notFound", 404)
+    if (!internals.config.openapi) throw new AuthApiError("notFound")
 
     const specURL = `${internals.config.basePath}/openapi.json`
 

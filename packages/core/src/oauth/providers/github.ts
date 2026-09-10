@@ -82,7 +82,7 @@ export const github: OAuthProvider = {
 
     if (!tokenResponse.ok) throw providerRejected(tokenResponse)
     const token = (await tokenResponse.json().catch(() => ({}))) as GitHubTokens
-    if (!token.access_token) throw new AuthApiError("providerRejected", 401)
+    if (!token.access_token) throw new AuthApiError("providerRejected")
 
     const authorization = {
       authorization: `Bearer ${token.access_token}`,
@@ -155,7 +155,7 @@ export const github: OAuthProvider = {
     // GitHub reports a dead grant as a 200 with an `error` body rather than a
     // status, so the refusal has to be read out of the payload.
     if (!token.access_token) {
-      throw new AuthApiError("providerReconnectRequired", 403)
+      throw new AuthApiError("providerReconnectRequired")
     }
 
     return readTokens(token)

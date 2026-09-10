@@ -21,7 +21,7 @@ export const getOpenAPIDocument = defineEndpoint({
   method: "GET",
   path: "/openapi.json",
   run: async (internals) => {
-    if (!internals.config.openapi) throw new AuthApiError("notFound", 404)
+    if (!internals.config.openapi) throw new AuthApiError("notFound")
 
     // Pure function of the resolved config, so built once per server.
     let document = documents.get(internals.config)

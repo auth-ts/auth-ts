@@ -17,7 +17,7 @@ export async function readBody<T>(
 ): Promise<T> {
   const parsed: unknown = await request.json().catch(() => ({}))
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new AuthApiError("invalidField", 400, {
+    throw new AuthApiError("invalidField", {
       message: "The body must be a JSON object."
     })
   }
@@ -25,7 +25,7 @@ export async function readBody<T>(
 
   for (const key of Object.keys(body)) {
     if (!accepted.includes(key)) {
-      throw new AuthApiError("invalidField", 400, {
+      throw new AuthApiError("invalidField", {
         message: `${key} is not accepted here.`
       })
     }

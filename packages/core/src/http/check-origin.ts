@@ -115,7 +115,7 @@ export function assertAllowedOrigin(
     internals.log.warn("refused a request from a disallowed origin", {
       origin
     })
-    throw new AuthApiError("forbiddenOrigin", 403)
+    throw new AuthApiError("forbiddenOrigin")
   }
 
   if (carriesBody(request.headers)) {
@@ -124,7 +124,7 @@ export function assertAllowedOrigin(
       internals.log.warn("refused a request body that is not JSON", {
         contentType: contentType.split(";")[0] ?? ""
       })
-      throw new AuthApiError("unsupportedMediaType", 415)
+      throw new AuthApiError("unsupportedMediaType")
     }
   }
 }

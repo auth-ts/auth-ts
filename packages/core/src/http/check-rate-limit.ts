@@ -103,7 +103,7 @@ export async function checkRateLimit(
     const retryAfter = Math.max(1, Math.ceil((endsAt.getTime() - now) / 1000))
     internals.log.warn("rate limit exceeded", { key: key.split(":")[0] })
 
-    throw new AuthApiError("rateLimited", 429, { retryAfter })
+    throw new AuthApiError("rateLimited", { retryAfter })
   }
 }
 

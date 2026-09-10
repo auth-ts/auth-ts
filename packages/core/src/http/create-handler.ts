@@ -2,7 +2,7 @@ import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError, isAuthApiError } from "./auth-api-error"
 import { assertAllowedOrigin } from "./check-origin"
 import type { AnyEndpoint } from "./define-endpoint"
-import { errorResponse } from "./error-response"
+import { ERROR_STATUS, errorResponse } from "./error-response"
 import { getErrorMessage } from "./get-error-message"
 import { matchEndpointParams } from "./match-route"
 import { resolveLocale } from "./resolve-locale"
@@ -69,7 +69,7 @@ export async function handleRequest(
 
   try {
     if (request.method !== endpoint.method) {
-      throw new AuthApiError("methodNotAllowed", 405)
+      throw new AuthApiError("methodNotAllowed")
     }
     assertAllowedOrigin(internals, request)
 
@@ -146,7 +146,7 @@ function toErrorResponse(
 
   return errorResponse(
     "internalError",
-    500,
+    ERROR_STATUS.internalError,
     getErrorMessage("internalError", locale, config.localization),
     { headers }
   )

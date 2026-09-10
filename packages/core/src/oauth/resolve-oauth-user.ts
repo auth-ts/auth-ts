@@ -80,7 +80,7 @@ export async function resolveOAuthUser(
       "oauth identity had no verified email and no existing identity",
       { provider }
     )
-    throw new AuthApiError("providerEmailUnverified", 403)
+    throw new AuthApiError("providerEmailUnverified")
   }
 
   // Merge semantics: an existing verification-code user takes the provider's

@@ -91,7 +91,7 @@ export async function consumeVerificationCode(
   )
 
   if (!stored || stored.purpose !== input.purpose) {
-    throw new AuthApiError("invalidCode", 401)
+    throw new AuthApiError("invalidCode")
   }
 
   if (stored.expiresAt.getTime() <= Date.now()) {
@@ -100,13 +100,13 @@ export async function consumeVerificationCode(
       table: "verifications",
       where: { id: { eq: stored.id } }
     })
-    throw new AuthApiError("invalidCode", 401)
+    throw new AuthApiError("invalidCode")
   }
 
   const presented = await hmacSha256Hex(input.code, internals.config.secret)
   if (!timingSafeEqualHex(presented, stored.codeHash)) {
     await countWrongGuess(internals, input.identifier, stored)
-    throw new AuthApiError("invalidCode", 401)
+    throw new AuthApiError("invalidCode")
   }
 
   // The conditional delete is what makes the code usable exactly once. Two
@@ -121,5 +121,5 @@ export async function consumeVerificationCode(
       codeHash: { eq: stored.codeHash }
     }
   })
-  if (!consumed) throw new AuthApiError("invalidCode", 401)
+  if (!consumed) throw new AuthApiError("invalidCode")
 }

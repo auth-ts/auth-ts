@@ -40,6 +40,6 @@ export function isProviderUnavailable(response: Response) {
  */
 export function providerRejected(response: Response) {
   return isProviderUnavailable(response)
-    ? new AuthApiError("providerUnavailable", 502)
-    : new AuthApiError("providerRejected", 401)
+    ? new AuthApiError("providerUnavailable")
+    : new AuthApiError("providerRejected")
 }

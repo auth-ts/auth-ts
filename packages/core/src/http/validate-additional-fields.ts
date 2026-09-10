@@ -47,7 +47,7 @@ export function validateAdditionalFields(
   if (value === undefined || value === null) return {}
 
   if (typeof value !== "object" || Array.isArray(value)) {
-    throw new AuthApiError("invalidField", 400, {
+    throw new AuthApiError("invalidField", {
       message: "additionalFields must be an object."
     })
   }
@@ -61,13 +61,13 @@ export function validateAdditionalFields(
 
     const declaredType = schema[fieldName]
     if (!declaredType) {
-      throw new AuthApiError("invalidField", 400, {
+      throw new AuthApiError("invalidField", {
         message: `Unknown field: ${fieldName}.`
       })
     }
 
     if (typeof fieldValue !== declaredType) {
-      throw new AuthApiError("invalidField", 400, {
+      throw new AuthApiError("invalidField", {
         message: `Field ${fieldName} must be a ${declaredType}.`
       })
     }

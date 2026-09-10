@@ -79,7 +79,7 @@ export const signInWithCode = defineEndpoint({
     const identifier = resolveCodeIdentifier(internals, input)
 
     if (typeof input.code !== "string" || input.code.length === 0) {
-      throw new AuthApiError("invalidField", 400, {
+      throw new AuthApiError("invalidField", {
         message: "A code is required."
       })
     }

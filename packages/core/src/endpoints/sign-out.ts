@@ -125,7 +125,7 @@ export const signOut = defineEndpoint({
       input.userId === undefined
         ? signedIn
         : signedIn.filter(({ userId }) => userId === input.userId)
-    if (targets.length === 0) throw new AuthApiError("notFound", 404)
+    if (targets.length === 0) throw new AuthApiError("notFound")
 
     internals.log.info("signing out", {
       scope,
