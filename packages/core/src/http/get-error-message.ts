@@ -75,5 +75,5 @@ export function getErrorMessage(
 
   return values.retryAfter === undefined
     ? template
-    : template.replace("{retryAfter}", String(values.retryAfter))
+    : template.replaceAll("{retryAfter}", String(values.retryAfter))
 }

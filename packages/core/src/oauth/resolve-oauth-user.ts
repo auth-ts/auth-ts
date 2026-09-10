@@ -83,8 +83,8 @@ export async function resolveOAuthUser(
     throw new AuthApiError("providerEmailUnverified", 403)
   }
 
-  // Merge semantics: an existing verification-code user picks up a name and picture on
-  // their first OAuth sign-in, without those overwriting anything already set.
+  // Merge semantics: an existing verification-code user takes the provider's
+  // name and picture on their first OAuth sign-in.
   const user = guest
     ? (
         await convertGuest(internals, guest, {

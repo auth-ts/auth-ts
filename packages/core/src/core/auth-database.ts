@@ -497,11 +497,10 @@ export interface AuthDatabase<
   /**
    * Inserts one row and returns it as stored.
    *
-   * `undefined` is allowed because not every store hands the row back the same
-   * way — `RETURNING` gives a set to pick from, a document store gives the
-   * document, and some give nothing at all. Return what you have; core decides
-   * what having nothing means, so no implementation has to invent a row or
-   * phrase that failure itself.
+   * `undefined` is in the type because not every store hands the row back the
+   * same way — `RETURNING` gives a set to pick from, a document store gives the
+   * document. Core needs the row and fails the request without it, so return
+   * what the store gave rather than inventing a row or phrasing that failure.
    *
    * What comes back is how core learns anything the store decided: the `id`
    * when `generateId` is not configured, and any column default. A unique

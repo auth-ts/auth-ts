@@ -92,8 +92,19 @@ export const getToken = defineEndpoint({
             tokenHash: { eq: await sha256Hex(rawToken) },
             expiresAt: { gt: new Date() }
           })
+          if (live?.userId !== userId) return userId
 
-          return live?.userId === userId ? null : userId
+          // Orphaned session: its user row is gone
+          const user = await selectOne(internals, "users", {
+            id: { eq: userId }
+          })
+          if (user) return null
+          await internals.db.delete({
+            table: "sessions",
+            where: { id: { eq: live.id } }
+          })
+
+          return userId
         })
       )
 

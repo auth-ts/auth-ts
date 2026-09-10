@@ -35,8 +35,9 @@ export interface SendVerificationCodeInput {
  * text and never as a bare hash: six digits is a million possibilities, so an
  * unkeyed digest is reversible from a database read in about a second.
  *
- * Storing it also deletes any previous code for that identifier, which is what
- * stops a resend from widening the set of values an attacker may guess.
+ * Storing it also deletes any previous code for that identifier and purpose,
+ * which is what stops a resend from widening the set of values an attacker may
+ * guess.
  *
  * @throws {AuthApiError} `cooldown` or `rateLimited` when throttled.
  */
@@ -51,7 +52,7 @@ export async function sendVerificationCode(
     const live = await selectOne(
       internals,
       "verifications",
-      { identifier: { eq: identifier.value } },
+      { identifier: { eq: identifier.value }, purpose: { eq: purpose } },
       { expiresAt: "desc" }
     )
     const cooldownRemaining = getCooldownRemaining(
@@ -87,7 +88,7 @@ export async function sendVerificationCode(
   const swept = sweepExpired(internals, "verifications")
   await internals.db.delete({
     table: "verifications",
-    where: { identifier: { eq: identifier.value } }
+    where: { identifier: { eq: identifier.value }, purpose: { eq: purpose } }
   })
   await insertRow(internals, "verifications", {
     identifier: identifier.value,

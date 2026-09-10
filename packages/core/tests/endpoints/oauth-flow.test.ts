@@ -515,6 +515,9 @@ describe("oauth callback", () => {
     expect(((await response.json()) as { code: string }).code).toBe(
       "providerDenied"
     )
+    expect(response.headers.get("set-cookie")).toMatch(
+      /auth-ts\.state=;.*Max-Age=0/
+    )
   })
 
   it("names a cancelled consent as denied, not as a broken sign-in", async () => {
@@ -1198,6 +1201,50 @@ describe("connect and disconnect", () => {
         userId: { eq: required(context.db.users()[0], "user").id }
       })
     ).toEqual([])
+  })
+
+  it("rejects a connect callback finished by a guest who did not start it", async () => {
+    const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
+    const refreshToken = await signInWithCode(context)
+
+    const startResponse = await context.auth.handler(
+      request("POST", "/api/auth/identities/connect/github", {
+        token: await mintToken(context.auth, refreshToken)
+      })
+    )
+    const stateCookie = required(
+      readSetCookies(startResponse).get("auth-ts.state"),
+      "state"
+    ).value
+    const { state } = decodeState(stateCookie)
+
+    const guestResponse = await context.auth.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const guestRefresh = required(
+      readRefreshCookie(guestResponse),
+      "refresh"
+    ).value
+    const guest = ((await guestResponse.json()) as { user: { id: string } })
+      .user
+
+    stubGitHub({ id: 4242, emails: verifiedEmails("attacker@example.com") })
+    const callbackResponse = await context.auth.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: {
+          "auth-ts.state": stateCookie,
+          ...refreshCookieFor(guestRefresh)
+        }
+      })
+    )
+
+    expect(callbackResponse.status).toBe(302)
+    expect(callbackError(callbackResponse)).toBe("unauthenticated")
+    expect(readRefreshCookie(callbackResponse)).toBeUndefined()
+    expect(await selectRows(context.db, "identities", {})).toEqual([])
+    expect(
+      await selectRow(context.db, "users", { id: { eq: guest.id } })
+    ).toMatchObject({ type: "guest", primaryUserId: null })
   })
 
   it("refuses to re-point a provider identity already linked elsewhere", async () => {

@@ -37,20 +37,24 @@ export function mayHaveSession(config: AuthClientConfig) {
   const cookies = globalThis.document?.cookie
   if (cookies === undefined) return true
 
+  let hint: string | undefined
   for (const entry of cookies.split(";")) {
     const separator = entry.indexOf("=")
     if (separator === -1) continue
     if (entry.slice(0, separator).trim() !== HINT_COOKIE_NAME) continue
 
-    // The hint carries the active user's id, so anything non-empty other than
-    // the explicit `out` is a session. A cookie left empty by a browser
-    // mid-deletion, or written by something else under the same name, is
-    // treated as no hint rather than as a verdict.
+    // Two hints that disagree are cookie tossing
     const value = entry.slice(separator + 1).trim()
-    if (value === "out") return false
-    if (value) return true
-    break
+    if (hint !== undefined && hint !== value) return true
+    hint = value
   }
+
+  // The hint carries the active user's id, so anything non-empty other than
+  // the explicit `out` is a session. A cookie left empty by a browser
+  // mid-deletion, or written by something else under the same name, is
+  // treated as no hint rather than as a verdict.
+  if (hint === "out") return false
+  if (hint) return true
 
   return isCrossOrigin(config.baseURL)
 }

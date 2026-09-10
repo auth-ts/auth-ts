@@ -526,6 +526,42 @@ describe("GET /token", () => {
     )
     expect(after.createdAt.getTime()).toBe(before.createdAt.getTime())
   })
+
+  it("retires a cookie whose session outlived its user, and the session with it", async () => {
+    const { auth, sentCodes, db } = await createTestServer()
+
+    await auth.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const signIn = await auth.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: {
+          email: "ada@example.com",
+          code: required(sentCodes[0], "sent code").code
+        }
+      })
+    )
+    const { user } = (await signIn.json()) as { user: { id: string } }
+    const cookies = refreshCookieFor(
+      required(readRefreshCookie(signIn), "refresh cookie").value,
+      user.id
+    )
+    await db.delete({ table: "users", where: { id: { eq: user.id } } })
+    expect(db.sessions()).toHaveLength(1)
+
+    const response = await auth.handler(
+      request("GET", "/api/auth/token", { cookies })
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toBeNull()
+    expect(
+      required(refreshEntryOf(readSetCookies(response)), "refresh").attributes
+    ).toContain("Max-Age=0")
+    expect(db.sessions()).toHaveLength(0)
+  })
 })
 
 describe("where a token comes from", () => {

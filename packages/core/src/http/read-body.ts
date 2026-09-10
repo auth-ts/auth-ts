@@ -15,10 +15,13 @@ export async function readBody<T>(
   request: Request,
   accepted: readonly string[]
 ): Promise<T> {
-  const body = (await request.json().catch(() => ({}))) as Record<
-    string,
-    unknown
-  >
+  const parsed: unknown = await request.json().catch(() => ({}))
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new AuthApiError("invalidField", 400, {
+      message: "The body must be a JSON object."
+    })
+  }
+  const body = parsed as Record<string, unknown>
 
   for (const key of Object.keys(body)) {
     if (!accepted.includes(key)) {

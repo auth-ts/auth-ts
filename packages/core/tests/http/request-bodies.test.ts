@@ -61,6 +61,22 @@ describe("what a request body may name", () => {
     expect(context.sentCodes).toHaveLength(0)
   })
 
+  it("refuses a JSON body that is not an object, with a 400 rather than a 500", async () => {
+    const context = await createTestServer()
+
+    for (const body of [null, [], "ada@example.com", 123]) {
+      const response = await context.auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", { body })
+      )
+
+      expect(response.status, JSON.stringify(body)).toBe(400)
+      expect((await errorBody(response)).code, JSON.stringify(body)).toBe(
+        "invalidField"
+      )
+    }
+    expect(context.sentCodes).toHaveLength(0)
+  })
+
   it("refuses a field that exists on the user but cannot be posted", async () => {
     const context = await createTestServer()
     const ada = await signIn(context, "ada@example.com")

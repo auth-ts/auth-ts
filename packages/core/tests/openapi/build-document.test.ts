@@ -17,6 +17,19 @@ function refs(value: unknown): string[] {
   )
 }
 
+type DocumentedResponse = {
+  headers?: Record<string, { description?: string }>
+}
+
+function responsesOf(path: string, method: string) {
+  const paths = reference.paths as Record<
+    string,
+    Record<string, { responses: Record<string, DocumentedResponse> }>
+  >
+
+  return paths[path]?.[method]?.responses ?? {}
+}
+
 function operations(document: typeof reference) {
   return Object.values(document.paths).flatMap((item) => Object.keys(item))
 }
@@ -120,6 +133,31 @@ describe("buildOpenAPIDocument", () => {
     )
 
     expect(undocumented).toEqual([])
+  })
+
+  it("documents both the cookie and the redirect on the callback's 302", () => {
+    const callback = responsesOf("/callback/{provider}", "get")["302"]
+
+    expect(Object.keys(callback?.headers ?? {})).toEqual([
+      "Set-Cookie",
+      "Location"
+    ])
+  })
+
+  it("names the cookie each response actually writes", () => {
+    const setCookie = (path: string, method: string) =>
+      Object.values(responsesOf(path, method)).find(
+        (response) => response.headers?.["Set-Cookie"]
+      )?.headers?.["Set-Cookie"]?.description
+
+    expect(setCookie("/sign-in/provider/{provider}", "post")).toContain("state")
+    expect(setCookie("/sign-out", "post")).toContain("Clears")
+    expect(setCookie("/token", "get")).toContain("Writes `auth-ts.refresh`")
+  })
+
+  it("documents the failures each route actually answers", () => {
+    expect(responsesOf("/identities/{id}/token", "get")).toHaveProperty("403")
+    expect(responsesOf("/sign-in/code", "post")).toHaveProperty("401")
   })
 
   it("gives every operation a summary", () => {

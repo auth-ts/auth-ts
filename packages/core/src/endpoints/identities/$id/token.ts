@@ -56,6 +56,10 @@ export const getProviderTokenDocs: EndpointDocs<GetProviderTokenInput, "id"> = {
   responses: {
     200: { description: "A live access token.", schema: "ProviderToken" },
     401: "Unauthenticated",
+    403: {
+      description: "providerReconnectRequired: the grant is gone; reconnect.",
+      schema: "AuthError"
+    },
     404: "NotFound"
   }
 }

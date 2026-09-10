@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { checkRateLimit } from "../../src/http/check-rate-limit"
+import { checkRateLimit, countAttempt } from "../../src/http/check-rate-limit"
 import { createTestInternals } from "../helpers/create-test-internals"
 import { selectRows } from "../helpers/rows"
 
@@ -29,6 +29,22 @@ describe("checkRateLimit", () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       await checkRateLimit(internals, KEY, WINDOW)
     }
+
+    expect(
+      deletes.mock.calls.filter(([input]) => input.table === "attempts")
+    ).toHaveLength(1)
+  })
+
+  it("sweeps from countAttempt itself, so wrong-guess rows are collected under rateLimit: false", async () => {
+    const { internals, db } = await createTestInternals()
+    const deletes = vi.spyOn(db, "delete")
+
+    await countAttempt(
+      internals,
+      "verificationCode:attempts:hash",
+      new Date(Date.now() + 60_000),
+      5
+    )
 
     expect(
       deletes.mock.calls.filter(([input]) => input.table === "attempts")

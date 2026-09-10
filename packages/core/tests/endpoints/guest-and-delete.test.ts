@@ -4,6 +4,7 @@ import {
   mintToken,
   readRefreshCookie,
   refreshCookieFor,
+  refreshCookies,
   request
 } from "../helpers/request"
 import { required } from "../helpers/required"
@@ -118,6 +119,53 @@ describe("guests and multiUser never mix", () => {
     )
 
     expect(response.status).toBe(200)
+  })
+
+  it("refuses a guest sign-in when any presented cookie is live, not only the hinted one", async () => {
+    const context = await createTestServer({ guest: true, multiUser: true })
+    const signedIn: Array<{ userId: string; refreshToken: string }> = []
+    for (const email of ["ada@example.com", "grace@example.com"]) {
+      await context.auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", { body: { email } })
+      )
+      const response = await context.auth.handler(
+        request("POST", "/api/auth/sign-in/code", {
+          body: {
+            email,
+            code: required(context.sentCodes.at(-1), "code").code
+          }
+        })
+      )
+      const { user } = (await response.json()) as { user: { id: string } }
+      signedIn.push({
+        userId: user.id,
+        refreshToken: required(readRefreshCookie(response), "refresh").value
+      })
+    }
+    const ada = required(signedIn[0], "ada")
+    const grace = required(signedIn[1], "grace")
+    await context.db.delete({
+      table: "sessions",
+      where: { userId: { eq: ada.userId } }
+    })
+
+    const refused = await context.auth.handler(
+      request("POST", "/api/auth/sign-in/guest", {
+        cookies: {
+          ...refreshCookies({
+            [ada.userId]: ada.refreshToken,
+            [grace.userId]: grace.refreshToken
+          }),
+          "auth-ts.hint": ada.userId
+        }
+      })
+    )
+
+    expect(refused.status).toBe(409)
+    expect(((await refused.json()) as { code: string }).code).toBe(
+      "guestRequiresSignOut"
+    )
+    expect(context.db.users()).toHaveLength(2)
   })
 
   it("leaves a guest nothing to switch to — a 404, not a special case", async () => {
@@ -574,6 +622,29 @@ describe("account deletion", () => {
     }
   })
 
+  it("sends no deletion code for a session that has already expired", async () => {
+    const context = await createTestServer()
+    const { refreshToken, token } = await signIn(context)
+    const session = required(context.db.sessions()[0], "session")
+    await context.db.update({
+      table: "sessions",
+      where: { id: { eq: session.id } },
+      values: { expiresAt: new Date(Date.now() - 1000) }
+    })
+
+    const sent = await context.auth.handler(
+      request("POST", "/api/auth/user/send-delete-code", {
+        cookies: refreshCookieFor(refreshToken),
+        token
+      })
+    )
+
+    expect(sent.status).toBe(401)
+    expect(
+      context.sentCodes.some((code) => code.purpose === "deleteUser")
+    ).toBe(false)
+  })
+
   it("completes deletion with a code from send-delete-code", async () => {
     const context = await createTestServer({
       user: { deleteFreshWindow: "0s" }
@@ -591,6 +662,43 @@ describe("account deletion", () => {
     ).code
     expect(required(context.sentCodes.at(-1), "deletion code").purpose).toBe(
       "deleteUser"
+    )
+
+    const response = await context.auth.handler(
+      request("DELETE", "/api/auth/user", {
+        cookies,
+        token,
+        body: { code: deletionCode }
+      })
+    )
+
+    expect(response.status).toBe(204)
+    expect(context.db.users()).toHaveLength(0)
+  })
+
+  it("keeps a deletion code apart from a sign-in code for the same address", async () => {
+    const context = await createTestServer({
+      user: { deleteFreshWindow: "0s" }
+    })
+    const { refreshToken, token } = await signIn(context)
+    const cookies = refreshCookieFor(refreshToken)
+
+    await context.auth.handler(
+      request("POST", "/api/auth/user/send-delete-code", { cookies, token })
+    )
+    const deletionCode = required(
+      context.sentCodes.at(-1),
+      "deletion code"
+    ).code
+
+    const resent = await context.auth.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    expect(resent.status).toBe(200)
+    expect(required(context.sentCodes.at(-1), "sign-in code").purpose).toBe(
+      "signIn"
     )
 
     const response = await context.auth.handler(

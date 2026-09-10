@@ -86,7 +86,7 @@ export async function consumeVerificationCode(
   const stored = await selectOne(
     internals,
     "verifications",
-    { identifier: { eq: input.identifier } },
+    { identifier: { eq: input.identifier }, purpose: { eq: input.purpose } },
     { expiresAt: "desc" }
   )
 

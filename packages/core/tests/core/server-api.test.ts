@@ -134,6 +134,16 @@ describe("getToken as a function", () => {
     ).rejects.toThrow(/cookie.path/)
   })
 
+  it("explains a narrowed cookie.path even when other cookies arrive", async () => {
+    const context = await createTestServer({ cookie: { path: "/api/auth" } })
+
+    await expect(
+      context.auth.getToken({
+        headers: new Headers({ cookie: "theme=dark; auth-ts.hint=user-1" })
+      })
+    ).rejects.toThrow(/cookie.path/)
+  })
+
   it("throws real Errors: instanceof, name, and a human message", async () => {
     // Compile-time: the wire body is a structural `Error`, so a raw fetch
     // caller can throw the parsed JSON into anything typed `Error`.

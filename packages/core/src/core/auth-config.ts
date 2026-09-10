@@ -194,6 +194,18 @@ function requireClaims(claims: JwtClaims | undefined): JwtClaims {
     : requireOwnedClaimsAbsent(claims)
 }
 
+function requireOrigins(origins: string[] | undefined) {
+  for (const origin of origins ?? []) {
+    if (!URL.canParse(origin)) {
+      throw new AuthConfigError(
+        `trustedOrigins entries must be absolute origins such as https://app.example.com, not ${JSON.stringify(origin)}. A value with no scheme never equals an Origin header, so every state-changing request from it would be refused.`
+      )
+    }
+  }
+
+  return origins ?? []
+}
+
 /**
  * Resolves `ipAddress` and refuses a shape that could never derive an address.
  *
@@ -214,6 +226,11 @@ function requireIpAddress(options: IpAddressOptions | undefined) {
   }
 
   if (Array.isArray(resolved.trustedProxies)) {
+    if (resolved.trustedProxies.length === 0) {
+      throw new AuthConfigError(
+        "ipAddress.trustedProxies must not be an empty list. No entry matches any hop, so no client address is ever derived; use 0 when there is no proxy."
+      )
+    }
     const invalid = resolved.trustedProxies.filter(
       (entry) => !isTrustedProxyEntry(entry)
     )
@@ -427,7 +444,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
     multiUser: options.multiUser ?? false,
     ...(options.localization ? { localization: options.localization } : {}),
     ipAddress: requireIpAddress(options.ipAddress),
-    trustedOrigins: options.trustedOrigins ?? [],
+    trustedOrigins: requireOrigins(options.trustedOrigins),
     openapi: options.openapi ?? false,
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {}),
@@ -457,5 +474,19 @@ function requireJwks(jwks: JwksOptions): JwksOptions {
     )
   }
 
+  const leaksPrivateKey = (json as { keys: unknown[] }).keys.some(
+    (key) =>
+      typeof key === "object" &&
+      key !== null &&
+      PRIVATE_JWK_MEMBERS.some((member) => member in key)
+  )
+  if (leaksPrivateKey) {
+    throw new AuthConfigError(
+      "jwks.json must hold public keys only. A key carrying d, p, q, dp, dq, qi, oth, or k is a private key, and /jwks would publish it."
+    )
+  }
+
   return jwks
 }
+
+const PRIVATE_JWK_MEMBERS = ["d", "p", "q", "dp", "dq", "qi", "oth", "k"]

@@ -14,11 +14,18 @@ export function createGetProviderToken(internals: AuthClientInternals) {
   return async function getProviderToken(
     input: GetProviderTokenInput
   ): Promise<ProviderTokenResult> {
-    return internals.fetchJson<ProviderTokenResult>({
+    const result = await internals.fetchJson<
+      Omit<ProviderTokenResult, "expiresAt"> & { expiresAt: string | null }
+    >({
       method: "GET",
       path: `/identities/${encodeURIComponent(input.id)}/token`,
       authenticated: true
     })
+
+    return {
+      ...result,
+      expiresAt: result.expiresAt ? new Date(result.expiresAt) : null
+    }
   }
 }
 

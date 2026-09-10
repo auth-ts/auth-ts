@@ -1,6 +1,6 @@
 import type { AuthConfig } from "../core/auth-config"
 import type { AuthInternals } from "../core/auth-internals"
-import { requestCookies } from "../lib/parse-cookies"
+import { readCookie, requestCookies } from "../lib/parse-cookies"
 import {
   clearCookie,
   clearHintCookie,
@@ -8,6 +8,7 @@ import {
   serializeHintCookie,
   shouldUseSecureCookies
 } from "../lib/serialize-cookie"
+import { HINT_COOKIE_NAME } from "../shared/hint-cookie"
 
 /** What writing the session cookies needs from the request, when there is one. */
 export interface SessionCookieContext {
@@ -151,11 +152,10 @@ export function clearedRefreshCookies(
     clearCookie(refreshCookieName(config, id), config.cookie.path, secure)
   )
 
-  // Whoever is still signed in here takes the hint; only an empty browser
-  // retires it. Order is the cookie header's, which is not meaningful — any
-  // survivor is a correct answer, and the next `/token` confirms it.
+  // An active survivor keeps the hint
   const remaining = [...presented.keys()].filter((id) => !retiring.includes(id))
-  const survivor = remaining[0]
+  const hinted = headers ? readCookie(headers, HINT_COOKIE_NAME) : undefined
+  const survivor = hinted && remaining.includes(hinted) ? hinted : remaining[0]
   cookies.push(
     survivor !== undefined
       ? serializeHintCookie({

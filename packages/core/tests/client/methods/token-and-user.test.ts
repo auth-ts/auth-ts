@@ -293,6 +293,26 @@ describe("the session hint", () => {
     expect(server.requests).toHaveLength(0)
   })
 
+  it("asks the server when two hints disagree, rather than trusting either", async () => {
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    Object.defineProperty(globalThis.document, "cookie", {
+      configurable: true,
+      get: () => "auth-ts.hint=user-1; auth-ts.hint=out"
+    })
+
+    try {
+      const client = createAuthClient()
+
+      expect(await client.getToken()).not.toBeNull()
+      expect(server.requests).toHaveLength(1)
+    } finally {
+      Reflect.deleteProperty(globalThis.document, "cookie")
+    }
+  })
+
   it("forgets a token it is still holding when the hint has gone", async () => {
     // Another tab signed out; this one must not keep serving from its cache.
     server.on("GET", "/api/auth/token", {
@@ -496,6 +516,62 @@ describe("refresh", () => {
       ).toHaveLength(2)
       expect(await client.getToken()).toBe(second)
     } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("drops a refresh that lands after a sign-out, so the session cannot come back", async () => {
+    const scripted = globalThis.fetch
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    vi.stubGlobal(
+      "fetch",
+      async (input: string | URL | Request, init?: RequestInit) => {
+        if (String(input).endsWith("/api/auth/token")) await gate
+
+        return scripted(input, init)
+      }
+    )
+    vi.useFakeTimers()
+    server.on("POST", "/api/auth/sign-in/code", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    server.on("POST", "/api/auth/sign-out", { status: 204 })
+    server.on("GET", "/api/auth/token", {
+      body: { user },
+      token: fakeAccessToken()
+    })
+    server.on("GET", "/api/auth/token", { body: null })
+    const client = createAuthClient()
+
+    try {
+      const nearingExpiry = await client.signInWithCode({
+        email: "ada@example.com",
+        code: "123456"
+      })
+      let landed = () => {}
+      const refreshed = new Promise<void>((resolve) => {
+        landed = resolve
+      })
+      // 55 seconds left: refreshing behind the caller
+      vi.setSystemTime(Date.now() + 545_000)
+      expect(await client.getToken({ onRefresh: () => landed() })).toBe(
+        nearingExpiry.token
+      )
+
+      await client.signOut()
+      release()
+      await refreshed
+
+      expect(await client.getToken()).toBeNull()
+      expect(
+        server.requests.filter((request) => request.path === "/api/auth/token")
+      ).toHaveLength(2)
+    } finally {
+      vi.unstubAllGlobals()
       vi.useRealTimers()
     }
   })

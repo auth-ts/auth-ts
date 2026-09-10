@@ -23,7 +23,7 @@ export interface SignInWithCodeInput extends IdentifierBody {
 
 /** How `POST /sign-in/code` appears in the OpenAPI document. */
 export const signInWithCodeDocs: EndpointDocs<SignInWithCodeInput> = {
-  description: "A failed request does not use up the code.",
+  description: "A rejected body does not use up the code.",
   tag: "Sign in",
   auth: "none",
   additionalFields: "nested",
@@ -43,6 +43,10 @@ export const signInWithCodeDocs: EndpointDocs<SignInWithCodeInput> = {
       schema: "TokenResult"
     },
     400: "InvalidField",
+    401: {
+      description: "The code is wrong, expired, or already used.",
+      schema: "AuthError"
+    },
     429: "RateLimited"
   }
 }

@@ -98,6 +98,33 @@ describe("construction failures", () => {
     ).not.toThrow()
   })
 
+  it("refuses jwks.json holding a private key, which /jwks would publish", () => {
+    const publicKey = { kty: "RSA", kid: "k1", n: "AQAB", e: "AQAB" }
+    for (const member of ["d", "p", "q", "dp", "dq", "qi", "oth", "k"]) {
+      expect(
+        () =>
+          createAuth({
+            ...baseOptions(),
+            jwks: {
+              json: { keys: [publicKey, { ...publicKey, [member]: "x" }] }
+            }
+          }),
+        member
+      ).toThrow(AuthConfigError)
+      expect(
+        () =>
+          createAuth({
+            ...baseOptions(),
+            jwks: { json: { keys: [{ ...publicKey, [member]: "x" }] } }
+          }),
+        member
+      ).toThrow(/jwks\.json must hold public keys only/)
+    }
+    expect(() =>
+      createAuth({ ...baseOptions(), jwks: { json: { keys: [publicKey] } } })
+    ).not.toThrow()
+  })
+
   it("leaves baseURL unset, providers or not, and reads no environment variable", () => {
     process.env.AUTH_BASE_URL = "https://from-the-environment.example.com"
     try {
@@ -410,6 +437,27 @@ describe("construction failures", () => {
         ipAddress: { trustedProxies: ["203.0.113.7", "10.0.0.0/24", "::1"] }
       }).config.ipAddress.trustedProxies
     ).toEqual(["203.0.113.7", "10.0.0.0/24", "::1"])
+  })
+
+  it("rejects an empty trusted proxy list, which would match no hop at all", () => {
+    expect(() =>
+      createAuth({ ...baseOptions(), ipAddress: { trustedProxies: [] } })
+    ).toThrow(AuthConfigError)
+    expect(() =>
+      createAuth({ ...baseOptions(), ipAddress: { trustedProxies: [] } })
+    ).toThrow(/ipAddress\.trustedProxies must not be an empty list/)
+  })
+
+  it("rejects a trusted origin with no scheme, which never matches an Origin header", () => {
+    expect(() =>
+      createAuth({ ...baseOptions(), trustedOrigins: ["app.example.com"] })
+    ).toThrow(AuthConfigError)
+    expect(() =>
+      createAuth({
+        ...baseOptions(),
+        trustedOrigins: ["https://app.example.com"]
+      })
+    ).not.toThrow()
   })
 
   it("rejects a prefix length that is not somewhere inside an IPv6 address", () => {

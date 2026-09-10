@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, request } from "../helpers/request"
+import { readSetCookies, refreshCookie, request } from "../helpers/request"
 import { required } from "../helpers/required"
 import { selectRow, selectRows } from "../helpers/rows"
 
@@ -270,6 +270,52 @@ describe("multiUser enabled", () => {
       await selectRows(context.db, "sessions", { userId: { eq: ada.user.id } })
     ).toHaveLength(1)
 
+    const whoami = await context.auth.handler(
+      request("GET", "/api/auth/token", { cookies: after })
+    )
+    expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
+      ada.user.id
+    )
+  })
+
+  it("keeps the hint on the active user when another survivor precedes them", async () => {
+    const context = await server()
+    const ada = await signIn(context, "ada@example.com")
+    const grace = await signIn(context, "grace@example.com", ada.cookies)
+    const carol = await signIn(context, "carol@example.com", grace.cookies)
+    const jar = carol.cookies
+    const cookies: Cookies = {
+      [refreshCookie(grace.user.id)]: required(
+        jar[refreshCookie(grace.user.id)],
+        "grace refresh cookie"
+      ),
+      [refreshCookie(ada.user.id)]: required(
+        jar[refreshCookie(ada.user.id)],
+        "ada refresh cookie"
+      ),
+      [refreshCookie(carol.user.id)]: required(
+        jar[refreshCookie(carol.user.id)],
+        "carol refresh cookie"
+      ),
+      "auth-ts.hint": ada.user.id
+    }
+
+    const response = await context.auth.handler(
+      request("POST", "/api/auth/sign-out", {
+        body: { userId: carol.user.id },
+        cookies,
+        token: await tokenFor(context, cookies)
+      })
+    )
+
+    expect(response.status).toBe(204)
+    expect(
+      required(readSetCookies(response).get("auth-ts.hint"), "hint").value
+    ).toBe(ada.user.id)
+    const after = applyCookies(cookies, response)
+    expect(usersInCookies(after).sort()).toEqual(
+      [ada.user.id, grace.user.id].sort()
+    )
     const whoami = await context.auth.handler(
       request("GET", "/api/auth/token", { cookies: after })
     )

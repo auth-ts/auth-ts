@@ -406,6 +406,29 @@ describe("connected accounts", () => {
     )
   })
 
+  it("revives expiresAt as a Date and leaves null alone", async () => {
+    server.on("GET", "/api/auth/identities/identity-1/token", {
+      body: {
+        token: "provider-token",
+        expiresAt: "2026-01-02T03:04:05.000Z",
+        scope: "repo"
+      }
+    })
+    server.on("GET", "/api/auth/identities/identity-1/token", {
+      body: { token: "provider-token", expiresAt: null, scope: "repo" }
+    })
+    const client = await signedIn()
+
+    const dated = await client.getProviderToken({ id: "identity-1" })
+    expect(dated.expiresAt).toBeInstanceOf(Date)
+    expect(dated.expiresAt?.getTime()).toBe(
+      Date.parse("2026-01-02T03:04:05.000Z")
+    )
+
+    const undated = await client.getProviderToken({ id: "identity-1" })
+    expect(undated.expiresAt).toBeNull()
+  })
+
   it("throws providerReconnectRequired when the grant is gone", async () => {
     server.on("GET", "/api/auth/identities/identity-1/token", {
       status: 403,

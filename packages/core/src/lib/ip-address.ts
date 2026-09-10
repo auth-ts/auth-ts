@@ -108,14 +108,14 @@ function isIPv6(value: string): boolean {
 
   const isGroup = (group: string) => /^[0-9a-fA-F]{1,4}$/.test(group)
 
-  const parseSide = (side: string): number | null => {
+  const parseSide = (side: string, allowTail: boolean): number | null => {
     if (side === "") return 0
     const groups = side.split(":")
 
     // An IPv4-mapped tail counts as two 16-bit groups.
     const tail = groups[groups.length - 1]
     if (tail?.includes(".")) {
-      if (!isIPv4(tail)) return null
+      if (!allowTail || !isIPv4(tail)) return null
       const head = groups.slice(0, -1)
       if (!head.every(isGroup)) return null
       return head.length + 2
@@ -126,14 +126,14 @@ function isIPv6(value: string): boolean {
   }
 
   if (halves.length === 2) {
-    const left = parseSide(halves[0] ?? "")
-    const right = parseSide(halves[1] ?? "")
+    const left = parseSide(halves[0] ?? "", false)
+    const right = parseSide(halves[1] ?? "", true)
     if (left === null || right === null) return false
     // The compressed run must stand for at least one omitted group.
     return left + right < 8
   }
 
-  return parseSide(value) === 8
+  return parseSide(value, true) === 8
 }
 
 /** True when the value is a syntactically valid IPv4 or IPv6 address. */

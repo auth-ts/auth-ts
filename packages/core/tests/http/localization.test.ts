@@ -49,6 +49,18 @@ describe("getErrorMessage", () => {
     ).toBe("Bitte warte 42 Sekunden.")
   })
 
+  it("interpolates every retryAfter placeholder, not only the first", () => {
+    const twice = {
+      messages: {
+        en: { cooldown: "Wait {retryAfter}s ({retryAfter} seconds)." }
+      }
+    }
+
+    expect(getErrorMessage("cooldown", "en", twice, { retryAfter: 42 })).toBe(
+      "Wait 42s (42 seconds)."
+    )
+  })
+
   it("never leaks identifiers, because messages take no identifier input", () => {
     for (const message of Object.values(builtInErrorMessages)) {
       expect(message).not.toMatch(/@/)

@@ -41,9 +41,17 @@ export async function countAttempt(
     })
   ])
 
-  return attempts.some(({ id }) => id === inserted.id)
+  const counted = attempts.some(({ id }) => id === inserted.id)
     ? attempts.length
     : Math.min(attempts.length + 1, limit + 1)
+
+  // The first attempt on a fresh key sweeps, so under a flood — the moment
+  // the table grows fastest — the sweep still runs once per key rather than
+  // once per request. Here rather than in `checkRateLimit`, so wrong-guess
+  // budgets under `rateLimit: false` are collected too.
+  if (counted === 1) await sweepExpired(internals, "attempts")
+
+  return counted
 }
 
 /**
@@ -87,11 +95,6 @@ export async function checkRateLimit(
     endsAt,
     window.max
   )
-
-  // The first attempt of a fresh window sweeps, so under a flood — the moment
-  // the table grows fastest — the sweep still runs once per key per window
-  // rather than once per request.
-  if (counted === 1) await sweepExpired(internals, "attempts")
 
   // The count includes this request, so the cap is exceeded at max + 1 — and a
   // refused request is still counted, which is what stops a caller who is

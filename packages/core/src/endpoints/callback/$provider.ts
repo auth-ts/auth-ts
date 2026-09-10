@@ -152,16 +152,22 @@ export const callbackProvider = defineEndpoint({
       // provider is really signing in: the identity decides whether they upgrade
       // in place or merge into the account it already belongs to, and they get a
       // session for the result — exactly what `/sign-in/provider/:provider` would do.
-      if (payload.intent === "connect" && active?.user.type !== "guest") {
-        return await connectIdentity(
-          internals,
-          input,
-          active,
-          payload.userId,
-          identity,
-          clearState,
-          payload.redirect
-        )
+      if (payload.intent === "connect") {
+        // Bound to the session that started it
+        if (!active || active.user.id !== payload.userId) {
+          throw unauthenticated()
+        }
+        if (active.user.type !== "guest") {
+          return await connectIdentity(
+            internals,
+            input,
+            active,
+            payload.userId,
+            identity,
+            clearState,
+            payload.redirect
+          )
+        }
       }
 
       // A signed-in guest converts rather than creating a new user. The lookup
@@ -188,10 +194,24 @@ export const callbackProvider = defineEndpoint({
 
       return { data: undefined, status: 302, headers }
     } catch (error) {
-      if (!isAuthApiError(error)) throw error
       const target = payload?.errorRedirect ?? config.baseURL
-      if (!target) throw error
-      return errorRedirect(error.code, clearState, target)
+      if (isAuthApiError(error) && target) {
+        return errorRedirect(error.code, clearState, target)
+      }
+
+      // The state dies with the flow regardless
+      const headers = new Headers({ "set-cookie": clearState })
+      if (!isAuthApiError(error)) {
+        internals.log.error("oauth callback failed", { error: String(error) })
+        throw new AuthApiError("internalError", 500, { headers })
+      }
+      throw new AuthApiError(error.code, error.status, {
+        message: error.message,
+        headers,
+        ...(error.retryAfter === undefined
+          ? {}
+          : { retryAfter: error.retryAfter })
+      })
     }
   }
 })

@@ -23,11 +23,13 @@ export class AuthApiError extends Error {
   readonly status: number
   /** Seconds to wait, for the throttling codes. */
   readonly retryAfter?: number
+  /** Headers the HTTP answer must carry, such as a cookie to clear. */
+  readonly headers?: Headers
 
   constructor(
     code: AuthErrorCode,
     status: number,
-    options: { retryAfter?: number; message?: string } = {}
+    options: { retryAfter?: number; message?: string; headers?: Headers } = {}
   ) {
     super(
       options.message ??
@@ -44,6 +46,7 @@ export class AuthApiError extends Error {
     this.code = code
     this.status = status
     if (options.retryAfter !== undefined) this.retryAfter = options.retryAfter
+    if (options.headers) this.headers = options.headers
   }
 }
 

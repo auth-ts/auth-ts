@@ -117,7 +117,9 @@ function toErrorResponse(
   locale: string
 ) {
   const { config } = internals
-  const headers = responseHeaders()
+  const headers = responseHeaders(
+    isAuthApiError(error) ? error.headers : undefined
+  )
 
   if (isAuthApiError(error)) {
     const message = getErrorMessage(error.code, locale, config.localization, {

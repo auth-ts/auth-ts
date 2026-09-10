@@ -299,10 +299,8 @@ function assertCookieReachable(
 ) {
   if (resolved.cookie.path === "/") return
   if (headers && readRefreshToken(internals, headers)) return
-  if (!headers?.get("cookie")) {
-    throw new AuthConfigError(
-      `No auth cookie on this request, and cookie.path is "${resolved.cookie.path}" rather than "/". ` +
-        'Server-side rendering only receives the refresh cookie when cookie.path is "/".'
-    )
-  }
+  throw new AuthConfigError(
+    `No auth cookie on this request, and cookie.path is "${resolved.cookie.path}" rather than "/". ` +
+      'Server-side rendering only receives the refresh cookie when cookie.path is "/".'
+  )
 }

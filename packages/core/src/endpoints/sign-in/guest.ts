@@ -8,7 +8,7 @@ import { insertRow } from "../../lib/insert-row"
 import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { issueSession } from "../../session/issue-session"
-import { readRefreshToken } from "../../session/resolve-session"
+import { readRefreshCookies } from "../../session/session-cookies"
 
 /** Body accepted by `POST /sign-in/guest`. */
 export interface SignInAsGuestInput {
@@ -75,14 +75,16 @@ export const signInAsGuest = defineEndpoint({
     // A browser that is signed in never becomes a guest on top of it: the
     // guest would displace or park a real account, and a guest parked behind
     // one is a row nothing will ever convert. A dead cookie does not count.
-    const presented = readRefreshToken(internals, headers)
-    if (presented) {
-      const live = await selectOne(internals, "sessions", {
-        tokenHash: { eq: await sha256Hex(presented.token) },
-        expiresAt: { gt: new Date() }
-      })
-      if (live) throw new AuthApiError("guestRequiresSignOut", 409)
-    }
+    const presented = [...readRefreshCookies(internals, headers)]
+    const live = await Promise.all(
+      presented.map(async ([, rawToken]) =>
+        selectOne(internals, "sessions", {
+          tokenHash: { eq: await sha256Hex(rawToken) },
+          expiresAt: { gt: new Date() }
+        })
+      )
+    )
+    if (live.some(Boolean)) throw new AuthApiError("guestRequiresSignOut", 409)
 
     const additionalFields = validateAdditionalFields(
       config.user.additionalFields,

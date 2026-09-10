@@ -46,6 +46,8 @@ describe("isIpAddress", () => {
       "",
       "gggg::1",
       "::1::2",
+      "1.2.3.4::",
+      "1.2.3.4::5",
       "x".repeat(60)
     ]) {
       expect(isIpAddress(invalid), invalid).toBe(false)

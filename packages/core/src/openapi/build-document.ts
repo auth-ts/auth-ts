@@ -4,7 +4,11 @@ import { endpointRegistry } from "../core/endpoint-registry"
 import { SAFE_METHODS } from "../http/check-origin"
 import type { AnyEndpoint } from "../http/define-endpoint"
 import { componentResponses, componentSchemas } from "./components"
-import type { AnyEndpointDocs, EndpointRequirement } from "./endpoint-docs"
+import type {
+  AnyEndpointDocs,
+  EndpointRequirement,
+  EndpointResponse
+} from "./endpoint-docs"
 import { endpointDocs, summaries } from "./endpoint-docs-registry"
 import type { ComponentName, JsonSchema } from "./json-schema"
 
@@ -99,6 +103,22 @@ function userSchema(config?: AuthConfig) {
   }
 }
 
+function cookieDescription(
+  kind: NonNullable<EndpointResponse["setsCookie"]>,
+  name: string
+) {
+  switch (kind) {
+    case "refresh":
+      return `Writes \`${name}\`, HttpOnly and SameSite=Lax.`
+    case "accounts":
+      return `Writes \`${name}\` for the added account beside the others.`
+    case "state":
+      return "Writes the OAuth state cookie, HttpOnly and SameSite=Lax."
+    case "cleared":
+      return `Clears \`${name}\`.`
+  }
+}
+
 function operation(
   name: keyof EndpointRegistry,
   endpoint: AnyEndpoint,
@@ -121,24 +141,27 @@ function operation(
           ? { "application/json": { schema: expand(response.schema) } }
           : undefined
 
-    responses[status] = {
-      description: response.description,
-      ...(content ? { content } : {}),
+    const headers = {
       ...(response.setsCookie
         ? {
-            headers: {
-              "Set-Cookie": {
-                schema: { type: "string" },
-                description: `Writes \`${config?.cookie.name ?? "auth-ts.refresh"}\`, HttpOnly and SameSite=Lax.`
-              }
+            "Set-Cookie": {
+              schema: { type: "string" },
+              description: cookieDescription(
+                response.setsCookie,
+                config?.cookie.name ?? "auth-ts.refresh"
+              )
             }
           }
         : {}),
       ...(response.redirect
-        ? {
-            headers: { Location: { schema: { type: "string", format: "uri" } } }
-          }
+        ? { Location: { schema: { type: "string", format: "uri" } } }
         : {})
+    }
+
+    responses[status] = {
+      description: response.description,
+      ...(content ? { content } : {}),
+      ...(Object.keys(headers).length > 0 ? { headers } : {})
     }
   }
 

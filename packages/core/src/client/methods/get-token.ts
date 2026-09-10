@@ -48,6 +48,7 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
 
       internals.log.debug("refreshing access token")
 
+      const started = internals.tokenStore.version()
       try {
         const wire = await internals.fetchJson<TokenResult | null>({
           method: "GET",
@@ -60,7 +61,10 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
 
           return null
         }
-        internals.tokenStore.set(result.token)
+        // A sign-out or switch since then wins
+        if (internals.tokenStore.version() === started) {
+          internals.tokenStore.set(result.token)
+        }
 
         return result
       } catch (error) {

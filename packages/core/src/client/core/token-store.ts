@@ -38,6 +38,8 @@ export interface TokenStore {
   /** Stores a token, reading its own lifetime claims to know when to refresh. */
   set(token: string): void
   clear(): void
+  /** Changes on every `set` or `clear`. */
+  version(): number
   /** True when there is no token, or it is inside the refresh-ahead window. */
   isExpiringSoon(): boolean
   /** Too close to expiry to hand out while a refresh runs behind it. */
@@ -57,9 +59,12 @@ export interface TokenStore {
 export function createTokenStore(log?: LeveledLogger): TokenStore {
   let state: TokenState | null = null
   let inFlight: Promise<unknown> | null = null
+  let version = 0
 
   return {
     get: () => state,
+
+    version: () => version,
 
     set(token) {
       const decoded = decodeToken(token)
@@ -70,10 +75,12 @@ export function createTokenStore(log?: LeveledLogger): TokenStore {
       const expiresAt = typeof claims.exp === "number" ? claims.exp * 1000 : now
 
       state = { token, issuedAt, expiresAt, receivedAt: now }
+      version += 1
     },
 
     clear() {
       state = null
+      version += 1
     },
 
     isExpiringSoon() {
@@ -84,16 +91,19 @@ export function createTokenStore(log?: LeveledLogger): TokenStore {
       // hours would otherwise either refresh on every call or never refresh at all.
       const lifetime = state.expiresAt - state.issuedAt
       const elapsed = Date.now() - state.receivedAt
+      // Short tokens keep a proportional buffer
+      const ahead = Math.min(REFRESH_AHEAD_MS, lifetime / 2)
 
-      return elapsed >= lifetime - REFRESH_AHEAD_MS
+      return elapsed >= lifetime - ahead
     },
 
     mustRefresh() {
       if (!state) return true
 
       const lifetime = state.expiresAt - state.issuedAt
+      const blocking = Math.min(REFRESH_BLOCKING_MS, lifetime / 4)
 
-      return Date.now() - state.receivedAt >= lifetime - REFRESH_BLOCKING_MS
+      return Date.now() - state.receivedAt >= lifetime - blocking
     },
 
     async singleFlight<Result>(refresh: () => Promise<Result>) {
