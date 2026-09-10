@@ -7,7 +7,6 @@ export const getJwksDocs: EndpointDocs<never> = {
   description: "Only served when jwks.json is configured.",
   tag: "Discovery",
   auth: "none",
-  requires: "jwks",
   responses: {
     200: {
       description: "The public key set, as given.",
@@ -31,6 +30,7 @@ export const getJwksDocs: EndpointDocs<never> = {
 export const getJwks = defineEndpoint({
   method: "GET",
   path: "/jwks",
+  requires: "jwks",
   run: async (internals) => {
     const json = internals.config.jwks?.json
     if (json === undefined) throw new AuthApiError("notFound")

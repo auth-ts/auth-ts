@@ -22,7 +22,6 @@ export const signInAsGuestDocs: EndpointDocs<SignInAsGuestInput> = {
   description: "Fails if this browser is already signed in.",
   tag: "Sign in",
   auth: "none",
-  requires: "guest",
   additionalFields: "nested",
   body: { type: "object", properties: {} },
   responses: {
@@ -51,6 +50,7 @@ export const signInAsGuestDocs: EndpointDocs<SignInAsGuestInput> = {
 export const signInAsGuest = defineEndpoint({
   method: "POST",
   path: "/sign-in/guest",
+  requires: "guest",
   parse: async ({ request }): Promise<SignInAsGuestInput> => {
     const body = await readBody<SignInAsGuestInput>(request, [
       "additionalFields"
@@ -60,9 +60,6 @@ export const signInAsGuest = defineEndpoint({
   },
   run: async (internals, input: SignInAsGuestInput) => {
     const { config } = internals
-    // Not merely disabled: absent. An endpoint that is off should look like an
-    // endpoint that does not exist.
-    if (!config.guest) throw new AuthApiError("notFound")
 
     const headers = input.headers ?? new Headers()
 

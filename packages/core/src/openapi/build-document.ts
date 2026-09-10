@@ -3,12 +3,9 @@ import type { EndpointRegistry } from "../core/endpoint-registry"
 import { endpointRegistry } from "../core/endpoint-registry"
 import { SAFE_METHODS } from "../http/check-origin"
 import type { AnyEndpoint } from "../http/define-endpoint"
+import { requirementMet } from "../http/endpoint-requirement"
 import { componentResponses, componentSchemas } from "./components"
-import type {
-  AnyEndpointDocs,
-  EndpointRequirement,
-  EndpointResponse
-} from "./endpoint-docs"
+import type { AnyEndpointDocs, EndpointResponse } from "./endpoint-docs"
 import { endpointDocs, summaries } from "./endpoint-docs-registry"
 import type { ComponentName, JsonSchema } from "./json-schema"
 
@@ -35,15 +32,6 @@ const TAG_ORDER = [
 // both meet what they expect.
 const REFRESH_COOKIE = "cookieAuth"
 const BEARER = "bearerAuth"
-
-function met(requirement: EndpointRequirement, config: AuthConfig) {
-  if (requirement === "guest") return config.guest
-  if (requirement === "multiUser") return config.multiUser
-  if (requirement === "providers")
-    return Object.keys(config.providers).length > 0
-  if (requirement === "jwks") return config.jwks?.json !== undefined
-  return config.baseURL !== undefined
-}
 
 function expand(schema: JsonSchema | ComponentName): JsonSchema {
   if (typeof schema === "string")
@@ -229,7 +217,12 @@ export function buildOpenAPIDocument(config?: AuthConfig): OpenAPIDocument {
     [keyof EndpointRegistry, AnyEndpoint]
   >) {
     const docs = endpointDocs[name]
-    if (docs.requires && config && !met(docs.requires, config)) continue
+    if (
+      endpoint.requires &&
+      config &&
+      !requirementMet(config, endpoint.requires)
+    )
+      continue
 
     // Relative to the server, which already carries the mount. Repeating it
     // here would make every resolved URL double it.

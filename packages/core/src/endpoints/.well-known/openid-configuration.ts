@@ -8,7 +8,6 @@ export const getDiscoveryDocs: EndpointDocs<never> = {
     "For verifiers that take an issuer URL and find the keys themselves.",
   tag: "Discovery",
   auth: "none",
-  requires: "baseURL",
   responses: {
     200: { description: "The discovery document.", schema: { type: "object" } }
   }
@@ -31,6 +30,7 @@ export const getDiscoveryDocs: EndpointDocs<never> = {
 export const getDiscovery = defineEndpoint({
   method: "GET",
   path: "/.well-known/openid-configuration",
+  requires: "baseURL",
   run: async (internals) => {
     const { issuer, basePath, baseURL, jwks } = internals.config
     if (!issuer || !baseURL) throw new AuthApiError("notFound")

@@ -1,5 +1,4 @@
 import type { AuthUser } from "../core/auth-database"
-import { notFound } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import { sha256Hex } from "../lib/hash"
 import { selectOne } from "../lib/select-one"
@@ -14,7 +13,6 @@ export const listUsersDocs: EndpointDocs<never> = {
     "Read from this browser's refresh cookies, so parked accounts are listed too, not only the active one.",
   tag: "Users",
   auth: "bearer",
-  requires: "multiUser",
   responses: {
     200: {
       description: "Every user signed in to this browser.",
@@ -42,11 +40,9 @@ export const listUsersDocs: EndpointDocs<never> = {
 export const listUsers = defineEndpoint({
   method: "GET",
   path: "/users",
+  requires: "multiUser",
   parse: ({ request }): CallerInput => ({ headers: request.headers }),
   run: async (internals, input: CallerInput) => {
-    const { config } = internals
-    if (!config.multiUser) throw notFound()
-
     const headers = input.headers ?? new Headers()
     await authenticate(internals, input)
 

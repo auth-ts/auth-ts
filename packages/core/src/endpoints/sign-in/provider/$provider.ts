@@ -34,7 +34,6 @@ export const signInWithProviderDocs: EndpointDocs<
   description: "Navigate to the url. Do not fetch it.",
   tag: "Sign in",
   auth: "none",
-  requires: "providers",
   additionalFields: "nested",
   params: {
     provider: "The provider to sign in with. Must be one you configured."
@@ -87,6 +86,7 @@ export const signInWithProviderDocs: EndpointDocs<
 export const signInWithProvider = defineEndpoint({
   method: "POST",
   path: "/sign-in/provider/$provider",
+  requires: "providers",
   parse: async ({ request, params }): Promise<SignInWithProviderInput> => {
     const body = await readBody<Omit<SignInWithProviderInput, "provider">>(
       request,

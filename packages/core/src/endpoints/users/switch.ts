@@ -22,7 +22,6 @@ export interface SwitchUserInput extends CallerInput {
 export const switchUserDocs: EndpointDocs<SwitchUserInput> = {
   tag: "Users",
   auth: "bearer",
-  requires: "multiUser",
   body: {
     type: "object",
     properties: {
@@ -60,6 +59,7 @@ export const switchUserDocs: EndpointDocs<SwitchUserInput> = {
 export const switchUser = defineEndpoint({
   method: "POST",
   path: "/users/switch",
+  requires: "multiUser",
   parse: async ({ request }): Promise<SwitchUserInput> => {
     const body = await readBody<{ userId?: string }>(request, ["userId"])
 
@@ -70,9 +70,6 @@ export const switchUser = defineEndpoint({
     }
   },
   run: async (internals, input: SwitchUserInput) => {
-    const { config } = internals
-    if (!config.multiUser) throw notFound()
-
     const headers = input.headers ?? new Headers()
     await authenticate(internals, input)
 

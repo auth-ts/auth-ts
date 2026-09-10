@@ -28,7 +28,6 @@ export const connectProviderDocs: EndpointDocs<
     "Connects to the current user, unlike sign-in. Navigate to the url.",
   tag: "Identities",
   auth: "bearer",
-  requires: "providers",
   params: { provider: "The provider to link. Must be one you configured." },
   body: {
     type: "object",
@@ -77,6 +76,7 @@ export const connectProviderDocs: EndpointDocs<
 export const connectProvider = defineEndpoint({
   method: "POST",
   path: "/identities/connect/$provider",
+  requires: "providers",
   parse: async ({ request, params }): Promise<ConnectProviderInput> => {
     const body = await readBody<Omit<ConnectProviderInput, "provider">>(
       request,

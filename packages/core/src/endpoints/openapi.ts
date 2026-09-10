@@ -1,5 +1,4 @@
 import type { AuthConfig } from "../core/auth-config"
-import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import { buildOpenAPIDocument } from "../openapi/build-document"
 
@@ -20,9 +19,8 @@ const documents = new WeakMap<
 export const getOpenAPIDocument = defineEndpoint({
   method: "GET",
   path: "/openapi.json",
+  requires: "openapi",
   run: async (internals) => {
-    if (!internals.config.openapi) throw new AuthApiError("notFound")
-
     // Pure function of the resolved config, so built once per server.
     let document = documents.get(internals.config)
     if (!document) {

@@ -1,4 +1,5 @@
 import type { AuthInternals } from "../core/auth-internals"
+import { defer } from "../lib/defer"
 import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
@@ -64,18 +65,14 @@ export async function slideSession(
   if (!session) return []
 
   const written = values()
-  waitUntil(
-    internals.db
-      .update({
-        table: "sessions",
-        where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
-        values: written
-      })
-      .then(
-        () => undefined,
-        (error) =>
-          internals.log.error("session slide failed", { error: String(error) })
-      )
+  defer(
+    internals,
+    "session slide",
+    internals.db.update({
+      table: "sessions",
+      where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
+      values: written
+    })
   )
 
   return [{ ...session, ...written }]

@@ -134,6 +134,15 @@ describe("getToken as a function", () => {
     ).rejects.toThrow(/cookie.path/)
   })
 
+  it("answers notFound from a callable whose configuration is off", async () => {
+    const context = await createTestServer()
+
+    await expect(context.auth.signInAsGuest({})).rejects.toMatchObject({
+      code: "notFound",
+      status: 404
+    })
+  })
+
   it("explains a narrowed cookie.path even when other cookies arrive", async () => {
     const context = await createTestServer({ cookie: { path: "/api/auth" } })
 

@@ -42,7 +42,6 @@ export const callbackProviderDocs: EndpointDocs<
   description: "The provider redirects here. Not called directly.",
   tag: "Sign in",
   auth: "none",
-  requires: "providers",
   params: { provider: "The provider the flow started with." },
   query: {
     code: { type: "string", description: "The provider's authorization code." },
@@ -74,6 +73,7 @@ export const callbackProviderDocs: EndpointDocs<
 export const callbackProvider = defineEndpoint({
   method: "GET",
   path: "/callback/$provider",
+  requires: "providers",
   parse: ({ request, params }): CallbackProviderInput => {
     const url = new URL(request.url)
 

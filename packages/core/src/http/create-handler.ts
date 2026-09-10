@@ -1,7 +1,8 @@
 import type { AuthInternals } from "../core/auth-internals"
-import { AuthApiError, isAuthApiError } from "./auth-api-error"
+import { AuthApiError, isAuthApiError, notFound } from "./auth-api-error"
 import { assertAllowedOrigin } from "./check-origin"
 import type { AnyEndpoint } from "./define-endpoint"
+import { requirementMet } from "./endpoint-requirement"
 import { ERROR_STATUS, errorResponse } from "./error-response"
 import { getErrorMessage } from "./get-error-message"
 import { matchEndpointParams } from "./match-route"
@@ -72,6 +73,9 @@ export async function handleRequest(
       throw new AuthApiError("methodNotAllowed")
     }
     assertAllowedOrigin(internals, request)
+    if (endpoint.requires && !requirementMet(config, endpoint.requires)) {
+      throw notFound()
+    }
 
     const input = endpoint.parse
       ? await endpoint.parse({ request, params, internals })

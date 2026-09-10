@@ -1,23 +1,5 @@
 import type { AuthInternals } from "../core/auth-internals"
-
-/** Runs hygiene work behind `waitUntil` where there is one, awaited otherwise. */
-function hygiene(
-  internals: AuthInternals,
-  label: string,
-  work: Promise<unknown>
-) {
-  const settled = work.then(
-    () => undefined,
-    (error) => internals.log.error(`${label} failed`, { error: String(error) })
-  )
-
-  if (internals.config.waitUntil) {
-    internals.config.waitUntil(settled)
-    return
-  }
-
-  return settled
-}
+import { defer } from "./defer"
 
 /**
  * Deletes a table's expired rows, riding on the request that is inserting one.
@@ -42,7 +24,7 @@ export function sweepExpired(
   internals: AuthInternals,
   table: "sessions" | "verifications" | "attempts"
 ) {
-  return hygiene(
+  return defer(
     internals,
     "sweep",
     internals.db.delete({ table, where: { expiresAt: { lt: new Date() } } })

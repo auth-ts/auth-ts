@@ -1,8 +1,13 @@
-import { type AuthApiError, isAuthApiError } from "../http/auth-api-error"
+import {
+  type AuthApiError,
+  isAuthApiError,
+  notFound
+} from "../http/auth-api-error"
 import { AuthConfigError } from "../http/auth-config-error"
 import type { AuthHandler } from "../http/create-handler"
 import { createHandler, handleRequest } from "../http/create-handler"
 import type { AnyEndpoint, EndpointDefinition } from "../http/define-endpoint"
+import { requirementMet } from "../http/endpoint-requirement"
 import { compileRoutes, matchRoute } from "../http/match-route"
 import { decodeToken } from "../jwt/decode-token"
 import type { SignTokenClaims } from "../jwt/sign-token"
@@ -152,6 +157,9 @@ export function createAuth<
     [string, AnyEndpoint]
   >) {
     callables[name] = async (input: unknown) => {
+      if (endpoint.requires && !requirementMet(resolved, endpoint.requires)) {
+        throw notFound()
+      }
       // `getToken` is the one callable that reads the cookie, and called
       // in-process is where the "server-side rendering never sees the cookie"
       // trap is explained instead of silently resolving to null.

@@ -1,4 +1,5 @@
 import type { AuthInternals } from "../core/auth-internals"
+import type { EndpointRequirement } from "./endpoint-requirement"
 
 /** HTTP methods the endpoint table uses. */
 export type EndpointMethod = "GET" | "POST" | "DELETE"
@@ -42,6 +43,8 @@ export interface EndpointDefinition<Input, Data> {
    * `/identities/$id/token`. Literal paths win over dynamic ones during matching.
    */
   path: string
+  /** Configuration this endpoint needs; without it the route answers 404. */
+  requires?: EndpointRequirement
   /**
    * Turns a `Request` into the input `run` takes.
    *
@@ -87,6 +90,7 @@ export function defineEndpoint<Input, Data>(
 export interface AnyEndpoint {
   method: EndpointMethod
   path: string
+  requires?: EndpointRequirement
   parse?: (context: ParseContext) => Promise<unknown> | unknown
   run: (
     internals: AuthInternals,

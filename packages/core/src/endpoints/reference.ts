@@ -1,4 +1,3 @@
-import { AuthApiError } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 
 // Pinned rather than floating: the page is served by this library, so a bad
@@ -20,9 +19,8 @@ const SCALAR_INTEGRITY =
 export const getReference = defineEndpoint({
   method: "GET",
   path: "/reference",
+  requires: "openapi",
   run: async (internals) => {
-    if (!internals.config.openapi) throw new AuthApiError("notFound")
-
     const specURL = `${internals.config.basePath}/openapi.json`
 
     return {

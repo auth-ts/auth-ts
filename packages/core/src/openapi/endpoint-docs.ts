@@ -18,19 +18,6 @@ export type EndpointTag =
 /** Which credential an operation reads. `"none"` is published, not left blank. */
 export type EndpointAuth = "bearer" | "cookie" | "none"
 
-/**
- * Configuration an operation depends on.
- *
- * A deployment without it answers 404 on that route, so the document leaves the
- * route out rather than describing something the reader cannot call.
- */
-export type EndpointRequirement =
-  | "guest"
-  | "multiUser"
-  | "providers"
-  | "jwks"
-  | "baseURL"
-
 /** One documented response. */
 export interface EndpointResponse {
   description: string
@@ -63,7 +50,6 @@ export interface EndpointDocs<
   description?: string
   tag: EndpointTag
   auth: EndpointAuth
-  requires?: EndpointRequirement
   /** Prose for the `$` segments of `path`. The names come from the path. */
   params?: { [K in PathParam]: string }
   query?: Record<string, JsonSchema>
@@ -92,7 +78,6 @@ export interface AnyEndpointDocs {
   description?: string
   tag: EndpointTag
   auth: EndpointAuth
-  requires?: EndpointRequirement
   params?: Record<string, string>
   query?: Record<string, JsonSchema>
   additionalFields?: "nested" | "flat"
