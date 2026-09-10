@@ -13,9 +13,6 @@
     "target": "ES2024",
     "allowJs": true,
     "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "~/*": ["./src/*"]
-    },
     "noEmit": true
   }
 }
