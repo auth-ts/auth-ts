@@ -1,4 +1,4 @@
-import { base64urlToBytes, bytesToBase64url } from "./base64url"
+import { base64urlToBytes, bytesToBase64url } from "../shared/base64url"
 
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()

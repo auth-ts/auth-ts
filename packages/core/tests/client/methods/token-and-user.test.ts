@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createAuthClient } from "../../../src/client/core/create-auth-client"
 import { AuthError, AuthNetworkError } from "../../../src/client/lib/auth-error"
+import { encodeBase64url } from "../../../src/shared/base64url"
 import type { FakeAuthServer } from "../helpers/fake-auth-server"
 import {
   fakeAccessToken,
@@ -60,6 +61,13 @@ describe("decodeToken", () => {
     expect(spent?.expired).toBe(true)
 
     expect(client.decodeToken("not a token")).toBeNull()
+  })
+
+  it("decodes claims as UTF-8", () => {
+    const payload = encodeBase64url(JSON.stringify({ name: "Zoë 日本" }))
+    const decoded = createAuthClient().decodeToken(`h.${payload}.s`)
+
+    expect(decoded?.claims).toMatchObject({ name: "Zoë 日本" })
   })
 })
 

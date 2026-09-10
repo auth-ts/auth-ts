@@ -1,11 +1,11 @@
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
-import { decodeBase64url, encodeBase64url } from "../lib/base64url"
 import { randomBytesBase64url } from "../lib/generate-random"
 import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"
 import { parseDuration } from "../lib/parse-duration"
 import { clearCookie, serializeCookie } from "../lib/serialize-cookie"
+import { decodeBase64url, encodeBase64url } from "../shared/base64url"
 import { codeChallengeS256, createCodeVerifier } from "./pkce"
 
 /**

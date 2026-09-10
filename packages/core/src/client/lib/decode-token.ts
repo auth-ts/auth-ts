@@ -1,5 +1,6 @@
 import type { DecodedToken } from "../../jwt/decode-token"
 import type { UnverifiedClaims } from "../../jwt/verify-token"
+import { decodeBase64url } from "../../shared/base64url"
 
 /**
  * Decodes a token **without verifying its signature**.
@@ -14,13 +15,11 @@ import type { UnverifiedClaims } from "../../jwt/verify-token"
  * not a well-formed JWT.
  */
 export function decodeToken(token: string): DecodedToken | null {
-  try {
-    const payload = token.split(".")[1]
-    if (!payload) return null
+  const payload = decodeBase64url(token.split(".")[1] ?? "")
+  if (payload === null) return null
 
-    const claims = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/"))
-    ) as UnverifiedClaims
+  try {
+    const claims = JSON.parse(payload) as UnverifiedClaims
     const expired =
       typeof claims.exp === "number" && claims.exp * 1000 <= Date.now()
 
