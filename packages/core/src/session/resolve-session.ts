@@ -96,31 +96,9 @@ async function liveSession(
 }
 
 /**
- * Resolves whichever session this browser holds, without reading the user.
- *
- * Answers for whoever the presented token turns out to belong to, because no
- * claim is being made about who that is — possession of the token is the whole
- * proof. Use {@link resolveSessionRowForUser} wherever the caller names a user.
- *
- * @returns The session and the hash it was found by, or `null`.
- */
-export function resolveSessionRow(
-  internals: AuthInternals,
-  headers: Headers
-): Promise<Omit<ResolvedSession, "user"> | null> {
-  return liveSession(
-    internals,
-    headers,
-    readRefreshToken(internals, headers)?.token
-  )
-}
-
-/**
  * Resolves the session held under one user's name, and only if it is theirs.
  *
- * Separate from {@link resolveSessionRow} rather than an optional argument on
- * it, because the difference is a security boundary and an omitted parameter
- * makes one look like the other. Naming a user is a claim, and the row is what
+ * Naming a user is a claim, and the row is what
  * settles it: a cookie's name is written by whoever sent it, and only the hash
  * inside proves anything. Without the check a caller could present their own
  * refresh token under somebody else's name and be answered with a session — and

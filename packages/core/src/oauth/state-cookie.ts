@@ -17,7 +17,7 @@ import { codeChallengeS256, createCodeVerifier } from "./pkce"
  * which holds for any client at all — a cookie replayed from a jar that does
  * not expire anything is refused here regardless.
  */
-export const OAUTH_STATE_TTL = "10m"
+const OAUTH_STATE_TTL = "10m"
 
 /**
  * How far ahead of this server's clock a state may claim to have been issued.

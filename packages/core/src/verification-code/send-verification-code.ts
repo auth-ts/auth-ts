@@ -18,7 +18,7 @@ import type { CodeIdentifier } from "./resolve-code-identifier"
  * short enough that the five-attempt cap and this window together make guessing a
  * six-digit code hopeless. A knob here would only ever be turned the wrong way.
  */
-export const VERIFICATION_CODE_TTL = "10m"
+const VERIFICATION_CODE_TTL = "10m"
 
 /** What sending a code needs to know. */
 export interface SendVerificationCodeInput {

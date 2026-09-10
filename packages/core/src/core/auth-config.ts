@@ -82,7 +82,7 @@ export interface AuthConfig {
  * `locale` is deliberately *not* reserved — core stores no locale, so declaring
  * one as an additional field is exactly how you persist a preference.
  */
-export const RESERVED_USER_FIELDS = [
+const RESERVED_USER_FIELDS = [
   "id",
   "email",
   "phoneNumber",

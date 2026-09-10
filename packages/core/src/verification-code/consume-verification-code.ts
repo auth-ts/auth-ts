@@ -15,7 +15,7 @@ import { selectOne } from "../lib/select-one"
  * digits needs a hundred thousand attempts on average, and this bounds an
  * attacker to five per code and three codes per ten minutes.
  */
-export const MAX_CODE_ATTEMPTS = 5
+const MAX_CODE_ATTEMPTS = 5
 
 /** What verifying a code needs to know. */
 export interface ConsumeVerificationCodeInput {

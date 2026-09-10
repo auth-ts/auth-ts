@@ -174,7 +174,7 @@ export async function issueSession(
  * `primaryUserId` is deliberately never included either — it describes a
  * pending data migration, not who is signed in.
  */
-export function accessTokenClaims(user: AuthUser, session: AuthSession) {
+function accessTokenClaims(user: AuthUser, session: AuthSession) {
   return {
     userId: user.id,
     type: user.type,

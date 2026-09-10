@@ -20,7 +20,7 @@ export interface TokenState {
  * token that passes the check, then expires while the request carrying it is
  * still in flight.
  */
-export const REFRESH_AHEAD_MS = 60_000
+const REFRESH_AHEAD_MS = 60_000
 
 /**
  * How close to expiry a caller has to wait for the new token.
@@ -30,7 +30,7 @@ export const REFRESH_AHEAD_MS = 60_000
  * blocks on the network. Below it there may not be enough life left to survive
  * the request being made, which is the failure the buffer exists to prevent.
  */
-export const REFRESH_BLOCKING_MS = 10_000
+const REFRESH_BLOCKING_MS = 10_000
 
 /** Holds the access token in memory and answers whether it still has life in it. */
 export interface TokenStore {

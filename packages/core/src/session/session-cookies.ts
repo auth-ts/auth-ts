@@ -76,7 +76,7 @@ export function readRefreshCookies(internals: AuthInternals, headers: Headers) {
  * the hint silently never arrives. A stated domain is either right or visibly
  * wrong.
  */
-export function hintCookieDomain(internals: AuthInternals) {
+function hintCookieDomain(internals: AuthInternals) {
   return internals.config.cookie.hintDomain
 }
 
