@@ -1,0 +1,90 @@
+---
+title: OpenAPI
+description: A spec for your deployment, and a browsable reference to go with it.
+---
+
+Every endpoint this library exposes is described as OpenAPI 3.1. The document is
+built from the same table the router and the callables come from, so it cannot
+drift from what the server actually serves.
+
+The rendered version of that document is [the API reference](/docs/open-api/session/get/token),
+and the file itself is at [/openapi.json](/openapi.json). Both describe the
+library with every feature turned on. What you probably want instead is a
+document describing *your* deployment.
+
+## Serving it from your own server
+
+One option, off by default:
+
+```ts
+const auth = createAuth({
+  // ...
+  openapi: true
+})
+```
+
+That adds two routes under your base path:
+
+| route | what it is |
+| --- | --- |
+| `GET /api/auth/openapi.json` | the document |
+| `GET /api/auth/reference` | a browsable reference, rendered from it |
+
+Open `/api/auth/reference` and you get every operation, its parameters, its
+request body, and its responses — against your own server, with a playground
+that sends real requests.
+
+It is off by default because the document names the providers you configured and
+the field names you declared under `user.additionalFields`. None of that is
+secret, but publishing it should be a decision rather than something you
+remember to turn off.
+
+## Generating it yourself
+
+If you would rather not serve it, build it directly:
+
+```ts
+import { buildOpenAPIDocument } from "@auth-ts/core"
+
+const document = buildOpenAPIDocument(auth.config)
+```
+
+Mount it wherever you like, or write it to a file at build time and commit it:
+
+```bash
+bun run scripts/write-openapi.ts > openapi.json
+```
+
+Point Scalar, Swagger UI, Insomnia, or Postman at either the route or the file.
+`openapi-typescript` will generate types from it, and most client generators
+take it as-is — `operationId` is the same name the method has on `auth`
+and on `authClient`, so a generated client lines up with both.
+
+## What the document reflects
+
+Passing `auth.config` is what makes it yours rather than the library's:
+
+- **Your base path.** Every path is prefixed with it, and `servers` carries your
+  `baseURL`.
+- **Only the routes you have.** A deployment without `guest` has no
+  `/sign-in/guest`; without `multiUser`, no `/users`; without providers,
+  none of the OAuth routes. They are absent rather than documented-and-404.
+- **Only the providers you configured.** `{provider}` is an enum of exactly the
+  ones you wired up, so the playground cannot offer a provider that would 404.
+- **Your additional fields.** Anything declared under `user.additionalFields`
+  appears on every user the document describes, and in the request bodies that
+  accept it.
+- **Your cookie name.** The `refreshCookie` security scheme names the cookie you
+  configured, not the default.
+
+## What a spec cannot say
+
+Two things worth knowing that the document notes but cannot express:
+
+Sign-in responses set an `HttpOnly` refresh cookie, and `GET /token` is the only
+endpoint that reads it. It never appears in a response body, so a playground
+cannot show it to you — and cannot set one either.
+
+`GET /callback/{provider}` answers a top-level browser navigation with a `302`.
+It is not something to fetch, and a playground that follows redirects lands on
+your application rather than showing you a response.

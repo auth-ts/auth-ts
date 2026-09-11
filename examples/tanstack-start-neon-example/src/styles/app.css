@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "light";
+  default: true;
+  --color-primary: oklch(58.5% 0.233 277.117); /* indigo-500 */
+  --color-primary-content: oklch(100% 0 0); /* base-100 */
+}
+
+@plugin "daisyui/theme" {
+  name: "dark";
+  prefersdark: true;
+  --color-primary: oklch(67.3% 0.182 276.935); /* indigo-400 */
+  --color-primary-content: oklch(25.33% 0.016 252.42); /* base-100 */
+}

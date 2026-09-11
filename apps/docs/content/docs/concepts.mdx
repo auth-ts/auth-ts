@@ -1,0 +1,175 @@
+---
+title: Concepts
+description: Two tokens, one cookie, and where authorization actually happens.
+icon: Lightbulb
+---
+
+## Two tokens
+
+**The refresh token** is the session. It is 32 random bytes, delivered to the
+browser only as an `HttpOnly`, `Secure`, `SameSite=Lax`, host-only cookie. It is
+rooted at `/` so a page request carries it, which is what lets a loader or a
+server component call `getToken` during rendering; `cookie.path` narrows it to
+the auth mount if you would rather the token stayed out of the `Cookie` header
+of every same-origin request, at the cost of that exchange. Your database stores
+nothing but `sha256` of it, so a leaked table cannot
+be replayed as a session. That is the whole of what hashing buys. The token
+itself is a bearer credential: whoever holds it holds the session until it is
+revoked or expires, and hashing does nothing to change that.
+
+**The access token** is a JWT, and it is the data-plane credential — the thing
+PostgREST verifies. It lives in a JavaScript variable for at most ten minutes and
+is never persisted anywhere.
+
+Once a session exists, every client method presents the access token and is
+authenticated from it with no session lookup; when it holds none — first load, or
+the one it had has expired — it exchanges the cookie for one at `/token` first,
+which is the only request that reads the cookie and the only one that touches a
+session. The sign-in methods are the exception only in the obvious sense: they
+run before a cookie exists, because they are what create it, and they hand back a
+token with the user. An application that never touches the access token still
+gets working sign-in, profile updates, deletion, and a correct user object.
+
+A visitor who is not signed in makes no request at all. Beside the refresh
+cookie the server writes `auth-ts.hint`, a cookie holding `in` or `out` that
+script *can* read, and the client checks it before it asks. The two are written
+and retired together, so a browser holding one holds both — and a public page
+costs nothing on load, nothing on every tab focus, and shows no refused request
+in the console for what is not a failure. It carries no credential; the refresh
+token stays `HttpOnly`. Cross-origin the hint reaches the app only when the
+browser accepts the domain the two hosts share, so a client with a `baseURL`
+elsewhere falls back to asking.
+
+## Why the token is only in memory
+
+A bearer token in `localStorage` turns any cross-site scripting flaw into a
+credential an attacker can exfiltrate and keep using after the tab is closed.
+`sessionStorage` is per-tab and solves nothing. In memory, the token dies with
+the page, and the thing that survives — the cookie — is unreadable from
+JavaScript by construction.
+
+## Why the refresh token is not rotated
+
+Rotation exists to limit the damage of a stolen refresh token. This one is
+`HttpOnly`, host-only, and never crosses an origin, so the theft it defends
+against mostly requires a compromise that defeats rotation anyway. What rotation
+reliably *does* cause is a race between concurrent tabs, where the second tab
+presents a token the first has already spent.
+
+If you store the refresh token outside an `HttpOnly` cookie, rotation and reuse
+detection become mandatory — which is exactly why that mode is not supported.
+A native client passing `cookieStorage` is not an exception to this: the store
+it hands over must be one the platform protects, the keychain or the keystore.
+A store any script on the device can read is the combination this design rules
+out, and nothing on the server can compensate for it.
+
+## Revocation has a latency, and it is the access token's lifetime
+
+The database verifies a signature and an expiry. It does not call you. So a
+revoked session keeps working until its current access token expires — ten
+minutes by default.
+
+This is worth saying plainly next to any "sign out everywhere" button, because
+the alternative is a support conversation. Shorten `jwt.ttl` if you want a
+tighter bound; you are trading refresh traffic for revocation speed.
+
+An action that cannot accept this latency does not have to: `verifySession`
+reads the session row the token names and answers `null` once it is revoked,
+where `verifyToken` still answers claims. It costs two reads and no write, and
+it is meant for the handful of actions worth that — not for every route.
+
+`GET /identities/:id/token` is the one endpoint that does not accept this
+latency. What it returns is a *provider* token, and a GitHub OAuth App issues
+tokens with no expiry at all — so a token handed out after the session was
+revoked would outlive the revocation permanently, not for ten minutes. That
+endpoint reads the session row and refuses when it is gone.
+
+## The claim shape
+
+```json
+{
+  "sub": "the user id",
+  "sid": "the session id",
+  "role": "authenticated",
+  "type": "user",
+  "amr": ["otp"],
+  "iat": 1771200000,
+  "exp": 1771200600
+}
+```
+
+`sid` is the session the token was minted from, so an endpoint given only the
+token still knows which device it is acting for — a local sign-out and "is this
+the current session" both read it. `role` is the Postgres
+role PostgREST assumes, and stays `authenticated` for everyone. `type` is what your policies read — `auth.session()->>'type' = 'admin'`,
+or denying guests writes. Core writes only `guest` and `user`, and only on
+insert; promoting someone to `admin` is your own SQL, so no endpoint can do it.
+
+The payload is readable by anyone holding the token and is shipped to your
+database on every query. Nothing secret belongs in it.
+
+### What proved identity
+
+Every session records how it was authenticated, in `sessions.amr`, and every
+token minted from it carries that as its `amr` claim. The vocabulary is the
+[RFC 8176](https://www.rfc-editor.org/rfc/rfc8176) registry's wherever it has a
+value for the case:
+
+| sign-in | `amr` | in the registry |
+| --- | --- | --- |
+| emailed code | `["otp"]` | yes |
+| texted code | `["sms"]` | yes |
+| Google, GitHub | `["fed"]` | no — nothing registered covers a federated assertion |
+| guest | `["anonymous"]` | no — nothing registered covers an unauthenticated session |
+
+The registry is explicitly not exhaustive — OpenID Connect leaves the values to
+agreement between the parties reading them — so the last two take the names the
+large providers converged on rather than inventing a third spelling.
+
+It is an array because a session accumulates: whatever proves identity again
+later adds to the list rather than replacing it. The shape is the one OIDC
+defines — a flat array of strings — so a policy tests it with one operator:
+
+```sql
+auth.jwt()->'amr' ? 'fed'
+```
+
+### Adding your own claims
+
+`jwt.claims` is merged into every token. Give it an object for a fixed set, or
+a function to derive them per user — which is how something like an
+organisation list gets in:
+
+```ts
+createAuth({
+  jwt: {
+    claims: async (user) => ({
+      role: "authenticated",
+      organizationIds: await organizationIdsFor(user.id)
+    })
+  },
+  ...
+})
+```
+
+It runs once per mint, not once per request, and receives the session as its
+second argument.
+
+Know what a claim costs before you reach for one. It is frozen for `jwt.ttl`,
+so a membership granted or revoked in the meantime does not reach a token
+already issued — harmless where a policy reads it as a hint, a window where a
+policy authorizes on it. A policy that reads `sub` and joins your membership
+table is always current, and the join is the price. Put the list in the token
+when the reader cannot join at all, as a change-feed fan-out cannot.
+
+`sub`, `iat`, and `exp` are refused either way — the signer owns those.
+
+## Where authorization happens
+
+In the database. The client's user object is a **render hint** — it decides
+whether to show someone's name in the corner, nothing more. With row-level
+security on the other end, a tampered cached id produces the wrong name in the
+interface and zero rows of data.
+
+That division is the whole point: the browser cannot be trusted, so it is not
+asked to be.

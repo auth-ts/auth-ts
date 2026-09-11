@@ -1,0 +1,187 @@
+---
+title: Building an account page
+description: The five queries an account screen needs, and why none of them is an endpoint.
+---
+
+An account screen shows a name, a list of devices, and a list of connected
+providers, and lets you change or remove each. None of that is an endpoint here.
+
+The rule the API follows is that an endpoint exists when it touches a **cookie,
+a secret, or a code** — something the browser cannot be handed and the database
+cannot check. Reading your own rows is none of those. Your `users`, `sessions`,
+and `identities` tables hold nothing that can authenticate anybody, so the same
+token that authorizes every other query authorizes these.
+
+That means the shape of your account page is yours: join your own tables, name
+your own columns, return what your interface actually renders. What follows is
+what the reference application does, in both a data-plane client and a
+server-side ORM.
+
+Two things stay with the library, and they are at the bottom: signing out, and
+deleting the account.
+
+## Before anything: what is granted
+
+```
+users, sessions, and identities are yours to query.
+verifications, attempts, and identitySecrets are never granted.
+```
+
+Nothing in the first three is a credential. `sessions.tokenHash` is a SHA-256 of
+thirty-two random bytes, so knowing it does not let anyone present the token it
+came from. The provider tokens live in `identitySecrets`, which has no policy at
+all. See [the Neon guide](/docs/guides/neon) for the SQL.
+
+The consequence worth knowing: `select()` with no column list is safe on all
+three. There is nothing on those rows to remember to leave out.
+
+## 1. The user
+
+```ts
+const { data: user } = await postgrest.from("users").select().single()
+```
+
+Row-level security already answers "which user", so there is no `eq` to write.
+With an ORM on your own server, the id comes from the verified token:
+
+```ts
+const claims = await auth.verifyToken(token)
+const [user] = await db.select().from(users).where(eq(users.id, claims.sub))
+```
+
+`verifyToken` is local — a signature check against the public key, no database
+and no network.
+
+For a cold boot where one request is the whole budget, `authClient.refresh()`
+hands back `{ token, user }` together, since `GET /token` reads that row to mint
+anyway.
+
+## 2. Renaming
+
+```ts
+await postgrest.from("users").update({ name }).throwOnError()
+```
+
+No `eq` again — the update policy narrows the write to the caller's row.
+
+**This is the one place a grant is load bearing.** Row-level security says which
+*rows* a role may touch, never which *columns*, so a policy alone lets a
+signed-in user set their own `type` to `admin` or repoint `email` at somebody
+else's account. Narrow the grant:
+
+```sql
+revoke update on table "users" from authenticated;
+grant update ("name", "image", "updatedAt") on table "users" to authenticated;
+```
+
+Changing `email` or `phoneNumber` is deliberately not a field update at all: an
+identifier is what every sign-in resolves through, so re-keying an account is a
+ceremony — a code verified at the new address — rather than a `PATCH`. `POST
+/user` rejects both for the same reason.
+
+## 3. Devices
+
+```ts
+const { data: sessions } = await postgrest
+  .from("sessions")
+  .select()
+  .order("createdAt", { ascending: false })
+```
+
+Which row is *this* device needs no request — the token names it:
+
+```ts
+const currentSessionId = authClient.decodeToken(token)?.claims.sid
+```
+
+## 4. Revoking a device
+
+```ts
+await postgrest.from("sessions").delete().eq("id", id).throwOnError()
+```
+
+Revoking **another** device is exactly that: the row goes, and that device stops
+being able to refresh. It keeps working until its current access token expires —
+ten minutes by default — which is the same bound the data plane has, and worth
+saying next to the button.
+
+Revoking **this** device is a sign-out, because the cookie has to go too:
+
+```ts
+await authClient.signOut()
+```
+
+Deleting your own session row without signing out is not broken, only untidy:
+the browser holds a cookie pointing at nothing, and the next `getToken()`
+answers `null` and clears it on the way out.
+
+## 5. Connected providers
+
+```ts
+const { data: identities } = await postgrest
+  .from("identities")
+  .select()
+  .order("provider", { ascending: true })
+```
+
+Disconnecting is a delete of that row, addressed by `id` rather than by provider
+name — one account can have two of the same provider connected, a personal and a
+work Google, and "disconnect Google" would take both:
+
+```ts
+await postgrest.from("identities").delete().eq("id", id).throwOnError()
+```
+
+`identitySecrets` cascades, so the stored grant goes with it. Nothing is revoked
+at the provider: that is the user's to do from their own account screen, and a
+revocation call that failed would leave this side lying either way.
+
+Connecting is an endpoint, because it is an OAuth round trip with a client
+secret and a state cookie:
+
+```ts
+await authClient.connectProvider({ provider: "google", redirect: "/account" })
+```
+
+## What is still the library's
+
+Two things on this page, and both for the same reason.
+
+**Signing out** is a cookie operation, and cookies are not rows:
+
+```ts
+await authClient.signOut()                  // this device
+await authClient.signOut({ scope: "others" })  // every other device
+await authClient.signOut({ scope: "global" })  // everywhere
+```
+
+**Deleting the account** is gated on a code, which is a secret the browser is
+never handed:
+
+```ts
+const result = await authClient.deleteUser()
+if (result.challengeRequired) {
+  await authClient.sendDeleteUserCode()
+  // collect the six digits, then:
+  await authClient.deleteUser({ code })
+}
+```
+
+A session that authenticated recently enough deletes immediately; anything older
+has to prove identity again first, which is what the challenge is.
+
+## Guest rows
+
+A guest's session is their only credential, so a guest left with no sessions is
+unreachable. The library does not collect those rows — deleting from your
+`users` table on a retention policy it invented is not its call. Do it on your
+own schedule:
+
+```sql
+delete from "users" u
+ where u."type" = 'guest'
+   and u."primaryUserId" is null
+   and not exists (select 1 from "sessions" s where s."userId" = u."id");
+```
+
+`primaryUserId` spares a merged guest whose data you have not migrated yet.

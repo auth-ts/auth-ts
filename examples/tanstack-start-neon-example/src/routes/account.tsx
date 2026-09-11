@@ -1,0 +1,455 @@
+import type { SignOutInput } from "@auth-ts/core/client"
+import { isAuthError } from "@auth-ts/core/client"
+import {
+  ArrowRightStartOnRectangleIcon,
+  ArrowsRightLeftIcon,
+  CheckIcon,
+  LinkSlashIcon,
+  TrashIcon,
+  XMarkIcon
+} from "@heroicons/react/24/outline"
+import {
+  useDeleteMutation,
+  useQuery,
+  useRevalidateTables,
+  useUpdateMutation
+} from "@supabase-cache-helpers/postgrest-react-query"
+import {
+  useQueryClient,
+  useQuery as useReactQuery
+} from "@tanstack/react-query"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { useState } from "react"
+import { GitHubIcon } from "../components/github-icon"
+import type { Notice } from "../components/notice"
+import { NoticeAlert } from "../components/notice"
+import { PendingSpinner } from "../components/pending-spinner"
+import { SignedOutCard } from "../components/signed-out-card"
+import { useCountdown } from "../hooks/use-countdown"
+import { useUser } from "../hooks/use-user"
+import { authClient } from "../lib/auth-client"
+import { client } from "../lib/client"
+
+export const Route = createFileRoute("/account")({ component: AccountPage })
+
+type SetNotice = (notice: Notice | null) => void
+type SignOut = (input?: SignOutInput) => Promise<void>
+
+function AccountPage() {
+  const { data: user, isPending } = useUser()
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [notice, setNotice] = useState<Notice | null>(null)
+
+  const signOut: SignOut = async (input) => {
+    await authClient.signOut(input)
+    await queryClient.resetQueries()
+    await navigate({ to: "/login" })
+  }
+
+  if (isPending) return <PendingSpinner />
+
+  if (!user) {
+    return <SignedOutCard title="Account">You're not signed in.</SignedOutCard>
+  }
+
+  return (
+    <section className="flex flex-col gap-6">
+      <div className="flex items-center gap-4">
+        {user.image ? (
+          <div className="avatar">
+            <div className="w-14 rounded-full">
+              <img src={user.image} alt="" />
+            </div>
+          </div>
+        ) : null}
+        <div>
+          <h1 className="text-2xl font-semibold">Account</h1>
+          <p className="text-sm text-base-content/60">
+            {user.email ?? user.phoneNumber ?? "Guest account"}
+          </p>
+        </div>
+      </div>
+
+      {notice ? <NoticeAlert notice={notice} /> : null}
+
+      <ProfileCard userId={user.id} name={user.name} setNotice={setNotice} />
+      <ProvidersCard setNotice={setNotice} />
+      <SessionsCard setNotice={setNotice} />
+      <SwitchUserCard userId={user.id} />
+      <SignOutButtons
+        userId={user.id}
+        signOut={signOut}
+        setNotice={setNotice}
+      />
+      <DeleteCard />
+    </section>
+  )
+}
+
+function ProfileCard({
+  userId,
+  name,
+  setNotice
+}: {
+  userId: string
+  name: string | null
+  setNotice: SetNotice
+}) {
+  // null until the user edits
+  const [draftName, setDraftName] = useState<string | null>(null)
+
+  const rename = useUpdateMutation(client.from("users"), ["id"], null, {
+    onSuccess: () => {
+      setDraftName(null)
+      setNotice({ text: "Saved.", tone: "success" })
+    },
+    onError: () => setNotice({ text: "Could not save.", tone: "error" })
+  })
+
+  const nameUnchanged =
+    draftName === null ||
+    draftName.trim() === "" ||
+    draftName.trim() === (name ?? "")
+
+  return (
+    <div className="card bg-base-100 shadow-sm">
+      <div className="card-body gap-4">
+        <h2 className="card-title">Profile</h2>
+        <form
+          className="join w-full"
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (draftName) rename.mutate({ id: userId, name: draftName.trim() })
+          }}
+        >
+          <input
+            value={draftName ?? name ?? ""}
+            onChange={(event) => setDraftName(event.target.value)}
+            placeholder="Your name"
+            className="input join-item flex-1"
+          />
+          <button
+            type="submit"
+            disabled={nameUnchanged || rename.isPending}
+            className="btn btn-primary join-item"
+          >
+            <CheckIcon className="size-4" />
+            Save
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ProvidersCard({ setNotice }: { setNotice: SetNotice }) {
+  const identities = useQuery(
+    client.from("identities").select().order("provider", { ascending: true })
+  )
+
+  // By id: one provider, many identities
+  const disconnect = useDeleteMutation(
+    client.from("identities"),
+    ["id"],
+    null,
+    {
+      onError: () => setNotice({ text: "Could not disconnect.", tone: "error" })
+    }
+  )
+
+  const linkGitHub = async () => {
+    setNotice(null)
+    try {
+      await authClient.connectProvider({
+        provider: "github",
+        redirect: "/account"
+      })
+    } catch (error) {
+      setNotice({
+        text: isAuthError(error) ? error.message : "Could not link GitHub.",
+        tone: "error"
+      })
+    }
+  }
+
+  return (
+    <div className="card bg-base-100 shadow-sm">
+      <div className="card-body gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="card-title">Connected providers</h2>
+          <button
+            type="button"
+            onClick={() => void linkGitHub()}
+            className="btn btn-outline btn-sm"
+          >
+            <GitHubIcon className="size-4" />
+            Link GitHub
+          </button>
+        </div>
+        {identities.data?.length === 0 ? (
+          <p className="text-sm text-base-content/60">None linked.</p>
+        ) : (
+          <ul className="list rounded-box bg-base-200">
+            {(identities.data ?? []).map((identity) => (
+              <li key={identity.id} className="list-row items-center">
+                <span className="badge badge-neutral capitalize">
+                  {identity.provider}
+                </span>
+                <span className="list-col-grow text-sm text-base-content/60">
+                  {identity.label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => disconnect.mutate({ id: identity.id })}
+                  className="btn btn-ghost btn-sm"
+                >
+                  <LinkSlashIcon className="size-4" />
+                  Disconnect
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SessionsCard({ setNotice }: { setNotice: SetNotice }) {
+  const sessions = useQuery(
+    client.from("sessions").select().order("createdAt", { ascending: false })
+  )
+
+  const revoke = useDeleteMutation(client.from("sessions"), ["id"], null, {
+    onError: () => setNotice({ text: "Could not revoke.", tone: "error" })
+  })
+
+  return (
+    <div className="card bg-base-100 shadow-sm">
+      <div className="card-body gap-4">
+        <h2 className="card-title">Sessions</h2>
+        <ul className="list rounded-box bg-base-200">
+          {(sessions.data ?? []).map((session) => (
+            <li key={session.id} className="list-row items-center">
+              <div className="list-col-grow min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="truncate text-sm"
+                    title={session.userAgent ?? undefined}
+                  >
+                    {session.userAgent ?? "Unknown device"}
+                  </span>
+                </div>
+                <div className="text-xs text-base-content/60">
+                  {session.ipAddress ?? "no ip"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => revoke.mutate({ id: session.id })}
+                className="btn btn-ghost btn-sm"
+              >
+                <XMarkIcon className="size-4" />
+                Revoke
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-base-content/60">
+          Revoked sessions keep working until their current access token expires
+          — ten minutes by default.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function SwitchUserCard({ userId }: { userId: string }) {
+  const queryClient = useQueryClient()
+  const users = useReactQuery({
+    queryKey: ["users"],
+    queryFn: authClient.listUsers,
+    // 404 means multiUser is off
+    retry: false
+  })
+
+  if (!users.data || users.data.length <= 1) return null
+
+  return (
+    <div className="card bg-base-100 shadow-sm">
+      <div className="card-body gap-4">
+        <h2 className="card-title">Switch user</h2>
+        <ul className="list rounded-box bg-base-200">
+          {users.data.map((signedIn) => (
+            <li key={signedIn.id} className="list-row items-center">
+              <span className="list-col-grow text-sm">
+                {signedIn.email ?? `Guest ${signedIn.id.slice(0, 8)}`}
+              </span>
+              {signedIn.id === userId ? (
+                <span className="badge badge-soft badge-sm">current</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await authClient.switchUser({
+                      userId: signedIn.id
+                    })
+                    await queryClient.resetQueries()
+                  }}
+                  className="btn btn-outline btn-sm"
+                >
+                  <ArrowsRightLeftIcon className="size-4" />
+                  Switch
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function SignOutButtons({
+  userId,
+  signOut,
+  setNotice
+}: {
+  userId: string
+  signOut: SignOut
+  setNotice: SetNotice
+}) {
+  const revalidateSessions = useRevalidateTables([
+    { schema: "public", table: "sessions" }
+  ])
+
+  const buttons: {
+    label: string
+    input?: SignOutInput
+    navigates: boolean
+  }[] = [
+    { label: "Sign out", navigates: true },
+    { label: "Sign out this account", input: { userId }, navigates: true },
+    {
+      label: "Sign out other devices",
+      input: { scope: "others" },
+      navigates: false
+    },
+    {
+      label: "Sign out everywhere",
+      input: { scope: "global" },
+      navigates: true
+    }
+  ]
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {buttons.map(({ label, input, navigates }) => (
+        <button
+          key={label}
+          type="button"
+          onClick={async () => {
+            if (navigates) {
+              await signOut(input)
+              return
+            }
+            await authClient.signOut(input)
+            setNotice({
+              text: "Signed out on your other devices.",
+              tone: "success"
+            })
+            await revalidateSessions()
+          }}
+          className="btn btn-outline btn-sm"
+        >
+          <ArrowRightStartOnRectangleIcon className="size-4" />
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function DeleteCard() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [deletionCode, setDeletionCode] = useState<string | null>(null)
+  // Own notice: the page alert is offscreen
+  const [deletionNotice, setDeletionNotice] = useState<Notice | null>(null)
+  const [deletionCooldown, startDeletionCooldown] = useCountdown()
+
+  const removeAccount = async () => {
+    setDeletionNotice(null)
+    try {
+      const result = await authClient.deleteUser(
+        deletionCode ? { code: deletionCode } : {}
+      )
+
+      if (result.status === "staleSession") {
+        // Show the field even if sending fails.
+        setDeletionCode("")
+        await authClient.sendDeleteUserCode()
+        setDeletionNotice({
+          text: "For your security, enter the code we just sent.",
+          tone: "info"
+        })
+        return
+      }
+
+      await queryClient.resetQueries()
+      await navigate({ to: "/login" })
+    } catch (error) {
+      if (isAuthError(error) && error.retryAfter) {
+        startDeletionCooldown(error.retryAfter)
+      }
+      setDeletionNotice({
+        text: isAuthError(error)
+          ? error.message
+          : "Could not delete the account.",
+        tone: "error"
+      })
+    }
+  }
+
+  return (
+    <div className="card border border-error/30 bg-base-100 shadow-sm">
+      <div className="card-body gap-4">
+        <h2 className="card-title text-error">Delete account</h2>
+        <p className="text-sm text-base-content/60">
+          This removes your account and everything in it. There is no undo.
+        </p>
+        {deletionNotice ? <NoticeAlert notice={deletionNotice} /> : null}
+        {deletionCode !== null ? (
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Confirmation code</legend>
+            <input
+              value={deletionCode}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              onChange={(event) => setDeletionCode(event.target.value)}
+              placeholder="123456"
+              className="input w-48 font-mono tracking-widest"
+            />
+          </fieldset>
+        ) : null}
+        <div className="card-actions">
+          {/* Cooldown gates sending, not confirming */}
+          <button
+            type="button"
+            onClick={removeAccount}
+            disabled={deletionCooldown > 0 && !deletionCode}
+            className="btn btn-error"
+          >
+            <TrashIcon className="size-4" />
+            {deletionCooldown > 0 && !deletionCode
+              ? `Try again in ${deletionCooldown}s`
+              : deletionCode !== null
+                ? "Confirm deletion"
+                : "Delete my account"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

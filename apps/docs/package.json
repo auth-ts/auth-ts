@@ -1,0 +1,32 @@
+{
+  "name": "docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "typecheck": "fumadocs-mdx && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@auth-ts/core": "workspace:*",
+    "@tanstack/react-router": "1.170.31",
+    "@tanstack/react-start": "1.168.48",
+    "fumadocs-core": "^16.15.0",
+    "fumadocs-openapi": "^11.3.1",
+    "fumadocs-ui": "^16.15.0",
+    "lucide-react": "1.33.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "shiki": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.1.0",
+    "fumadocs-mdx": "15.3.0",
+    "fumadocs-typescript": "5.3.0",
+    "tailwindcss": "4.3.3",
+    "zod": "4.4.3"
+  }
+}

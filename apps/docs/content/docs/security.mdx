@@ -1,0 +1,351 @@
+---
+title: Security
+description: The threat model, and what each defence is actually defending against.
+icon: ShieldCheck
+---
+
+Every item here has a test. Several exist because the failure mode is a full
+account takeover rather than a bug.
+
+## Verification codes
+
+Six digits, drawn from a CSPRNG with rejection sampling — never
+`Math.random()`, and never a plain modulo, which biases the range and therefore
+shrinks it.
+
+Stored as **HMAC-SHA-256 keyed with your server secret**, not as a bare hash. A
+million possibilities means an unkeyed digest is reversible from a database read
+in about a second; keyed with a secret the database never holds, a database leak
+alone yields no working codes.
+
+Five wrong guesses burn the code, counted per code rather than per caller, so a
+resend is a fresh budget and a guess against a superseded code spends nothing.
+Sending a new code deletes the previous ones and **latest wins** on verification,
+so a resend cannot widen the set of values an attacker may guess. No slow hashing
+— the ten-minute lifetime and the attempt cap do that job, and bcrypt here would
+only slow down honest sign-ins.
+
+Sign-in codes and account-deletion codes share an identifier, so a stranger
+spamming `/sign-in/send-code` at your address keeps you inside the send cooldown
+for `/user/send-delete-code` too. Purposes are checked on verify, so a sign-in
+code can never authorize a deletion — this is a bounded nuisance, not a bypass.
+
+`DELETE /user` never sends a code itself. A stale session refuses outright, with
+no side effect, so retrying a failed delete cannot fire a storm of email —
+`/user/send-delete-code` is the one call that puts a code in flight, and it needs
+the caller's own bearer token.
+
+A code whose delivery fails is rolled back rather than left live, so a sender
+outage does not start the cooldown against the person who never received it.
+
+## Rate limiting
+
+On by default, backed by your database through one insert and one bounded read —
+approximate under a simultaneous burst, by design, in the way described below.
+Sending is limited per identifier and per IP, verification per IP, and deletion
+codes per identifier. There is also a sixty-second cooldown between sends to one
+address, derived from the newest code's own expiry so it needs no extra state.
+
+Each counted request appends a row to `attempts` under a key containing the
+window, and the check reads at most `max + 1` of them. Nothing is
+read-modify-written, so no request can be lost — but the count is not exact
+either: requests that are genuinely simultaneous can each read a number below
+the cap before the others land. The overshoot is bounded by that one burst and
+cannot be repeated. If you want exactness, enforce it at your edge on
+`/sign-in/send-code` and `/sign-in/code` and set `rateLimit: false`; the
+five-guess cap on each code is keyed on the code rather than the caller and
+stays on regardless.
+
+Scope is authentication abuse only — email flooding and credential guessing. It
+is not a general API limiter; that belongs in infrastructure in front of
+everything, these routes included.
+
+## OAuth
+
+**State is verified** against a short-lived `HttpOnly` cookie scoped to the
+callback path. Without it, an attacker hands a victim a callback URL carrying the
+attacker's own authorization code and the victim's browser quietly completes a
+sign-in as the attacker. The cookie is also **HMAC-signed under `secret`**, so
+its contents — the return path, whether the flow is a sign-in or a connect, and
+any sign-up fields — cannot be rewritten by anything else able to set cookies for
+your host; an unsigned or edited cookie is treated as missing. The callback
+re-validates the sign-up fields against the declared schema regardless. The
+payload carries when it was issued, and a flow older than ten minutes is refused
+on the server's clock — the cookie's own expiry is a browser courtesy, not the
+rule.
+
+**PKCE on every exchange, and a nonce for Google.** The state cookie also holds
+an S256 code verifier; only its challenge travels through the browser, and the
+provider refuses to exchange an authorization code without the verifier — so a
+code intercepted on the way back is worthless to whoever has it. Google's ID
+token must additionally echo the nonce the authorize request carried, which ties
+the token to this flow rather than to any flow.
+
+**Google's ID token is verified, not decoded.** Signature against Google's
+published keys, issuer, audience (your client id), and expiry — even though it
+arrived over TLS from Google's own token endpoint. A provider outage, including
+an unreachable key set, is reported as such rather than as a refused sign-in.
+
+**Only verified email addresses are accepted.** GitHub returns unverified
+addresses, so the library takes only the entry that is both `primary` and
+`verified`; Google must report `email_verified: true`. Skipping this is a
+complete account takeover, and row-level security cannot save you — it will
+faithfully serve the attacker the victim's rows, because authorization cannot fix
+an authentication failure.
+
+**The redirect URI is derived per request** — from `X-Forwarded-Host` and
+`X-Forwarded-Proto`, falling back to the request URL — unless `baseURL` pins it.
+That is deliberate, and it is not the weak link people expect: a provider only
+ever redirects to a URI registered in its own console, so a forged `Host`
+produces an error page at GitHub or Google rather than an authorization code
+delivered anywhere. The authorize request and the code exchange build the URI
+from one function, so the two always agree — a mismatch is what providers reject.
+Set `baseURL` when the canonical origin should be fixed regardless: a proxy that
+rewrites the host without forwarding it, or a deployment answering on several
+origins.
+
+**Redirects are validated.** A `?redirect=` value must be a same-origin relative
+path: it must start with `/`, and `//evil.example` is rejected because browsers
+treat protocol-relative URLs as absolute.
+
+**Connecting requires the same session** that started the flow. Otherwise an
+attacker who lures a signed-in victim through a connect URL links their own
+provider identity to the victim's account, and signs in as them afterwards. A
+provider identity already linked elsewhere is never re-pointed.
+
+## Sessions
+
+The browser receives the refresh token only as an `HttpOnly`, `Secure`,
+`SameSite=Lax` cookie with **no `Domain` attribute**, so it is never
+broadcast to sibling subdomains. `Secure` is dropped in exactly one case —
+plain-HTTP `localhost`, where a browser would refuse the cookie outright and
+local development would not work at all. Every other origin gets it, including
+an endpoint called in-process where there is no request URL to judge by.
+
+The database sees only the hash, so a leaked table yields nothing replayable. The cookie is not the symmetric case: it *is*
+the credential. `HttpOnly` keeps script from reading it, but whatever does
+obtain it — a stolen browser profile, a device backup, a proxy terminating
+TLS — holds the session until that session is revoked or expires. Hashing
+protects the database, not a stolen token.
+
+Revoking a session is a delete of the row, through your data plane — so the
+policy that scopes it to its owner is the same one that scopes every other read
+of `sessions`, rather than a check somebody remembered to write. Revoking the
+one this browser is on leaves a cookie pointing at nothing; the next `/token`
+answers `null` and clears it, and `signOut` is the call that does both at once.
+
+**One cookie beside it is readable by script**, on purpose. `auth-ts.hint` holds
+`in` or `out` and nothing else, and is written and retired with the refresh
+cookie it shadows. It exists so a signed-out visitor costs no request: the
+client reads it before asking `/token`, and a browser that has never signed in
+skips the exchange entirely. It carries no credential and grants nothing —
+whoever can read it can already see the signed-out page it produces. It is the
+only cookie here that may carry a `Domain`, and only for a request from a
+trusted origin on another host, because that app cannot otherwise see it.
+
+**State-changing requests are checked against their `Origin`.** CORS headers
+decide who may *read* a response, not who may *send* a request: a `POST` with a
+simple content type goes out without a preflight, cookie attached. `SameSite=Lax`
+confines that to the same site, which still leaves a sibling subdomain — or a
+browser that does not enforce it — able to sign the user out, sign them into
+someone else's account, or have a guest's session merged into an attacker's. So
+every non-`GET` request that carries an `Origin` (or, failing that, a `Referer`)
+must name the server's own origin — as the runtime sees it, or as a proxy
+forwarded it once `trustedProxyHeaders` is on — its `baseURL`, or one of its
+`trustedOrigins`; anything else is refused with **403 `forbiddenOrigin`** before
+the body is parsed. A request with neither header is a non-browser client, which
+holds no cookie and cannot be made to act for anyone.
+
+**`X-Forwarded-Host` is read only when you say a proxy sets it.** Nothing about
+a request distinguishes a forwarded header from one its sender wrote, and the
+origin those headers name is both what the OAuth `redirect_uri` is built from
+and an entry in the allowlist above — so reading them unasked would let a caller
+nominate the origin it is then checked against. `trustedProxyHeaders` defaults
+to `false`, and the origin is the request URL's own:
+
+```ts
+createAuth({
+  // ...
+  trustedProxyHeaders: true
+})
+```
+
+Turn it on when this server sits behind a proxy that sets `X-Forwarded-Host` and
+`X-Forwarded-Proto` and cannot be bypassed — a runtime that only ever sees an
+internal URL, or an app answering on several approved domains. A `baseURL` wins
+outright when set, so the two are alternatives rather than layers: pin the origin
+or derive it, not both.
+
+**Request bodies must be `application/json`**, or the answer is **415
+`unsupportedMediaType`**. This is the second, independent layer: a page cannot
+send that content type cross-origin without a preflight, so a browser stops most
+of these before any header reaches the server. That is a bonus and not the
+guarantee — whoever answers the preflight is your application's business — so
+the check runs on every request regardless, including when a privacy extension
+has stripped `Origin`. The client already sends it; bodiless requests such as
+`GET /users` are untouched.
+
+**`GET /token` is the one route a cookie alone authenticates**, and being a
+bodiless `GET` it is exempt from both layers above. That is safe for the reason
+CORS exists: a cross-site page can *send* the request, but without an allowed
+origin the browser will not let it *read* the reply, which is where the token is.
+Every other authenticated route takes the bearer and nothing else, so a request
+carrying only a cookie cannot act for anyone — the whole class of cross-site
+request forgery ends at that one route.
+
+With no session it answers **200 with `null`**, not 401, and expires whatever
+dead cookies the request presented on the way out. Nobody signed in is the
+answer to the question, not a failure to answer it; and only an answer can carry
+`Set-Cookie`, which is what stops the next page load asking again.
+
+## Accounts
+
+`type` is written by core only as `guest` or `user`, and only on insert — so
+signing in cannot demote an administrator, and no endpoint can produce `admin`.
+`POST /user` rejects `email`, `phoneNumber`, and `type`.
+
+Additional fields are an allowlist applied on insert only. On an existing user
+they are ignored, because otherwise any sign-in request could rewrite profile
+columns.
+
+Deletion is always gated: either the session authenticated within the freshness
+window, or a code is emailed. The challenge answers **403**, never a 2xx, so a
+client cannot mistake it for success and tell someone their account is gone when
+it is not.
+
+Codes carry a purpose. A sign-in code cannot authorize a deletion, and a deletion
+code cannot sign anyone in.
+
+## Cross-origin
+
+When the application and the auth server share an origin — the usual case, and
+what the reference application does — there is nothing to configure here.
+
+When they do not, name the application:
+
+```ts
+createAuth({
+  // ...
+  trustedOrigins: ["https://app.example.com"]
+})
+```
+
+That grants trust: an origin listed there may make state-changing requests, and
+is the one whose host the sign-in hint can be scoped to. It sends no CORS
+headers.
+
+**CORS is yours.** This library does not set `Access-Control-*` on any response
+and does not answer `OPTIONS`. That is deliberate: an application with one CORS
+policy across its API should not have to carve an exception out of it for this
+mount, and two things both claiming to own the policy is worse than either
+owning it. Configure it wherever you already do.
+
+<Callout type="warn">
+  Whatever answers the preflight has to allow credentials, or the browser
+  withholds the session cookie and `GET /token` answers `null` however the
+  server is configured. It also has to allow the `authorization` and
+  `content-type` headers, or every authenticated route fails its preflight.
+</Callout>
+
+On TanStack Start, the auth mount is an ordinary server route, so CORS goes in
+`src/start.ts` alongside anything else that wraps a request:
+
+```ts title="src/start.ts"
+import { createMiddleware, createStart } from "@tanstack/react-start"
+
+const ALLOWED = new Set(["https://app.example.com"])
+
+export const startInstance = createStart(() => ({
+  requestMiddleware: [
+    createMiddleware().server(async ({ next, request }) => {
+      const origin = request.headers.get("origin")
+      const allowed = origin && ALLOWED.has(origin)
+
+      if (request.method === "OPTIONS" && allowed) {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "access-control-allow-origin": origin,
+            "access-control-allow-credentials": "true",
+            "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
+            "access-control-allow-headers": "content-type, authorization",
+            "access-control-max-age": "600"
+          }
+        })
+      }
+
+      const result = await next()
+      if (allowed) {
+        result.response.headers.set("access-control-allow-origin", origin)
+        result.response.headers.set("access-control-allow-credentials", "true")
+        result.response.headers.append("vary", "origin")
+      }
+      return result
+    })
+  ]
+}))
+```
+
+Echo the origin rather than sending `*`: a wildcard is refused by browsers
+alongside `Allow-Credentials`, correctly, since it would let any site read a
+credentialed response.
+
+<Callout>
+  Vite answers preflights itself in `dev` and `preview`, permissively for any
+  localhost origin and without `Allow-Credentials`. That shadows whatever you
+  write, so set `server.cors` and `preview.cors` to `false` and let your own
+  handling run in every environment.
+</Callout>
+
+## Deploying
+
+The client's IP address needs no configuration to work: `x-forwarded-for` is
+read, and a header carrying a single entry is taken as the client. That is
+correct on any platform whose proxy overwrites the header rather than appending
+to it, which is most of them.
+
+What is never trusted is a chain nobody vouched for. Proxies *append*, and the
+header starts as whatever the client typed — so with two or more entries and no
+declared topology, none of them is used, and the per-IP limits sit out that
+request rather than keying on an address the caller chose. Two ways to make a
+chain readable, both under `ipAddress`:
+
+- `trustedProxies: 1` — the number of proxies you run. The client is that many
+  hops from the right. Use this where proxy addresses are not enumerable, which
+  includes Cloudflare and Vercel.
+- `trustedProxies: ["10.0.0.0/24"]` — their addresses or ranges, when you run
+  them yourself. The chain is walked right to left, your hops are skipped, and
+  the first entry that is not yours is the client.
+
+Stronger than either: point `headers` at a single-value header your platform
+sets and a client cannot append to — `cf-connecting-ip` on Cloudflare,
+`true-client-ip` on Akamai. Neither form verifies who actually connected, only
+how the header is read, so keep the app reachable only through those proxies.
+
+Whatever arrives is validated as an IP address before it becomes a rate-limit
+key or a stored column, and normalized first, so `2001:DB8::1`,
+`2001:db8:0:0:0:0:0:1`, and `::ffff:203.0.113.7` cannot buy a caller three
+buckets for two addresses. IPv6 limits count per `/64` — a residential client
+owns the whole prefix, so per-address counters would be rotated past for free.
+
+When no address can be derived at all, the per-IP limits do not apply and
+nothing is written to `session.ipAddress`; the per-identifier limits and the
+cooldown are unaffected, and the first request it happens to says so in your
+logs. Requests are never merged into one shared bucket in that case, which
+would let a single caller lock everyone out of a flow.
+
+If your database exposes a REST API, check what it grants by default. Neon, for
+example, grants the `authenticated` role full access to everything in `public`
+when the Data API is enabled — so the auth tables must be explicitly protected,
+or any signed-in user can read every code in your system.
+
+The split is per table:
+
+> `users`, `sessions`, and `identities` are yours to query.
+> `verifications`, `attempts`, and `identitySecrets` are never granted.
+
+Nothing in the first three can authenticate anybody, so reading them whole is
+safe. The second three hold a credential or the identifier somebody is signing
+in with, and they are protected by having no policy rather than by a column
+grant — forgetting a policy leaks nothing, where forgetting a revoke leaks
+ciphertext. See [the Neon guide](/docs/guides/neon) for the SQL.
