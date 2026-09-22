@@ -197,13 +197,14 @@ export interface AuthIdentity {
 }
 
 /**
- * The provider tokens for one identity, encrypted.
+ * The provider tokens for one identity, as the provider issued them.
  *
  * A table of its own rather than columns on `identities`, so that protecting
  * them is a table nobody writes a policy for rather than a column grant every
  * consumer has to remember to revoke. `identities` is then safe to read whole,
- * and the failure mode of forgetting something is nothing rather than
- * ciphertext on a screen.
+ * and the failure mode of forgetting something is nothing rather than a
+ * credential on a screen. They cannot be hashed — a provider has to be handed
+ * the token back — so the table being unreadable is the protection.
  *
  * **This table must cascade from `identities`.** Disconnecting a provider
  * deletes the identity, and an orphaned row here is a stored credential nothing
@@ -214,24 +215,23 @@ export interface AuthIdentitySecret {
   /** The identity these belong to. Deleting it must delete this row. */
   identityId: string
   /**
-   * The provider's access token, **encrypted**. Short-lived — read it through
+   * The provider's access token. Short-lived — read it through
    * `getProviderToken`, which refreshes it rather than handing back a spent one.
    */
-  accessTokenEncrypted?: string | null
-  /** When {@link accessTokenEncrypted} expires, as the provider reported it. */
+  accessToken?: string | null
+  /** When {@link accessToken} expires, as the provider reported it. */
   accessTokenExpiresAt?: Date | null
   /**
-   * The provider's refresh token, **encrypted**. The durable half of the grant:
-   * this is what keeps calling a provider's API working for months without the
-   * user signing in again, and the one column whose leak matters most.
+   * The provider's refresh token. The durable half of the grant: this is what
+   * keeps calling a provider's API working for months without the user signing
+   * in again, and the one column whose leak matters most.
    */
-  refreshTokenEncrypted?: string | null
+  refreshToken?: string | null
   /**
-   * When {@link refreshTokenEncrypted} expires. Null where the provider reports
-   * none.
+   * When {@link refreshToken} expires. Null where the provider reports none.
    *
-   * It sits beside the ciphertext rather than on `identities` because it
-   * describes the credential: a dead grant is one row to clear, not two.
+   * It sits beside the token rather than on `identities` because it describes
+   * the credential: a dead grant is one row to clear, not two.
    */
   refreshTokenExpiresAt?: Date | null
   /** Written by core on insert. */

@@ -487,8 +487,8 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           )
           await create(db, "identitySecrets", {
             identityId: linked.id,
-            accessTokenEncrypted: "v1.ciphertext",
-            refreshTokenEncrypted: "v1.ciphertext",
+            accessToken: "provider-access-token",
+            refreshToken: "provider-refresh-token",
             createdAt: new Date(),
             updatedAt: new Date()
           })
@@ -506,7 +506,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           })
           if (orphaned.length > 0) {
             throw new Error(
-              "a provider's encrypted tokens outlived the identity that addressed them. Core deletes them itself, so this only fails where something else removes an identity — but an orphaned row is a stored credential nothing points at, and no policy can scope it."
+              "a provider's tokens outlived the identity that addressed them. Core deletes them itself, so this only fails where something else removes an identity — but an orphaned row is a stored credential nothing points at, and no policy can scope it."
             )
           }
         } finally {

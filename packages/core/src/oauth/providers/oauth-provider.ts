@@ -3,7 +3,7 @@ import type { ProviderCredentials } from "../../core/auth-options"
 /**
  * What a provider handed over with the grant, in plaintext.
  *
- * Only ever in memory and in transit: persistence encrypts these, and nothing
+ * Persisted only in `identitySecrets`, which nothing grants, and nothing
  * returns them to a browser except the short-lived access token, deliberately.
  * Every field is optional because providers differ wildly in what they issue —
  * GitHub's classic tokens never expire and carry no refresh token, Google
@@ -50,7 +50,7 @@ export interface ProviderIdentity {
    * The grant itself, when the provider issued one worth keeping.
    *
    * Present on every exchange; what it contains depends on what was asked for.
-   * Stored encrypted so the application can keep calling that provider's API on
+   * Stored so the application can keep calling that provider's API on
    * the user's behalf — see `getProviderToken`.
    */
   tokens?: ProviderTokens

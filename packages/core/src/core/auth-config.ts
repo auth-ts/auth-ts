@@ -408,7 +408,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
   // short one is brute-forced offline rather than online.
   if (secret.length < MINIMUM_SECRET_LENGTH) {
     throw new AuthConfigError(
-      `secret must be at least ${MINIMUM_SECRET_LENGTH} characters. It keys the verification-code HMAC, the provider-token encryption, and the OAuth state cookie — \`bun x @auth-ts/cli keygen\` generates one.`
+      `secret must be at least ${MINIMUM_SECRET_LENGTH} characters. It signs the OAuth state cookie — \`bun x @auth-ts/cli keygen\` generates one.`
     )
   }
 

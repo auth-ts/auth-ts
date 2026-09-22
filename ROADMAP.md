@@ -40,7 +40,7 @@ GitHub is in real use. Google is the part with no real-world evidence behind it.
       place with name and avatar.
 - [ ] **Google** — run it through sign in, connect from the account page,
       disconnect, and sign in again to confirm the stable-id match holds.
-- [ ] **Connected accounts, live.** Provider tokens are stored encrypted and
+- [ ] **Connected accounts, live.** Provider tokens are stored and
       `getProviderToken` refreshes them, but no real provider has issued a
       refresh token to this code yet. Prove it with Google and
       `offlineAccess: true`: connect, wait past the hour, call the API again,

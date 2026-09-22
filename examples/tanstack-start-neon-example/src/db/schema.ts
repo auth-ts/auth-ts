@@ -203,12 +203,12 @@ export const identitySecrets = pgTable.withRLS(
     identityId: uuid("identityId")
       .notNull()
       .references(() => identities.id, { onDelete: "cascade" }),
-    accessTokenEncrypted: text("accessTokenEncrypted"),
+    accessToken: text("accessToken"),
     accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
       withTimezone: true,
       mode: "string"
     }),
-    refreshTokenEncrypted: text("refreshTokenEncrypted"),
+    refreshToken: text("refreshToken"),
     refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
       withTimezone: true,
       mode: "string"

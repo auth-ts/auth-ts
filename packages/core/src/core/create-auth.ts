@@ -14,7 +14,6 @@ import type { SignTokenClaims } from "../jwt/sign-token"
 import { signToken } from "../jwt/sign-token"
 import type { TokenClaims } from "../jwt/verify-token"
 import { verifyToken } from "../jwt/verify-token"
-import { decryptSecret } from "../lib/encrypt"
 import { selectOne } from "../lib/select-one"
 import type { CallerInput } from "../session/authenticate"
 import type { ResolvedSession } from "../session/resolve-session"
@@ -244,9 +243,7 @@ export function createAuth<
         identityId: { eq: identityId }
       })
 
-      return secrets?.refreshTokenEncrypted
-        ? decryptSecret(resolved.secret, secrets.refreshTokenEncrypted)
-        : null
+      return secrets?.refreshToken ?? null
     }
   }
 }

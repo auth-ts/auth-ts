@@ -9,12 +9,8 @@ import {
   unauthenticated
 } from "../../../http/auth-api-error"
 import { defineEndpoint } from "../../../http/define-endpoint"
-import { decryptSecret } from "../../../lib/encrypt"
 import { selectOne } from "../../../lib/select-one"
-import {
-  encryptTokens,
-  storeIdentitySecrets
-} from "../../../oauth/link-identity"
+import { splitTokens, storeIdentitySecrets } from "../../../oauth/link-identity"
 import { getProvider } from "../../../oauth/providers/get-provider"
 import type { ProviderTokens } from "../../../oauth/providers/oauth-provider"
 import { PROVIDER_DEADLINE_MS } from "../../../oauth/providers/provider-response"
@@ -96,7 +92,7 @@ export const getProviderToken = defineEndpoint({
     // One parallel wave — all three keys are known up-front. The secrets read
     // is speculative and discarded unread when the checks below refuse the
     // caller. Provider tokens can outlive this session, hence the session
-    // check; the ciphertext lives in its own table so that `identities` needs
+    // check; the tokens live in their own table so that `identities` needs
     // no column grants to be safe to read.
     const [session, identity, secrets] = await Promise.all([
       selectOne(internals, "sessions", {
@@ -112,7 +108,7 @@ export const getProviderToken = defineEndpoint({
     if (!session) throw unauthenticated()
     if (!identity) throw notFound()
 
-    const stored = secrets && (await liveAccessToken(internals, secrets))
+    const stored = secrets && liveAccessToken(secrets)
     if (stored) {
       return {
         data: {
@@ -132,19 +128,14 @@ export const getProviderToken = defineEndpoint({
  *
  * A missing expiry means the provider issues tokens that do not expire — a
  * GitHub OAuth App does — so the absence is "good indefinitely", not "unknown".
- * A token this secret can no longer decrypt reads the same as no token: the
- * refresh path below re-mints one, and only fails if that is impossible too.
  */
-function liveAccessToken(
-  internals: AuthInternals,
-  secrets: AuthIdentitySecret
-) {
-  if (!secrets.accessTokenEncrypted) return null
+function liveAccessToken(secrets: AuthIdentitySecret) {
+  if (!secrets.accessToken) return null
 
   const expiry = secrets.accessTokenExpiresAt
   if (expiry && expiry.getTime() <= Date.now() + EXPIRY_SKEW_MS) return null
 
-  return decryptSecret(internals.config.secret, secrets.accessTokenEncrypted)
+  return secrets.accessToken
 }
 
 /** Trades the stored refresh token for a fresh grant, and records what comes back. */
@@ -154,12 +145,7 @@ async function refreshProviderToken(
   secrets: AuthIdentitySecret | null
 ): Promise<ProviderTokenResult> {
   const configured = getProvider(internals.config.providers, identity.provider)
-  const refreshToken = secrets?.refreshTokenEncrypted
-    ? await decryptSecret(
-        internals.config.secret,
-        secrets.refreshTokenEncrypted
-      )
-    : null
+  const refreshToken = secrets?.refreshToken ?? null
 
   if (
     !configured?.provider.refreshAccessToken ||
@@ -183,7 +169,7 @@ async function refreshProviderToken(
       error.code === "providerReconnectRequired"
     ) {
       // The grant is gone at the provider, so what recorded it goes: the
-      // ciphertext row, and the scope that described what it bought.
+      // secrets row, and the scope that described what it bought.
       await Promise.all([
         internals.db.delete({
           table: "identitySecrets",
@@ -206,7 +192,7 @@ async function refreshProviderToken(
     throw new AuthApiError("providerReconnectRequired")
   }
 
-  const stored = await encryptTokens(internals.config.secret, tokens)
+  const stored = splitTokens(tokens)
   await Promise.all([
     Object.keys(stored.identity).length > 0
       ? internals.db.update({

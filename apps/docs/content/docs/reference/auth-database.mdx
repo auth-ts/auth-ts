@@ -34,7 +34,7 @@ cost of not having an adapter package.
 | `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `(identifier, purpose, attemptHash)`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
-| `identitySecrets` | `id`, `identityId`, `accessTokenEncrypted`, `accessTokenExpiresAt`, `refreshTokenEncrypted`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |
+| `identitySecrets` | `id`, `identityId`, `accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |
 
 **Three of these tables are yours to query. Three are not.**
 
@@ -49,14 +49,12 @@ signing in with, and no application needs to read them.
 That split is why the provider tokens sit in `identitySecrets` rather than in
 columns on `identities`: protection becomes a table nobody writes a policy for,
 instead of a column grant everybody has to remember. Forget a policy and you
-leak nothing; forget a revoke and you leaked ciphertext.
+leak nothing; forget a revoke and you leaked a credential.
 
-`accessTokenEncrypted` and `refreshTokenEncrypted` hold the grant a connected
-account gave you, encrypted with AES-256-GCM under a key derived from your
-`secret` before they ever reach your `insert`. Store them as text and let them
-be — the library is the only thing that reads them back. Rotating `secret` makes
-them unreadable, which surfaces as "reconnect this account" and never as a wrong
-token sent to a provider.
+`accessToken` and `refreshToken` hold the grant a connected account gave you,
+as the provider issued it. They cannot be hashed — the provider has to be
+handed the token back — so the table being unreadable is the protection. Store
+them as text and let them be; the library is the only thing that reads them.
 
 **`identitySecrets` must cascade from `identities`.** Disconnecting a provider
 deletes the identity, and an orphaned row here is a stored credential nothing

@@ -76,32 +76,32 @@ export type Database = {
       }
       identitySecrets: {
         Row: {
-          accessTokenEncrypted: string | null
+          accessToken: string | null
           accessTokenExpiresAt: string | null
           createdAt: string
           id: string
           identityId: string
-          refreshTokenEncrypted: string | null
+          refreshToken: string | null
           refreshTokenExpiresAt: string | null
           updatedAt: string
         }
         Insert: {
-          accessTokenEncrypted?: string | null
+          accessToken?: string | null
           accessTokenExpiresAt?: string | null
           createdAt?: string
           id?: string
           identityId: string
-          refreshTokenEncrypted?: string | null
+          refreshToken?: string | null
           refreshTokenExpiresAt?: string | null
           updatedAt?: string
         }
         Update: {
-          accessTokenEncrypted?: string | null
+          accessToken?: string | null
           accessTokenExpiresAt?: string | null
           createdAt?: string
           id?: string
           identityId?: string
-          refreshTokenEncrypted?: string | null
+          refreshToken?: string | null
           refreshTokenExpiresAt?: string | null
           updatedAt?: string
         }

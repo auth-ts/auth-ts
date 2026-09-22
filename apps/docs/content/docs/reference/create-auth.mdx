@@ -100,7 +100,7 @@ Plus the JWT-plane functions:
 - `getToken({ headers })` — exchanges the refresh cookie for an access token,
   and returns the user with it, or `null` when nobody is signed in. The one
   function that reads the cookie.
-- `getProviderRefreshToken(identityId)` — the decrypted refresh token for one
+- `getProviderRefreshToken(identityId)` — the refresh token for one
   connected account. **Not an endpoint**, at any status: it is the durable half
   of a provider grant, and only server code that manages its own refresh cycle —
   a nightly sync job, say — has any use for it. Everything interactive wants
@@ -129,7 +129,7 @@ screen — so `offlineAccess` also means the consent screen appears on every
 sign-in with that provider. That is the visible cost of a connection that keeps
 working; leave it off and you get sign-in only.
 
-What the provider hands over is stored on the identity, encrypted. To use it,
+What the provider hands over is stored beside the identity, in a table nothing grants. To use it,
 ask for a live access token by identity id:
 
 ```ts

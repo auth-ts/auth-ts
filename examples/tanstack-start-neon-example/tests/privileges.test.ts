@@ -23,8 +23,8 @@ const seedRow: Record<string, string> = {
   identitySecrets: `insert into "users" ("id") values (uuidv7());
     insert into "identities" ("id", "userId", "provider", "providerUserId")
       select uuidv7(), "id", 'github', 'p1' from "users" limit 1;
-    insert into "identitySecrets" ("identityId", "accessTokenEncrypted")
-      select "id", 'v1.ciphertext' from "identities" limit 1`
+    insert into "identitySecrets" ("identityId", "accessToken")
+      select "id", 'provider-access-token' from "identities" limit 1`
 }
 
 /** No column here is a secret. */

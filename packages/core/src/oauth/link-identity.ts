@@ -1,6 +1,5 @@
 import type { AuthIdentity, AuthIdentitySecret } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
-import { encryptSecret } from "../lib/encrypt"
 import { insertRow } from "../lib/insert-row"
 import { selectOne } from "../lib/select-one"
 import type {
@@ -21,36 +20,19 @@ export const IDENTITY_PAGE_SIZE = 100
  * The stored form of a grant, split across the two tables that hold it.
  *
  * Exported because refreshing writes the same columns as linking does, and the
- * two must not drift into encrypting different things.
+ * two must not drift into storing different things.
  */
-export async function encryptTokens(
-  secret: string,
-  tokens: ProviderTokens
-): Promise<{
+export function splitTokens(tokens: ProviderTokens): {
   identity: Partial<AuthIdentity>
   secrets: Partial<AuthIdentitySecret>
-}> {
+} {
   return {
     identity: {
       ...(tokens.scope ? { scope: tokens.scope } : {})
     },
     secrets: {
-      ...(tokens.accessToken
-        ? {
-            accessTokenEncrypted: await encryptSecret(
-              secret,
-              tokens.accessToken
-            )
-          }
-        : {}),
-      ...(tokens.refreshToken
-        ? {
-            refreshTokenEncrypted: await encryptSecret(
-              secret,
-              tokens.refreshToken
-            )
-          }
-        : {}),
+      ...(tokens.accessToken ? { accessToken: tokens.accessToken } : {}),
+      ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
       ...(tokens.accessTokenExpiresAt
         ? { accessTokenExpiresAt: tokens.accessTokenExpiresAt }
         : {}),
@@ -62,7 +44,7 @@ export async function encryptTokens(
 }
 
 /**
- * Writes a grant's encrypted halves, creating the row on first connect.
+ * Writes a grant's secret halves, creating the row on first connect.
  *
  * `existing` is the secrets row when the caller has already read it, `null`
  * when it knows there is none, and omitted to read it here.
@@ -116,15 +98,11 @@ export async function linkIdentity(
   provider: string,
   { providerUserId, label, tokens }: ProviderIdentity
 ) {
-  const [existing, stored] = await Promise.all([
-    selectOne(internals, "identities", {
-      provider: { eq: provider },
-      providerUserId: { eq: providerUserId }
-    }),
-    tokens
-      ? encryptTokens(internals.config.secret, tokens)
-      : { identity: {}, secrets: {} }
-  ])
+  const existing = await selectOne(internals, "identities", {
+    provider: { eq: provider },
+    providerUserId: { eq: providerUserId }
+  })
+  const stored = tokens ? splitTokens(tokens) : { identity: {}, secrets: {} }
 
   if (existing) {
     // Both halves, not just the label: a sign-in that changes nothing about the

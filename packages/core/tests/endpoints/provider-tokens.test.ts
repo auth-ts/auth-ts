@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { decryptSecret, encryptSecret } from "../../src/lib/encrypt"
 import { createTestServer } from "../helpers/create-test-server"
 import {
   mintToken,
@@ -82,31 +81,14 @@ const GRANT = {
 }
 
 describe("storing a provider grant", () => {
-  it("keeps the tokens encrypted, never as the provider sent them", async () => {
+  it("stores the tokens as the provider sent them, in the secrets table only", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)
     const { identity, secrets } = await signInWithGitHub(context, GRANT)
 
-    for (const column of [
-      secrets.accessTokenEncrypted,
-      secrets.refreshTokenEncrypted
-    ]) {
-      expect(column).toMatch(/^v1\./)
-    }
+    expect(secrets.accessToken).toBe("provider-access-token")
+    expect(secrets.refreshToken).toBe("provider-refresh-token")
     expect(JSON.stringify(identity)).not.toContain("provider-access-token")
     expect(JSON.stringify(identity)).not.toContain("provider-refresh-token")
-
-    expect(
-      await decryptSecret(
-        context.auth.config.secret,
-        required(secrets.accessTokenEncrypted, "access token")
-      )
-    ).toBe("provider-access-token")
-    expect(
-      await decryptSecret(
-        context.auth.config.secret,
-        required(secrets.refreshTokenEncrypted, "refresh token")
-      )
-    ).toBe("provider-refresh-token")
   })
 
   it("records the granted scope and the expiry, which are not secrets", async () => {
@@ -130,15 +112,8 @@ describe("storing a provider grant", () => {
     })
 
     expect(second.identity.id).toBe(first.identity.id)
-    expect(second.secrets.accessTokenEncrypted).not.toBe(
-      first.secrets.accessTokenEncrypted
-    )
-    expect(
-      await decryptSecret(
-        context.auth.config.secret,
-        required(second.secrets.accessTokenEncrypted, "access token")
-      )
-    ).toBe("second-access-token")
+    expect(second.secrets.accessToken).toBe("second-access-token")
+    expect(second.secrets.refreshToken).toBe("second-refresh-token")
   })
 
   it("keeps every token column out of identities, so the table reads whole", async () => {
@@ -218,12 +193,7 @@ describe("GET /identities/:id/token", () => {
       }),
       "identity"
     )
-    expect(
-      await decryptSecret(
-        context.auth.config.secret,
-        required(stored.accessTokenEncrypted, "access token")
-      )
-    ).toBe("refreshed-access-token")
+    expect(stored.accessToken).toBe("refreshed-access-token")
   })
 
   it("stores a rotated refresh token, so the next refresh still works", async () => {
@@ -249,12 +219,7 @@ describe("GET /identities/:id/token", () => {
       }),
       "identity"
     )
-    expect(
-      await decryptSecret(
-        context.auth.config.secret,
-        required(stored.refreshTokenEncrypted, "refresh token")
-      )
-    ).toBe("rotated-refresh-token")
+    expect(stored.refreshToken).toBe("rotated-refresh-token")
   })
 
   it("clears the grant and asks for a reconnect once the provider forgets it", async () => {
@@ -298,34 +263,12 @@ describe("GET /identities/:id/token", () => {
     await context.db.update({
       table: "identitySecrets",
       where: { identityId: { eq: identity.id } },
-      values: { accessTokenEncrypted: null }
+      values: { accessToken: null }
     })
 
     const response = await tokenRequest(context, refreshToken, identity.id)
 
     expect(response.status).toBe(403)
-  })
-
-  it("treats a token written under a rotated secret as needing a refresh", async () => {
-    const context = await createTestServer(OAUTH_OPTIONS)
-    const { refreshToken, identity } = await signInWithGitHub(context, GRANT)
-    await context.db.update({
-      table: "identitySecrets",
-      where: { identityId: { eq: identity.id } },
-      values: {
-        accessTokenEncrypted: await encryptSecret(
-          "some-other-secret",
-          "unreadable"
-        )
-      }
-    })
-    stubGitHub({ ...GRANT, refreshed: { access_token: "refreshed-token" } })
-
-    const response = await tokenRequest(context, refreshToken, identity.id)
-
-    expect(((await response.json()) as { token: string }).token).toBe(
-      "refreshed-token"
-    )
   })
 
   it("404s on someone else's identity, so ids cannot be probed", async () => {
