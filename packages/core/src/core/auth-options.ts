@@ -363,14 +363,6 @@ export interface AuthOptions<
   jwt?: JwtOptions
   /** Where the public key set is hosted, or the document to serve it from. */
   jwks?: JwksOptions
-  /**
-   * Server secret that signs the OAuth state cookie. Defaults to the
-   * `AUTH_SECRET` environment variable.
-   *
-   * Must not be the JWT key: different type, different blast radius, rotated
-   * independently.
-   */
-  secret?: string
   /** Where the handlers are mounted. Drives the OAuth callback URLs. @default "/api/auth" */
   basePath?: string
   /**

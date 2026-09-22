@@ -3,7 +3,6 @@
 // Runtime types generated with workerd@1.20260820.1 2026-08-21 nodejs_compat
 interface __BaseEnv_Env {
   JWT_PRIVATE_KEY: string
-  AUTH_SECRET: string
   AUTH_BASE_URL: string
   DATABASE_URL: string
   VITE_NEON_DATA_API_URL: string
@@ -25,7 +24,6 @@ declare namespace NodeJS {
       Pick<
         Cloudflare.Env,
         | "JWT_PRIVATE_KEY"
-        | "AUTH_SECRET"
         | "AUTH_BASE_URL"
         | "DATABASE_URL"
         | "VITE_NEON_DATA_API_URL"

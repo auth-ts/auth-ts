@@ -17,8 +17,7 @@ import { createMemoryDatabase } from "../../src/lib/memory-database"
 // options only have to satisfy the types.
 const base = {
   email: { sendCode: () => {} },
-  jwt: { privateKey: "unused" },
-  secret: "unused"
+  jwt: { privateKey: "unused" }
 }
 
 const additionalFields = {

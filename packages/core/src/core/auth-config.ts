@@ -48,7 +48,6 @@ export interface AuthConfig {
   jwt: Required<Pick<JwtOptions, "privateKey" | "alg" | "ttl" | "claims">> &
     Pick<JwtOptions, "audience">
   jwks?: JwksOptions
-  secret: string
   basePath: string
   baseURL?: string
   trustedProxyHeaders: boolean
@@ -353,11 +352,8 @@ function resolveRateLimit(
   return merged
 }
 
-/** The shortest secret that is not a guess. `keygen` emits 43 base64url characters. */
-const MINIMUM_SECRET_LENGTH = 32
-
 /**
- * Applies defaults, reads secrets from the environment, and validates.
+ * Applies defaults, reads the signing key from the environment, and validates.
  *
  * Synchronous and free of input/output, so constructing a server is cheap enough
  * to memoize per tenant. Everything that can be wrong with a configuration is
@@ -390,28 +386,6 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
     )
   }
 
-  const secret = options.secret ?? readEnvironmentVariable("AUTH_SECRET")
-  if (!secret) {
-    throw new AuthConfigError(
-      "Missing server secret. Set secret or the AUTH_SECRET environment variable."
-    )
-  }
-  if (secret === privateKey) {
-    throw new AuthConfigError(
-      "secret must not be the JWT signing key. They have different blast radiuses and are rotated independently."
-    )
-  }
-  // Length, because entropy is not measurable from here — a 32-character
-  // passphrase is weaker than 32 random bytes and both pass. What this catches
-  // is the hand-written secret, which is the one that gets guessed: every OAuth
-  // sign-in hands the browser an HMAC of a known message under this key, so a
-  // short one is brute-forced offline rather than online.
-  if (secret.length < MINIMUM_SECRET_LENGTH) {
-    throw new AuthConfigError(
-      `secret must be at least ${MINIMUM_SECRET_LENGTH} characters. It signs the OAuth state cookie — \`bun x @auth-ts/cli keygen\` generates one.`
-    )
-  }
-
   const baseURL = options.baseURL?.replace(/\/+$/, "")
 
   const additionalFields = options.user?.additionalFields ?? {}
@@ -437,7 +411,6 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
       ...(options.jwt?.audience ? { audience: options.jwt.audience } : {})
     },
     ...(options.jwks ? { jwks: requireJwks(options.jwks) } : {}),
-    secret,
     basePath,
     ...(baseURL ? { baseURL, issuer: `${baseURL}${basePath}` } : {}),
     trustedProxyHeaders: options.trustedProxyHeaders ?? false,

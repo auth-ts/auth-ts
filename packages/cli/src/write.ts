@@ -21,7 +21,7 @@ export async function existingEnvNames(path: string, names: string[]) {
 /**
  * Appends variables to an env file, replacing only the ones named in `replace`.
  *
- * Append-only by default: a value already in the file is a live secret, and
+ * Append-only by default: a value already in the file is a live key, and
  * overwriting it invalidates everything signed with it. Replacing is possible
  * but never assumed — the caller asks first, and passes the answer here.
  *

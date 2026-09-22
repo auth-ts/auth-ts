@@ -24,8 +24,6 @@ export interface Jwks {
 export interface KeygenResult {
   /** PKCS#8 PEM — the value of `JWT_PRIVATE_KEY`. */
   privateKeyPem: string
-  /** 32 random bytes, base64 — the value of `AUTH_SECRET`. */
-  secret: string
   /** The public key set. */
   jwks: Jwks
 }
@@ -45,9 +43,9 @@ async function toPublicJwk(publicKey: CryptoKey, algorithm: JwtAlgorithm) {
 }
 
 /**
- * Generates a signing key, a server secret, and the public key set.
+ * Generates a signing key and the public key set.
  *
- * Nothing is written here. What the command does with the three is its own
+ * Nothing is written here. What the command does with the two is its own
  * decision, and the default is to print them and leave the filesystem alone.
  */
 export async function keygen({
@@ -57,12 +55,7 @@ export async function keygen({
     extractable: true
   })
   const privateKeyPem = await exportPKCS8(privateKey)
-  // `openssl rand -base64 32`, without the shell.
-  const secret = Buffer.from(
-    crypto.getRandomValues(new Uint8Array(32))
-  ).toString("base64")
-
   const jwks: Jwks = { keys: [await toPublicJwk(publicKey, algorithm)] }
 
-  return { privateKeyPem, secret, jwks }
+  return { privateKeyPem, jwks }
 }

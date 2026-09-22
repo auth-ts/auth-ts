@@ -136,8 +136,8 @@ await postgrest.from("identities").delete().eq("id", id).throwOnError()
 at the provider: that is the user's to do from their own account screen, and a
 revocation call that failed would leave this side lying either way.
 
-Connecting is an endpoint, because it is an OAuth round trip with a client
-secret and a state cookie:
+Connecting is an endpoint, because it is an OAuth round trip with the
+provider's client secret and a state cookie:
 
 ```ts
 await authClient.connectProvider({ provider: "google", redirect: "/account" })

@@ -1,20 +1,18 @@
 ---
 title: CLI
-description: bun x @auth-ts/cli keygen — the signing key, the secret, and jwks.json.
+description: bun x @auth-ts/cli keygen — the signing key and jwks.json.
 ---
 
 ```bash
 bun x @auth-ts/cli keygen
 ```
 
-`keygen` generates the three things a server needs: a signing key, a server
-secret, and the public key set that verifies tokens signed with the key. It
-prints all three and then asks whether to keep them.
+`keygen` generates the two things a server needs: a signing key, and the public
+key set that verifies tokens signed with it. It prints both and then asks
+whether to keep them.
 
 ```text
 JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-
-AUTH_SECRET="..."
 
 jwks.json
 {
@@ -26,10 +24,10 @@ jwks.json
 Write /your/app/.env and /your/app/public/jwks.json? [y/N]
 ```
 
-Answer yes and the two variables are appended to `.env` and the key set is
-written to `public/jwks.json`. Answer no — or pipe the output anywhere, which
-skips the question — and nothing is written at all. The three lines are the
-whole of stdout; the question and everything after it go to stderr, so
+Answer yes and the key is appended to `.env` and the key set is written to
+`public/jwks.json`. Answer no — or pipe the output anywhere, which skips the
+question — and nothing is written at all. The two lines are the whole of
+stdout; the question and everything after it go to stderr, so
 redirecting gets you the values and nothing else — without the highlighting,
 which is only ever printed to a terminal, and never when `NO_COLOR` is set.
 
@@ -44,13 +42,12 @@ Bun, Vite, and Next all expand.
 
 ## Writing to your env file
 
-Appending only. A variable the file already sets is a live secret — replacing
-`AUTH_SECRET` invalidates every verification code in flight, and replacing
+Appending only. A variable the file already sets is a live key — replacing
 `JWT_PRIVATE_KEY` invalidates every token signed with it — so an existing name
-is never overwritten silently. You are asked about each one:
+is never overwritten silently. You are asked:
 
 ```text
-AUTH_SECRET is already set in /your/app/.env. Overwrite it? [y/N]
+JWT_PRIVATE_KEY is already set in /your/app/.env. Overwrite it? [y/N]
 ```
 
 `--yes` answers the first question, not this one. A flag can commit you to
@@ -86,5 +83,5 @@ where.
 | --- | --- | --- |
 | `--alg RS256\|ES256` | `RS256` | The signing algorithm, in any case. Match `jwt.alg` on the server. |
 | `--out DIR` | `public` | Where `jwks.json` goes. Created if it is not there. |
-| `--env FILE` | `.env` | Which env file the two variables are appended to. |
+| `--env FILE` | `.env` | Which env file the key is appended to. |
 | `--yes`, `-y` | off | Write without asking. Still will not overwrite a variable that is already set. |

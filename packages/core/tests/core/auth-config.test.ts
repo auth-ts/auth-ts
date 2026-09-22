@@ -8,16 +8,16 @@ import { generateTestKeys } from "../helpers/generate-test-keys"
 const keys = await generateTestKeys("RS256")
 
 /** The variables `createAuth` falls back to when an option is missing. */
-const SECRET_ENVIRONMENT_KEYS = ["JWT_PRIVATE_KEY", "AUTH_SECRET"] as const
+const SECRET_ENVIRONMENT_KEYS = ["JWT_PRIVATE_KEY"] as const
 
 /**
  * Runs every test against a known-empty environment, and hands the real one back
  * afterwards.
  *
- * Half this file asserts that construction *fails* when a secret is missing, and
+ * Half this file asserts that construction *fails* when the key is missing, and
  * a developer working on an auth library is exactly the person likely to have
- * `AUTH_SECRET` exported in their shell — which would satisfy the fallback and
- * turn those tests green for the wrong reason.
+ * `JWT_PRIVATE_KEY` exported in their shell — which would satisfy the fallback
+ * and turn those tests green for the wrong reason.
  */
 beforeEach(() => {
   for (const key of SECRET_ENVIRONMENT_KEYS) {
@@ -41,8 +41,7 @@ const previousEnvironment: Record<string, string | undefined> = {}
 const baseOptions = () => ({
   database: createMemoryDatabase(),
   email: { sendCode: () => {} },
-  jwt: { privateKey: keys.privateKeyPem },
-  secret: "server-secret-long-enough-to-pass-the-floor"
+  jwt: { privateKey: keys.privateKeyPem }
 })
 
 describe("construction failures", () => {
@@ -59,26 +58,6 @@ describe("construction failures", () => {
     const { jwt: _jwt, ...withoutKey } = baseOptions()
 
     expect(() => createAuth(withoutKey)).toThrow(/JWT_PRIVATE_KEY/)
-  })
-
-  it("names the missing environment variable for the secret", () => {
-    const { secret: _secret, ...withoutSecret } = baseOptions()
-
-    expect(() => createAuth(withoutSecret)).toThrow(/AUTH_SECRET/)
-  })
-
-  it("refuses a secret that is also the signing key", () => {
-    expect(() =>
-      createAuth({ ...baseOptions(), secret: keys.privateKeyPem })
-    ).toThrow(/must not be the JWT signing key/)
-  })
-
-  it("refuses a secret short enough to guess offline", () => {
-    // Every OAuth sign-in hands the browser an HMAC of a known message under
-    // this key, so a short one is attacked offline rather than online.
-    expect(() => createAuth({ ...baseOptions(), secret: "hunter2" })).toThrow(
-      /at least 32 characters/
-    )
   })
 
   it("refuses jwks.json that is not a parsed key set", () => {
@@ -585,24 +564,22 @@ describe("resolved defaults", () => {
     })
   })
 
-  it("reads secrets from the environment when not supplied", () => {
-    const { jwt: _jwt, secret: _secret, ...fromEnvironment } = baseOptions()
+  it("reads the signing key from the environment when not supplied", () => {
+    const { jwt: _jwt, ...fromEnvironment } = baseOptions()
     process.env.JWT_PRIVATE_KEY = keys.privateKeyPem
-    process.env.AUTH_SECRET = "environment-secret-long-enough-to-pass"
 
-    // Cleanup belongs to afterEach, so a failure here cannot leave the variables
+    // Cleanup belongs to afterEach, so a failure here cannot leave the variable
     // set for whatever runs next.
-    expect(createAuth(fromEnvironment).config.secret).toBe(
-      "environment-secret-long-enough-to-pass"
+    expect(createAuth(fromEnvironment).config.jwt.privateKey).toBe(
+      keys.privateKeyPem
     )
   })
 
-  it("starts each test with the fallback variables genuinely absent", () => {
-    // The invariant the whole file's missing-secret assertions rest on. It fails
-    // if the guard is removed and the developer running the suite exports either
+  it("starts each test with the fallback variable genuinely absent", () => {
+    // The invariant the whole file's missing-key assertions rest on. It fails
+    // if the guard is removed and the developer running the suite exports the
     // variable, or if the afterEach teardown ever goes back to assigning
-    // `undefined` — which Node stringifies into a perfectly usable secret.
-    expect("AUTH_SECRET" in process.env).toBe(false)
+    // `undefined` — which Node stringifies into a perfectly usable key.
     expect("JWT_PRIVATE_KEY" in process.env).toBe(false)
   })
 })

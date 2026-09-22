@@ -70,7 +70,6 @@ export async function createTestInternals(
         })
       }
     },
-    secret: "test-server-secret-long-enough-to-pass",
     logLevel: overrides.logLevel ?? "debug",
     logger: (level, message, data) => {
       logCalls.push({ level, message, ...(data ? { data } : {}) })

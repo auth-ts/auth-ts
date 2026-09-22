@@ -65,7 +65,6 @@ export async function createTestServer(
       }
     },
     jwt: { privateKey: privateKeyPem },
-    secret: "test-server-secret-long-enough-to-pass",
     logLevel: "debug",
     logger: (level, message, data) => {
       logCalls.push({ level, message, ...(data ? { data } : {}) })

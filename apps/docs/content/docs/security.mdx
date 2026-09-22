@@ -82,14 +82,14 @@ everything, these routes included.
 **State is verified** against a short-lived `HttpOnly` cookie scoped to the
 callback path. Without it, an attacker hands a victim a callback URL carrying the
 attacker's own authorization code and the victim's browser quietly completes a
-sign-in as the attacker. The cookie is also **HMAC-signed under `secret`**, so
-its contents — the return path, whether the flow is a sign-in or a connect, and
-any sign-up fields — cannot be rewritten by anything else able to set cookies for
-your host; an unsigned or edited cookie is treated as missing. The callback
-re-validates the sign-up fields against the declared schema regardless. The
-payload carries when it was issued, and a flow older than ten minutes is refused
-on the server's clock — the cookie's own expiry is a browser courtesy, not the
-rule.
+sign-in as the attacker. The cookie is not signed, and does not need to be:
+nothing in it is trusted on its own. The state has to match what the provider
+echoed, the return path is validated, sign-up fields are checked against the
+declared schema, the provider has to be this callback's, and a connect has to
+be finished by the session that started it. Whoever can rewrite the cookie
+already controls the browser it lives in. The payload carries when it was
+issued, and a flow older than ten minutes is refused on the server's clock — the
+cookie's own expiry is a browser courtesy, not the rule.
 
 **PKCE on every exchange, and a nonce for Google.** The state cookie also holds
 an S256 code verifier; only its challenge travels through the browser, and the

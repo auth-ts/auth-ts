@@ -13,7 +13,6 @@ import { stubGitHub } from "../helpers/stub-provider-network"
 
 const OAUTH_OPTIONS = {
   baseURL: "https://app.example.com",
-  secret: "test-server-secret-long-enough-to-pass",
   providers: {
     github: { clientId: "client-id", clientSecret: "client-secret" }
   }

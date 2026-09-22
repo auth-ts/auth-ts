@@ -32,10 +32,10 @@ bun add @auth-ts/core
 bun x @auth-ts/cli keygen
 ```
 
-That prints `JWT_PRIVATE_KEY`, `AUTH_SECRET`, and the public key set, then asks
-whether to keep them: the two variables appended to `.env`, the key set written
-to `public/jwks.json` — a static file your framework serves at `/jwks.json`. The two values must differ: one signs tokens, the other keys the
-verification-code HMAC, and they have different blast radiuses.
+That prints `JWT_PRIVATE_KEY` and the public key set, then asks whether to keep
+them: the key appended to `.env`, the key set written to `public/jwks.json` — a
+static file your framework serves at `/jwks.json`. That key is the only secret
+the server holds.
 
 ### 3. Write the four functions
 

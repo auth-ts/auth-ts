@@ -10,18 +10,18 @@ const USAGE = `Usage: bun x @auth-ts/cli <command>
 Commands:
   keygen [--alg RS256|ES256] [--out DIR] [--env FILE] [--yes]
 
-Prints a signing key, a server secret, and the public key set, then asks
-whether to keep them. Nothing is written unless you say so.
+Prints a signing key and the public key set, then asks whether to keep them.
+Nothing is written unless you say so.
 
   --alg   RS256 (default) or ES256
   --out   where jwks.json goes, default public
-  --env   which env file the two variables are appended to, default .env
+  --env   which env file the variable is appended to, default .env
   --yes   write both without asking. A variable the env file already sets is
-          still left alone — replacing a live secret is only ever answered in
+          still left alone — replacing a live key is only ever answered in
           person.
 
 Everything printed goes to stdout and everything said goes to stderr, so the
-three lines pipe cleanly on their own.
+two lines pipe cleanly on their own.
 `
 
 /**
@@ -169,22 +169,18 @@ async function confirm(question: string) {
 
 async function runKeygen(args: string[]) {
   const options = parseKeygenArgs(args)
-  const { privateKeyPem, secret, jwks } = await keygen(options)
+  const { privateKeyPem, jwks } = await keygen(options)
 
   const variable = (name: string, value: string) =>
     `${out.name(name)}${out.punctuation("=")}${out.value(value)}\n`
 
   console.log(variable("JWT_PRIVATE_KEY", quoteForEnv(privateKeyPem)))
-  console.log(variable("AUTH_SECRET", `"${secret}"`))
-  // Not a variable like the other two — a file, shown as one.
+  // Not a variable like the other — a file, shown as one.
   console.log(
     `${out.name("jwks.json")}\n${highlightJson(JSON.stringify(jwks, null, 2), out)}`
   )
 
-  const values = {
-    JWT_PRIVATE_KEY: quoteForEnv(privateKeyPem),
-    AUTH_SECRET: `"${secret}"`
-  }
+  const values = { JWT_PRIVATE_KEY: quoteForEnv(privateKeyPem) }
 
   const write =
     options.yes ||
@@ -193,8 +189,8 @@ async function runKeygen(args: string[]) {
     ))
   if (!write) return
 
-  // Appending is the quiet path. A name already in the file is a live secret,
-  // so replacing it is asked about one at a time, and never by a flag.
+  // Appending is the quiet path. A name already in the file is a live key, so
+  // replacing it is asked about, and never by a flag.
   const alreadySet = await existingEnvNames(
     options.envPath,
     Object.keys(values)

@@ -14,8 +14,8 @@ rather than in application code.
   Deno, and Bun.
 * `@auth-ts/core/client` — browser token management, from the same package. The
   entry a browser imports carries none of the issuer.
-* `@auth-ts/cli` — `bun x @auth-ts/cli keygen`: the signing key, the
-  `AUTH_SECRET`, and the `public/jwks.json` to deploy with your app.
+* `@auth-ts/cli` — `bun x @auth-ts/cli keygen`: the signing key and the
+  `public/jwks.json` to deploy with your app.
 
 Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous guests.
 
@@ -26,9 +26,9 @@ bun add @auth-ts/core
 bun x @auth-ts/cli keygen
 ```
 
-`keygen` prints `JWT_PRIVATE_KEY`, `AUTH_SECRET`, and the public key set, then
-asks whether to keep them — the two variables appended to `.env`, the key set
-written to `public/jwks.json`, which your framework serves at `/jwks.json`.
+`keygen` prints `JWT_PRIVATE_KEY` and the public key set, then asks whether to
+keep them — the key appended to `.env`, the key set written to
+`public/jwks.json`, which your framework serves at `/jwks.json`.
 
 ```ts
 // auth-server.ts

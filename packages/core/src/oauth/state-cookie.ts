@@ -1,10 +1,10 @@
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { randomBytesBase64url } from "../lib/generate-random"
-import { hmacSha256Hex, timingSafeEqualHex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"
 import { parseDuration } from "../lib/parse-duration"
 import { clearCookie, serializeCookie } from "../lib/serialize-cookie"
+import { validateRedirect } from "../lib/validate-redirect"
 import { decodeBase64url, encodeBase64url } from "../shared/base64url"
 import { codeChallengeS256, createCodeVerifier } from "./pkce"
 
@@ -13,9 +13,9 @@ import { codeChallengeS256, createCodeVerifier } from "./pkce"
  *
  * Long enough to sign in at the provider, short enough that an abandoned tab
  * cannot be completed hours later. Enforced twice: as the cookie's `Max-Age`,
- * which a browser honours, and against the `issuedAt` signed into the payload,
- * which holds for any client at all — a cookie replayed from a jar that does
- * not expire anything is refused here regardless.
+ * which a browser honours, and against the `issuedAt` in the payload, which
+ * holds for any client at all — a cookie replayed from a jar that does not
+ * expire anything is refused here regardless.
  */
 const OAUTH_STATE_TTL = "10m"
 
@@ -35,10 +35,8 @@ export interface OAuthStatePayload {
   /**
    * The provider the flow started against, so the cookie completes only that
    * provider's callback. The cookie is already path-scoped to it, but a path is
-   * a browser courtesy, not a boundary against the writer the signature guards
-   * against — a sibling subdomain or injected script sets a cookie at any path
-   * it likes. Signing the provider in is what makes a provider-A cookie
-   * worthless at provider B's callback, whatever intent or redirect it carries.
+   * a browser courtesy: a sibling subdomain or injected script sets a cookie at
+   * any path it likes, so the callback checks the provider itself.
    */
   provider: string
   /** Whether the callback should sign someone in or link to the current user. */
@@ -71,37 +69,22 @@ export interface OAuthStatePayload {
 }
 
 /**
- * Serializes and signs a state payload: `base64url(json).hmac`.
+ * Serializes a state payload as `base64url(json)`.
  *
- * Signed because the cookie is the callback's only memory of how the flow
- * began, and a cookie is writable by more than this server — a sibling
- * subdomain, or script on the page. Without the signature, whatever set it
- * could rewrite `redirect` into a path of their choosing, flip a sign-in into a
- * connect, or add sign-up fields the start endpoint never validated. The HMAC
- * is keyed on `secret`, which nothing outside this process holds.
+ * Not signed. The cookie is the callback's only memory of how the flow began,
+ * and a cookie is writable by more than this server — but nothing in it is
+ * trusted on its own: the state has to match the provider's echo, the redirect
+ * is validated, sign-up fields are checked against the schema, and a connect
+ * has to be finished by the session that started it. Whoever can rewrite the
+ * cookie already controls the browser it lives in, and gains nothing by it.
  */
-export async function signStatePayload(
-  payload: OAuthStatePayload,
-  secret: string
-) {
-  const encoded = encodeBase64url(JSON.stringify(payload))
-  return `${encoded}.${await hmacSha256Hex(encoded, secret)}`
+export function encodeStatePayload(payload: OAuthStatePayload) {
+  return encodeBase64url(JSON.stringify(payload))
 }
 
-/** Verifies a cookie value produced by {@link signStatePayload}; `null` otherwise. */
-async function verifyStatePayload(
-  value: string,
-  secret: string
-): Promise<OAuthStatePayload | null> {
-  const separator = value.lastIndexOf(".")
-  if (separator === -1) return null
-
-  const encoded = value.slice(0, separator)
-  const signature = value.slice(separator + 1)
-  const expected = await hmacSha256Hex(encoded, secret)
-  if (!timingSafeEqualHex(signature, expected)) return null
-
-  const json = decodeBase64url(encoded)
+/** Parses a cookie value produced by {@link encodeStatePayload}; `null` otherwise. */
+function decodeStatePayload(value: string): OAuthStatePayload | null {
+  const json = decodeBase64url(value)
   if (json === null) return null
   try {
     const parsed: unknown = JSON.parse(json)
@@ -117,9 +100,9 @@ async function verifyStatePayload(
 export interface StateCookie {
   /** The `?state=` value. */
   state: string
-  /** The S256 challenge of the verifier signed into the cookie. */
+  /** The S256 challenge of the verifier in the cookie. */
   codeChallenge: string
-  /** The OIDC nonce signed into the cookie. */
+  /** The OIDC nonce in the cookie. */
   nonce: string
   /** The `Set-Cookie` header value. */
   setCookie: string
@@ -140,17 +123,14 @@ export async function createStateCookie(
   const nonce = randomBytesBase64url(32)
   const setCookie = serializeCookie({
     name: internals.config.cookie.stateName,
-    value: await signStatePayload(
-      {
-        ...payload,
-        state,
-        provider,
-        issuedAt: Date.now(),
-        codeVerifier,
-        nonce
-      } satisfies OAuthStatePayload,
-      internals.config.secret
-    ),
+    value: encodeStatePayload({
+      ...payload,
+      state,
+      provider,
+      issuedAt: Date.now(),
+      codeVerifier,
+      nonce
+    } satisfies OAuthStatePayload),
     // Scoped to the exact callback path: this cookie is only ever read there, so
     // there is no reason for it to ride along with anything else.
     path: `${internals.config.basePath}/callback/${provider}`,
@@ -175,17 +155,17 @@ export async function createStateCookie(
  * — or, on a connect flow, link the attacker's provider identity to the victim's
  * account.
  *
- * The signature is checked before anything in the payload is read, so a cookie
- * this server did not write — or one it wrote and something else edited — is
- * indistinguishable from a missing one. Then the payload's own claims: the
- * state must match the parameter, the provider must be this callback's, the
- * flow must be younger than {@link OAUTH_STATE_TTL}, and the PKCE verifier and
- * nonce must be present — a payload without them was not written by this
- * version of the server and cannot complete an exchange that requires them.
+ * The payload's claims are what is checked: the state must match the
+ * parameter, the provider must be this callback's, the flow must be younger
+ * than {@link OAUTH_STATE_TTL}, and the PKCE verifier and nonce must be
+ * present — a payload without them cannot complete an exchange that requires
+ * them. The return paths are validated again here, exactly as the start
+ * endpoint validated them, because the cookie could have been edited since.
+ * A cookie that does not parse is indistinguishable from a missing one.
  *
- * @throws {AuthApiError} `unauthenticated` when the cookie is missing, was not
- * signed by this server, does not match the parameter, was issued for a
- * different provider's callback, or has aged out.
+ * @throws {AuthApiError} `invalidState` when the cookie is missing or
+ * unreadable, does not match the parameter, was issued for a different
+ * provider's callback, or has aged out.
  */
 export async function readStateCookie(
   internals: AuthInternals,
@@ -196,9 +176,9 @@ export async function readStateCookie(
   const raw = readCookie(headers, internals.config.cookie.stateName)
   if (!raw || !stateParameter) throw new AuthApiError("invalidState")
 
-  const payload = await verifyStatePayload(raw, internals.config.secret)
+  const payload = decodeStatePayload(raw)
   if (!payload) {
-    internals.log.warn("oauth state cookie failed signature check")
+    internals.log.warn("oauth state cookie is unreadable")
     throw new AuthApiError("invalidState")
   }
 
@@ -232,7 +212,18 @@ export async function readStateCookie(
     throw new AuthApiError("invalidState")
   }
 
-  return payload
+  if (payload.intent !== "signIn" && payload.intent !== "connect") {
+    internals.log.warn("oauth state carries an unknown intent")
+    throw new AuthApiError("invalidState")
+  }
+
+  return {
+    ...payload,
+    redirect: validateRedirect(payload.redirect),
+    ...(payload.errorRedirect
+      ? { errorRedirect: validateRedirect(payload.errorRedirect) }
+      : {})
+  }
 }
 
 /** Expires the state cookie once the flow is finished, successfully or not. */

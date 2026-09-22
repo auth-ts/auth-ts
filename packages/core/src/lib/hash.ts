@@ -26,51 +26,6 @@ export async function sha256Hex(value: string) {
 }
 
 /**
- * HMAC keys, imported once per secret.
- *
- * Importing a raw key is the expensive half of an HMAC, and the secret does not
- * change between requests — so it is done on first use and kept. Keyed by the
- * secret string because one process may serve several tenants, each with its
- * own; the map grows to the number of distinct secrets it has seen and no
- * further. The secret is already in memory in the resolved config, so holding
- * the imported key beside it reveals nothing new.
- */
-const hmacKeys = new Map<string, Promise<CryptoKey>>()
-
-function hmacKey(secret: string) {
-  let key = hmacKeys.get(secret)
-  if (!key) {
-    key = crypto.subtle.importKey(
-      "raw",
-      textEncoder.encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"]
-    )
-    hmacKeys.set(secret, key)
-    // A failed import must not be cached as a permanently rejected promise.
-    key.catch(() => hmacKeys.delete(secret))
-  }
-  return key
-}
-
-/**
- * Signs a value with HMAC-SHA-256 under the server secret and returns lowercase hex.
- *
- * The OAuth state cookie is signed this way, so nothing else able to set
- * cookies for the host can rewrite where a flow returns to or which user it
- * connects.
- */
-export async function hmacSha256Hex(value: string, secret: string) {
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    await hmacKey(secret),
-    textEncoder.encode(value)
-  )
-  return toHex(signature)
-}
-
-/**
  * The scrypt cost a code is stored under: 16 MiB, the memory the book's Argon2
  * recommendation asks for, at one lane so throughput is the server's.
  */

@@ -388,7 +388,7 @@ describe("oauth callback", () => {
     ]) {
       const response = await auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": await forgeState(stale) }
+          cookies: { "auth-ts.state": forgeState(stale) }
         })
       )
       expect(response.status, JSON.stringify(stale.issuedAt)).toBe(302)
@@ -402,7 +402,7 @@ describe("oauth callback", () => {
     const slightlyAhead = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": await forgeState({
+          "auth-ts.state": forgeState({
             ...payload,
             issuedAt: Date.now() + 30_000
           })
@@ -424,7 +424,7 @@ describe("oauth callback", () => {
     ]) {
       const response = await auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": await forgeState(broken) }
+          cookies: { "auth-ts.state": forgeState(broken) }
         })
       )
       expect(response.status).toBe(302)
@@ -830,10 +830,9 @@ describe("oauth callback", () => {
   })
 
   it("revalidates additionalFields from the state cookie instead of trusting them", async () => {
-    // The signature proves the payload came from this server, not that the
-    // fields are still declared. Any path that signs a payload without running
-    // /sign-in/provider/:provider's validation would ride an undeclared column into user
-    // creation, so the callback checks again where the write happens.
+    // The cookie is writable by whoever holds the browser, so nothing in it is
+    // trusted on its own: an undeclared column planted there must not ride into
+    // user creation, so the callback validates again where the write happens.
     const { auth, db } = await createTestServer({
       ...OAUTH_OPTIONS,
       user: { additionalFields: { plan: "string" } }
@@ -841,8 +840,7 @@ describe("oauth callback", () => {
     const { stateCookie, state } = await startSignIn(auth)
     stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
 
-    // Signed with the real secret, so only the revalidation can catch it.
-    const tampered = await forgeState({
+    const tampered = forgeState({
       ...decodeState(stateCookie),
       additionalFields: { plan: "pro", type: "admin" }
     })
@@ -868,7 +866,7 @@ describe("oauth callback", () => {
         `/api/auth/callback/github?code=abc&state=${clean.state}`,
         {
           cookies: {
-            "auth-ts.state": await forgeState({
+            "auth-ts.state": forgeState({
               ...decodeState(clean.stateCookie),
               additionalFields: { plan: "pro" }
             })
@@ -880,20 +878,18 @@ describe("oauth callback", () => {
     expect(db.users()[0]).toMatchObject({ plan: "pro" })
   })
 
-  it("rejects a state cookie that this server did not sign", async () => {
+  it("rejects a state cookie that does not match the callback's state", async () => {
     const { auth, db } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie, state } = await startSignIn(auth)
     stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
     const payload = decodeState(stateCookie)
 
     const forgeries = [
-      // Edited in place: the payload no longer matches the signature.
-      `${stateCookie.startsWith("A") ? "B" : "A"}${stateCookie.slice(1)}`,
-      // The open-redirect attempt: same state, hostile return path, signed
-      // under some other key.
-      await forgeState({ ...payload, redirect: "//evil.example" }, "not-it"),
-      // The pre-signing shape, for anyone replaying an old cookie.
+      // Someone else's flow: a different state than the provider echoed.
+      forgeState({ ...payload, state: "not-the-one-the-provider-echoed" }),
+      // Not a payload at all.
       JSON.stringify(payload),
+      "garbage",
       ""
     ]
     for (const forged of forgeries) {
@@ -903,7 +899,7 @@ describe("oauth callback", () => {
         })
       )
       expect(response.status, JSON.stringify(forged)).toBe(302)
-      // No verified state, so the configured baseURL is the target.
+      // No readable state, so the configured baseURL is the target.
       expect(response.headers.get("location"), JSON.stringify(forged)).toBe(
         "https://app.example.com/?error=invalidState"
       )
@@ -911,10 +907,32 @@ describe("oauth callback", () => {
     expect(db.users()).toHaveLength(0)
   })
 
+  it("validates the return path from the cookie rather than trusting it", async () => {
+    // The open-redirect attempt: the cookie is the attacker's own to edit, so
+    // the redirect it carries is checked the same way a query value would be.
+    const { auth } = await createTestServer(OAUTH_OPTIONS)
+    const { stateCookie, state } = await startSignIn(auth)
+    stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+
+    const response = await auth.handler(
+      request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+        cookies: {
+          "auth-ts.state": forgeState({
+            ...decodeState(stateCookie),
+            redirect: "//evil.example"
+          })
+        }
+      })
+    )
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get("location")).toBe("/")
+  })
+
   it("refuses a state cookie at a different provider's callback, even a genuine one", async () => {
-    // Path scoping keeps a browser from sending this, but the writer the
-    // signature defends against can plant a cookie at any path. The provider
-    // is signed in, so a GitHub start cannot complete a Google callback.
+    // Path scoping keeps a browser from sending this, but a sibling subdomain
+    // or injected script can plant a cookie at any path. The provider is in the
+    // payload and checked, so a GitHub start cannot complete a Google callback.
     const { auth, db } = await createTestServer({
       ...OAUTH_OPTIONS,
       providers: {
