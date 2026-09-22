@@ -686,7 +686,9 @@ describe("consumeVerificationCode", () => {
     // Fifty wrong guesses in flight at once, every one reading the row before
     // any has counted. A counter on the code row let them all write back 0 + 1
     // and the code survived with one attempt against it; a row appended per
-    // guess cannot lose a write, so they count as fifty and the code is burned.
+    // guess cannot lose a write, so they count as fifty. Whether any of the
+    // fifty saw enough of the others to burn the row is the scheduler's
+    // business — the next guess counts fifty-one and is refused either way.
     // Every read is held until all fifty have happened, so the overlap is the
     // test's rather than the scheduler's. Default options, which is the
     // configuration with no per-IP limit behind the cap.
@@ -732,7 +734,6 @@ describe("consumeVerificationCode", () => {
     expect(
       await countAttempts(db, await attemptKey(internals.config.secret, code))
     ).toBe(guesses)
-    expect(await storedCodes(db)).toHaveLength(0)
     // And the right code is dead with it.
     await expect(
       consumeVerificationCode(internals, {
@@ -741,6 +742,73 @@ describe("consumeVerificationCode", () => {
         purpose: "signIn"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    expect(await storedCodes(db)).toHaveLength(0)
+  })
+
+  it("refuses a correct guess that read the row before the burn landed", async () => {
+    // The right code is in flight and has read the row. Six wrong guesses then
+    // run to completion, but every burn they issue is held back — so the row is
+    // still there when the right code resumes. It must be refused on the count
+    // alone: comparing first would let a burst that outruns the burn win.
+    const { internals, db, code } = await sendAndRead()
+    const wrongCode = code === "000000" ? "111111" : "000000"
+
+    let releaseRead = () => {}
+    const readHeld = new Promise<void>((resolve) => {
+      releaseRead = resolve
+    })
+    const realSelect = db.select.bind(db)
+    db.select = async (input) => {
+      const rows = await realSelect(input)
+      if (input.table === "verifications") {
+        db.select = realSelect
+        await readHeld
+      }
+      return rows
+    }
+    const correct = consumeVerificationCode(internals, {
+      identifier: "ada@example.com",
+      code,
+      purpose: "signIn"
+    })
+    await vi.waitFor(() => expect(db.select).toBe(realSelect))
+
+    let releaseBurns = () => {}
+    const burnsHeld = new Promise<void>((resolve) => {
+      releaseBurns = resolve
+    })
+    let holdBurns = true
+    const realDelete = db.delete.bind(db)
+    db.delete = async (input) => {
+      if (input.table === "verifications" && holdBurns) await burnsHeld
+      return realDelete(input)
+    }
+    const wrongGuesses = Promise.allSettled(
+      Array.from({ length: 6 }, () =>
+        consumeVerificationCode(internals, {
+          identifier: "ada@example.com",
+          code: wrongCode,
+          purpose: "signIn"
+        })
+      )
+    )
+    await vi.waitFor(async () =>
+      expect(
+        await countAttempts(db, await attemptKey(internals.config.secret, code))
+      ).toBe(6)
+    )
+    expect(await liveCode(db)).not.toBeNull()
+
+    holdBurns = false
+    releaseRead()
+    await expect(correct).rejects.toThrowError(
+      expect.objectContaining({ code: "invalidCode" })
+    )
+
+    releaseBurns()
+    const results = await wrongGuesses
+    expect(results.every((result) => result.status === "rejected")).toBe(true)
+    expect(await storedCodes(db)).toHaveLength(0)
   })
 
   it("rejects an expired code, and takes the row with it", async () => {
