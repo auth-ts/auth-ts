@@ -298,7 +298,7 @@ import { isAuthError } from "@auth-ts/core/client"
 try {
   await authClient.sendSignInCode({ email })
 } catch (error) {
-  if (isAuthError(error) && error.code === "cooldown") {
+  if (isAuthError(error) && error.code === "rateLimited") {
     // error.retryAfter is in seconds. Render a countdown; "try again later"
     // with no number is the least useful message in software.
   }

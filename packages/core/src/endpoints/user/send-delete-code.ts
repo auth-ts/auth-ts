@@ -5,22 +5,33 @@ import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
+import { attemptCookie } from "../../shared/attempt-cookie"
 import { accountIdentifier } from "../../verification-code/resolve-code-identifier"
 import { sendVerificationCode } from "../../verification-code/send-verification-code"
 
+/** What `POST /user/send-delete-code` is called with. */
+export interface SendDeleteUserCodeInput extends CallerInput {
+  requestURL?: string
+}
+
 /** How `POST /user/send-delete-code` appears in the OpenAPI document. */
-export const sendDeleteUserCodeDocs: EndpointDocs<CallerInput> = {
+export const sendDeleteUserCodeDocs: EndpointDocs<SendDeleteUserCodeInput> = {
   description:
     "Sent to whichever address is already on the account. There is nothing to choose, so there is nothing to post.",
   tag: "User",
   auth: "bearer",
   responses: {
     200: {
-      description: "Accepted for delivery.",
+      description:
+        "Accepted for delivery. Browsers carry the attempt cookie to `DELETE /user`; other callers present `attempt`.",
+      setsCookie: "attempt",
       schema: {
         type: "object",
-        properties: { sent: { type: "boolean" } },
-        required: ["sent"]
+        properties: {
+          sent: { type: "boolean" },
+          attempt: { type: "string" }
+        },
+        required: ["sent", "attempt"]
       }
     },
     401: "Unauthenticated",
@@ -39,8 +50,11 @@ export const sendDeleteUserCodeDocs: EndpointDocs<CallerInput> = {
 export const sendDeleteUserCode = defineEndpoint({
   method: "POST",
   path: "/user/send-delete-code",
-  parse: ({ request }): CallerInput => ({ headers: request.headers }),
-  run: async (internals, input: CallerInput) => {
+  parse: ({ request }): SendDeleteUserCodeInput => ({
+    headers: request.headers,
+    requestURL: request.url
+  }),
+  run: async (internals, input: SendDeleteUserCodeInput) => {
     const headers = input.headers ?? new Headers()
     const caller = await authenticate(internals, input)
     const user = await selectOne(internals, "users", {
@@ -59,7 +73,7 @@ export const sendDeleteUserCode = defineEndpoint({
     const identifier = accountIdentifier(user)
     if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
 
-    await sendVerificationCode(internals, {
+    const attempt = await sendVerificationCode(internals, {
       identifier,
       purpose: "deleteUser",
       locale: resolveLocale(
@@ -69,6 +83,16 @@ export const sendDeleteUserCode = defineEndpoint({
       headers
     })
 
-    return { data: { sent: true } }
+    return {
+      data: { sent: true, attempt },
+      headers: new Headers({
+        "set-cookie": attemptCookie(
+          internals,
+          "deleteUser",
+          attempt,
+          input.requestURL
+        )
+      })
+    }
   }
 })

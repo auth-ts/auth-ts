@@ -59,8 +59,8 @@ export interface IpAddressOptions {
    * Derive no address at all.
    *
    * Nothing is read from any header, `session.ipAddress` stays null, and every
-   * per-IP limit is inert — the per-identifier limits and the cooldown, which
-   * are what protect a target inbox, are unaffected.
+   * per-IP limit is inert — the per-identifier guess limit, which is what
+   * protects an account, is unaffected.
    *
    * @default false
    */

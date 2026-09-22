@@ -18,8 +18,8 @@ const seedRow: Record<string, string> = {
   attempts: `insert into "attempts" ("key", "expiresAt")
              values ('k', now() + interval '10 minutes')`,
   verifications: `insert into "verifications"
-                    ("identifier", "codeHash", "purpose", "expiresAt")
-                  values ('a@example.test', 'x', 'signIn', now() + interval '10 minutes')`,
+                    ("identifier", "codeHash", "attemptHash", "purpose", "expiresAt")
+                  values ('a@example.test', 'x', 'y', 'signIn', now() + interval '10 minutes')`,
   identitySecrets: `insert into "users" ("id") values (uuidv7());
     insert into "identities" ("id", "userId", "provider", "providerUserId")
       select uuidv7(), "id", 'github', 'p1' from "users" limit 1;

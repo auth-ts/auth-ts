@@ -10,8 +10,18 @@ export type SendSignInCodeInput =
 /** The identifier, the code, and any declared sign-up fields. */
 export type SignInWithCodeInput = SendSignInCodeInput & {
   code: string
+  /**
+   * The attempt token `sendSignInCode` returned. Browsers and `cookieStorage`
+   * clients carry it as a cookie; pass it only where neither applies.
+   */
+  attempt?: string
   /** Applied only if this verification creates the account. */
   additionalFields?: Record<string, string | number | boolean>
+}
+
+/** What a send returns: the attempt token the code is bound to. */
+export interface SendCodeResult {
+  attempt: string
 }
 
 /** What a completed sign-in returns. */
@@ -25,12 +35,14 @@ export interface SignInResult {
 export async function sendSignInCode(
   internals: AuthClientInternals,
   input: SendSignInCodeInput
-): Promise<void> {
-  await internals.fetchJson({
+): Promise<SendCodeResult> {
+  const { attempt } = await internals.fetchJson<SendCodeResult>({
     method: "POST",
     path: "/sign-in/send-code",
     body: input
   })
+
+  return { attempt }
 }
 
 /** `POST /sign-in/code`; the token it returns is stored for every call after. */

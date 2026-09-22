@@ -139,17 +139,20 @@ export interface AuthSession {
 export type VerificationPurpose = "signIn" | "deleteUser"
 
 /**
- * A verification code, stored as an HMAC of the six digits.
+ * A verification code, stored as an HMAC of the code.
  *
- * Several rows may exist for one identifier: a send deletes the identifier's
- * codes and inserts a new one, and a verify reads the newest by `expiresAt`.
- * Latest wins, so a resend still invalidates the code before it.
+ * Several rows may be live for one identifier at once — one per client that
+ * asked. Each is bound to the attempt token its requester holds, so a verify
+ * reads exactly one row: the identifier's, for this purpose, for this attempt.
+ * A send never touches another client's code.
  */
 export interface AuthVerification {
   id: string
   /** Normalized email or E.164 phone number. */
   identifier: string
   codeHash: string
+  /** SHA-256 of the attempt token handed to the client that requested the code. */
+  attemptHash: string
   expiresAt: Date
   purpose: VerificationPurpose
   /** Written by core on insert. */
@@ -447,7 +450,7 @@ export type AuthDeleteInput<
  * | --- | --- | --- | --- |
  * | `users` | `email`, `phoneNumber` | | |
  * | `sessions` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
- * | `verifications` | | `identifier`, `expiresAt` | `expiresAt` |
+ * | `verifications` | | `(identifier, purpose, attemptHash)`, `expiresAt` | `expiresAt` |
  * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
  * | `identities` | `(provider, providerUserId)` | `userId` | |
  *

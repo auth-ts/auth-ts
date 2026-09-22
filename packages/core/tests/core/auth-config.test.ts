@@ -236,12 +236,6 @@ describe("construction failures", () => {
         rateLimit: { sendCodePerIP: { max: 30, window: "1 month" } }
       })
     ).toThrow(/rateLimit.sendCodePerIP.window/)
-    expect(() =>
-      createAuth({
-        ...baseOptions(),
-        rateLimit: { sendCodeCooldown: "soon" }
-      })
-    ).toThrow(/rateLimit.sendCodeCooldown/)
   })
 
   it("rejects a token or session lifetime under one second, which rounds to zero", () => {
@@ -288,12 +282,6 @@ describe("construction failures", () => {
         rateLimit: { sendCodePerIP: { max: 30, window: "-10m" } }
       })
     ).toThrow(/rateLimit\.sendCodePerIP\.window/)
-    expect(() =>
-      createAuth({
-        ...baseOptions(),
-        rateLimit: { sendCodeCooldown: "-60s" }
-      })
-    ).toThrow(/rateLimit\.sendCodeCooldown/)
   })
 
   it("rejects a duration too large for a Date, naming the option", () => {
@@ -330,13 +318,32 @@ describe("construction failures", () => {
         rateLimit: { signInCodePerIP: { max: 30, window: "0.0001s" } }
       })
     ).toThrow(/rateLimit\.signInCodePerIP\.window must be a positive duration/)
-    // The cooldown is a spacing, not a window: zero means "no spacing" and stays legal.
+  })
+
+  it("defaults the verification code to six alphanumeric symbols and bounds the length", () => {
+    expect(createAuth(baseOptions()).config.verificationCode).toEqual({
+      alphabet: "alphanumeric",
+      length: 6
+    })
+    expect(
+      createAuth({
+        ...baseOptions(),
+        verificationCode: { alphabet: "numeric", length: 8 }
+      }).config.verificationCode
+    ).toEqual({ alphabet: "numeric", length: 8 })
+
+    for (const length of [5, 13, 6.5]) {
+      expect(() =>
+        createAuth({ ...baseOptions(), verificationCode: { length } })
+      ).toThrow(/verificationCode\.length/)
+    }
     expect(() =>
       createAuth({
         ...baseOptions(),
-        rateLimit: { sendCodeCooldown: "0s" }
+        // @ts-expect-error: the alphabet is a closed set
+        verificationCode: { alphabet: "hex" }
       })
-    ).not.toThrow()
+    ).toThrow(/verificationCode\.alphabet/)
   })
 
   it("rejects a non-positive or fractional rate-limit max", () => {
@@ -569,13 +576,12 @@ describe("resolved defaults", () => {
   it("merges partial rate limits over the defaults", () => {
     const { config } = createAuth({
       ...baseOptions(),
-      rateLimit: { sendCodePerIdentifier: { max: 9, window: "1h" } }
+      rateLimit: { guessPerIdentifier: { max: 9, window: "1h" } }
     })
 
     expect(config.rateLimit).toMatchObject({
-      sendCodePerIdentifier: { max: 9, window: "1h" },
-      sendCodePerIP: { max: 30, window: "10m" },
-      sendCodeCooldown: "60s"
+      guessPerIdentifier: { max: 9, window: "1h" },
+      sendCodePerIP: { max: 30, window: "10m" }
     })
   })
 

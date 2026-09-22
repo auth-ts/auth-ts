@@ -10,7 +10,7 @@ const localization = {
   messages: {
     de: {
       invalidCode: "Dieser Code ist ungültig.",
-      cooldown: "Bitte warte {retryAfter} Sekunden."
+      rateLimited: "Bitte warte {retryAfter} Sekunden."
     }
   }
 }
@@ -42,23 +42,23 @@ describe("getErrorMessage", () => {
 
   it("interpolates retryAfter in both built-in and overridden messages", () => {
     expect(
-      getErrorMessage("cooldown", "en", localization, { retryAfter: 42 })
+      getErrorMessage("rateLimited", "en", localization, { retryAfter: 42 })
     ).toContain("42")
     expect(
-      getErrorMessage("cooldown", "de", localization, { retryAfter: 42 })
+      getErrorMessage("rateLimited", "de", localization, { retryAfter: 42 })
     ).toBe("Bitte warte 42 Sekunden.")
   })
 
   it("interpolates every retryAfter placeholder, not only the first", () => {
     const twice = {
       messages: {
-        en: { cooldown: "Wait {retryAfter}s ({retryAfter} seconds)." }
+        en: { rateLimited: "Wait {retryAfter}s ({retryAfter} seconds)." }
       }
     }
 
-    expect(getErrorMessage("cooldown", "en", twice, { retryAfter: 42 })).toBe(
-      "Wait 42s (42 seconds)."
-    )
+    expect(
+      getErrorMessage("rateLimited", "en", twice, { retryAfter: 42 })
+    ).toBe("Wait 42s (42 seconds).")
   })
 
   it("never leaks identifiers, because messages take no identifier input", () => {

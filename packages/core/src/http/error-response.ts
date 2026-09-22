@@ -6,8 +6,6 @@
  * forever and are only ever added to.
  */
 export type AuthErrorCode =
-  /** A send was attempted before the per-identifier cooldown elapsed. */
-  | "cooldown"
   /** A fixed-window rate limit was exceeded. */
   | "rateLimited"
   /** Wrong, expired, already-used, or for a different purpose. */
@@ -59,7 +57,6 @@ export type AuthErrorCode =
 
 /** The status each code answers with. Complete by construction, like the messages. */
 export const ERROR_STATUS: Record<AuthErrorCode, number> = {
-  cooldown: 429,
   rateLimited: 429,
   invalidCode: 401,
   staleSession: 403,
@@ -96,7 +93,7 @@ export interface AuthErrorBody {
   code: AuthErrorCode
   /** Human-readable, localized, and free of identifiers and secrets. */
   message: string
-  /** Seconds to wait, present on `cooldown` and `rateLimited`. */
+  /** Seconds to wait, present on `rateLimited`. */
   retryAfter?: number
 }
 

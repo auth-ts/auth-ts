@@ -31,7 +31,7 @@ cost of not having an adapter package.
 | --- | --- | --- | --- | --- |
 | `users` | `id`, `email`, `phoneNumber`, `name`, `image`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
 | `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
-| `verifications` | `id`, `identifier`, `codeHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `identifier`, `expiresAt` | `expiresAt` |
+| `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `(identifier, purpose, attemptHash)`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
 | `identitySecrets` | `id`, `identityId`, `accessTokenEncrypted`, `accessTokenExpiresAt`, `refreshTokenEncrypted`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |
@@ -188,14 +188,13 @@ The honest trade: this is not exact. Each request's read sees every insert
 committed before it ran, so requests that are genuinely simultaneous can each
 read a number below the cap in the instant before the others land. The overshoot
 is bounded by that burst's concurrency and cannot be repeated — once it settles,
-the rest of the window is refused. For a six-digit code that is roughly twenty
-guesses instead of five, once, against a million values.
+the rest of the window is refused. For the guess limit that is roughly twenty
+guesses instead of five, once, against a billion values.
 
 If you want exactness, put it in front: a rule at your edge on `/sign-in/send-code`
 and `/sign-in/code` counts a burst more precisely than any database round trip, and
-you can then set `rateLimit: false`. The five-guess cap on each individual code
-is not a rate limit, is keyed on the code rather than the caller, and stays on
-regardless — nothing in front of this server can enforce it.
+you can then set `rateLimit: false`. The per-address guess limit stays on
+regardless — nothing in front of this server can key on the address.
 
 ## Writing your implementation
 

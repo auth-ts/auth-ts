@@ -2,6 +2,7 @@ import { defineEndpoint } from "../../http/define-endpoint"
 import { readBody } from "../../http/read-body"
 import { resolveLocale } from "../../http/resolve-locale"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
+import { attemptCookie } from "../../shared/attempt-cookie"
 import type { IdentifierBody } from "../../verification-code/resolve-code-identifier"
 import { resolveCodeIdentifier } from "../../verification-code/resolve-code-identifier"
 import { sendVerificationCode } from "../../verification-code/send-verification-code"
@@ -10,6 +11,7 @@ import { sendVerificationCode } from "../../verification-code/send-verification-
 export interface SendSignInCodeInput extends IdentifierBody {
   /** Request headers, filled in from the request when over HTTP. */
   headers?: Headers
+  requestURL?: string
 }
 
 /** How `POST /sign-in/send-code` appears in the OpenAPI document. */
@@ -29,11 +31,20 @@ export const sendSignInCodeDocs: EndpointDocs<SendSignInCodeInput> = {
   },
   responses: {
     200: {
-      description: "Accepted for delivery.",
+      description:
+        "Accepted for delivery. The code can only be verified by the client that requested it: browsers carry the attempt cookie, other callers present `attempt`.",
+      setsCookie: "attempt",
       schema: {
         type: "object",
-        properties: { sent: { type: "boolean" } },
-        required: ["sent"]
+        properties: {
+          sent: { type: "boolean" },
+          attempt: {
+            type: "string",
+            description:
+              "Present it as `attempt` on `/sign-in/code` when no cookie jar carries it."
+          }
+        },
+        required: ["sent", "attempt"]
       }
     },
     400: "InvalidField",
@@ -58,13 +69,13 @@ export const sendSignInCode = defineEndpoint({
       "phoneNumber"
     ])
 
-    return { ...body, headers: request.headers }
+    return { ...body, headers: request.headers, requestURL: request.url }
   },
   run: async (internals, input: SendSignInCodeInput) => {
     const identifier = resolveCodeIdentifier(internals, input)
     const headers = input.headers ?? new Headers()
 
-    await sendVerificationCode(internals, {
+    const attempt = await sendVerificationCode(internals, {
       identifier,
       purpose: "signIn",
       locale: resolveLocale(
@@ -74,6 +85,16 @@ export const sendSignInCode = defineEndpoint({
       headers
     })
 
-    return { data: { sent: true } }
+    return {
+      data: { sent: true, attempt },
+      headers: new Headers({
+        "set-cookie": attemptCookie(
+          internals,
+          "signIn",
+          attempt,
+          input.requestURL
+        )
+      })
+    }
   }
 })

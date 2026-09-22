@@ -240,6 +240,7 @@ export type Database = {
       }
       verifications: {
         Row: {
+          attemptHash: string
           codeHash: string
           createdAt: string
           expiresAt: string
@@ -249,6 +250,7 @@ export type Database = {
           updatedAt: string
         }
         Insert: {
+          attemptHash: string
           codeHash: string
           createdAt?: string
           expiresAt: string
@@ -258,6 +260,7 @@ export type Database = {
           updatedAt?: string
         }
         Update: {
+          attemptHash?: string
           codeHash?: string
           createdAt?: string
           expiresAt?: string

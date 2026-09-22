@@ -63,7 +63,7 @@ const authError: ObjectSchemaFor<AuthErrorBody> = {
     },
     retryAfter: {
       type: "integer",
-      description: "Seconds; on `cooldown` and `rateLimited`."
+      description: "Seconds; on `rateLimited`."
     }
   },
   required: ["name", "code", "message"]
@@ -115,7 +115,7 @@ export const componentResponses: Record<
   ),
   RateLimited: {
     ...failure(
-      "A cooldown or fixed-window limit was exceeded. `retryAfter` carries the wait, mirrored into the `Retry-After` header."
+      "A fixed-window limit was exceeded. `retryAfter` carries the wait, mirrored into the `Retry-After` header."
     ),
     headers: { "Retry-After": { schema: { type: "integer" } } }
   } as ReturnType<typeof failure>,

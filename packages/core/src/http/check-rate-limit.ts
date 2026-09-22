@@ -79,8 +79,6 @@ export async function checkRateLimit(
   key: string,
   window: RateLimitWindow
 ) {
-  if (internals.config.rateLimit === false) return
-
   const now = Date.now()
   // Windows are aligned to the clock rather than started by the first request,
   // so every caller counting the same key agrees on which window they are in

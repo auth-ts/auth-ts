@@ -105,11 +105,13 @@ describe("timestamps on the wire", () => {
 })
 
 describe("sendSignInCode", () => {
-  it("passes the identifier through and reports a cooldown with its countdown", async () => {
-    server.on("POST", "/api/auth/sign-in/send-code", { body: { sent: true } })
+  it("passes the identifier through and reports a rate limit with its countdown", async () => {
+    server.on("POST", "/api/auth/sign-in/send-code", {
+      body: { sent: true, attempt: "attempt-1" }
+    })
     server.on("POST", "/api/auth/sign-in/send-code", {
       status: 429,
-      body: { code: "cooldown", message: "Wait 60 seconds.", retryAfter: 60 }
+      body: { code: "rateLimited", message: "Wait 60 seconds.", retryAfter: 60 }
     })
     const client = createAuthClient()
 
@@ -119,7 +121,7 @@ describe("sendSignInCode", () => {
     await expect(
       client.sendSignInCode({ email: "ada@example.com" })
     ).rejects.toMatchObject({
-      code: "cooldown",
+      code: "rateLimited",
       retryAfter: 60
     })
   })
@@ -127,7 +129,7 @@ describe("sendSignInCode", () => {
   it("throws a real Error, carrying name and the server's message", async () => {
     server.on("POST", "/api/auth/sign-in/send-code", {
       status: 429,
-      body: { code: "cooldown", message: "Wait 60 seconds.", retryAfter: 60 }
+      body: { code: "rateLimited", message: "Wait 60 seconds.", retryAfter: 60 }
     })
     const client = createAuthClient()
 
@@ -448,7 +450,9 @@ describe("connected accounts", () => {
 
 describe("locale", () => {
   it("sends Accept-Language and updates it at runtime", async () => {
-    server.on("POST", "/api/auth/sign-in/send-code", { body: { sent: true } })
+    server.on("POST", "/api/auth/sign-in/send-code", {
+      body: { sent: true, attempt: "attempt-1" }
+    })
     const client = createAuthClient({ locale: "de" })
 
     await client.sendSignInCode({ email: "ada@example.com" })
@@ -462,7 +466,9 @@ describe("locale", () => {
 
 describe("baseURL", () => {
   it("targets a different origin when configured", async () => {
-    server.on("POST", "/api/auth/sign-in/send-code", { body: { sent: true } })
+    server.on("POST", "/api/auth/sign-in/send-code", {
+      body: { sent: true, attempt: "attempt-1" }
+    })
 
     await createAuthClient({
       baseURL: "https://auth.example.com"

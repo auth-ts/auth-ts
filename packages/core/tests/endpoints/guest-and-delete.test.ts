@@ -762,35 +762,35 @@ describe("account deletion", () => {
     expect(context.db.users()).toHaveLength(1)
   })
 
-  it("rate limits repeated calls to send-delete-code rather than a storm of email", async () => {
+  it("rate limits send-delete-code per client address rather than per account", async () => {
     vi.useFakeTimers()
     // Pinned to the start of a window: the limiter's windows are aligned to the
     // clock rather than started by the first request, so a run that straddled a
-    // boundary would hand the fourth call a fresh allowance.
+    // boundary would hand the last call a fresh allowance.
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
     try {
       const context = await createTestServer({
-        user: { deleteFreshWindow: "0s" }
+        user: { deleteFreshWindow: "0s" },
+        ipAddress: { trustedProxies: 1 },
+        rateLimit: { sendCodePerIP: { max: 2, window: "10m" } }
       })
       const { refreshToken, token } = await signIn(context)
       const cookies = refreshCookieFor(refreshToken)
       const before = context.sentCodes.length
-
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await context.auth.handler(
+      const from = (address: string) =>
+        context.auth.handler(
           request("POST", "/api/auth/user/send-delete-code", {
             cookies,
-            token
+            token,
+            headers: { "x-forwarded-for": address }
           })
         )
-        vi.advanceTimersByTime(61_000)
-      }
 
-      const limited = await context.auth.handler(
-        request("POST", "/api/auth/user/send-delete-code", { cookies, token })
-      )
-
-      expect(limited.status).toBe(429)
+      expect((await from("203.0.113.7")).status).toBe(200)
+      expect((await from("203.0.113.7")).status).toBe(200)
+      expect((await from("203.0.113.7")).status).toBe(429)
+      // The account itself is never the thing that is limited.
+      expect((await from("203.0.113.8")).status).toBe(200)
       expect(context.sentCodes.length - before).toBe(3)
     } finally {
       vi.useRealTimers()

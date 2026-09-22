@@ -66,6 +66,7 @@ describe("sweeping", () => {
       values: {
         identifier: "grace@example.com",
         codeHash: "stale-code",
+        attemptHash: "stale-attempt",
         expiresAt: new Date(Date.now() - 1000),
         purpose: "signIn",
         createdAt: new Date(Date.now() - 2000),

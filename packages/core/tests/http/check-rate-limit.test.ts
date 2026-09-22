@@ -108,14 +108,4 @@ describe("checkRateLimit", () => {
     )
     expect(keys.size).toBe(1)
   })
-
-  it("does nothing at all when the limiter is off", async () => {
-    const { internals, db } = await createTestInternals({ rateLimit: false })
-
-    for (let attempt = 0; attempt < 10; attempt++) {
-      await checkRateLimit(internals, KEY, WINDOW)
-    }
-
-    expect(await selectRows(db, "attempts")).toEqual([])
-  })
 })

@@ -162,7 +162,7 @@ never handed:
 const result = await authClient.deleteUser()
 if (result.challengeRequired) {
   await authClient.sendDeleteUserCode()
-  // collect the six digits, then:
+  // collect the code, then:
   await authClient.deleteUser({ code })
 }
 ```

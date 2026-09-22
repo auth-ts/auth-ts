@@ -19,7 +19,7 @@ import type {
 
 /** Everything a send callback is told about the code it is delivering. */
 export interface SendCodeContext {
-  /** The six-digit code, in plain text. Deliver it; never store it. */
+  /** The code, in plain text. Deliver it; never store it. */
   code: string
   /**
    * The locale core already resolved for this request. Use it as-is rather than
@@ -279,28 +279,45 @@ export interface RateLimitWindow {
  * front of everything, these routes included.
  */
 export interface RateLimitOptions {
-  /** Closes the resend-to-reset-attempts loop. @default { max: 3, window: "10m" } */
-  sendCodePerIdentifier?: RateLimitWindow
+  /**
+   * Guesses at codes for one email address or phone number, from anyone.
+   *
+   * The one limit that bounds brute force: a code is bound to the client that
+   * requested it, so this is the only budget an attacker can spend against an
+   * address. Under attack the real user's guess may be refused for the rest of
+   * the window; requesting a code never is. Stays on under `rateLimit: false`,
+   * because nothing in front of this server can key on the address.
+   * @default { max: 5, window: "5m" }
+   */
+  guessPerIdentifier?: RateLimitWindow
   /** @default { max: 30, window: "10m" } */
   sendCodePerIP?: RateLimitWindow
   /**
-   * Protects the population rather than one code: blocks cross-identifier
-   * spraying and code-burning griefing, and bounds the non-atomic attempt count.
+   * Guesses from one address, across every identifier: blocks spraying.
    * @default { max: 30, window: "10m" }
    */
   signInCodePerIP?: RateLimitWindow
-  /** @default { max: 3, window: "10m" } */
-  deleteUserPerIdentifier?: RateLimitWindow
   /** @default { max: 30, window: "10m" } */
   guestPerIP?: RateLimitWindow
+}
+
+/**
+ * The shape of the codes `sendCode` delivers.
+ *
+ * The odds of a brute-force attack at the default guess limit, running
+ * nonstop and emailing the target every ten minutes: six `alphanumeric`
+ * symbols take about a thousand years to reach a 50% chance; eight digits
+ * about ninety-five years; six digits about one year. Choose `numeric` for
+ * the one-time-code autofill phones offer, and lengthen it if you do.
+ */
+export interface VerificationCodeOptions {
   /**
-   * Minimum spacing between sends to one identifier.
-   *
-   * Windows cap volume; this caps rapid-fire. Derived from the newest code's
-   * `expiresAt` minus the code TTL, so it adds no state and no extra query.
-   * @default "60s"
+   * `alphanumeric` is A–Z and 2–9 without I, O, 0 and 1. `numeric` is digits.
+   * @default "alphanumeric"
    */
-  sendCodeCooldown?: Duration
+  alphabet?: "alphanumeric" | "numeric"
+  /** Symbols per code, 6 to 12. @default 6 */
+  length?: number
 }
 
 /**
@@ -396,17 +413,18 @@ export interface AuthOptions<
   /**
    * Set `false` to disable the built-in limiter and bring your own.
    *
-   * That turns off the per-IP and per-identifier windows and the send cooldown.
-   * Turning them off is the recommended posture when something in front of this
-   * server already limits `/sign-in/send-code` and `/sign-in/code` — a Cloudflare rule
-   * or a Durable Object counts a burst more precisely than a database round
-   * trip can, and stops it before it reaches you at all.
+   * That turns off the per-IP windows. Turning them off is the recommended
+   * posture when something in front of this server already limits
+   * `/sign-in/send-code` and `/sign-in/code` — a Cloudflare rule or a Durable
+   * Object counts a burst more precisely than a database round trip can, and
+   * stops it before it reaches you at all.
    *
-   * The five-guess cap on each verification code is not a rate limit and stays on
-   * regardless: it is what makes six digits safe, it is keyed on the code
-   * rather than the caller, and nothing in front of this server can enforce it.
+   * `guessPerIdentifier` stays on regardless: it is what makes a short code
+   * safe, and nothing in front of this server can key on the address.
    */
   rateLimit?: RateLimitOptions | false
+  /** Alphabet and length of the codes `sendCode` delivers. */
+  verificationCode?: VerificationCodeOptions
   /**
    * Google-style switching: several users signed in to one browser.
    *

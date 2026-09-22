@@ -23,6 +23,7 @@ export type {
 } from "./client/methods/identities-and-users"
 export type { OAuthNavigationInput } from "./client/methods/oauth"
 export type {
+  SendCodeResult,
   SendSignInCodeInput,
   SignInAsGuestInput,
   SignInResult,

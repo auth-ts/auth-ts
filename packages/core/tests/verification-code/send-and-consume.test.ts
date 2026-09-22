@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
-import { hmacSha256Hex } from "../../src/lib/hash"
+import { CODE_ALPHABETS } from "../../src/lib/generate-random"
+import { sha256Hex } from "../../src/lib/hash"
 import type { MemoryDatabase } from "../../src/lib/memory-database"
 import { consumeVerificationCode } from "../../src/verification-code/consume-verification-code"
 import { resolveCodeIdentifier } from "../../src/verification-code/resolve-code-identifier"
@@ -10,38 +11,20 @@ import { selectRows } from "../helpers/rows"
 
 const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 
-/** Every code stored for the identifier. A send replaces them, so normally one. */
+/** Every code stored for the identifier, one per attempt that asked. */
 const storedCodes = (db: MemoryDatabase) =>
   selectRows(db, "verifications", { identifier: { eq: emailIdentifier.value } })
 
-/** The row a verify would read: the newest by expiry, exactly as core reads it. */
-const liveCode = async (db: MemoryDatabase) => {
-  const [row] = await db.select({
-    table: "verifications",
-    where: { identifier: { eq: emailIdentifier.value } },
-    limit: 1,
-    orderBy: { expiresAt: "desc" }
-  })
-
-  return row ?? null
-}
-
-/**
- * How many attempts are on record for a key.
- *
- * The limiter appends a row per counted request rather than incrementing a
- * counter, so the count is a row count — and a window key carries the aligned
- * window start as a suffix, which is why this matches on a prefix.
- */
-const countAttempts = async (db: MemoryDatabase, prefix: string) => {
+/** How many rows the guess limiter holds for an identifier. */
+const countGuesses = async (db: MemoryDatabase, identifier: string) => {
   const rows = await selectRows(db, "attempts")
 
-  return rows.filter((row) => row.key.startsWith(prefix)).length
+  return rows.filter((row) => row.key.startsWith(`signIn:guess:${identifier}:`))
+    .length
 }
 
-/** The key a wrong guess against `code` is counted under. */
-const attemptKey = async (secret: string, code: string) =>
-  `verificationCode:attempts:${await hmacSha256Hex(code, secret)}`
+/** A code no generator would draw: outside the alphabet, so never a collision. */
+const WRONG_CODE = "??????"
 
 describe("resolveCodeIdentifier", () => {
   it("normalizes an email before it reaches any callback", async () => {
@@ -80,43 +63,50 @@ describe("resolveCodeIdentifier", () => {
 
   it("requires exactly one identifier", async () => {
     const { internals } = await createTestInternals()
+    const invalid = expect.objectContaining({ code: "invalidField" })
 
-    expect(() => resolveCodeIdentifier(internals, {})).toThrowError(
-      expect.objectContaining({ code: "invalidField" })
-    )
+    expect(() => resolveCodeIdentifier(internals, {})).toThrow(invalid)
     expect(() =>
       resolveCodeIdentifier(internals, {
         email: "ada@example.com",
-        phoneNumber: "+15551234567"
+        phoneNumber: "+15555550123"
       })
-    ).toThrowError(expect.objectContaining({ code: "invalidField" }))
+    ).toThrow(invalid)
   })
 
   it("rejects a phone code when no sms sender is configured", async () => {
     const { internals } = await createTestInternals()
     expect(() =>
-      resolveCodeIdentifier(internals, { phoneNumber: "+15551234567" })
-    ).toThrowError(expect.objectContaining({ code: "channelNotConfigured" }))
+      resolveCodeIdentifier(internals, { phoneNumber: "+15555550123" })
+    ).toThrow(expect.objectContaining({ code: "channelNotConfigured" }))
   })
 
   it("accepts and normalizes a phone number when sms is configured", async () => {
     const { internals } = await createTestInternals({
-      sms: { sendCode: () => {} }
+      sms: { sendCode: () => undefined }
     })
     expect(
-      resolveCodeIdentifier(internals, { phoneNumber: "+1 (555) 123-4567" })
-    ).toEqual({
-      kind: "phoneNumber",
-      value: "+15551234567"
-    })
+      resolveCodeIdentifier(internals, { phoneNumber: "+1 (555) 555-0123" })
+    ).toEqual({ kind: "phoneNumber", value: "+15555550123" })
   })
 })
 
 describe("sendVerificationCode", () => {
-  it("rolls the stored code back when delivery fails, so the retry is not in cooldown", async () => {
-    // The cooldown is derived from the newest stored row. A row left behind by a
-    // code nobody received would refuse the user's retry for a minute — for an
-    // outage that was the sender's, not theirs.
+  const send = (
+    internals: Awaited<ReturnType<typeof createTestInternals>>["internals"],
+    headers = new Headers()
+  ) =>
+    sendVerificationCode(internals, {
+      identifier: emailIdentifier,
+      purpose: "signIn",
+      locale: "en",
+      headers
+    })
+
+  it("rolls the stored code back when delivery fails", async () => {
+    // A row left behind by a code nobody received would sit bound to an
+    // attempt token the client is about to present, for an outage that was the
+    // sender's, not theirs.
     let outage = true
     const { internals, db, logCalls } = await createTestInternals({
       email: {
@@ -125,15 +115,8 @@ describe("sendVerificationCode", () => {
         }
       }
     })
-    const send = () =>
-      sendVerificationCode(internals, {
-        identifier: emailIdentifier,
-        purpose: "signIn",
-        locale: "en",
-        headers: new Headers()
-      })
 
-    await expect(send()).rejects.toThrow("SMTP down")
+    await expect(send(internals)).rejects.toThrow("SMTP down")
     expect(await storedCodes(db)).toHaveLength(0)
     expect(
       logCalls.some(
@@ -144,94 +127,46 @@ describe("sendVerificationCode", () => {
     ).toBe(true)
 
     outage = false
-    await expect(send()).resolves.toBeUndefined()
-    expect(await liveCode(db)).not.toBeNull()
+    await expect(send(internals)).resolves.toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(await storedCodes(db)).toHaveLength(1)
   })
 
-  it("leaves the identifier resendable at once when racing sends end with a failed delivery", async () => {
-    // A stores code A, B stores code B over it, A delivers, B's delivery
-    // fails. B's store deleted A's row and latest wins, so the code that
-    // reached the inbox was already dead; B's rollback then matches on B's own
-    // hash and takes back the code nobody received. Nothing usable was
-    // delivered and nothing unusable is left behind, so the question is only
-    // what the person can do about it: asking again works immediately rather
-    // than after a cooldown for a code that never arrived.
-    let deliveries = 0
-    const { internals, db, sentCodes } = await createTestInternals({
-      email: {
-        sendCode: ({ email, code, locale, purpose, headers }) => {
-          deliveries += 1
-          if (deliveries === 2) throw new Error("SMTP blip")
-          sentCodes.push({
-            channel: "email",
-            destination: email,
-            code,
-            locale,
-            purpose,
-            headers
-          })
-        }
-      }
+  it("delivers a code from the configured alphabet and stores only its HMAC", async () => {
+    const { internals, db, sentCodes } = await createTestInternals()
+
+    const attempt = await send(internals)
+
+    const sent = required(sentCodes[0], "sent code")
+    expect(sent.code).toHaveLength(6)
+    for (const symbol of sent.code) {
+      expect(CODE_ALPHABETS.alphanumeric).toContain(symbol)
+    }
+    expect(sent.destination).toBe("ada@example.com")
+
+    const [stored] = await storedCodes(db)
+    expect(stored?.codeHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(stored?.codeHash).not.toContain(sent.code)
+    expect(stored?.attemptHash).toBe(await sha256Hex(attempt))
+    expect(stored?.purpose).toBe("signIn")
+  })
+
+  it("honours a numeric alphabet and a longer code", async () => {
+    const { internals, sentCodes } = await createTestInternals({
+      verificationCode: { alphabet: "numeric", length: 8 }
     })
-    const send = () =>
-      sendVerificationCode(internals, {
-        identifier: emailIdentifier,
-        purpose: "signIn",
-        locale: "en",
-        headers: new Headers()
-      })
 
-    const outcomes = await Promise.allSettled([send(), send()])
-    // One of the two loses the race for the second delivery and is the
-    // rejection — which one is the scheduler's business, not the contract's.
-    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual([
-      "fulfilled",
-      "rejected"
-    ])
-    const rejected = outcomes.find(
-      (outcome): outcome is PromiseRejectedResult =>
-        outcome.status === "rejected"
-    )
-    expect(String(rejected?.reason)).toContain("SMTP blip")
+    const attempt = await send(internals)
 
-    // The code that did arrive belonged to the superseded send.
+    const sent = required(sentCodes[0], "sent code")
+    expect(sent.code).toMatch(/^\d{8}$/)
     await expect(
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
-        code: required(sentCodes[0], "delivered code").code,
-        purpose: "signIn"
+        code: sent.code,
+        purpose: "signIn",
+        attempt
       })
-    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
-    expect(await storedCodes(db)).toHaveLength(0)
-
-    // And the immediate retry is not in cooldown.
-    await expect(send()).resolves.toBeUndefined()
-    expect(await liveCode(db)).not.toBeNull()
-  })
-
-  it("delivers a six-digit code and stores only its HMAC", async () => {
-    const { internals, db, sentCodes } = await createTestInternals()
-
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-
-    const sent = required(sentCodes[0], "sent code")
-    expect(sent.code).toMatch(/^\d{6}$/)
-    expect(sent.destination).toBe("ada@example.com")
-
-    const stored = required(await liveCode(db), "stored code")
-    expect(stored.codeHash).toMatch(/^[0-9a-f]{64}$/)
-    expect(stored.codeHash).not.toContain(sent.code)
-    expect(stored.purpose).toBe("signIn")
-    // The guess budget is a set of attempt rows keyed on the hash rather than a
-    // column on this row, so a fresh code simply has none against it.
-    expect(
-      await countAttempts(db, `verificationCode:attempts:${stored.codeHash}`)
-    ).toBe(0)
+    ).resolves.toBeUndefined()
   })
 
   it("passes the resolved locale, purpose, and request headers to the sender", async () => {
@@ -254,215 +189,76 @@ describe("sendVerificationCode", () => {
     expect(sent.headers.get("host")).toBe("tenant.example.com")
   })
 
-  it("replaces the code on resend, so only the latest one is guessable", async () => {
-    const { internals, db, sentCodes } = await createTestInternals({
-      rateLimit: false
-    })
+  it("keeps every client's code live: a send never replaces another attempt's", async () => {
+    const { internals, db, sentCodes } = await createTestInternals()
 
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-    const firstHash = required(await liveCode(db), "first").codeHash
+    const first = await send(internals)
+    const second = await send(internals)
+    const third = await send(internals)
 
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-
-    expect(sentCodes).toHaveLength(2)
-    // A send deletes the identifier's codes and inserts one: the first code's
-    // row is gone rather than merely outranked.
-    const stored = await storedCodes(db)
-    expect(stored).toHaveLength(1)
-    expect(required(stored[0], "second").codeHash).not.toBe(firstHash)
-
-    // The first code no longer verifies.
+    expect(await storedCodes(db)).toHaveLength(3)
+    // Any of them verifies, but only with its own attempt token.
     await expect(
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
-        code: required(sentCodes[0], "first sent").code,
-        purpose: "signIn"
+        code: required(sentCodes[0], "first").code,
+        purpose: "signIn",
+        attempt: second
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    await consumeVerificationCode(internals, {
+      identifier: "ada@example.com",
+      code: required(sentCodes[0], "first").code,
+      purpose: "signIn",
+      attempt: first
+    })
+    await consumeVerificationCode(internals, {
+      identifier: "ada@example.com",
+      code: required(sentCodes[2], "third").code,
+      purpose: "signIn",
+      attempt: third
+    })
+    expect(await storedCodes(db)).toHaveLength(1)
   })
 
-  it("enforces the 60 second cooldown with an accurate retryAfter, and sends nothing", async () => {
-    const { internals, sentCodes } = await createTestInternals()
-
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
+  it("never limits sends per address, only per client address", async () => {
+    const { internals, sentCodes } = await createTestInternals({
+      ipAddress: { trustedProxies: 1 },
+      rateLimit: { sendCodePerIP: { max: 2, window: "10m" } }
     })
-    await expect(
-      sendVerificationCode(internals, {
-        identifier: emailIdentifier,
-        purpose: "signIn",
-        locale: "en",
-        headers: new Headers()
-      })
-    ).rejects.toThrowError(
-      expect.objectContaining({ code: "cooldown", retryAfter: 60 })
+    const from = (address: string) =>
+      send(internals, new Headers({ "x-forwarded-for": address }))
+
+    await from("203.0.113.7")
+    await from("203.0.113.7")
+    await expect(from("203.0.113.7")).rejects.toThrowError(
+      expect.objectContaining({ code: "rateLimited" })
     )
-
-    expect(sentCodes).toHaveLength(1)
+    // A different client asking for the same address is not affected.
+    await from("203.0.113.8")
+    expect(sentCodes).toHaveLength(3)
   })
 
-  it("allows a resend once the cooldown has passed but the window has not", async () => {
-    vi.useFakeTimers()
-    // Windows are aligned to the clock, so the test starts on a boundary and
-    // every send below lands in a window the test names rather than one the
-    // wall clock happened to be in.
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
-    try {
-      const { internals, sentCodes } = await createTestInternals()
-      await sendVerificationCode(internals, {
-        identifier: emailIdentifier,
-        purpose: "signIn",
-        locale: "en",
-        headers: new Headers()
-      })
-
-      vi.advanceTimersByTime(61_000)
-      await sendVerificationCode(internals, {
-        identifier: emailIdentifier,
-        purpose: "signIn",
-        locale: "en",
-        headers: new Headers()
-      })
-
-      expect(sentCodes).toHaveLength(2)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("stops the fourth send in the window with 429 and sends no email", async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
-    try {
-      const { internals, db, sentCodes } = await createTestInternals()
-
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await sendVerificationCode(internals, {
-          identifier: emailIdentifier,
-          purpose: "signIn",
-          locale: "en",
-          headers: new Headers()
-        })
-        vi.advanceTimersByTime(61_000)
-      }
-
-      await expect(
-        sendVerificationCode(internals, {
-          identifier: emailIdentifier,
-          purpose: "signIn",
-          locale: "en",
-          headers: new Headers()
-        })
-      ).rejects.toThrowError(expect.objectContaining({ code: "rateLimited" }))
-
-      expect(sentCodes).toHaveLength(3)
-      // The refused request is counted too, which is what stops a caller who is
-      // already over the limit from buying a fresh allowance by carrying on.
-      expect(await countAttempts(db, "sendCode:id:ada@example.com:")).toBe(4)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("allows a send again once the aligned window rolls over", async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
-    try {
-      const { internals, db, sentCodes } = await createTestInternals()
-
-      for (let attempt = 0; attempt < 3; attempt++) {
-        await sendVerificationCode(internals, {
-          identifier: emailIdentifier,
-          purpose: "signIn",
-          locale: "en",
-          headers: new Headers()
-        })
-        vi.advanceTimersByTime(61_000)
-      }
-
-      vi.advanceTimersByTime(10 * 60_000)
-      await sendVerificationCode(internals, {
-        identifier: emailIdentifier,
-        purpose: "signIn",
-        locale: "en",
-        headers: new Headers()
-      })
-
-      expect(sentCodes).toHaveLength(4)
-      // Nothing was reset: the window start is part of the key, so the fourth
-      // send counts under a key of its own — and as the first attempt of a
-      // fresh window it swept the spent windows' expired rows on the way.
-      const keys = new Set(
-        (await selectRows(db, "attempts"))
-          .filter((row) => row.key.startsWith("sendCode:id:ada@example.com:"))
-          .map((row) => row.key)
-      )
-      expect(keys.size).toBe(1)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("skips the windows and the cooldown entirely when rateLimit is false", async () => {
+  it("skips the per-IP window when rateLimit is false, and writes no attempt rows", async () => {
     const { internals, db, sentCodes } = await createTestInternals({
-      rateLimit: false
-    })
-
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-
-    // Not one counted request: no per-identifier window, no per-IP window, and
-    // the second send is not held back by the cooldown either.
-    expect(await selectRows(db, "attempts")).toHaveLength(0)
-    expect(sentCodes).toHaveLength(2)
-  })
-
-  it("counts per-ip sends from the proxy header", async () => {
-    const { internals, db } = await createTestInternals({
+      rateLimit: false,
       ipAddress: { trustedProxies: 1 }
     })
     const headers = new Headers({ "x-forwarded-for": "203.0.113.7" })
 
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers
-    })
+    for (let count = 0; count < 40; count++) await send(internals, headers)
 
-    // The key carries the aligned window start, so the assertion is on the
-    // address's rows rather than on one exact key.
-    expect(await countAttempts(db, "sendCode:ip:203.0.113.7:")).toBe(1)
+    expect(await selectRows(db, "attempts")).toHaveLength(0)
+    expect(sentCodes).toHaveLength(40)
   })
 })
 
 describe("consumeVerificationCode", () => {
-  const sendAndRead = async () => {
-    const context = await createTestInternals()
-    await sendVerificationCode(context.internals, {
+  const sendAndRead = async (
+    overrides: Parameters<typeof createTestInternals>[0] = {}
+  ) => {
+    const context = await createTestInternals(overrides)
+    const attempt = await sendVerificationCode(context.internals, {
       identifier: emailIdentifier,
       purpose: "signIn",
       locale: "en",
@@ -470,17 +266,19 @@ describe("consumeVerificationCode", () => {
     })
     return {
       ...context,
+      attempt,
       code: required(context.sentCodes[0], "sent code").code
     }
   }
 
-  it("accepts the right code and burns it, so it cannot be replayed", async () => {
-    const { internals, db, code } = await sendAndRead()
+  it("accepts the right code once, so it cannot be replayed", async () => {
+    const { internals, db, code, attempt } = await sendAndRead()
 
     await consumeVerificationCode(internals, {
       identifier: "ada@example.com",
       code,
-      purpose: "signIn"
+      purpose: "signIn",
+      attempt
     })
 
     expect(await storedCodes(db)).toHaveLength(0)
@@ -488,88 +286,142 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        purpose: "signIn"
+        purpose: "signIn",
+        attempt
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
 
-  it("rejects a sign-in code presented for deletion, and the reverse", async () => {
-    const { internals, code } = await sendAndRead()
+  it("accepts the code in any case, so a phone keyboard cannot get it wrong", async () => {
+    const { internals, code, attempt } = await sendAndRead()
 
     await expect(
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
-        code,
-        purpose: "deleteUser"
+        code: code.toLowerCase(),
+        purpose: "signIn",
+        attempt
       })
-    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    ).resolves.toBeUndefined()
   })
 
-  it("burns the code after five wrong guesses", async () => {
-    const { internals, db, code } = await sendAndRead()
-    const wrongCode = code === "000000" ? "111111" : "000000"
+  it("refuses the right code without its attempt token", async () => {
+    const { internals, db, code, attempt } = await sendAndRead()
 
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (const presented of [null, "", `${attempt}x`]) {
       await expect(
         consumeVerificationCode(internals, {
           identifier: "ada@example.com",
-          code: wrongCode,
-          purpose: "signIn"
+          code,
+          purpose: "signIn",
+          attempt: presented
         })
       ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     }
-    // The budget is a row per guess in `attempts`, keyed on the code's hash
-    // rather than a column on the code row — appending is what makes it hold
-    // under concurrency.
-    const key = await attemptKey(internals.config.secret, code)
-    expect(await countAttempts(db, key)).toBe(4)
-    expect(await liveCode(db)).not.toBeNull()
+    expect(await storedCodes(db)).toHaveLength(1)
+  })
 
-    await expect(
-      consumeVerificationCode(internals, {
-        identifier: "ada@example.com",
-        code: wrongCode,
-        purpose: "signIn"
-      })
-    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+  it("rejects a sign-in code presented for deletion, and the reverse", async () => {
+    const { internals, code, attempt } = await sendAndRead()
 
-    expect(await storedCodes(db)).toHaveLength(0)
-
-    // Even the correct code is dead once the row is burned.
     await expect(
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        purpose: "signIn"
+        purpose: "deleteUser",
+        attempt
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+  })
+
+  it("limits guesses per address, whoever is guessing", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
+    try {
+      const { internals, db, code, attempt } = await sendAndRead()
+      const guess = (value: string, token = attempt) =>
+        consumeVerificationCode(internals, {
+          identifier: "ada@example.com",
+          code: value,
+          purpose: "signIn",
+          attempt: token
+        })
+
+      for (let count = 0; count < 5; count++) {
+        await expect(guess(WRONG_CODE)).rejects.toThrowError(
+          expect.objectContaining({ code: "invalidCode" })
+        )
+      }
+      expect(await countGuesses(db, "ada@example.com")).toBe(5)
+
+      // The sixth is refused before it is even compared — with the right code,
+      // and from a different attempt on the same address.
+      const stranger = await sendVerificationCode(internals, {
+        identifier: emailIdentifier,
+        purpose: "signIn",
+        locale: "en",
+        headers: new Headers()
+      })
+      for (const [value, token] of [
+        [code, attempt],
+        [WRONG_CODE, stranger]
+      ] as const) {
+        await expect(guess(value, token)).rejects.toThrowError(
+          expect.objectContaining({ code: "rateLimited", retryAfter: 300 })
+        )
+      }
+      // The code itself was never spent, and the window passing restores it.
+      expect(await storedCodes(db)).toHaveLength(2)
+      vi.advanceTimersByTime(5 * 60_000)
+      await expect(guess(code)).resolves.toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("keeps the guess limit on under rateLimit: false", async () => {
+    const { internals, code, attempt } = await sendAndRead({
+      rateLimit: false
+    })
+    const guess = (value: string) =>
+      consumeVerificationCode(internals, {
+        identifier: "ada@example.com",
+        code: value,
+        purpose: "signIn",
+        attempt
+      })
+
+    for (let count = 0; count < 5; count++) {
+      await expect(guess(WRONG_CODE)).rejects.toThrowError(
+        expect.objectContaining({ code: "invalidCode" })
+      )
+    }
+    await expect(guess(code)).rejects.toThrowError(
+      expect.objectContaining({ code: "rateLimited" })
+    )
   })
 
   it("lets exactly one of two concurrent valid submissions succeed", async () => {
     // Regression for the double-consume race: both requests read the row and
     // pass the HMAC check, so the conditional delete has to be the gate. A real
     // database has latency between read and delete — model it with a yield.
-    const { internals, db, code } = await sendAndRead()
-    const originalDelete = db.delete.bind(db)
-    db.delete = async (input) => {
+    const { internals, code, attempt } = await sendAndRead()
+    const originalDelete = internals.db.delete.bind(internals.db)
+    internals.db.delete = async (input) => {
       if (input.table === "verifications") {
         await new Promise((resolve) => setTimeout(resolve, 5))
       }
       return originalDelete(input)
     }
-
-    const results = await Promise.allSettled([
+    const submit = () =>
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        purpose: "signIn"
-      }),
-      consumeVerificationCode(internals, {
-        identifier: "ada@example.com",
-        code,
-        purpose: "signIn"
+        purpose: "signIn",
+        attempt
       })
-    ])
+
+    const results = await Promise.allSettled([submit(), submit()])
 
     expect(
       results.filter((result) => result.status === "fulfilled")
@@ -579,244 +431,12 @@ describe("consumeVerificationCode", () => {
     ).toHaveLength(1)
   })
 
-  it("refuses a code issued before a resend, even if its row was read before the resend landed", async () => {
-    // The hash is part of the delete's where clause, so the old code cannot
-    // consume the row the resend created. Limits off so the resend is not
-    // stopped by the cooldown before it ever reaches the store.
-    const { internals, db, sentCodes } = await createTestInternals({
-      rateLimit: false
-    })
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-    const oldCode = required(sentCodes[0], "first code").code
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-    const newCode = required(sentCodes.at(-1), "resent code").code
-    expect(newCode).not.toBe(oldCode)
-
-    await expect(
-      consumeVerificationCode(internals, {
-        identifier: "ada@example.com",
-        code: oldCode,
-        purpose: "signIn"
-      })
-    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
-    expect(await liveCode(db)).not.toBeNull()
-
-    await consumeVerificationCode(internals, {
-      identifier: "ada@example.com",
-      code: newCode,
-      purpose: "signIn"
-    })
-  })
-
-  it("does not burn a resend's fresh code when a stale request hits the attempt cap", async () => {
-    // Four wrong guesses against code A. The fifth reads A; before it acts, a
-    // resend replaces the row with B. The fifth decides to burn — but it read A,
-    // so it must burn A and only A. B has no attempts against it and survives.
-    // The resend is injected into the read itself, the narrowest interleaving
-    // there is: no sleep, no luck. Limits off so the resend is not stopped by
-    // the cooldown before it reaches the store.
-    const { internals, db, sentCodes } = await createTestInternals({
-      rateLimit: false
-    })
-    const send = () =>
-      sendVerificationCode(internals, {
-        identifier: emailIdentifier,
-        purpose: "signIn",
-        locale: "en",
-        headers: new Headers()
-      })
-    await send()
-    const codeA = required(sentCodes[0], "first code").code
-    const wrongCode = codeA === "000000" ? "111111" : "000000"
-    const guessWrong = () =>
-      expect(
-        consumeVerificationCode(internals, {
-          identifier: "ada@example.com",
-          code: wrongCode,
-          purpose: "signIn"
-        })
-      ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
-
-    for (let attempt = 0; attempt < 4; attempt++) await guessWrong()
-
-    const realSelect = db.select.bind(db)
-    let resendOnRead = true
-    db.select = async (input) => {
-      const rows = await realSelect(input)
-      if (resendOnRead && input.table === "verifications") {
-        resendOnRead = false
-        await send()
-      }
-      return rows
-    }
-    await guessWrong()
-    db.select = realSelect
-
-    const codeB = required(sentCodes.at(-1), "resent code").code
-    expect(codeB).not.toBe(codeA)
-    // B is still there: the burn matched A's hash and found nothing. And the
-    // stale guesses counted against A's key alone — B starts with a full budget,
-    // so a wrong guess against it is its first, not its sixth.
-    expect(
-      await countAttempts(db, await attemptKey(internals.config.secret, codeA))
-    ).toBe(5)
-    expect(
-      await countAttempts(db, await attemptKey(internals.config.secret, codeB))
-    ).toBe(0)
-    await guessWrong()
-    expect(await liveCode(db)).not.toBeNull()
-    await consumeVerificationCode(internals, {
-      identifier: "ada@example.com",
-      code: codeB,
-      purpose: "signIn"
-    })
-  })
-
-  it("counts concurrent wrong guesses atomically, so the cap cannot be raced past", async () => {
-    // Fifty wrong guesses in flight at once, every one reading the row before
-    // any has counted. A counter on the code row let them all write back 0 + 1
-    // and the code survived with one attempt against it; a row appended per
-    // guess cannot lose a write, so they count as fifty. Whether any of the
-    // fifty saw enough of the others to burn the row is the scheduler's
-    // business — the next guess counts fifty-one and is refused either way.
-    // Every read is held until all fifty have happened, so the overlap is the
-    // test's rather than the scheduler's. Default options, which is the
-    // configuration with no per-IP limit behind the cap.
-    const guesses = 50
-    const { internals, db, sentCodes } = await createTestInternals()
-    await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
-      purpose: "signIn",
-      locale: "en",
-      headers: new Headers()
-    })
-    const code = required(sentCodes[0], "code").code
-    const wrongCode = code === "000000" ? "111111" : "000000"
-    let releaseReads = () => {}
-    const allRead = new Promise<void>((resolve) => {
-      releaseReads = resolve
-    })
-    let reads = 0
-    const realSelect = db.select.bind(db)
-    db.select = async (input) => {
-      const rows = await realSelect(input)
-      if (input.table === "verifications") {
-        reads += 1
-        if (reads === guesses) releaseReads()
-        await allRead
-      }
-      return rows
-    }
-
-    const results = await Promise.allSettled(
-      Array.from({ length: guesses }, () =>
-        consumeVerificationCode(internals, {
-          identifier: "ada@example.com",
-          code: wrongCode,
-          purpose: "signIn"
-        })
-      )
-    )
-    db.select = realSelect
-
-    expect(results.every((result) => result.status === "rejected")).toBe(true)
-    // Every guess is on record — an append never loses one.
-    expect(
-      await countAttempts(db, await attemptKey(internals.config.secret, code))
-    ).toBe(guesses)
-    // And the right code is dead with it.
-    await expect(
-      consumeVerificationCode(internals, {
-        identifier: "ada@example.com",
-        code,
-        purpose: "signIn"
-      })
-    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
-    expect(await storedCodes(db)).toHaveLength(0)
-  })
-
-  it("refuses a correct guess that read the row before the burn landed", async () => {
-    // The right code is in flight and has read the row. Six wrong guesses then
-    // run to completion, but every burn they issue is held back — so the row is
-    // still there when the right code resumes. It must be refused on the count
-    // alone: comparing first would let a burst that outruns the burn win.
-    const { internals, db, code } = await sendAndRead()
-    const wrongCode = code === "000000" ? "111111" : "000000"
-
-    let releaseRead = () => {}
-    const readHeld = new Promise<void>((resolve) => {
-      releaseRead = resolve
-    })
-    const realSelect = db.select.bind(db)
-    db.select = async (input) => {
-      const rows = await realSelect(input)
-      if (input.table === "verifications") {
-        db.select = realSelect
-        await readHeld
-      }
-      return rows
-    }
-    const correct = consumeVerificationCode(internals, {
-      identifier: "ada@example.com",
-      code,
-      purpose: "signIn"
-    })
-    await vi.waitFor(() => expect(db.select).toBe(realSelect))
-
-    let releaseBurns = () => {}
-    const burnsHeld = new Promise<void>((resolve) => {
-      releaseBurns = resolve
-    })
-    let holdBurns = true
-    const realDelete = db.delete.bind(db)
-    db.delete = async (input) => {
-      if (input.table === "verifications" && holdBurns) await burnsHeld
-      return realDelete(input)
-    }
-    const wrongGuesses = Promise.allSettled(
-      Array.from({ length: 6 }, () =>
-        consumeVerificationCode(internals, {
-          identifier: "ada@example.com",
-          code: wrongCode,
-          purpose: "signIn"
-        })
-      )
-    )
-    await vi.waitFor(async () =>
-      expect(
-        await countAttempts(db, await attemptKey(internals.config.secret, code))
-      ).toBe(6)
-    )
-    expect(await liveCode(db)).not.toBeNull()
-
-    holdBurns = false
-    releaseRead()
-    await expect(correct).rejects.toThrowError(
-      expect.objectContaining({ code: "invalidCode" })
-    )
-
-    releaseBurns()
-    const results = await wrongGuesses
-    expect(results.every((result) => result.status === "rejected")).toBe(true)
-    expect(await storedCodes(db)).toHaveLength(0)
-  })
-
-  it("rejects an expired code, and takes the row with it", async () => {
-    const { internals, db, code } = await sendAndRead()
-    const stored = required(await liveCode(db), "stored")
+  it("rejects an expired code", async () => {
+    const { internals, db, code, attempt } = await sendAndRead()
+    const [stored] = await storedCodes(db)
     await db.update({
       table: "verifications",
-      where: { id: { eq: stored.id } },
+      where: { id: { eq: required(stored, "stored").id } },
       values: { expiresAt: new Date(Date.now() - 1000) }
     })
 
@@ -824,12 +444,10 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        purpose: "signIn"
+        purpose: "signIn",
+        attempt
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
-    // The row was already in hand, so it is deleted rather than left for the
-    // sweep.
-    expect(await storedCodes(db)).toHaveLength(0)
   })
 
   it("rejects a code for an identifier that never requested one", async () => {
@@ -838,8 +456,9 @@ describe("consumeVerificationCode", () => {
     await expect(
       consumeVerificationCode(internals, {
         identifier: "nobody@example.com",
-        code: "123456",
-        purpose: "signIn"
+        code: "ABCDEF",
+        purpose: "signIn",
+        attempt: "anything"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })

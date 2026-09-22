@@ -2,12 +2,10 @@ import type { VerificationPurpose } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
-import { getCooldownRemaining } from "../http/get-cooldown-remaining"
-import { randomSixDigitCode } from "../lib/generate-random"
-import { hmacSha256Hex } from "../lib/hash"
+import { randomBytesBase64url, randomCode } from "../lib/generate-random"
+import { hmacSha256Hex, sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
-import { selectOne } from "../lib/select-one"
 import { sweepExpired } from "../lib/sweep-expired"
 import type { CodeIdentifier } from "./resolve-code-identifier"
 
@@ -15,10 +13,10 @@ import type { CodeIdentifier } from "./resolve-code-identifier"
  * How long a verification code is valid.
  *
  * Not configurable: ten minutes is long enough to switch to an email client and
- * short enough that the five-attempt cap and this window together make guessing a
- * six-digit code hopeless. A knob here would only ever be turned the wrong way.
+ * short enough that a guessed code has to be guessed while its requester is
+ * still waiting. A knob here would only ever be turned the wrong way.
  */
-const VERIFICATION_CODE_TTL = "10m"
+export const VERIFICATION_CODE_TTL = "10m"
 
 /** What sending a code needs to know. */
 export interface SendVerificationCodeInput {
@@ -32,14 +30,17 @@ export interface SendVerificationCodeInput {
  * Generates, stores, and delivers a verification code.
  *
  * The code is stored as an HMAC keyed with the server secret, never in plain
- * text and never as a bare hash: six digits is a million possibilities, so an
- * unkeyed digest is reversible from a database read in about a second.
+ * text and never as a bare hash: a short code has few enough values that an
+ * unkeyed digest is reversible from a database read.
  *
- * Storing it also deletes any previous code for that identifier and purpose,
- * which is what stops a resend from widening the set of values an attacker may
- * guess.
+ * Every send is its own attempt: a fresh token goes back to the caller, and
+ * the code can only be redeemed by whoever presents it. Nothing is deleted on
+ * send, so a stranger requesting a code for your address cannot replace or
+ * spend the one you are holding. That is what makes it safe to never limit
+ * sends per address — the only per-address limit is on guesses.
  *
- * @throws {AuthApiError} `cooldown` or `rateLimited` when throttled.
+ * @returns The attempt token the caller must present with the code.
+ * @throws {AuthApiError} `rateLimited` when the per-IP limit is exceeded.
  */
 export async function sendVerificationCode(
   internals: AuthInternals,
@@ -49,75 +50,34 @@ export async function sendVerificationCode(
   const { identifier, purpose, locale, headers } = input
 
   if (config.rateLimit !== false) {
-    const live = await selectOne(
-      internals,
-      "verifications",
-      { identifier: { eq: identifier.value }, purpose: { eq: purpose } },
-      { expiresAt: "desc" }
-    )
-    const cooldownRemaining = getCooldownRemaining(
-      live,
-      VERIFICATION_CODE_TTL,
-      config.rateLimit.sendCodeCooldown
-    )
-    if (cooldownRemaining > 0) {
-      throw new AuthApiError("cooldown", { retryAfter: cooldownRemaining })
-    }
-
-    const perIdentifier =
-      purpose === "deleteUser"
-        ? config.rateLimit.deleteUserPerIdentifier
-        : config.rateLimit.sendCodePerIdentifier
-    const scope = purpose === "deleteUser" ? "deleteUser" : "sendCode"
-    await checkRateLimit(
-      internals,
-      `${scope}:id:${identifier.value}`,
-      perIdentifier
-    )
-
     const ipKey = ipRateLimitKey(internals, headers, "sendCode")
     if (ipKey)
       await checkRateLimit(internals, ipKey, config.rateLimit.sendCodePerIP)
   }
 
-  const code = randomSixDigitCode()
-  const codeHash = await hmacSha256Hex(code, config.secret)
-  // Delete then insert: latest wins. Two sends racing can leave both rows for
-  // an instant, and that is harmless — verification reads the newest, so the
-  // earlier code is dead either way and the sweep collects it.
+  const attempt = randomBytesBase64url(32)
+  const code = randomCode(
+    config.verificationCode.alphabet,
+    config.verificationCode.length
+  )
   const swept = sweepExpired(internals, "verifications")
-  await internals.db.delete({
-    table: "verifications",
-    where: { identifier: { eq: identifier.value }, purpose: { eq: purpose } }
-  })
-  await insertRow(internals, "verifications", {
+  const stored = await insertRow(internals, "verifications", {
     identifier: identifier.value,
-    codeHash,
+    codeHash: await hmacSha256Hex(code, config.secret),
+    attemptHash: await sha256Hex(attempt),
     expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
     purpose
   })
   await swept
 
-  // Stored first, then delivered, and rolled back if delivery throws. The
-  // rollback keeps a sender outage from costing the user anything: the cooldown
-  // is derived from the newest stored code, so a row left behind by a code
-  // nobody received would refuse their retry for a minute. The delete matches
-  // on the hash, so a resend that landed in between keeps its own fresh code.
-  //
-  // Two sends to one identifier racing each other are not serialized, and do
-  // not need to be. Latest wins on verification, so the earlier send's code is
-  // dead the moment the later one is stored — whether or not the earlier one is
-  // still in flight to the inbox. Serializing that would take a lock primitive
-  // the database contract deliberately does not have.
+  // Stored first, then delivered, and rolled back if delivery throws, so a
+  // code nobody received is not left live against its attempt.
   try {
     await deliver(internals, identifier, code, locale, purpose, headers)
   } catch (error) {
     await internals.db.delete({
       table: "verifications",
-      where: {
-        identifier: { eq: identifier.value },
-        codeHash: { eq: codeHash }
-      }
+      where: { id: { eq: stored.id } }
     })
     internals.log.error("verification code delivery failed", {
       channel: identifier.kind,
@@ -131,6 +91,8 @@ export async function sendVerificationCode(
     channel: identifier.kind,
     purpose
   })
+
+  return attempt
 }
 
 /** Hands the code to the configured sender for its channel. */

@@ -8,6 +8,8 @@ import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 import { clearedRefreshCookies } from "../session/session-cookies"
+import type { AttemptInput } from "../shared/attempt-cookie"
+import { readAttempt } from "../shared/attempt-cookie"
 // Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
 import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
@@ -129,7 +131,7 @@ export const updateUser = defineEndpoint({
 })
 
 /** Body accepted by `DELETE /user`. */
-export interface DeleteUserInput extends CallerInput {
+export interface DeleteUserInput extends CallerInput, AttemptInput {
   /** The confirmation code, when a challenge was issued. */
   code?: string
   requestURL?: string
@@ -147,6 +149,11 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
       code: {
         type: "string",
         description: "The confirmation code, when one was issued."
+      },
+      attempt: {
+        type: "string",
+        description:
+          "The token `/user/send-delete-code` returned. Browsers send it as a cookie instead."
       }
     }
   },
@@ -154,7 +161,8 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
     204: { description: "Deleted.", setsCookie: "cleared" },
     401: "Unauthenticated",
     403: "StaleSession",
-    409: "GuestCannotReceiveCode"
+    409: "GuestCannotReceiveCode",
+    429: "RateLimited"
   }
 }
 
@@ -178,7 +186,10 @@ export const deleteUser = defineEndpoint({
   method: "DELETE",
   path: "/user",
   parse: async ({ request }): Promise<DeleteUserInput> => {
-    const body = await readBody<{ code?: string }>(request, ["code"])
+    const body = await readBody<{ code?: string; attempt?: string }>(request, [
+      "code",
+      "attempt"
+    ])
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },
@@ -220,7 +231,8 @@ export const deleteUser = defineEndpoint({
       await consumeVerificationCode(internals, {
         identifier: identifier.value,
         code: input.code,
-        purpose: "deleteUser"
+        purpose: "deleteUser",
+        attempt: readAttempt(input, "deleteUser")
       })
       return finishDeletion()
     }

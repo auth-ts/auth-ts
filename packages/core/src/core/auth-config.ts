@@ -21,8 +21,10 @@ import type {
   ProviderCredentials,
   ProvidersOptions,
   RateLimitOptions,
+  RateLimitWindow,
   SessionOptions,
-  SmsOptions
+  SmsOptions,
+  VerificationCodeOptions
 } from "./auth-options"
 
 /**
@@ -64,6 +66,7 @@ export interface AuthConfig {
     deleteFreshWindow: Duration
   }
   rateLimit: Required<RateLimitOptions> | false
+  verificationCode: Required<VerificationCodeOptions>
   multiUser: boolean
   localization?: LocalizationOptions
   ipAddress: IpAddressConfig
@@ -92,13 +95,34 @@ const RESERVED_USER_FIELDS = [
   "image"
 ] as const
 
+/** The guess budget per identifier, applied even under `rateLimit: false`. */
+export const DEFAULT_GUESS_LIMIT: RateLimitWindow = { max: 5, window: "5m" }
+
 const DEFAULT_RATE_LIMIT: Required<RateLimitOptions> = {
-  sendCodePerIdentifier: { max: 3, window: "10m" },
+  guessPerIdentifier: DEFAULT_GUESS_LIMIT,
   sendCodePerIP: { max: 30, window: "10m" },
   signInCodePerIP: { max: 30, window: "10m" },
-  deleteUserPerIdentifier: { max: 3, window: "10m" },
-  guestPerIP: { max: 30, window: "10m" },
-  sendCodeCooldown: "60s"
+  guestPerIP: { max: 30, window: "10m" }
+}
+
+function resolveVerificationCode(
+  options: VerificationCodeOptions | undefined
+): Required<VerificationCodeOptions> {
+  const alphabet = options?.alphabet ?? "alphanumeric"
+  const length = options?.length ?? 6
+
+  if (alphabet !== "alphanumeric" && alphabet !== "numeric") {
+    throw new AuthConfigError(
+      `verificationCode.alphabet must be "alphanumeric" or "numeric".`
+    )
+  }
+  if (!Number.isInteger(length) || length < 6 || length > 12) {
+    throw new AuthConfigError(
+      "verificationCode.length must be an integer from 6 to 12."
+    )
+  }
+
+  return { alphabet, length }
 }
 
 /** Reads an environment variable without assuming a Node-style global exists. */
@@ -306,11 +330,7 @@ function resolveRateLimit(
   ) as RateLimitOptions
   const merged = { ...DEFAULT_RATE_LIMIT, ...defined }
 
-  requireDuration(merged.sendCodeCooldown, "rateLimit.sendCodeCooldown")
-
   for (const [name, limit] of Object.entries(merged)) {
-    if (typeof limit === "string") continue
-
     if (!Number.isInteger(limit.max) || limit.max < 1) {
       throw new AuthConfigError(
         `rateLimit.${name}.max must be a positive integer.`
@@ -441,6 +461,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
       )
     },
     rateLimit,
+    verificationCode: resolveVerificationCode(options.verificationCode),
     multiUser: options.multiUser ?? false,
     ...(options.localization ? { localization: options.localization } : {}),
     ipAddress: requireIpAddress(options.ipAddress),

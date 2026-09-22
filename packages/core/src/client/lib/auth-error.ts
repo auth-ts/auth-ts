@@ -12,7 +12,7 @@ export class AuthError extends Error {
   readonly code: AuthErrorCode
   /** HTTP status, for the rare case it matters. */
   readonly status: number
-  /** Seconds to wait, present on `cooldown` and `rateLimited`. Render a countdown. */
+  /** Seconds to wait, present on `rateLimited`. Render a countdown. */
   readonly retryAfter?: number
 
   constructor(

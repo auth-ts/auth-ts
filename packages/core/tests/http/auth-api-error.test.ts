@@ -15,8 +15,8 @@ describe("AuthApiError", () => {
   })
 
   it("interpolates retryAfter into the message", () => {
-    expect(new AuthApiError("cooldown", { retryAfter: 7 }).message).toContain(
-      "7"
-    )
+    expect(
+      new AuthApiError("rateLimited", { retryAfter: 7 }).message
+    ).toContain("7")
   })
 })

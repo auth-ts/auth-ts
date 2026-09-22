@@ -263,6 +263,33 @@ During development — `NODE_ENV=development` — a request with no forwarded he
 reports `127.0.0.1` rather than nothing, so per-IP limits are testable on the one
 machine where you want to try them. Nothing is invented in production.
 
+## Verification codes
+
+Codes are six symbols from a thirty-two-symbol alphabet by default: uppercase
+letters and digits without I, O, 0 and 1. Switch to digits when you want the
+one-time-code autofill phones offer, and lengthen the code if you do:
+
+```ts
+createAuth({
+  // ...
+  verificationCode: { alphabet: "numeric", length: 8 }
+})
+```
+
+Each code is bound to the client that requested it, so the only limit an
+attacker can spend against an address is the guess limit
+(`rateLimit.guessPerIdentifier`, five per five minutes by default). At that
+rate, nonstop guessing reaches even odds after roughly:
+
+| Code | Values | Time to a 50% chance |
+| --- | --- | --- |
+| 6 alphanumeric | 1.1 billion | ~1,000 years |
+| 8 digits | 100 million | ~95 years |
+| 6 digits | 1 million | ~1 year |
+
+Every one of those attacks emails the target every ten minutes to keep a live
+code, so none of them is quiet.
+
 ## Durations
 
 Every duration uses one format — `"10m"`, `"30d"`, `"60s"` — and one parser, so

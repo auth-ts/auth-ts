@@ -27,6 +27,7 @@ import {
 import type { OAuthNavigationInput } from "../methods/oauth"
 import { connectProvider, signInWithProvider } from "../methods/oauth"
 import type {
+  SendCodeResult,
   SendSignInCodeInput,
   SignInAsGuestInput,
   SignInResult,
@@ -95,10 +96,14 @@ export interface AuthClient {
    * exists — the server has nothing to reveal, since the account is created at
    * verification.
    *
-   * @throws {AuthError} `cooldown` or `rateLimited`, both carrying
-   * `retryAfter`. Render the countdown rather than only disabling the button.
+   * The code can only be verified by this client: browsers and `cookieStorage`
+   * clients carry the attempt cookie; anywhere else, pass the returned
+   * `attempt` to `signInWithCode`.
+   *
+   * @throws {AuthError} `rateLimited`, carrying `retryAfter`. Render the
+   * countdown rather than only disabling the button.
    */
-  sendSignInCode: (input: SendSignInCodeInput) => Promise<void>
+  sendSignInCode: (input: SendSignInCodeInput) => Promise<SendCodeResult>
   /**
    * Verifies a code and starts a session.
    *
@@ -179,10 +184,10 @@ export interface AuthClient {
    * Goes to whichever address is already on the account — there is nothing to
    * choose, so there is nothing to pass.
    *
-   * @throws {AuthError} `cooldown` or `rateLimited`, or
-   * `guestCannotReceiveCode` for a guest with no email or phone number on file.
+   * @throws {AuthError} `rateLimited`, or `guestCannotReceiveCode` for a guest
+   * with no email or phone number on file.
    */
-  sendDeleteUserCode: () => Promise<void>
+  sendDeleteUserCode: () => Promise<SendCodeResult>
   /**
    * Signs out.
    *

@@ -44,7 +44,8 @@ export type {
   SendCodeContext,
   SessionOptions,
   SmsOptions,
-  UserOptions
+  UserOptions,
+  VerificationCodeOptions
 } from "./core/auth-options"
 export type {
   Auth,

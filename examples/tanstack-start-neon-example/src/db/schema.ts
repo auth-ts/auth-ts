@@ -102,6 +102,7 @@ export const verifications = pgTable.withRLS(
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     identifier: text("identifier").notNull(),
     codeHash: text("codeHash").notNull(),
+    attemptHash: text("attemptHash").notNull(),
     expiresAt: timestamp("expiresAt", {
       withTimezone: true,
       mode: "string"
@@ -119,7 +120,11 @@ export const verifications = pgTable.withRLS(
       .$onUpdate(() => new Date().toISOString())
   },
   (table) => [
-    index("verificationsIdentifierIndex").on(table.identifier),
+    index("verificationsAttemptIndex").on(
+      table.identifier,
+      table.purpose,
+      table.attemptHash
+    ),
     index("verificationsExpiresAtIndex").on(table.expiresAt),
     check(
       "verificationsPurposeCheck",

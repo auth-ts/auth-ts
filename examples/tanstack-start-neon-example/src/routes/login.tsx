@@ -166,12 +166,13 @@ function LoginPage() {
               <fieldset className="fieldset">
                 <legend className="fieldset-legend">Code</legend>
                 <input
-                  inputMode="numeric"
                   autoComplete="one-time-code"
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   required
                   value={code}
                   onChange={(event) => setCode(event.target.value)}
-                  placeholder="123456"
+                  placeholder="A1B2C3"
                   className="input w-full text-center font-mono text-lg tracking-[0.4em]"
                 />
                 <p className="label">Sent to {email}</p>

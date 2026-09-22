@@ -23,7 +23,7 @@ export interface EndpointResponse {
   description: string
   schema?: JsonSchema | ComponentName
   /** Which cookie the response writes; the builder names it from `config.cookie`. */
-  setsCookie?: "refresh" | "accounts" | "state" | "cleared"
+  setsCookie?: "refresh" | "accounts" | "state" | "attempt" | "cleared"
   /** A `Location` header and no body. */
   redirect?: true
   /** Only the OAuth callback, which answers a navigation with a page. */

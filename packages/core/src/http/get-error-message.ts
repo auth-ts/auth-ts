@@ -13,7 +13,6 @@ import type { AuthErrorCode } from "./error-response"
  * a screenshot, or a support ticket.
  */
 export const builtInErrorMessages: Record<AuthErrorCode, string> = {
-  cooldown: "Please wait {retryAfter} seconds before requesting another code.",
   rateLimited: "Too many attempts. Please try again in {retryAfter} seconds.",
   invalidCode: "That code is not valid. Request a new one and try again.",
   staleSession: "Please sign in again to continue.",

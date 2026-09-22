@@ -7,17 +7,18 @@ import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { convertGuest } from "../../session/convert-guest"
 import { issueSession } from "../../session/issue-session"
 import { resolveCallerSession } from "../../session/resolve-session"
+import type { AttemptInput } from "../../shared/attempt-cookie"
+import { readAttempt } from "../../shared/attempt-cookie"
 import { findOrCreateUser } from "../../user/find-or-create-user"
 import { consumeVerificationCode } from "../../verification-code/consume-verification-code"
 import type { IdentifierBody } from "../../verification-code/resolve-code-identifier"
 import { resolveCodeIdentifier } from "../../verification-code/resolve-code-identifier"
 
 /** Body accepted by `POST /sign-in/code`. */
-export interface SignInWithCodeInput extends IdentifierBody {
+export interface SignInWithCodeInput extends IdentifierBody, AttemptInput {
   code: string
   /** Values for fields declared in `user.additionalFields`, applied on creation only. */
   additionalFields?: Record<string, unknown>
-  headers?: Headers
   requestURL?: string
 }
 
@@ -32,7 +33,12 @@ export const signInWithCodeDocs: EndpointDocs<SignInWithCodeInput> = {
     properties: {
       email: { type: "string", format: "email" },
       phoneNumber: { type: "string", description: "E.164." },
-      code: { type: "string" }
+      code: { type: "string" },
+      attempt: {
+        type: "string",
+        description:
+          "The token `/sign-in/send-code` returned. Browsers send it as a cookie instead."
+      }
     },
     required: ["code"]
   },
@@ -69,6 +75,7 @@ export const signInWithCode = defineEndpoint({
       "email",
       "phoneNumber",
       "code",
+      "attempt",
       "additionalFields"
     ])
 
@@ -107,7 +114,8 @@ export const signInWithCode = defineEndpoint({
       consumeVerificationCode(internals, {
         identifier: identifier.value,
         code: input.code,
-        purpose: "signIn"
+        purpose: "signIn",
+        attempt: readAttempt(input, "signIn")
       }),
       resolveCallerSession(internals, input)
     ])

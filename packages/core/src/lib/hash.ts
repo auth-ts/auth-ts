@@ -12,7 +12,7 @@ function toHex(buffer: ArrayBuffer) {
  * Refresh tokens are stored this way, so a leaked table cannot be replayed as a
  * session. That is all it buys: the hash is unkeyed, so anyone holding a token
  * can find its row, and the token stays a bearer credential either way. Thirty
- * two random bytes need no key — six-digit codes do, which is why those get
+ * two random bytes need no key — short codes do, which is why those get
  * {@link hmacSha256Hex} instead.
  */
 export async function sha256Hex(value: string) {
@@ -55,10 +55,10 @@ function hmacKey(secret: string) {
 /**
  * Signs a value with HMAC-SHA-256 under the server secret and returns lowercase hex.
  *
- * Verification codes are stored this way rather than as a bare hash. Six digits is only
- * a million possibilities, so a plain SHA-256 of a code is reversible from a
- * database read in about a second; keying the hash with a secret the database
- * never holds means a database leak alone does not yield working codes.
+ * Verification codes are stored this way rather than as a bare hash. A short
+ * code has few enough values that a plain SHA-256 of it is reversible from a
+ * database read in seconds; keying the hash with a secret the database never
+ * holds means a database leak alone does not yield working codes.
  */
 export async function hmacSha256Hex(value: string, secret: string) {
   const signature = await crypto.subtle.sign(

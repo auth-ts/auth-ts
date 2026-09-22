@@ -2,6 +2,7 @@ import type { AuthUser } from "../../core/auth-database"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
 import { reviveUser } from "../lib/revive-user"
+import type { SendCodeResult } from "./sign-in"
 
 /** The flat body accepted by profile updates. */
 export type UpdateUserInput = {
@@ -72,6 +73,8 @@ export interface DeleteUserResult {
 /** Input for account deletion. */
 export interface DeleteUserInput {
   code?: string
+  /** The attempt token `sendDeleteUserCode` returned, where no cookie carries it. */
+  attempt?: string
 }
 
 /** `DELETE /user`; a stale session is reported as a result, not thrown. */
@@ -100,10 +103,12 @@ export async function deleteUser(
 /** `POST /user/send-delete-code`. */
 export async function sendDeleteUserCode(
   internals: AuthClientInternals
-): Promise<void> {
-  await internals.fetchJson({
+): Promise<SendCodeResult> {
+  const { attempt } = await internals.fetchJson<SendCodeResult>({
     method: "POST",
     path: "/user/send-delete-code",
     authenticated: true
   })
+
+  return { attempt }
 }

@@ -157,6 +157,7 @@ describe("select", () => {
       values: {
         identifier,
         codeHash: "old",
+        attemptHash: "old",
         expiresAt: older,
         purpose: "signIn",
         createdAt: new Date(),
@@ -168,6 +169,7 @@ describe("select", () => {
       values: {
         identifier,
         codeHash: "new",
+        attemptHash: "new",
         expiresAt: newer,
         purpose: "signIn",
         createdAt: new Date(),

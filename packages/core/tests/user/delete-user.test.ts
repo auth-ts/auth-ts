@@ -41,6 +41,7 @@ async function seed() {
       values: {
         identifier,
         codeHash: `code-${identifier}`,
+        attemptHash: `attempt-${identifier}`,
         expiresAt: new Date(Date.now() + 60_000),
         purpose: "signIn",
         createdAt: new Date(),

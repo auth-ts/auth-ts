@@ -525,6 +525,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
         await create(db, "verifications", {
           identifier,
           codeHash: `${unique()}`,
+          attemptHash: `${unique()}`,
           expiresAt,
           purpose: "signIn",
           createdAt: new Date(),

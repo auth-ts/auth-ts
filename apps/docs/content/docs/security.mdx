@@ -9,29 +9,40 @@ account takeover rather than a bug.
 
 ## Verification codes
 
-Six digits, drawn from a CSPRNG with rejection sampling — never
+Six symbols by default, from an alphabet of thirty-two — uppercase letters and
+digits without the four that get misread — drawn from a CSPRNG one masked byte
+at a time, with the overflow rejected rather than reduced: never
 `Math.random()`, and never a plain modulo, which biases the range and therefore
-shrinks it.
+shrinks it. `verificationCode` switches to digits for phones that autofill
+one-time codes, and sets the length.
 
 Stored as **HMAC-SHA-256 keyed with your server secret**, not as a bare hash. A
-million possibilities means an unkeyed digest is reversible from a database read
-in about a second; keyed with a secret the database never holds, a database leak
+short code has few enough values that an unkeyed digest is reversible from a
+database read; keyed with a secret the database never holds, a database leak
 alone yields no working codes.
 
-Five wrong guesses burn the code, counted per code rather than per caller, so a
-resend is a fresh budget and a guess against a superseded code spends nothing.
-A guess is counted before it is checked, so a burst that outruns the burn is
-still refused past the cap — with the same one-burst overshoot the limiter
-below describes, and no more.
-Sending a new code deletes the previous ones and **latest wins** on verification,
-so a resend cannot widen the set of values an attacker may guess. No slow hashing
-— the ten-minute lifetime and the attempt cap do that job, and bcrypt here would
-only slow down honest sign-ins.
+**Every code is bound to the client that asked for it.** A send hands back an
+attempt token — as an `HttpOnly` cookie scoped to the auth mount, and in the
+body for callers with no cookie jar — and stores its hash beside the code. A
+verify reads exactly one row: the address, the purpose, and that attempt. A
+stranger requesting a code for your address gets a code of their own; they
+cannot replace yours, spend yours, or guess at yours, so there is no limit on
+how many codes an address may have in flight and nothing an attacker can do to
+keep you from starting a sign-in.
 
-Sign-in codes and account-deletion codes share an identifier, so a stranger
-spamming `/sign-in/send-code` at your address keeps you inside the send cooldown
-for `/user/send-delete-code` too. Purposes are checked on verify, so a sign-in
-code can never authorize a deletion — this is a bounded nuisance, not a bypass.
+What is limited is **guessing, per address, from anyone**: five guesses in
+five minutes by default, and the sixth is refused before it is compared. That
+is the one budget an attacker holds against an account, and at six symbols from
+thirty-two it takes on the order of a thousand years of nonstop guessing —
+emailing the target every ten minutes to keep a live code — to reach even
+odds. Under that attack the real user's guess may be refused for the rest of
+the window; their code is never touched. No slow hashing — the ten-minute
+lifetime and the guess budget do that job, and bcrypt here would only slow down
+honest sign-ins.
+
+Purposes are checked on verify, so a sign-in code can never authorize a
+deletion, and the two carry separate attempt cookies so requesting one does not
+orphan the other.
 
 `DELETE /user` never sends a code itself. A stale session refuses outright, with
 no side effect, so retrying a failed delete cannot fire a storm of email —
@@ -39,15 +50,15 @@ no side effect, so retrying a failed delete cannot fire a storm of email —
 the caller's own bearer token.
 
 A code whose delivery fails is rolled back rather than left live, so a sender
-outage does not start the cooldown against the person who never received it.
+outage leaves nothing bound to the token the person is about to present.
 
 ## Rate limiting
 
 On by default, backed by your database through one insert and one bounded read —
 approximate under a simultaneous burst, by design, in the way described below.
-Sending is limited per identifier and per IP, verification per IP, and deletion
-codes per identifier. There is also a sixty-second cooldown between sends to one
-address, derived from the newest code's own expiry so it needs no extra state.
+Sending is limited per IP, guessing per address and per IP, and guest sign-in
+per IP. Nothing is limited per account except guesses, so an attacker cannot
+lock an address out of receiving codes.
 
 Each counted request appends a row to `attempts` under a key containing the
 window, and the check reads at most `max + 1` of them. Nothing is
@@ -56,8 +67,8 @@ either: requests that are genuinely simultaneous can each read a number below
 the cap before the others land. The overshoot is bounded by that one burst and
 cannot be repeated. If you want exactness, enforce it at your edge on
 `/sign-in/send-code` and `/sign-in/code` and set `rateLimit: false`; the
-five-guess cap on each code is keyed on the code rather than the caller and
-stays on regardless.
+per-address guess limit stays on regardless, because nothing in front of this
+server can key on the address.
 
 Scope is authentication abuse only — email flooding and credential guessing. It
 is not a general API limiter; that belongs in infrastructure in front of
@@ -332,9 +343,8 @@ buckets for two addresses. IPv6 limits count per `/64` — a residential client
 owns the whole prefix, so per-address counters would be rotated past for free.
 
 When no address can be derived at all, the per-IP limits do not apply and
-nothing is written to `session.ipAddress`; the per-identifier limits and the
-cooldown are unaffected, and the first request it happens to says so in your
-logs. Requests are never merged into one shared bucket in that case, which
+nothing is written to `session.ipAddress`; the per-address guess limit is
+unaffected, and the first request it happens to says so in your logs. Requests are never merged into one shared bucket in that case, which
 would let a single caller lock everyone out of a flow.
 
 If your database exposes a REST API, check what it grants by default. Neon, for

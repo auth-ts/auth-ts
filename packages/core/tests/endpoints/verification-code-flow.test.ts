@@ -88,39 +88,82 @@ describe("verification code sign-in over HTTP", () => {
     expect(body.message).not.toContain("ada@example.com")
   })
 
-  it("returns 429 with Retry-After and a cooldown code on a rapid resend", async () => {
+  it("binds the code to the client that asked: another client's cookie cannot spend it", async () => {
+    const { auth, sentCodes } = await createTestServer()
+    const sendResponse = await auth.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const attempt = readSetCookies(sendResponse).get("auth-ts.attempt")
+    expect(attempt?.attributes).toContain("HttpOnly")
+    expect(attempt?.attributes).toContain("Path=/api/auth")
+    expect(attempt?.attributes).toContain("Max-Age=600")
+    // The body carries it too, for callers with no cookie jar.
+    const sent = (await sendResponse.json()) as { attempt: string }
+    expect(sent.attempt).toBe(attempt?.value)
+
+    const stranger = await auth.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: {
+          email: "ada@example.com",
+          code: required(sentCodes[0], "sent code").code
+        },
+        cookies: { "auth-ts.attempt": "someone-elses-attempt" }
+      })
+    )
+    expect(stranger.status).toBe(401)
+
+    const owner = await auth.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: {
+          email: "ada@example.com",
+          code: required(sentCodes[0], "sent code").code,
+          attempt: sent.attempt
+        },
+        cookies: { "auth-ts.attempt": "someone-elses-attempt" }
+      })
+    )
+    expect(owner.status).toBe(200)
+  })
+
+  it("returns 429 with Retry-After once an address has been guessed at too often", async () => {
     const { auth, sentCodes } = await createTestServer()
     await auth.handler(
       request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" }
       })
     )
+    const code = required(sentCodes[0], "sent code").code
+    const wrong = code === "AAAAAA" ? "BBBBBB" : "AAAAAA"
+    const guess = (value: string) =>
+      auth.handler(
+        request("POST", "/api/auth/sign-in/code", {
+          body: { email: "ada@example.com", code: value }
+        })
+      )
 
-    const response = await auth.handler(
-      request("POST", "/api/auth/sign-in/send-code", {
-        body: { email: "ada@example.com" }
-      })
-    )
+    for (let attempt = 0; attempt < 5; attempt++) {
+      expect((await guess(wrong)).status).toBe(401)
+    }
+    const response = await guess(code)
 
     expect(response.status).toBe(429)
-    expect(response.headers.get("retry-after")).toBe("60")
-
+    expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0)
     const body = (await response.json()) as {
       code: string
       retryAfter: number
       message: string
     }
-    expect(body.code).toBe("cooldown")
-    expect(body.retryAfter).toBe(60)
-    expect(body.message).toContain("60")
-    expect(sentCodes).toHaveLength(1)
+    expect(body.code).toBe("rateLimited")
+    expect(body.message).toContain(String(body.retryAfter))
   })
 
   it("localizes the message while keeping the code stable", async () => {
-    const { auth } = await createTestServer({
+    const { auth, sentCodes } = await createTestServer({
       localization: {
         defaultLocale: "en",
-        messages: { de: { cooldown: "Bitte warte {retryAfter} Sekunden." } }
+        messages: { de: { rateLimited: "Bitte warte {retryAfter} Sekunden." } }
       }
     })
     await auth.handler(
@@ -128,20 +171,30 @@ describe("verification code sign-in over HTTP", () => {
         body: { email: "ada@example.com" }
       })
     )
+    const code = required(sentCodes[0], "sent code").code
+    const wrong = code === "AAAAAA" ? "BBBBBB" : "AAAAAA"
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await auth.handler(
+        request("POST", "/api/auth/sign-in/code", {
+          body: { email: "ada@example.com", code: wrong }
+        })
+      )
+    }
 
     const response = await auth.handler(
-      request("POST", "/api/auth/sign-in/send-code", {
-        body: { email: "ada@example.com" },
+      request("POST", "/api/auth/sign-in/code", {
+        body: { email: "ada@example.com", code: wrong },
         headers: { "accept-language": "de-AT,de;q=0.9" }
       })
     )
 
     const body = (await response.json()) as {
       code: string
+      retryAfter: number
       message: string
     }
-    expect(body.code).toBe("cooldown")
-    expect(body.message).toBe("Bitte warte 60 Sekunden.")
+    expect(body.code).toBe("rateLimited")
+    expect(body.message).toBe(`Bitte warte ${body.retryAfter} Sekunden.`)
   })
 
   it("passes the resolved locale through to the sender", async () => {
