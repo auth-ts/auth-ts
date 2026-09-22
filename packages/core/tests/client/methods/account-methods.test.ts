@@ -274,17 +274,19 @@ describe("signOut", () => {
 })
 
 describe("deleteUser", () => {
-  it("reports a stale session as a value, not an error", async () => {
+  it("reports the verification challenge as a value, not an error", async () => {
     server.on("DELETE", "/api/auth/user", {
       status: 403,
       body: {
-        code: "staleSession",
-        message: "Please sign in again to continue."
+        code: "verificationRequired",
+        message: "Confirm it's you to continue."
       }
     })
     const client = await signedIn()
 
-    expect(await client.deleteUser()).toEqual({ status: "staleSession" })
+    expect(await client.deleteUser()).toEqual({
+      status: "verificationRequired"
+    })
   })
 
   it("clears everything once the account is gone", async () => {

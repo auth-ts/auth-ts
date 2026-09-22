@@ -253,9 +253,6 @@ describe("construction failures", () => {
       })
     ).toThrow(/jwt\.ttl/)
     expect(() =>
-      createAuth({ ...baseOptions(), user: { deleteFreshWindow: "-1m" } })
-    ).toThrow(/user\.deleteFreshWindow/)
-    expect(() =>
       createAuth({
         ...baseOptions(),
         rateLimit: { sendCodePerIP: { max: 30, window: "-10m" } }
@@ -272,18 +269,10 @@ describe("construction failures", () => {
     ).toThrow(/session\.ttl.*out of range/)
   })
 
-  it("still accepts a zero duration, which deleteFreshWindow documents", () => {
-    // `"0s"` means no session is ever fresh enough to skip the emailed code —
-    // a real setting, not a mistake, so the negative check must stop at zero.
-    expect(() =>
-      createAuth({ ...baseOptions(), user: { deleteFreshWindow: "0s" } })
-    ).not.toThrow()
-  })
-
   it("rejects a zero rate-limit window, which would silently disable the limit", () => {
     // The store resets the count whenever `resetAt <= now()`, so a window that
-    // ends the instant it starts counts every request as the first one. Unlike
-    // `deleteFreshWindow`, zero is never a setting here — only a mistake.
+    // ends the instant it starts counts every request as the first one, so
+    // zero is never a setting here — only a mistake.
     expect(() =>
       createAuth({
         ...baseOptions(),
@@ -501,7 +490,6 @@ describe("resolved defaults", () => {
     expect(config.session).toEqual({ ttl: "30d", sliding: true })
     expect(config.cookie.name).toBe("auth-ts.refresh")
     expect(config.cookie.path).toBe("/")
-    expect(config.user.deleteFreshWindow).toBe("15m")
     expect(config.multiUser).toBe(false)
     expect(config.guest).toBe(false)
     expect(config.logLevel).toBe("warn")

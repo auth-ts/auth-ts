@@ -15,7 +15,7 @@ import type { AuthErrorCode } from "./error-response"
 export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   rateLimited: "Too many attempts. Please try again in {retryAfter} seconds.",
   invalidCode: "That code is not valid. Request a new one and try again.",
-  staleSession: "Please sign in again to continue.",
+  verificationRequired: "Confirm it's you to continue.",
   unauthenticated: "You are not signed in.",
   providerConflict: "That account is already connected to a different user.",
   providerDenied: "That sign-in was cancelled.",

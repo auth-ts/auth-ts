@@ -66,8 +66,8 @@ export async function signOut(
 
 /** What a deletion attempt resolved to. */
 export interface DeleteUserResult {
-  /** `"staleSession"` means call `sendDeleteUserCode` and retry with the code it sends. */
-  status: "deleted" | "staleSession"
+  /** `"verificationRequired"` means call `sendDeleteUserCode` and retry with the code it sends. */
+  status: "deleted" | "verificationRequired"
 }
 
 /** Input for account deletion. */
@@ -77,7 +77,7 @@ export interface DeleteUserInput {
   attempt?: string
 }
 
-/** `DELETE /user`; a stale session is reported as a result, not thrown. */
+/** `DELETE /user`; the verification challenge is reported as a result, not thrown. */
 export async function deleteUser(
   internals: AuthClientInternals,
   input: DeleteUserInput = {}
@@ -90,8 +90,8 @@ export async function deleteUser(
       authenticated: true
     })
   } catch (error) {
-    if (error instanceof AuthError && error.code === "staleSession")
-      return { status: "staleSession" }
+    if (error instanceof AuthError && error.code === "verificationRequired")
+      return { status: "verificationRequired" }
     throw error
   }
 

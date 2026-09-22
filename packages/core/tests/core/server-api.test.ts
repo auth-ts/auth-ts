@@ -471,9 +471,7 @@ describe("calling with a token instead of a request", () => {
   })
 
   it("serves every authenticated callable from the token alone", async () => {
-    const context = await createTestServer({
-      user: { deleteFreshWindow: "1h" }
-    })
+    const context = await createTestServer()
     const { token } = await signIn(context)
     const { auth } = context
 
@@ -481,7 +479,10 @@ describe("calling with a token instead of a request", () => {
     expect(updated.name).toBe("Ada")
     expect(updated.email).toBe("ada@example.com")
 
-    await auth.deleteUser({ token })
+    // No cookie jar in-process: the attempt token rides in the result and back.
+    const { attempt } = await auth.sendDeleteUserCode({ token })
+    const code = required(context.sentCodes.at(-1), "deletion code").code
+    await auth.deleteUser({ token, code, attempt })
     expect(context.db.sessions()).toHaveLength(0)
   })
 

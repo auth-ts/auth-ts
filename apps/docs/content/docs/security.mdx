@@ -225,10 +225,11 @@ Additional fields are an allowlist applied on insert only. On an existing user
 they are ignored, because otherwise any sign-in request could rewrite profile
 columns.
 
-Deletion is always gated: either the session authenticated within the freshness
-window, or a code is emailed. The challenge answers **403**, never a 2xx, so a
-client cannot mistake it for success and tell someone their account is gone when
-it is not.
+Deletion always needs a code, and the code is filed under the session that
+asked for it: no other session of the same user can redeem it, and there is no
+"signed in recently enough" bypass — a hijacked session is exactly the one
+that is recent. The challenge answers **403**, never a 2xx, so a client cannot
+mistake it for success and tell someone their account is gone when it is not.
 
 Codes carry a purpose. A sign-in code cannot authorize a deletion, and a deletion
 code cannot sign anyone in.

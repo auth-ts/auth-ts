@@ -62,7 +62,6 @@ export interface AuthConfig {
   }
   user: {
     additionalFields: AdditionalFieldsSchema
-    deleteFreshWindow: Duration
   }
   rateLimit: Required<RateLimitOptions> | false
   verificationCode: Required<VerificationCodeOptions>
@@ -138,10 +137,6 @@ function readEnvironmentVariable(name: string) {
  * before they were handed out, and a negative rate-limit window puts the window
  * start in the future. Both fail at runtime rather than at startup, which is
  * the trade this function exists to reverse.
- *
- * Zero is left alone deliberately. It is a documented value for
- * {@link UserOptions.deleteFreshWindow}, where it means no session is ever
- * fresh enough to skip the emailed code.
  */
 function requireDuration(value: Duration, optionName: string) {
   let milliseconds: number
@@ -426,13 +421,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
         : {}),
       stateName: "auth-ts.state"
     },
-    user: {
-      additionalFields,
-      deleteFreshWindow: requireDuration(
-        options.user?.deleteFreshWindow ?? "15m",
-        "user.deleteFreshWindow"
-      )
-    },
+    user: { additionalFields },
     rateLimit,
     verificationCode: resolveVerificationCode(options.verificationCode),
     multiUser: options.multiUser ?? false,

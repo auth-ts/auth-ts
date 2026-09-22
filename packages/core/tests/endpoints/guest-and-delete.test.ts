@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
 import {
-  mintToken,
   readRefreshCookie,
   refreshCookieFor,
   refreshCookies,
@@ -413,16 +412,32 @@ describe("account deletion", () => {
     }
   }
 
-  it("deletes immediately when the session authenticated recently", async () => {
-    const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
-
-    const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies: refreshCookieFor(refreshToken),
-        token
+  /** The whole two-step delete, for tests that care about what is left behind. */
+  const deleteWithCode = async (
+    context: Awaited<ReturnType<typeof createTestServer>>,
+    session: { refreshToken: string; token: string }
+  ) => {
+    const cookies = refreshCookieFor(session.refreshToken)
+    await context.auth.handler(
+      request("POST", "/api/auth/user/send-delete-code", {
+        cookies,
+        token: session.token
       })
     )
+    return context.auth.handler(
+      request("DELETE", "/api/auth/user", {
+        cookies,
+        token: session.token,
+        body: { code: required(context.sentCodes.at(-1), "deletion code").code }
+      })
+    )
+  }
+
+  it("deletes the account and clears the cookie once the code is presented", async () => {
+    const context = await createTestServer()
+    const session = await signIn(context)
+
+    const response = await deleteWithCode(context, session)
 
     expect(response.status).toBe(204)
     expect(context.db.users()).toHaveLength(0)
@@ -436,14 +451,13 @@ describe("account deletion", () => {
     // Core deletes the children itself rather than requiring ON DELETE CASCADE,
     // and a code left behind would sign the address's next owner into nothing.
     const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
-    const cookies = refreshCookieFor(refreshToken)
+    const session = await signIn(context)
 
-    // An outstanding code, sent and never verified.
+    // An outstanding sign-in code, sent and never verified.
     await context.auth.handler(
       request("POST", "/api/auth/sign-in/send-code", {
         body: { email: "ada@example.com" },
-        cookies
+        cookies: refreshCookieFor(session.refreshToken)
       })
     )
     expect(
@@ -452,9 +466,7 @@ describe("account deletion", () => {
       })
     ).not.toEqual([])
 
-    const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", { cookies, token })
-    )
+    const response = await deleteWithCode(context, session)
 
     expect(response.status).toBe(204)
     expect(
@@ -491,12 +503,7 @@ describe("account deletion", () => {
     const grace = await insertUser(context.db, { email: "grace@example.com" })
     await session(grace.id, "grace-laptop")
 
-    const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies: refreshCookieFor(refreshToken),
-        token
-      })
-    )
+    const response = await deleteWithCode(context, { refreshToken, token })
 
     expect(response.status).toBe(204)
     expect(
@@ -510,10 +517,8 @@ describe("account deletion", () => {
     ).toBeNull()
   })
 
-  it("refuses a stale session outright, never a 2xx and never a side effect", async () => {
-    const context = await createTestServer({
-      user: { deleteFreshWindow: "0s" }
-    })
+  it("answers the challenge outright, never a 2xx and never a side effect", async () => {
+    const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
     const before = context.sentCodes.length
 
@@ -526,34 +531,10 @@ describe("account deletion", () => {
 
     expect(response.status).toBe(403)
     expect(((await response.json()) as { code: string }).code).toBe(
-      "staleSession"
+      "verificationRequired"
     )
     expect(context.db.users()).toHaveLength(1)
     expect(context.sentCodes.length).toBe(before)
-  })
-
-  it("treats a zero-length freshness window as always requiring a code", async () => {
-    // Regression: with `<=`, a session created in the same millisecond as the
-    // request satisfied a zero window and deleted the account outright.
-    vi.useFakeTimers()
-    try {
-      const context = await createTestServer({
-        user: { deleteFreshWindow: "0s" }
-      })
-      const { refreshToken, token } = await signIn(context)
-
-      const response = await context.auth.handler(
-        request("DELETE", "/api/auth/user", {
-          cookies: refreshCookieFor(refreshToken),
-          token
-        })
-      )
-
-      expect(response.status).toBe(403)
-      expect(context.db.users()).toHaveLength(1)
-    } finally {
-      vi.useRealTimers()
-    }
   })
 
   it("refuses a token whose session has expired but is unswept", async () => {
@@ -571,51 +552,6 @@ describe("account deletion", () => {
       )
 
       expect(response.status).toBe(401)
-      expect(context.db.users()).toHaveLength(1)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("deletes immediately at the boundary of a non-zero window", async () => {
-    vi.useFakeTimers()
-    try {
-      const context = await createTestServer({
-        user: { deleteFreshWindow: "15m" }
-      })
-      const { refreshToken } = await signIn(context)
-
-      vi.advanceTimersByTime(15 * 60_000 - 1)
-      // Past the token's own lifetime, so the caller refreshes first — the
-      // freshness window is measured from the session, not from the token.
-      const fresh = await context.auth.handler(
-        request("DELETE", "/api/auth/user", {
-          token: await mintToken(context.auth, refreshToken)
-        })
-      )
-
-      expect(fresh.status).toBe(204)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("challenges once the non-zero window has elapsed", async () => {
-    vi.useFakeTimers()
-    try {
-      const context = await createTestServer({
-        user: { deleteFreshWindow: "15m" }
-      })
-      const { refreshToken } = await signIn(context)
-
-      vi.advanceTimersByTime(15 * 60_000)
-      const stale = await context.auth.handler(
-        request("DELETE", "/api/auth/user", {
-          token: await mintToken(context.auth, refreshToken)
-        })
-      )
-
-      expect(stale.status).toBe(403)
       expect(context.db.users()).toHaveLength(1)
     } finally {
       vi.useRealTimers()
@@ -646,9 +582,7 @@ describe("account deletion", () => {
   })
 
   it("completes deletion with a code from send-delete-code", async () => {
-    const context = await createTestServer({
-      user: { deleteFreshWindow: "0s" }
-    })
+    const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
     const cookies = refreshCookieFor(refreshToken)
 
@@ -676,10 +610,45 @@ describe("account deletion", () => {
     expect(context.db.users()).toHaveLength(0)
   })
 
+  it("binds the deletion code to the session that asked for it", async () => {
+    // Two sessions for one user. The code goes to the same address either way,
+    // but it is filed under the session that requested it, so a hijacked
+    // session elsewhere cannot spend a code the owner asked for — or vice versa.
+    const context = await createTestServer()
+    const first = await signIn(context)
+    const second = await signIn(context)
+
+    await context.auth.handler(
+      request("POST", "/api/auth/user/send-delete-code", {
+        cookies: refreshCookieFor(first.refreshToken),
+        token: first.token
+      })
+    )
+    const code = required(context.sentCodes.at(-1), "deletion code").code
+
+    const elsewhere = await context.auth.handler(
+      request("DELETE", "/api/auth/user", {
+        cookies: refreshCookieFor(second.refreshToken),
+        token: second.token,
+        body: { code }
+      })
+    )
+    expect(elsewhere.status).toBe(401)
+    expect(context.db.users()).toHaveLength(1)
+
+    const asker = await context.auth.handler(
+      request("DELETE", "/api/auth/user", {
+        cookies: refreshCookieFor(first.refreshToken),
+        token: first.token,
+        body: { code }
+      })
+    )
+    expect(asker.status).toBe(204)
+    expect(context.db.users()).toHaveLength(0)
+  })
+
   it("keeps a deletion code apart from a sign-in code for the same address", async () => {
-    const context = await createTestServer({
-      user: { deleteFreshWindow: "0s" }
-    })
+    const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
     const cookies = refreshCookieFor(refreshToken)
 
@@ -714,9 +683,7 @@ describe("account deletion", () => {
   })
 
   it("sends nothing for a token whose session is already revoked", async () => {
-    const context = await createTestServer({
-      user: { deleteFreshWindow: "0s" }
-    })
+    const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
     const cookies = refreshCookieFor(refreshToken)
 
@@ -734,9 +701,7 @@ describe("account deletion", () => {
   })
 
   it("refuses a sign-in code as a deletion code", async () => {
-    const context = await createTestServer({
-      user: { deleteFreshWindow: "0s" }
-    })
+    const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
     const cookies = refreshCookieFor(refreshToken)
 
@@ -770,7 +735,6 @@ describe("account deletion", () => {
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
     try {
       const context = await createTestServer({
-        user: { deleteFreshWindow: "0s" },
         ipAddress: { trustedProxies: 1 },
         rateLimit: { sendCodePerIP: { max: 2, window: "10m" } }
       })
@@ -799,8 +763,7 @@ describe("account deletion", () => {
 
   it("refuses to delete a guest who has no way to receive a code", async () => {
     const context = await createTestServer({
-      guest: true,
-      user: { deleteFreshWindow: "0s" }
+      guest: true
     })
     const { refreshToken, token } = await signInGuest(context)
 

@@ -20,7 +20,14 @@ export const VERIFICATION_CODE_TTL = "10m"
 
 /** What sending a code needs to know. */
 export interface SendVerificationCodeInput {
-  identifier: CodeIdentifier
+  /** Where the code is delivered. */
+  deliverTo: CodeIdentifier
+  /**
+   * What the code is filed under, and what a verify has to name to find it.
+   * The address for a sign-in; the session id for an action a signed-in
+   * user is confirming, so no other session of theirs can redeem it.
+   */
+  key: string
   purpose: VerificationPurpose
   locale: string
   headers: Headers
@@ -48,7 +55,7 @@ export async function sendVerificationCode(
   input: SendVerificationCodeInput
 ) {
   const { config } = internals
-  const { identifier, purpose, locale, headers } = input
+  const { deliverTo, key, purpose, locale, headers } = input
 
   if (config.rateLimit !== false) {
     const ipKey = ipRateLimitKey(internals, headers, "sendCode")
@@ -63,7 +70,7 @@ export async function sendVerificationCode(
   )
   const swept = sweepExpired(internals, "verifications")
   const stored = await insertRow(internals, "verifications", {
-    identifier: identifier.value,
+    identifier: key,
     codeHash: await scryptHash(code),
     attemptHash: await sha256Hex(attempt),
     expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
@@ -74,14 +81,14 @@ export async function sendVerificationCode(
   // Stored first, then delivered, and rolled back if delivery throws, so a
   // code nobody received is not left live against its attempt.
   try {
-    await deliver(internals, identifier, code, locale, purpose, headers)
+    await deliver(internals, deliverTo, code, locale, purpose, headers)
   } catch (error) {
     await internals.db.delete({
       table: "verifications",
       where: { id: { eq: stored.id } }
     })
     internals.log.error("verification code delivery failed", {
-      channel: identifier.kind,
+      channel: deliverTo.kind,
       purpose
     })
     throw error
@@ -89,7 +96,7 @@ export async function sendVerificationCode(
   // Channel and purpose only: the address is personal data and the code is a
   // credential, so neither is ever handed to a log sink.
   internals.log.info("verification code sent", {
-    channel: identifier.kind,
+    channel: deliverTo.kind,
     purpose
   })
 

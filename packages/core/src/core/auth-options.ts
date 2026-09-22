@@ -252,17 +252,6 @@ export interface UserOptions<
    * and so does what your `upsertUser` receives.
    */
   additionalFields?: S
-  /**
-   * How recently the session must have authenticated for `DELETE /user` to act
-   * immediately; older sessions are challenged with an emailed code.
-   *
-   * Measured from the session's `createdAt` — when identity was actually proven —
-   * not from a sliding last-seen value, which says nothing about who is at the
-   * keyboard now. `"0s"` always requires the code.
-   *
-   * @default "15m"
-   */
-  deleteFreshWindow?: Duration
 }
 
 /** One fixed-window rate limit. */

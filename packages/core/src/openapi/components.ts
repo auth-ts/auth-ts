@@ -120,8 +120,8 @@ export const componentResponses: Record<
     headers: { "Retry-After": { schema: { type: "integer" } } }
   } as ReturnType<typeof failure>,
   Forbidden: failure("The origin is not one this server serves."),
-  StaleSession: failure(
-    "The session is too old for this action without re-proving identity, or the origin is not one this server serves. `code` says which."
+  VerificationRequired: failure(
+    "The action needs identity confirmed first, or the origin is not one this server serves. `code` says which."
   ),
   Conflict: failure(
     "That provider identity is already linked to a different user."

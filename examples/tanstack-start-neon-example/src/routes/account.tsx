@@ -386,7 +386,7 @@ function DeleteCard() {
         deletionCode ? { code: deletionCode } : {}
       )
 
-      if (result.status === "staleSession") {
+      if (result.status === "verificationRequired") {
         // Show the field even if sending fails.
         setDeletionCode("")
         await authClient.sendDeleteUserCode()

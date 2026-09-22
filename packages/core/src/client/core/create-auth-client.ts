@@ -166,13 +166,12 @@ export interface AuthClient {
   /** Updates the signed-in user and returns the row as stored. */
   updateUser: (input: UpdateUserInput) => Promise<AuthUser>
   /**
-   * Deletes the account, in one or two steps.
+   * Deletes the account, in two steps.
    *
-   * A recently authenticated session deletes immediately; an older one gets a
-   * `"staleSession"` result, at which point you call `sendDeleteUserCode()` and
-   * retry with the code it sends. The two-step case is reported as a value
-   * rather than an error because it is an expected branch of a working flow,
-   * not a failure.
+   * The first call gets a `"verificationRequired"` result, at which point you
+   * call `sendDeleteUserCode()` and retry with the code it sends. The
+   * challenge is reported as a value rather than an error because it is an
+   * expected branch of a working flow, not a failure.
    *
    * @throws {AuthError} For a wrong code, or when a guest has no way to receive
    * one.

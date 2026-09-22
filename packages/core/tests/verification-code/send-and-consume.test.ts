@@ -97,7 +97,8 @@ describe("sendVerificationCode", () => {
     headers = new Headers()
   ) =>
     sendVerificationCode(internals, {
-      identifier: emailIdentifier,
+      deliverTo: emailIdentifier,
+      key: emailIdentifier.value,
       purpose: "signIn",
       locale: "en",
       headers
@@ -169,6 +170,42 @@ describe("sendVerificationCode", () => {
     ).resolves.toBeUndefined()
   })
 
+  it("files the code under the key, which need not be the address it went to", async () => {
+    // An action a signed-in user confirms is keyed on their session: the code
+    // still goes to their address, but only that session can redeem it.
+    const { internals, sentCodes } = await createTestInternals()
+    const attempt = await sendVerificationCode(internals, {
+      deliverTo: emailIdentifier,
+      key: "session-a",
+      purpose: "deleteUser",
+      locale: "en",
+      headers: new Headers()
+    })
+    const code = required(sentCodes[0], "sent code").code
+    expect(required(sentCodes[0], "sent code").destination).toBe(
+      "ada@example.com"
+    )
+
+    for (const identifier of ["ada@example.com", "session-b"]) {
+      await expect(
+        consumeVerificationCode(internals, {
+          identifier,
+          code,
+          purpose: "deleteUser",
+          attempt
+        })
+      ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    }
+    await expect(
+      consumeVerificationCode(internals, {
+        identifier: "session-a",
+        code,
+        purpose: "deleteUser",
+        attempt
+      })
+    ).resolves.toBeUndefined()
+  })
+
   it("passes the resolved locale, purpose, and request headers to the sender", async () => {
     const { internals, sentCodes } = await createTestInternals()
     const headers = new Headers({
@@ -177,7 +214,8 @@ describe("sendVerificationCode", () => {
     })
 
     await sendVerificationCode(internals, {
-      identifier: emailIdentifier,
+      deliverTo: emailIdentifier,
+      key: emailIdentifier.value,
       purpose: "deleteUser",
       locale: "de",
       headers
@@ -259,7 +297,8 @@ describe("consumeVerificationCode", () => {
   ) => {
     const context = await createTestInternals(overrides)
     const attempt = await sendVerificationCode(context.internals, {
-      identifier: emailIdentifier,
+      deliverTo: emailIdentifier,
+      key: emailIdentifier.value,
       purpose: "signIn",
       locale: "en",
       headers: new Headers()
@@ -357,7 +396,8 @@ describe("consumeVerificationCode", () => {
       // The sixth is refused before it is even compared — with the right code,
       // and from a different attempt on the same address.
       const stranger = await sendVerificationCode(internals, {
-        identifier: emailIdentifier,
+        deliverTo: emailIdentifier,
+        key: emailIdentifier.value,
         purpose: "signIn",
         locale: "en",
         headers: new Headers()

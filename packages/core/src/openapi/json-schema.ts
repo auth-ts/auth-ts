@@ -46,7 +46,7 @@ export type ComponentResponseName =
   | "InvalidField"
   | "RateLimited"
   | "Forbidden"
-  | "StaleSession"
+  | "VerificationRequired"
   | "Conflict"
   | "GuestCannotReceiveCode"
   | "UnsupportedMediaType"

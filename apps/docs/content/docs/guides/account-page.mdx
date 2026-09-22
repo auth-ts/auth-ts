@@ -160,15 +160,16 @@ never handed:
 
 ```ts
 const result = await authClient.deleteUser()
-if (result.challengeRequired) {
+if (result.status === "verificationRequired") {
   await authClient.sendDeleteUserCode()
   // collect the code, then:
   await authClient.deleteUser({ code })
 }
 ```
 
-A session that authenticated recently enough deletes immediately; anything older
-has to prove identity again first, which is what the challenge is.
+Every deletion goes through the challenge. The code is bound to the session
+that requested it, so a hijacked session on another device cannot use one you
+asked for.
 
 ## Guest rows
 

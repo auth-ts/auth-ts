@@ -10,8 +10,8 @@ export type AuthErrorCode =
   | "rateLimited"
   /** Wrong, expired, already-used, or for a different purpose. */
   | "invalidCode"
-  /** The session is too old for this action without re-proving identity. */
-  | "staleSession"
+  /** The action needs identity confirmed first: fetch a code and retry with it. */
+  | "verificationRequired"
   /** No session, or a session that no longer resolves. */
   | "unauthenticated"
   /** That provider identity is already linked to a different user. */
@@ -59,7 +59,7 @@ export type AuthErrorCode =
 export const ERROR_STATUS: Record<AuthErrorCode, number> = {
   rateLimited: 429,
   invalidCode: 401,
-  staleSession: 403,
+  verificationRequired: 403,
   unauthenticated: 401,
   providerConflict: 409,
   providerDenied: 401,

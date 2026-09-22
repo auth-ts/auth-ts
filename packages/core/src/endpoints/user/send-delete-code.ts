@@ -74,7 +74,8 @@ export const sendDeleteUserCode = defineEndpoint({
     if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
 
     const attempt = await sendVerificationCode(internals, {
-      identifier,
+      deliverTo: identifier,
+      key: caller.sessionId,
       purpose: "deleteUser",
       locale: resolveLocale(
         headers.get("accept-language"),

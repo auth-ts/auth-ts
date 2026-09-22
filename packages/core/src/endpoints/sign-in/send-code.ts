@@ -76,7 +76,8 @@ export const sendSignInCode = defineEndpoint({
     const headers = input.headers ?? new Headers()
 
     const attempt = await sendVerificationCode(internals, {
-      identifier,
+      deliverTo: identifier,
+      key: identifier.value,
       purpose: "signIn",
       locale: resolveLocale(
         headers.get("accept-language"),

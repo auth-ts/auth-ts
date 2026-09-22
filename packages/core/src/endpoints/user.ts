@@ -2,7 +2,6 @@ import { AuthApiError, unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
 import { readBody } from "../http/read-body"
 import { validateAdditionalFields } from "../http/validate-additional-fields"
-import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
@@ -140,7 +139,7 @@ export interface DeleteUserInput extends CallerInput, AttemptInput {
 /** How `DELETE /user` appears in the OpenAPI document. */
 export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
   description:
-    "An old session gets a code first — repeat the call with it. Only 204 means deleted.",
+    "Fetch a code with /user/send-delete-code first, then repeat the call with it. Only 204 means deleted.",
   tag: "User",
   auth: "bearer",
   body: {
@@ -160,7 +159,7 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
   responses: {
     204: { description: "Deleted.", setsCookie: "cleared" },
     401: "Unauthenticated",
-    403: "StaleSession",
+    403: "VerificationRequired",
     409: "GuestCannotReceiveCode",
     429: "RateLimited"
   }
@@ -169,18 +168,22 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
 /**
  * Delete the current user.
  *
- * Two phases, in one endpoint. A session that authenticated recently deletes
- * immediately; an older one must call `POST /user/send-delete-code` first and
- * retry with the code it sends.
+ * Two steps, always: a call without a code answers the challenge, the caller
+ * fetches one with `POST /user/send-delete-code`, and retries with it. There
+ * is no "signed in recently enough" bypass — a hijacked session is exactly
+ * the one that is recent.
+ *
+ * The code is filed under the session that asked for it, so no other session
+ * of the same user can redeem it, and its purpose is checked on verify, so a
+ * sign-in code never authorizes a deletion.
  *
  * The challenge deliberately answers 403 rather than 202: **204 must be the only
  * success shape**, or a client that treats any 2xx as done will clear its state
  * and tell the user their account is gone while it very much is not.
  *
- * This endpoint never sends anything itself — a stale session refuses outright,
- * with no side effect, so retrying a failed delete cannot fire a storm of codes.
- * The purpose is checked on verify, so a sign-in code never authorizes a
- * deletion.
+ * This endpoint never sends anything itself — a call without a code refuses
+ * outright, with no side effect, so retrying a failed delete cannot fire a
+ * storm of codes.
  */
 export const deleteUser = defineEndpoint({
   method: "DELETE",
@@ -197,9 +200,8 @@ export const deleteUser = defineEndpoint({
     const headers = input.headers ?? new Headers()
     const caller = await authenticate(internals, input)
 
-    const { config } = internals
-    // The fresh window is measured from the session, and a session already
-    // revoked refuses the delete rather than honouring a token that outlived it.
+    // A session already revoked refuses the delete rather than honouring a
+    // token that outlived it.
     const [user, session] = await Promise.all([
       selectOne(internals, "users", { id: { eq: caller.userId } }),
       selectOne(internals, "sessions", {
@@ -224,30 +226,18 @@ export const deleteUser = defineEndpoint({
       return { data: undefined, status: 204, headers: responseHeaders }
     }
 
-    const identifier = accountIdentifier(user)
-    if (input.code) {
-      if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
-
-      await consumeVerificationCode(internals, {
-        identifier: identifier.value,
-        code: input.code,
-        purpose: "deleteUser",
-        attempt: readAttempt(input, "deleteUser")
-      })
-      return finishDeletion()
+    // A guest with no identifier cannot be challenged at all.
+    if (!accountIdentifier(user)) {
+      throw new AuthApiError("guestCannotReceiveCode")
     }
+    if (!input.code) throw new AuthApiError("verificationRequired")
 
-    // Strictly less than, so that a window of "0s" means what it says: always
-    // require the code. With `<=`, a session created in the same millisecond as
-    // the request would satisfy a zero-length window and delete outright.
-    const authenticatedAgo = Date.now() - session.createdAt.getTime()
-    if (authenticatedAgo < parseDuration(config.user.deleteFreshWindow)) {
-      return finishDeletion()
-    }
-
-    // A guest with no identifier still can't be challenged at all.
-    if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
-
-    throw new AuthApiError("staleSession")
+    await consumeVerificationCode(internals, {
+      identifier: caller.sessionId,
+      code: input.code,
+      purpose: "deleteUser",
+      attempt: readAttempt(input, "deleteUser")
+    })
+    return finishDeletion()
   }
 })
