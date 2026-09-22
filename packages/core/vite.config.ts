@@ -26,6 +26,6 @@ export default defineConfig({
     },
     target: "es2022",
     minify: false,
-    rollupOptions: { external: ["jose"] }
+    rollupOptions: { external: ["jose", "node:crypto"] }
   }
 })

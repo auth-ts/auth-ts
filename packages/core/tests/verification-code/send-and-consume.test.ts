@@ -131,7 +131,7 @@ describe("sendVerificationCode", () => {
     expect(await storedCodes(db)).toHaveLength(1)
   })
 
-  it("delivers a code from the configured alphabet and stores only its HMAC", async () => {
+  it("delivers a code from the configured alphabet and stores only its scrypt hash", async () => {
     const { internals, db, sentCodes } = await createTestInternals()
 
     const attempt = await send(internals)
@@ -144,7 +144,7 @@ describe("sendVerificationCode", () => {
     expect(sent.destination).toBe("ada@example.com")
 
     const [stored] = await storedCodes(db)
-    expect(stored?.codeHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(stored?.codeHash).toMatch(/^\$scrypt\$ln=14,r=8,p=1\$/)
     expect(stored?.codeHash).not.toContain(sent.code)
     expect(stored?.attemptHash).toBe(await sha256Hex(attempt))
     expect(stored?.purpose).toBe("signIn")

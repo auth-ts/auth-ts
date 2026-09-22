@@ -139,7 +139,7 @@ export interface AuthSession {
 export type VerificationPurpose = "signIn" | "deleteUser"
 
 /**
- * A verification code, stored as an HMAC of the code.
+ * A verification code, stored as an scrypt string of the code.
  *
  * Several rows may be live for one identifier at once — one per client that
  * asked. Each is bound to the attempt token its requester holds, so a verify
@@ -150,6 +150,7 @@ export interface AuthVerification {
   id: string
   /** Normalized email or E.164 phone number. */
   identifier: string
+  /** A PHC-style scrypt string: `$scrypt$ln=14,r=8,p=1$<salt>$<key>`. */
   codeHash: string
   /** SHA-256 of the attempt token handed to the client that requested the code. */
   attemptHash: string

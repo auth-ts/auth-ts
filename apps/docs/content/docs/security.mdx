@@ -16,10 +16,13 @@ at a time, with the overflow rejected rather than reduced: never
 shrinks it. `verificationCode` switches to digits for phones that autofill
 one-time codes, and sets the length.
 
-Stored as **HMAC-SHA-256 keyed with your server secret**, not as a bare hash. A
-short code has few enough values that an unkeyed digest is reversible from a
-database read; keyed with a secret the database never holds, a database leak
-alone yields no working codes.
+Stored under **scrypt** at 16 MiB (`N=2^14, r=8, p=1`, a fresh 16-byte salt,
+parameters carried in the string), never as a fast hash. A short code has few
+enough values that a SHA-256 of it falls to a GPU in seconds; at scrypt's cost
+a leaked table takes far longer to reverse than its codes live, and nothing
+else has to stay secret for that to hold. This is the one place the server
+reaches for `node:crypto`, which Node, Bun, Deno and Workers all provide; a
+runtime with only Web Crypto can run everything here except the code flow.
 
 **Every code is bound to the client that asked for it.** A send hands back an
 attempt token — as an `HttpOnly` cookie scoped to the auth mount, and in the

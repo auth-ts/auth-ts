@@ -45,6 +45,13 @@ const IMPORT_PATTERNS = [
 const BUILTIN_MODULES = new Set(builtinModules)
 
 /**
+ * Built-ins a server entry may reach: scrypt has no Web Crypto equivalent,
+ * and Node, Bun, Deno and Workers all provide this one. Each entry rule below
+ * still says whether it is allowed to, so the client bundle cannot pick it up.
+ */
+const ALLOWED_BUILTINS = new Set(["node:crypto"])
+
+/**
  * Whether an import specifier resolves to a Node built-in.
  *
  * A `node:` prefix settles it on its own: the prefix means exactly that, and
@@ -78,7 +85,12 @@ for (const filePath of javascriptFiles(distributionRoot)) {
     pattern.lastIndex = 0
     for (const match of contents.matchAll(pattern)) {
       const specifier = match[1]
-      if (specifier === undefined || !isNodeBuiltin(specifier)) continue
+      if (
+        specifier === undefined ||
+        !isNodeBuiltin(specifier) ||
+        ALLOWED_BUILTINS.has(specifier)
+      )
+        continue
 
       violations.push(
         `${filePath.slice(distributionRoot.length + 1)} imports ${specifier}`
@@ -124,13 +136,13 @@ const ENTRY_RULES: EntryRule[] = [
     entry: "index.js",
     sources: null,
     forbidden: ["src/client.ts", "src/client/"],
-    dependencies: ["jose"]
+    dependencies: ["jose", "node:crypto"]
   },
   {
     entry: "testing.js",
     sources: null,
     forbidden: ["src/client.ts", "src/client/"],
-    dependencies: []
+    dependencies: ["node:crypto"]
   }
 ]
 
@@ -234,5 +246,5 @@ if (violations.length > 0) {
 }
 
 console.log(
-  "Bundle check passed: no Node built-ins, and the entries stay apart."
+  "Bundle check passed: no Node built-ins beyond node:crypto on the server, and the entries stay apart."
 )

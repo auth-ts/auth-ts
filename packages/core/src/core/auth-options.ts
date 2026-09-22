@@ -364,8 +364,8 @@ export interface AuthOptions<
   /** Where the public key set is hosted, or the document to serve it from. */
   jwks?: JwksOptions
   /**
-   * Server secret that keys the verification-code HMAC and signs the OAuth state
-   * cookie. Defaults to the `AUTH_SECRET` environment variable.
+   * Server secret that signs the OAuth state cookie and encrypts stored
+   * provider tokens. Defaults to the `AUTH_SECRET` environment variable.
    *
    * Must not be the JWT key: different type, different blast radius, rotated
    * independently.

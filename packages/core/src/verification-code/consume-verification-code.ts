@@ -3,7 +3,7 @@ import type { VerificationPurpose } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit } from "../http/check-rate-limit"
-import { hmacSha256Hex, sha256Hex, timingSafeEqualHex } from "../lib/hash"
+import { scryptVerify, sha256Hex } from "../lib/hash"
 import { selectOne } from "../lib/select-one"
 
 /** What verifying a code needs to know. */
@@ -56,8 +56,7 @@ export async function consumeVerificationCode(
   })
   if (!stored) throw new AuthApiError("invalidCode")
 
-  const presented = await hmacSha256Hex(input.code.toUpperCase(), config.secret)
-  if (!timingSafeEqualHex(presented, stored.codeHash)) {
+  if (!(await scryptVerify(input.code.toUpperCase(), stored.codeHash))) {
     throw new AuthApiError("invalidCode")
   }
 

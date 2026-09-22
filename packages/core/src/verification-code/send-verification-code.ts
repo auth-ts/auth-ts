@@ -3,7 +3,7 @@ import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
 import { randomBytesBase64url, randomCode } from "../lib/generate-random"
-import { hmacSha256Hex, sha256Hex } from "../lib/hash"
+import { scryptHash, sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
 import { sweepExpired } from "../lib/sweep-expired"
@@ -29,9 +29,10 @@ export interface SendVerificationCodeInput {
 /**
  * Generates, stores, and delivers a verification code.
  *
- * The code is stored as an HMAC keyed with the server secret, never in plain
- * text and never as a bare hash: a short code has few enough values that an
- * unkeyed digest is reversible from a database read.
+ * The code is stored under scrypt, never in plain text and never as a fast
+ * hash: a short code has few enough values that a digest is reversible from a
+ * database read, and a slow one keeps a leaked table unreadable for longer
+ * than its codes live.
  *
  * Every send is its own attempt: a fresh token goes back to the caller, and
  * the code can only be redeemed by whoever presents it. Nothing is deleted on
@@ -63,7 +64,7 @@ export async function sendVerificationCode(
   const swept = sweepExpired(internals, "verifications")
   const stored = await insertRow(internals, "verifications", {
     identifier: identifier.value,
-    codeHash: await hmacSha256Hex(code, config.secret),
+    codeHash: await scryptHash(code),
     attemptHash: await sha256Hex(attempt),
     expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
     purpose
