@@ -71,7 +71,7 @@ export async function issueSession(
   const now = new Date()
 
   // A cookie about to be overwritten leaves its session unreachable from this
-  // browser, so it is deleted rather than left to run out a month-long lifetime
+  // browser, so it is deleted rather than left to run out its lifetime
   // somewhere nobody can revoke it. Without multiUser that is every session the
   // browser presented — no row needs reading to know it. With multiUser it is
   // only this user's own previous one, and which is which comes from each row

@@ -46,6 +46,12 @@ describe("getToken as a function", () => {
       context.db.sessions()[0],
       "session"
     ).expiresAt.getTime()
+    // Last used over an hour ago, so the slide is due.
+    await context.db.update({
+      table: "sessions",
+      where: {},
+      values: { updatedAt: new Date(Date.now() - 2 * 60 * 60_000) }
+    })
 
     const result = required(
       await context.auth.getToken({
@@ -60,7 +66,7 @@ describe("getToken as a function", () => {
 
     expect(result.user.email).toBe("ada@example.com")
     expect(await context.auth.verifyToken(result.token)).toBeTruthy()
-    expect(after).toBeGreaterThanOrEqual(before)
+    expect(after).toBeGreaterThan(before)
   })
 
   it("does not slide when sliding is off", async () => {

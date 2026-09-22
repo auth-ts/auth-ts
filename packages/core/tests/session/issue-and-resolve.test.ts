@@ -427,7 +427,10 @@ describe("sliding behind waitUntil", () => {
     await db.update({
       table: "sessions",
       where: {},
-      values: { expiresAt: stale }
+      values: {
+        expiresAt: stale,
+        updatedAt: new Date(Date.now() - 2 * 3_600_000)
+      }
     })
 
     const resolved = await resolveSession(internals, headers)
@@ -469,6 +472,11 @@ describe("sliding behind waitUntil", () => {
   it("routes a failed deferred write to the logger, never the answer", async () => {
     const { internals, db, deferred, logCalls, user, headers } =
       await signedIn()
+    await db.update({
+      table: "sessions",
+      where: {},
+      values: { updatedAt: new Date(Date.now() - 2 * 3_600_000) }
+    })
     vi.spyOn(db, "update").mockRejectedValue(new Error("connection lost"))
 
     const resolved = await resolveSession(internals, headers)
@@ -480,6 +488,48 @@ describe("sliding behind waitUntil", () => {
         (call) => call.level === "error" && call.message.includes("slide")
       )
     ).toBe(true)
+  })
+})
+
+describe("sliding once an hour", () => {
+  it("reads on every refresh and writes the row at most once an hour", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
+    try {
+      const { internals, db } = await createTestInternals()
+      const user = await insertUser(db, { email: "ada@example.com" })
+      const issued = await issueSession(internals, {
+        user,
+        amr: ["otp"],
+        headers: new Headers(),
+        requestURL: REQUEST_URL
+      })
+      const headers = new Headers({ cookie: cookieHeaderOf(issued) })
+      const update = vi.spyOn(db, "update")
+      const sessionWrites = () =>
+        update.mock.calls.filter(([input]) => input.table === "sessions")
+      const row = () => required(db.sessions()[0], "session")
+      const atSignIn = {
+        updatedAt: row().updatedAt.getTime(),
+        expiresAt: row().expiresAt.getTime()
+      }
+
+      // Used again within the hour: answered from the read, nothing written.
+      vi.advanceTimersByTime(30 * 60_000)
+      expect(await resolveSession(internals, headers)).not.toBeNull()
+      expect(sessionWrites()).toHaveLength(0)
+      expect(row().updatedAt.getTime()).toBe(atSignIn.updatedAt)
+      expect(row().expiresAt.getTime()).toBe(atSignIn.expiresAt)
+
+      // An hour on, the use is recorded and the expiry moves with it.
+      vi.advanceTimersByTime(31 * 60_000)
+      expect(await resolveSession(internals, headers)).not.toBeNull()
+      expect(sessionWrites()).toHaveLength(1)
+      expect(row().updatedAt.getTime()).toBeGreaterThan(atSignIn.updatedAt)
+      expect(row().expiresAt.getTime()).toBeGreaterThan(atSignIn.expiresAt)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

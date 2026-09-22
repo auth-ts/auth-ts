@@ -4,6 +4,16 @@ import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
 
+/**
+ * How often a live session's row is written on use.
+ *
+ * A session is read on every refresh and written at most this often. Writing
+ * on every request buys nothing: expiry measured to the hour is the same
+ * policy as expiry measured to the millisecond, and a page load is otherwise
+ * a database write.
+ */
+const SLIDE_INTERVAL = "1h"
+
 /** User-agent and validated client IP for a session row, from the request headers. */
 export function sessionStamp(internals: AuthInternals, headers: Headers) {
   const userAgent = headers.get("user-agent")
@@ -16,24 +26,20 @@ export function sessionStamp(internals: AuthInternals, headers: Headers) {
 }
 
 /**
- * Finds a live session by its token hash and marks it used.
+ * Finds a live session by its token hash and, at most once an hour, marks it used.
  *
- * The `where` is the whole safety property: a row whose `expiresAt` has passed
- * matches nothing, so an expired session can never be extended by the very
- * write that was meant to record activity on a live one. Nothing comes back and
- * the caller reads that as "no session".
+ * The read enforces liveness: a row whose `expiresAt` has passed matches
+ * nothing. The write, when it is due, keeps the same predicate, so a session
+ * revoked between the two cannot be revived by the write that was meant to
+ * record activity on a live one.
  *
- * Recording the use is bookkeeping and always happens; extending expiry is
- * policy and answers to `session.sliding`. A deployment on a fixed
- * re-authentication interval still wants a device list that says when each
- * device was last seen.
+ * Recording the use is bookkeeping and happens whenever an hour has passed;
+ * extending expiry is policy and answers to `session.sliding`. A deployment on
+ * a fixed re-authentication interval still wants a device list that says when
+ * each device was last seen.
  *
- * With `waitUntil` configured the answer comes from a read and the write runs
- * behind the response, so the hot path never blocks on a Postgres write. The
- * read enforces the same expiry predicate, and the deferred write keeps it too,
- * so a session revoked in the gap cannot be revived. What an interrupted
- * isolate can lose is one use-stamp — bookkeeping, never liveness. Without
- * `waitUntil` it stays one statement: two awaited would be strictly worse.
+ * With `waitUntil` configured the write runs behind the response. What an
+ * interrupted isolate can lose is one use-stamp — bookkeeping, never liveness.
  *
  * @returns The row as it now stands, or nothing when no live session matched.
  */
@@ -44,36 +50,31 @@ export async function slideSession(
 ) {
   const { sliding, ttl } = internals.config.session
   const { waitUntil } = internals.config
-  const values = () => ({
-    updatedAt: new Date(),
-    ...sessionStamp(internals, headers),
-    ...(sliding ? { expiresAt: new Date(Date.now() + parseDuration(ttl)) } : {})
-  })
-
-  if (!waitUntil) {
-    return internals.db.update({
-      table: "sessions",
-      where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
-      values: values()
-    })
-  }
 
   const session = await selectOne(internals, "sessions", {
     tokenHash: { eq: tokenHash },
     expiresAt: { gt: new Date() }
   })
   if (!session) return []
+  if (
+    Date.now() - session.updatedAt.getTime() <
+    parseDuration(SLIDE_INTERVAL)
+  ) {
+    return [session]
+  }
 
-  const written = values()
-  defer(
-    internals,
-    "session slide",
-    internals.db.update({
-      table: "sessions",
-      where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
-      values: written
-    })
-  )
+  const written = {
+    updatedAt: new Date(),
+    ...sessionStamp(internals, headers),
+    ...(sliding ? { expiresAt: new Date(Date.now() + parseDuration(ttl)) } : {})
+  }
+  const write = internals.db.update({
+    table: "sessions",
+    where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
+    values: written
+  })
+  if (waitUntil) defer(internals, "session slide", write)
+  else await write
 
   return [{ ...session, ...written }]
 }

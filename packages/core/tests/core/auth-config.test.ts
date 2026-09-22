@@ -487,7 +487,7 @@ describe("resolved defaults", () => {
     expect(config.jwt.alg).toBe("RS256")
     expect(config.jwt.ttl).toBe("10m")
     expect(config.jwt.claims).toEqual({ role: "authenticated" })
-    expect(config.session).toEqual({ ttl: "30d", sliding: true })
+    expect(config.session).toEqual({ ttl: "10d", sliding: true })
     expect(config.cookie.name).toBe("auth-ts.refresh")
     expect(config.cookie.path).toBe("/")
     expect(config.multiUser).toBe(false)

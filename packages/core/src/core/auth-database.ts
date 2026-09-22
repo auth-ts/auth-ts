@@ -105,12 +105,8 @@ export interface AuthSession {
   userId: string
   tokenHash: string
   /**
-   * When this session was created — the one timestamp core owns.
-   *
-   * It is an authentication input, not bookkeeping: account deletion reads the
-   * age of the *authentication* from it. A sliding "last active" value would say
-   * nothing about how recently the person proved who they were. Core writes it
-   * on insert and never updates it, so a refresh slides `expiresAt` alone.
+   * When this session was created. Core writes it on insert and never updates
+   * it; `updatedAt` is when the session was last used, to the hour.
    */
   createdAt: Date
   expiresAt: Date

@@ -64,16 +64,15 @@ export function readRefreshToken(
 }
 
 /**
- * Finds a live session by a raw refresh token and marks it used.
+ * Finds a live session by a raw refresh token and, at most hourly, marks it used.
  *
- * One statement: the session is found and touched together, matched on the hash
- * and on an expiry still ahead of now. Expiry is therefore enforced here rather
- * than trusted to a cleanup sweep — an expired row simply matches nothing, and
- * a dead session cannot be revived by the write that would have extended it.
+ * The session is matched on the hash and on an expiry still ahead of now, so
+ * expiry is enforced here rather than trusted to a cleanup sweep — an expired
+ * row simply matches nothing, and a dead session cannot be revived by the
+ * write that would have extended it.
  *
  * Sliding on the way through means being in the application keeps a session
- * alive, and the columns say when it was last used rather than when it was last
- * written to.
+ * alive, to the hour.
  */
 async function liveSession(
   internals: AuthInternals,

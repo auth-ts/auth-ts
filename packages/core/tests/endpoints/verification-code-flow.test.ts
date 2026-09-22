@@ -562,8 +562,13 @@ describe("GET /token", () => {
     }
     const before = required(db.sessions()[0], "session")
 
-    // The columns carry whole milliseconds, so a read in the same tick would
-    // land on the same value and prove nothing.
+    // Last used over an hour ago, so the slide is due. The columns carry whole
+    // milliseconds, so a read in the same tick would prove nothing either.
+    await db.update({
+      table: "sessions",
+      where: {},
+      values: { updatedAt: new Date(Date.now() - 2 * 3_600_000) }
+    })
     await new Promise((resolve) => setTimeout(resolve, 5))
     const read = await auth.handler(
       request("GET", "/api/auth/token", { cookies })
@@ -719,6 +724,12 @@ describe("where a token comes from", () => {
 
   it("touches the session on /token and on nothing else", async () => {
     const { context, cookies, token } = await signedIn()
+    // Last used over an hour ago, so the slide on /token is due.
+    await context.db.update({
+      table: "sessions",
+      where: {},
+      values: { updatedAt: new Date(Date.now() - 2 * 3_600_000) }
+    })
     const update = vi.spyOn(context.db, "update")
 
     await context.auth.handler(

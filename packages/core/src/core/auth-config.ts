@@ -410,7 +410,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
     ...(baseURL ? { baseURL, issuer: `${baseURL}${basePath}` } : {}),
     trustedProxyHeaders: options.trustedProxyHeaders ?? false,
     session: {
-      ttl: requireLifetime(options.session?.ttl ?? "30d", "session.ttl"),
+      ttl: requireLifetime(options.session?.ttl ?? "10d", "session.ttl"),
       sliding: options.session?.sliding ?? true
     },
     cookie: {
