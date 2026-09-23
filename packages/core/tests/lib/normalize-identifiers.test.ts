@@ -1,12 +1,44 @@
 import { describe, expect, it } from "vitest"
 import {
-  normalizeEmail,
-  normalizePhone
+  normalizePhone,
+  verifyAccountIdentifierEmailAddressPattern
 } from "../../src/lib/normalize-identifiers"
 
-describe("normalizeEmail", () => {
-  it("collapses case and trims, so one person is one account", () => {
-    expect(normalizeEmail("  Ada@Example.COM ")).toBe("ada@example.com")
+describe("verifyAccountIdentifierEmailAddressPattern", () => {
+  const verify = verifyAccountIdentifierEmailAddressPattern
+
+  it("accepts the book's shape and nothing looser", () => {
+    for (const email of [
+      "ada@example.com",
+      "ada.lovelace+notes_1-2@sub-domain.example.co",
+      "a@b.c",
+      `${"a".repeat(100 - "@example.com".length)}@example.com`
+    ]) {
+      expect(verify(email), email).toBe(true)
+    }
+  })
+
+  it("refuses rather than repairs", () => {
+    for (const email of [
+      "Ada@example.com",
+      "ada@Example.com",
+      " ada@example.com",
+      "ada@example.com ",
+      "ada",
+      "ada@",
+      "@example.com",
+      "ada@@example.com",
+      "ada@example",
+      "ada@.example.com",
+      "ada@example.com.",
+      "ada lovelace@example.com",
+      '"ada"@example.com',
+      "ada@exämple.com",
+      "adä@example.com",
+      `${"a".repeat(101 - "@example.com".length)}@example.com`
+    ]) {
+      expect(verify(email), email).toBe(false)
+    }
   })
 })
 

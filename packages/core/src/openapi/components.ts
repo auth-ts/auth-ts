@@ -14,7 +14,12 @@ const user: ObjectSchemaFor<CoreUserFields> = {
   type: "object",
   properties: {
     id: { type: "string" },
-    email: { type: "string", format: "email" },
+    email: {
+      type: "string",
+      format: "email",
+      description:
+        "Lowercase; letters, digits and . _ + - before one @, a dotted domain after; at most 100 characters. Taken as sent, never modified."
+    },
     phoneNumber: { type: "string", description: "E.164." },
     name: { type: "string" },
     image: { type: "string" },
@@ -111,7 +116,7 @@ export const componentResponses: Record<
   Unauthenticated: failure("No session, or a session that no longer resolves."),
   NotFound: failure("No such route, provider, session, or account."),
   InvalidField: failure(
-    "A field was unknown, reserved, or the wrong primitive type."
+    "A field was unknown, reserved, or the wrong primitive type — or, as `invalidEmailAddress`, an email address outside the rules: lowercase, one @, a dotted domain, at most 100 characters."
   ),
   RateLimited: {
     ...failure(

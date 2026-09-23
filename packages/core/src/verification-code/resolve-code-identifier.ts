@@ -1,18 +1,13 @@
 import type { AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
-import { normalizeEmail, normalizePhone } from "../lib/normalize-identifiers"
+import {
+  normalizePhone,
+  verifyAccountIdentifierEmailAddressPattern
+} from "../lib/normalize-identifiers"
 
 /**
- * The longest an email address can be and still be deliverable — RFC 5321's
- * path limit. Phone numbers are bounded by E.164 inside `normalizePhone`; this
- * is the email side of the same fence, so an identifier is never an unbounded
- * string by the time it becomes a rate-limit key or a stored column.
- */
-const MAX_EMAIL_LENGTH = 254
-
-/**
- * A sign-in identifier after normalization, tagged with the channel it arrived on.
+ * A sign-in identifier as it will be stored, tagged with the channel it arrived on.
  *
  * Tagged rather than a bare string because the channel decides which sender runs
  * and which limits apply; carrying it alongside the value means no downstream
@@ -30,21 +25,23 @@ export interface IdentifierBody {
 }
 
 /**
- * Turns a request body into exactly one normalized, deliverable identifier.
+ * Turns a request body into exactly one deliverable identifier.
  *
  * The shape of the body *is* the channel selector, so this is the single place
  * that rule is enforced — for both sending and verifying, which is why it lives
- * here rather than inline in either endpoint.
+ * here rather than inline in either endpoint. An email address is the book's
+ * account identifier: checked against its rules and never modified, so what
+ * the user typed is what is stored, sent to and shown.
  *
- * @throws {AuthApiError} `invalidField` unless exactly one identifier is present
- * and well formed, or `channelNotConfigured` when this server has no sender for it.
+ * @throws {AuthApiError} `invalidField` unless exactly one identifier is present,
+ * `invalidEmailAddress` for an address the book's rules refuse, `channelNotConfigured`
+ * when this server has no sender for it.
  */
 export function resolveCodeIdentifier(
   internals: AuthInternals,
   body: IdentifierBody
 ): CodeIdentifier {
-  const hasEmail =
-    typeof body.email === "string" && body.email.trim().length > 0
+  const hasEmail = typeof body.email === "string" && body.email.length > 0
   const hasPhone =
     typeof body.phoneNumber === "string" && body.phoneNumber.trim().length > 0
 
@@ -56,14 +53,9 @@ export function resolveCodeIdentifier(
 
   if (hasEmail) {
     if (!internals.config.email) throw new AuthApiError("channelNotConfigured")
-    const value = normalizeEmail(body.email as string)
-    if (
-      value.length > MAX_EMAIL_LENGTH ||
-      !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value)
-    ) {
-      throw new AuthApiError("invalidField", {
-        message: "Provide a valid email address."
-      })
+    const value = body.email as string
+    if (!verifyAccountIdentifierEmailAddressPattern(value)) {
+      throw new AuthApiError("invalidEmailAddress")
     }
     return { kind: "email", value }
   }

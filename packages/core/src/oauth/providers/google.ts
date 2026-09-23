@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, errors, jwtVerify } from "jose"
 import { AuthApiError } from "../../http/auth-api-error"
+import { verifyAccountIdentifierEmailAddressPattern } from "../../lib/normalize-identifiers"
 import type { TokenResponse } from "./grant"
 import { readTokenResponse, readTokens, requestedScopes } from "./grant"
 import type {
@@ -132,13 +133,16 @@ export const google: OAuthProvider = {
     if (claims.nonce !== nonce) throw new AuthApiError("providerRejected")
 
     // Same stakes as GitHub: an unverified address is an account takeover waiting
-    // to happen, so it is dropped rather than trusted.
-    const email = claims.email_verified === true ? claims.email : undefined
+    // to happen, so it is dropped rather than trusted. Lowercased as GoTrue
+    // does with provider data, then held to the book's rules like a typed one.
+    const email =
+      claims.email_verified === true ? claims.email?.toLowerCase() : undefined
+    const usable = email && verifyAccountIdentifierEmailAddressPattern(email)
 
     return {
       providerUserId: claims.sub,
-      ...(email ? { label: email.toLowerCase() } : {}),
-      ...(email ? { email: email.toLowerCase() } : {}),
+      ...(email ? { label: email } : {}),
+      ...(usable ? { email } : {}),
       ...(claims.name ? { name: claims.name } : {}),
       ...(claims.picture ? { image: claims.picture } : {}),
       tokens: readTokens(token)

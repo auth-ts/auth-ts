@@ -25,6 +25,8 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   invalidState: "That sign-in attempt expired. Please start again.",
   channelNotConfigured: "That sign-in method is not available.",
   invalidField: "Some of the submitted fields are not accepted.",
+  invalidEmailAddress:
+    "Enter a lowercase email address with a dot in its domain.",
   notFound: "Not found.",
   methodNotAllowed: "That method is not allowed here.",
   forbiddenOrigin: "This request came from a site that is not allowed.",

@@ -1,4 +1,5 @@
 import { AuthApiError } from "../../http/auth-api-error"
+import { verifyAccountIdentifierEmailAddressPattern } from "../../lib/normalize-identifiers"
 import { readTokenResponse, readTokens, requestedScopes } from "./grant"
 import type {
   AuthorizeURLInput,
@@ -112,13 +113,17 @@ export const github: OAuthProvider = {
     // the user has never confirmed, and trusting one would let an attacker claim
     // somebody else's account by listing their address and never verifying it.
     const verified = emails.find((entry) => entry.primary && entry.verified)
+    // Lowercased as GoTrue does with provider data, then held to the book's
+    // rules like a typed address.
+    const email = verified?.email.toLowerCase()
+    const usable = email && verifyAccountIdentifierEmailAddressPattern(email)
 
     return {
       providerUserId: String(profile.id),
       // The handle, not the address: `login` is always present, while a primary
       // verified email frequently is not.
       label: profile.login,
-      ...(verified ? { email: verified.email.toLowerCase() } : {}),
+      ...(usable ? { email } : {}),
       ...(profile.name ? { name: profile.name } : { name: profile.login }),
       ...(profile.avatar_url ? { image: profile.avatar_url } : {}),
       tokens: readTokens(token)

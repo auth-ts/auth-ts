@@ -1432,6 +1432,23 @@ describe("google", () => {
     })
   })
 
+  it("treats a provider address the book's rules refuse as no address at all", async () => {
+    // A first sign-in needs a verified address to become an account; one that
+    // fails the rules is dropped, so this is refused the same way.
+    const { auth, db } = await createTestServer(GOOGLE_OPTIONS)
+
+    const response = await callback(auth, {
+      sub: "g-2",
+      email: "ada@localhost",
+      emailVerified: true,
+      name: "Ada"
+    })
+
+    expect(response.status).toBe(302)
+    expect(callbackError(response)).toBe("providerEmailUnverified")
+    expect(db.users()).toHaveLength(0)
+  })
+
   it("refuses an ID token that does not verify — wrong key, audience, issuer, expiry, or shape", async () => {
     const { auth, db } = await createTestServer(GOOGLE_OPTIONS)
 

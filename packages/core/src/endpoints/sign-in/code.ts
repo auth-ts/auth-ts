@@ -30,7 +30,12 @@ export const signInWithCodeDocs: EndpointDocs<SignInWithCodeInput> = {
   body: {
     type: "object",
     properties: {
-      email: { type: "string", format: "email" },
+      email: {
+        type: "string",
+        format: "email",
+        description:
+          "Lowercase; letters, digits and . _ + - before one @, a dotted domain after; at most 100 characters. Taken as sent, never modified."
+      },
       phoneNumber: { type: "string", description: "E.164." },
       code: { type: "string" },
       attempt: {

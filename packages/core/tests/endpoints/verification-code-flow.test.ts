@@ -15,7 +15,7 @@ describe("verification code sign-in over HTTP", () => {
 
     const sendResponse = await auth.handler(
       request("POST", "/api/auth/sign-in/send-code", {
-        body: { email: "Ada@Example.com" }
+        body: { email: "ada@example.com" }
       })
     )
     expect(sendResponse.status).toBe(200)

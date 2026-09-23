@@ -28,6 +28,8 @@ export type AuthErrorCode =
   | "channelNotConfigured"
   /** A request field was unknown, reserved, or the wrong primitive type. */
   | "invalidField"
+  /** An email address that fails the book's rules: lowercase, one `@`, a dotted domain, at most 100 characters. */
+  | "invalidEmailAddress"
   /** No such route, provider, session, or account. */
   | "notFound"
   /** The HTTP method is not allowed for this path. */
@@ -68,6 +70,7 @@ export const ERROR_STATUS: Record<AuthErrorCode, number> = {
   invalidState: 401,
   channelNotConfigured: 400,
   invalidField: 400,
+  invalidEmailAddress: 400,
   notFound: 404,
   methodNotAllowed: 405,
   forbiddenOrigin: 403,

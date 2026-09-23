@@ -30,38 +30,30 @@ const guessTokens = async (db: MemoryDatabase, identifier: string) =>
 const WRONG_CODE = "??????"
 
 describe("resolveCodeIdentifier", () => {
-  it("normalizes an email before it reaches any callback", async () => {
+  it("takes an email as sent, and refuses one the book would", async () => {
+    // Never modified: what the user typed is what is stored and shown.
     const { internals } = await createTestInternals()
     expect(
-      resolveCodeIdentifier(internals, { email: "  Ada@Example.COM " })
-    ).toEqual({
-      kind: "email",
-      value: "ada@example.com"
-    })
-  })
+      resolveCodeIdentifier(internals, { email: "ada@example.com" })
+    ).toEqual({ kind: "email", value: "ada@example.com" })
 
-  it("rejects a malformed or oversized email before it becomes a key or a row", async () => {
-    const { internals } = await createTestInternals()
     const invalid = expect.objectContaining({
-      code: "invalidField",
+      code: "invalidEmailAddress",
       status: 400
     })
-
-    for (const email of ["ada", "ada@", "@example.com", "ada@example"]) {
+    for (const email of [
+      "Ada@Example.COM",
+      " ada@example.com ",
+      "ada",
+      "ada@",
+      "@example.com",
+      "ada@example",
+      `${"a".repeat(101 - "@example.com".length)}@example.com`
+    ]) {
       expect(() => resolveCodeIdentifier(internals, { email }), email).toThrow(
         invalid
       )
     }
-
-    // RFC 5321 caps a deliverable address at 254 characters. The phone side is
-    // bounded by E.164 already; without this the email side was unbounded.
-    const atLimit = `${"a".repeat(254 - "@example.com".length)}@example.com`
-    expect(resolveCodeIdentifier(internals, { email: atLimit }).value).toBe(
-      atLimit
-    )
-    expect(() =>
-      resolveCodeIdentifier(internals, { email: `a${atLimit}` })
-    ).toThrow(invalid)
   })
 
   it("requires exactly one identifier", async () => {
