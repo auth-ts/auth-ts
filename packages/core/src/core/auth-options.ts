@@ -386,11 +386,11 @@ export interface RateLimitOptions {
 /**
  * The shape of the codes `sendCode` delivers.
  *
- * The default is the book's: eight `alphanumeric` symbols, 40 bits. At the
- * default guess limit, running nonstop and emailing the target every hour,
- * that takes about a million years to reach a 50% chance; eight digits
- * about ninety-five years; six digits about one year. `numeric` is for the
- * one-time-code autofill phones offer, and falls below the book's bar.
+ * The odds of a brute-force attack at the default guess limit, running
+ * nonstop and emailing the target every hour: six `alphanumeric`
+ * symbols take about a thousand years to reach a 50% chance; eight digits
+ * about ninety-five years; six digits about one year. Choose `numeric` for
+ * the one-time-code autofill phones offer, and lengthen it if you do.
  */
 export interface VerificationCodeOptions {
   /**
@@ -398,7 +398,7 @@ export interface VerificationCodeOptions {
    * @default "alphanumeric"
    */
   alphabet?: "alphanumeric" | "numeric"
-  /** Symbols per code: 8 to 12 `alphanumeric`, 6 to 12 `numeric`. @default 8 */
+  /** Symbols per code, 6 to 12. @default 6 */
   length?: number
 }
 

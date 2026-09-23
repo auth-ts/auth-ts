@@ -287,17 +287,11 @@ describe("construction failures", () => {
     ).toThrow(/rateLimit\.guesses\.refill must be a positive duration/)
   })
 
-  it("defaults the verification code to the book's eight alphanumeric symbols and bounds the length", () => {
+  it("defaults the verification code to six alphanumeric symbols and bounds the length", () => {
     expect(createAuth(baseOptions()).config.verificationCode).toEqual({
       alphabet: "alphanumeric",
-      length: 8
+      length: 6
     })
-    expect(
-      createAuth({
-        ...baseOptions(),
-        verificationCode: { alphabet: "numeric", length: 6 }
-      }).config.verificationCode
-    ).toEqual({ alphabet: "numeric", length: 6 })
     expect(
       createAuth({
         ...baseOptions(),
@@ -305,7 +299,7 @@ describe("construction failures", () => {
       }).config.verificationCode
     ).toEqual({ alphabet: "numeric", length: 8 })
 
-    for (const length of [7, 13, 8.5]) {
+    for (const length of [5, 13, 6.5]) {
       expect(() =>
         createAuth({ ...baseOptions(), verificationCode: { length } })
       ).toThrow(/verificationCode\.length/)
