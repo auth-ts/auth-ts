@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 import { createTestServer } from "../helpers/create-test-server"
-import { readSetCookies, refreshCookie, request } from "../helpers/request"
+import {
+  REFRESH_COOKIE,
+  readSetCookies,
+  refreshCookie,
+  request
+} from "../helpers/request"
 import { required } from "../helpers/required"
 import { selectRow, selectRows } from "../helpers/rows"
 
@@ -10,8 +15,8 @@ type Cookies = Record<string, string>
 /** The user a refresh cookie belongs to, which its name carries. */
 const usersInCookies = (cookies: Cookies) =>
   Object.keys(cookies)
-    .filter((name) => name.startsWith("auth-ts.refresh."))
-    .map((name) => name.slice("auth-ts.refresh.".length))
+    .filter((name) => name.startsWith(`${REFRESH_COOKIE}.`))
+    .map((name) => name.slice(`${REFRESH_COOKIE}.`.length))
 
 /**
  * The access token this browser's cookies buy right now.
@@ -393,12 +398,12 @@ describe("a refresh cookie carrying somebody else's name", () => {
   const relabelled = (cookies: Cookies, victimId: string) => {
     const own = required(
       Object.entries(cookies).find(([name]) =>
-        name.startsWith("auth-ts.refresh.")
+        name.startsWith(`${REFRESH_COOKIE}.`)
       )?.[1],
       "attacker refresh cookie"
     )
 
-    return { [`auth-ts.refresh.${victimId}`]: own }
+    return { [refreshCookie(victimId)]: own }
   }
 
   it("cannot switch onto the named user, nor mint a token for them", async () => {
@@ -478,7 +483,7 @@ describe("a refresh cookie carrying somebody else's name", () => {
     await context.auth.handler(
       request("POST", "/api/auth/sign-out", {
         body: { scope: "global", userId: victim.user.id },
-        cookies: { [`auth-ts.refresh.${victim.user.id}`]: "not-a-token" },
+        cookies: { [refreshCookie(victim.user.id)]: "not-a-token" },
         token: await tokenFor(context, attacker.cookies)
       })
     )
@@ -543,14 +548,14 @@ describe("retiring a browser's cookies", () => {
     const ada = await signIn(context, "ada@example.com")
     const own = required(
       Object.entries(ada.cookies).find(([name]) =>
-        name.startsWith("auth-ts.refresh.")
+        name.startsWith(`${REFRESH_COOKIE}.`)
       )?.[1],
       "ada refresh cookie"
     )
 
     const response = await context.auth.handler(
       request("GET", "/api/auth/token", {
-        cookies: { "auth-ts.refresh.someone-else": own }
+        cookies: { [refreshCookie("someone-else")]: own }
       })
     )
 
@@ -568,7 +573,7 @@ describe("superseding a session", () => {
     const ada = await signIn(context, "ada@example.com")
     const own = required(
       Object.entries(ada.cookies).find(([name]) =>
-        name.startsWith("auth-ts.refresh.")
+        name.startsWith(`${REFRESH_COOKIE}.`)
       )?.[1],
       "ada refresh cookie"
     )
@@ -576,7 +581,7 @@ describe("superseding a session", () => {
     // Her own token, relabelled. The row still says Ada, so signing in again
     // retires it rather than leaving it live under a name nobody looks up.
     const again = await signIn(context, "ada@example.com", {
-      "auth-ts.refresh.bogus": own
+      [refreshCookie("bogus")]: own
     })
 
     expect(
@@ -590,14 +595,14 @@ describe("superseding a session", () => {
     const ada = await signIn(context, "ada@example.com")
     const own = required(
       Object.entries(ada.cookies).find(([name]) =>
-        name.startsWith("auth-ts.refresh.")
+        name.startsWith(`${REFRESH_COOKIE}.`)
       )?.[1],
       "ada refresh cookie"
     )
     const selects = vi.spyOn(context.db, "select")
 
     const again = await signIn(context, "ada@example.com", {
-      "auth-ts.refresh.bogus": own
+      [refreshCookie("bogus")]: own
     })
 
     expect(

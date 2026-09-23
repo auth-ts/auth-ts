@@ -515,7 +515,7 @@ describe("GET /token", () => {
     )
     // The accounts cookie is not this endpoint's to retire: the sessions it
     // lists are live, and none of them is what was just refused.
-    expect(cookies.get("auth-ts.refresh.accounts")).toBeUndefined()
+    expect(cookies.get("__Host-auth-ts.refresh.accounts")).toBeUndefined()
   })
 
   it("says out rather than nothing when the app is on another origin", async () => {

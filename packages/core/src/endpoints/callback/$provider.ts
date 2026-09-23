@@ -92,7 +92,7 @@ export const callbackProvider = defineEndpoint({
     if (!configured) throw notFound()
 
     const secure = shouldUseSecureCookies(input.requestURL)
-    const clearState = clearStateCookie(internals, input.provider, secure)
+    const clearState = clearStateCookie(internals, secure)
 
     // A failure answers where the flow said to, then where the server is
     // configured to live. Only a server with neither says so in JSON.

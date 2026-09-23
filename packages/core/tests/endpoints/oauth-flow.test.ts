@@ -6,7 +6,8 @@ import {
   readRefreshCookie,
   readSetCookies,
   refreshCookieFor,
-  request
+  request,
+  STATE_COOKIE
 } from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
@@ -44,7 +45,7 @@ async function startSignIn(
     request("POST", "/api/auth/sign-in/provider/github", { body })
   )
   const stateCookie = required(
-    readSetCookies(response).get("auth-ts.state"),
+    readSetCookies(response).get(STATE_COOKIE),
     "state cookie"
   ).value
   const state = decodeState(stateCookie).state
@@ -85,14 +86,13 @@ describe("oauth start", () => {
     expect(location.href).not.toContain(payload.codeVerifier)
   })
 
-  it("scopes the state cookie to the callback path only", async () => {
+  it("sets the state cookie at the root, which is what earns it __Host-", async () => {
     const { auth } = await createTestServer(OAUTH_OPTIONS)
     const { response } = await startSignIn(auth)
 
     expect(
-      required(readSetCookies(response).get("auth-ts.state"), "state")
-        .attributes
-    ).toContain("Path=/api/auth/callback/github")
+      required(readSetCookies(response).get(STATE_COOKIE), "state").attributes
+    ).toContain("Path=/")
   })
 
   it("keeps a same-origin redirect and discards anything else", async () => {
@@ -133,7 +133,7 @@ describe("oauth start", () => {
     expect(((await response.json()) as { code: string }).code).toBe(
       "invalidField"
     )
-    expect(readSetCookies(response).get("auth-ts.state")).toBeUndefined()
+    expect(readSetCookies(response).get(STATE_COOKIE)).toBeUndefined()
   })
 
   it("404s an unconfigured provider and every prototype key", async () => {
@@ -256,7 +256,7 @@ describe("oauth redirect_uri origin", () => {
     const { url } = (await start.clone().json()) as { url: string }
     const location = new URL(url)
     const stateCookie = required(
-      readSetCookies(start).get("auth-ts.state"),
+      readSetCookies(start).get(STATE_COOKIE),
       "state cookie"
     ).value
     const { state } = decodeState(stateCookie)
@@ -268,7 +268,7 @@ describe("oauth redirect_uri origin", () => {
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         ...proxied,
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -302,7 +302,7 @@ describe("oauth callback", () => {
 
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -331,7 +331,7 @@ describe("oauth callback", () => {
 
       return auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": stateCookie }
+          cookies: { [STATE_COOKIE]: stateCookie }
         })
       )
     }
@@ -358,7 +358,7 @@ describe("oauth callback", () => {
 
     await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -388,7 +388,7 @@ describe("oauth callback", () => {
     ]) {
       const response = await auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": forgeState(stale) }
+          cookies: { [STATE_COOKIE]: forgeState(stale) }
         })
       )
       expect(response.status, JSON.stringify(stale.issuedAt)).toBe(302)
@@ -402,7 +402,7 @@ describe("oauth callback", () => {
     const slightlyAhead = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": forgeState({
+          [STATE_COOKIE]: forgeState({
             ...payload,
             issuedAt: Date.now() + 30_000
           })
@@ -424,7 +424,7 @@ describe("oauth callback", () => {
     ]) {
       const response = await auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": forgeState(broken) }
+          cookies: { [STATE_COOKIE]: forgeState(broken) }
         })
       )
       expect(response.status).toBe(302)
@@ -444,7 +444,7 @@ describe("oauth callback", () => {
 
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -454,7 +454,7 @@ describe("oauth callback", () => {
     expect(callbackError(response)).toBe("providerUnavailable")
     // The state cookie is cleared whichever way the callback ends.
     expect(
-      required(readSetCookies(response).get("auth-ts.state"), "state").value
+      required(readSetCookies(response).get(STATE_COOKIE), "state").value
     ).toBe("")
   })
 
@@ -465,7 +465,7 @@ describe("oauth callback", () => {
 
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=bad&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -484,7 +484,7 @@ describe("oauth callback", () => {
       request(
         "GET",
         `/api/auth/callback/github?error=access_denied&state=${state}`,
-        { cookies: { "auth-ts.state": stateCookie } }
+        { cookies: { [STATE_COOKIE]: stateCookie } }
       )
     )
 
@@ -503,7 +503,7 @@ describe("oauth callback", () => {
       request(
         "GET",
         `/api/auth/callback/github?error=access_denied&state=${state}`,
-        { cookies: { "auth-ts.state": stateCookie } }
+        { cookies: { [STATE_COOKIE]: stateCookie } }
       )
     )
 
@@ -524,7 +524,7 @@ describe("oauth callback", () => {
       request(
         "GET",
         `/api/auth/callback/github?error=access_denied&state=${state}`,
-        { cookies: { "auth-ts.state": stateCookie } }
+        { cookies: { [STATE_COOKIE]: stateCookie } }
       )
     )
 
@@ -553,7 +553,7 @@ describe("oauth callback", () => {
 
       const response = await auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": stateCookie }
+          cookies: { [STATE_COOKIE]: stateCookie }
         })
       )
 
@@ -579,7 +579,7 @@ describe("oauth callback", () => {
       })
       const throttled = await auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": stateCookie }
+          cookies: { [STATE_COOKIE]: stateCookie }
         })
       )
       expect(throttled.status, JSON.stringify(headers)).toBe(302)
@@ -600,7 +600,7 @@ describe("oauth callback", () => {
     })
     const refused = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
     expect(refused.status).toBe(302)
@@ -640,7 +640,7 @@ describe("oauth callback", () => {
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": stateCookie,
+          [STATE_COOKIE]: stateCookie,
           ...refreshCookieFor(guestRefresh)
         }
       })
@@ -708,7 +708,7 @@ describe("oauth callback", () => {
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": stateCookie,
+          [STATE_COOKIE]: stateCookie,
           ...refreshCookieFor(guestRefresh)
         }
       })
@@ -754,7 +754,7 @@ describe("oauth callback", () => {
       })
     )
     const stateCookie = required(
-      readSetCookies(startResponse).get("auth-ts.state"),
+      readSetCookies(startResponse).get(STATE_COOKIE),
       "state"
     ).value
     const { state } = decodeState(stateCookie)
@@ -763,7 +763,7 @@ describe("oauth callback", () => {
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": stateCookie,
+          [STATE_COOKIE]: stateCookie,
           ...refreshCookieFor(guestRefresh)
         }
       })
@@ -807,7 +807,7 @@ describe("oauth callback", () => {
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": stateCookie,
+          [STATE_COOKIE]: stateCookie,
           ...refreshCookieFor(guestRefresh)
         }
       })
@@ -846,7 +846,7 @@ describe("oauth callback", () => {
     })
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": tampered }
+        cookies: { [STATE_COOKIE]: tampered }
       })
     )
 
@@ -855,7 +855,7 @@ describe("oauth callback", () => {
     expect(db.users()).toHaveLength(0)
     // The state cookie is cleared whichever way the callback ends.
     expect(
-      required(readSetCookies(response).get("auth-ts.state"), "state").value
+      required(readSetCookies(response).get(STATE_COOKIE), "state").value
     ).toBe("")
 
     // And a declared field still comes through untouched.
@@ -866,7 +866,7 @@ describe("oauth callback", () => {
         `/api/auth/callback/github?code=abc&state=${clean.state}`,
         {
           cookies: {
-            "auth-ts.state": forgeState({
+            [STATE_COOKIE]: forgeState({
               ...decodeState(clean.stateCookie),
               additionalFields: { plan: "pro" }
             })
@@ -895,7 +895,7 @@ describe("oauth callback", () => {
     for (const forged of forgeries) {
       const response = await auth.handler(
         request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-          cookies: { "auth-ts.state": forged }
+          cookies: { [STATE_COOKIE]: forged }
         })
       )
       expect(response.status, JSON.stringify(forged)).toBe(302)
@@ -917,7 +917,7 @@ describe("oauth callback", () => {
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": forgeState({
+          [STATE_COOKIE]: forgeState({
             ...decodeState(stateCookie),
             redirect: "//evil.example"
           })
@@ -945,7 +945,7 @@ describe("oauth callback", () => {
 
     const response = await auth.handler(
       request("GET", `/api/auth/callback/google?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -964,7 +964,7 @@ describe("oauth callback", () => {
         "GET",
         "/api/auth/callback/github?code=abc&state=attacker-supplied",
         {
-          cookies: { "auth-ts.state": stateCookie }
+          cookies: { [STATE_COOKIE]: stateCookie }
         }
       )
     )
@@ -997,7 +997,7 @@ describe("oauth callback", () => {
 
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -1016,7 +1016,7 @@ describe("oauth callback", () => {
 
     const response = await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -1035,7 +1035,7 @@ describe("oauth callback", () => {
         "GET",
         `/api/auth/callback/github?code=abc&state=${first.state}`,
         {
-          cookies: { "auth-ts.state": first.stateCookie }
+          cookies: { [STATE_COOKIE]: first.stateCookie }
         }
       )
     )
@@ -1052,7 +1052,7 @@ describe("oauth callback", () => {
         "GET",
         `/api/auth/callback/github?code=abc&state=${second.state}`,
         {
-          cookies: { "auth-ts.state": second.stateCookie }
+          cookies: { [STATE_COOKIE]: second.stateCookie }
         }
       )
     )
@@ -1087,7 +1087,7 @@ describe("oauth callback", () => {
     })
     await auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -1149,7 +1149,7 @@ describe("connect and disconnect", () => {
       })
     )
     const stateCookie = required(
-      readSetCookies(startResponse).get("auth-ts.state"),
+      readSetCookies(startResponse).get(STATE_COOKIE),
       "state"
     ).value
     const { state } = decodeState(stateCookie)
@@ -1157,7 +1157,7 @@ describe("connect and disconnect", () => {
     stubGitHub({ id: 4242, emails: verifiedEmails("different@example.com") })
     const callbackResponse = await context.auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { ...cookies, "auth-ts.state": stateCookie }
+        cookies: { ...cookies, [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -1201,7 +1201,7 @@ describe("connect and disconnect", () => {
       })
     )
     const stateCookie = required(
-      readSetCookies(startResponse).get("auth-ts.state"),
+      readSetCookies(startResponse).get(STATE_COOKIE),
       "state"
     ).value
     const { state } = decodeState(stateCookie)
@@ -1210,7 +1210,7 @@ describe("connect and disconnect", () => {
     // The victim follows the link without the session that started it.
     const callbackResponse = await context.auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -1233,7 +1233,7 @@ describe("connect and disconnect", () => {
       })
     )
     const stateCookie = required(
-      readSetCookies(startResponse).get("auth-ts.state"),
+      readSetCookies(startResponse).get(STATE_COOKIE),
       "state"
     ).value
     const { state } = decodeState(stateCookie)
@@ -1252,7 +1252,7 @@ describe("connect and disconnect", () => {
     const callbackResponse = await context.auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
         cookies: {
-          "auth-ts.state": stateCookie,
+          [STATE_COOKIE]: stateCookie,
           ...refreshCookieFor(guestRefresh)
         }
       })
@@ -1292,7 +1292,7 @@ describe("connect and disconnect", () => {
       })
     )
     const stateCookie = required(
-      readSetCookies(startResponse).get("auth-ts.state"),
+      readSetCookies(startResponse).get(STATE_COOKIE),
       "state"
     ).value
     const { state } = decodeState(stateCookie)
@@ -1300,7 +1300,7 @@ describe("connect and disconnect", () => {
     stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
     const callbackResponse = await context.auth.handler(
       request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-        cookies: { ...cookies, "auth-ts.state": stateCookie }
+        cookies: { ...cookies, [STATE_COOKIE]: stateCookie }
       })
     )
 
@@ -1330,7 +1330,7 @@ describe("google", () => {
       request("POST", "/api/auth/sign-in/provider/google")
     )
     const stateCookie = required(
-      readSetCookies(response).get("auth-ts.state"),
+      readSetCookies(response).get(STATE_COOKIE),
       "state cookie"
     ).value
     return { stateCookie, state: decodeState(stateCookie).state }
@@ -1346,7 +1346,7 @@ describe("google", () => {
     stubGoogle({ nonce: decodeState(stateCookie).nonce, ...identity })
     return auth.handler(
       request("GET", `/api/auth/callback/google?code=abc&state=${state}`, {
-        cookies: { "auth-ts.state": stateCookie }
+        cookies: { [STATE_COOKIE]: stateCookie }
       })
     )
   }
@@ -1359,7 +1359,7 @@ describe("google", () => {
     const { url } = (await start.clone().json()) as { url: string }
     const location = new URL(url)
     const stateCookie = required(
-      readSetCookies(start).get("auth-ts.state"),
+      readSetCookies(start).get(STATE_COOKIE),
       "state cookie"
     ).value
     const payload = decodeState(stateCookie)
@@ -1380,7 +1380,7 @@ describe("google", () => {
       request(
         "GET",
         `/api/auth/callback/google?code=abc&state=${payload.state}`,
-        { cookies: { "auth-ts.state": stateCookie } }
+        { cookies: { [STATE_COOKIE]: stateCookie } }
       )
     )
     expect(response.status).toBe(302)

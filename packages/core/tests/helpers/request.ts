@@ -43,9 +43,13 @@ export function request(
   })
 }
 
+/** Every test server is https, so the browser-side names carry the prefix. */
+export const REFRESH_COOKIE = "__Host-auth-ts.refresh"
+export const STATE_COOKIE = "__Host-auth-ts.state"
+
 /** The cookie one user's refresh token rides in, mirroring `refreshCookieName`. */
 export function refreshCookie(userId: string) {
-  return `auth-ts.refresh.${userId}`
+  return `${REFRESH_COOKIE}.${userId}`
 }
 
 /** Cookie header entries for a browser holding these users' refresh tokens. */
@@ -91,8 +95,9 @@ export function readSetCookies(response: Response | { headers: Headers }) {
 export function refreshEntryOf(
   cookies: Map<string, { value: string; attributes: string }>
 ) {
+  // Prefixed on https, plain where the path is narrowed or the origin is http.
   const refresh = [...cookies].filter(([name]) =>
-    name.startsWith("auth-ts.refresh.")
+    name.replace(/^__Host-/, "").startsWith("auth-ts.refresh.")
   )
 
   // A response may clear one user's cookie while setting another's — a guest

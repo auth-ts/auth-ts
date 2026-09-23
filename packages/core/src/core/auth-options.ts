@@ -207,7 +207,12 @@ export interface SessionOptions {
  * configurable would turn one careless line into an XSS or CSRF exposure.
  */
 export interface CookieOptions {
-  /** @default "auth-ts.refresh" */
+  /**
+   * The browser stores it as `__Host-<name>.<userId>` wherever it can —
+   * `Secure` and `Path=/`, which is everywhere but plain-HTTP localhost and a
+   * narrowed `path` — so a sibling subdomain cannot plant one.
+   * @default "auth-ts.refresh"
+   */
   name?: string
   /**
    * Defaults to `"/"`, so a page request carries the session.
@@ -222,7 +227,8 @@ export interface CookieOptions {
    * same-origin request and the access logs, CDN logs, and APM traces those
    * pass through. Path is not a security boundary in the browser — `HttpOnly`,
    * `SameSite=Lax`, and host-only scoping are what protect the token — so what
-   * this buys is exposure hygiene, and it costs you server-side session reads.
+   * this buys is exposure hygiene, and it costs you server-side session reads
+   * and the `__Host-` prefix, which the browser allows only at `/`.
    */
   path?: string
   /**

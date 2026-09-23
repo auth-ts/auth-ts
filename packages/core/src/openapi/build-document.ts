@@ -272,7 +272,7 @@ export function buildOpenAPIDocument(config?: AuthConfig): OpenAPIDocument {
           in: "cookie",
           name: config?.cookie.name ?? "auth-ts.refresh",
           description:
-            "Set by the server, HttpOnly and host-only. A browser sends it automatically; a playground cannot set it."
+            "Set by the server, HttpOnly, host-only and `__Host-` prefixed over HTTPS. A browser sends it automatically; a playground cannot set it."
         }
       }
     }

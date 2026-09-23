@@ -53,15 +53,24 @@ function decodeSegment(segment: string) {
   }
 }
 
-/** Every refresh token this browser presented, by the user it belongs to. */
+/**
+ * Every refresh token this browser presented, by the user it belongs to.
+ *
+ * Read under the `__Host-` name and the plain one, and where both name the
+ * same user the `__Host-` cookie wins: a page script cannot set that one, so
+ * it is the one the server wrote.
+ */
 export function readRefreshCookies(internals: AuthInternals, headers: Headers) {
   const prefix = `${internals.config.cookie.name}.`
   const tokens = new Map<string, string>()
 
-  for (const [name, value] of requestCookies(headers)) {
-    if (!name.startsWith(prefix) || !value) continue
-    const userId = decodeSegment(name.slice(prefix.length))
-    if (userId) tokens.set(userId, value)
+  for (const hosted of [false, true]) {
+    for (const [name, value] of requestCookies(headers)) {
+      const expected = hosted ? `__Host-${prefix}` : prefix
+      if (!name.startsWith(expected) || !value) continue
+      const userId = decodeSegment(name.slice(expected.length))
+      if (userId) tokens.set(userId, value)
+    }
   }
 
   return tokens

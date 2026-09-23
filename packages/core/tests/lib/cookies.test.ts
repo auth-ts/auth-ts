@@ -123,6 +123,21 @@ describe("serializeCookie", () => {
     expect(setCookie.toLowerCase()).not.toContain("domain")
   })
 
+  it("prefixes the name with __Host- only where the browser accepts it", () => {
+    const at = (path: string, secure?: boolean) =>
+      serializeCookie({ name: "auth-ts.refresh", value: "v", path, secure })
+
+    expect(at("/")).toMatch(/^__Host-auth-ts\.refresh=/)
+    expect(at("/", false)).toMatch(/^auth-ts\.refresh=/)
+    expect(at("/api/auth")).toMatch(/^auth-ts\.refresh=/)
+    expect(clearCookie("auth-ts.refresh", "/")).toMatch(
+      /^__Host-auth-ts\.refresh=;/
+    )
+    expect(clearCookie("auth-ts.refresh", "/", false)).toMatch(
+      /^auth-ts\.refresh=;/
+    )
+  })
+
   it("omits Max-Age when no lifetime is given", () => {
     expect(serializeCookie({ name: "s", value: "v", path: "/" })).not.toContain(
       "Max-Age"
@@ -212,6 +227,24 @@ describe("shouldUseSecureCookies", () => {
     // `Secure` is a local development origin, and nothing here says it is one.
     expect(shouldUseSecureCookies()).toBe(true)
     expect(shouldUseSecureCookies(undefined)).toBe(true)
+  })
+})
+
+describe("readRefreshCookies", () => {
+  it("prefers the __Host- cookie when a plain one names the same user", () => {
+    // A page script can set the plain name; only the server can set __Host-.
+    const config = {
+      cookie: { name: "auth-ts.refresh", path: "/" }
+    } as Parameters<typeof refreshCookieName>[0]
+    const headers = new Headers({
+      cookie:
+        "auth-ts.refresh.ada=planted; __Host-auth-ts.refresh.ada=real; auth-ts.refresh.grace=old"
+    })
+
+    const tokens = readRefreshCookies({ config } as never, headers)
+
+    expect(tokens.get("ada")).toBe("real")
+    expect(tokens.get("grace")).toBe("old")
   })
 })
 

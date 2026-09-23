@@ -138,10 +138,15 @@ provider identity already linked elsewhere is never re-pointed.
 
 The browser receives the refresh token only as an `HttpOnly`, `Secure`,
 `SameSite=Lax` cookie with **no `Domain` attribute**, so it is never
-broadcast to sibling subdomains. `Secure` is dropped in exactly one case —
-plain-HTTP `localhost`, where a browser would refuse the cookie outright and
-local development would not work at all. Every other origin gets it, including
-an endpoint called in-process where there is no request URL to judge by.
+broadcast to sibling subdomains. In production its name carries the `__Host-`
+prefix, as does the OAuth state cookie: a browser accepts a `__Host-` cookie
+only from the host itself, so a compromised sibling subdomain cannot plant one
+and sign a visitor into an attacker's account. `Secure` — and with it the
+prefix — is dropped in exactly one case: plain-HTTP `localhost`, where a browser
+would refuse the cookie outright and local development would not work at all.
+Every other origin gets it, including an endpoint called in-process where there
+is no request URL to judge by. Narrowing `cookie.path` to the auth mount also
+forgoes the prefix, which the browser allows only at `/`.
 
 The token is `id.secret`, and the code is Lucia's `auth_session.ts` with the
 database calls swapped in: thirty-two random bytes, base64 in the token,

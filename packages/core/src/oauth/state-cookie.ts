@@ -131,9 +131,8 @@ export async function createStateCookie(
       codeVerifier,
       nonce
     } satisfies OAuthStatePayload),
-    // Scoped to the exact callback path: this cookie is only ever read there, so
-    // there is no reason for it to ride along with anything else.
-    path: `${internals.config.basePath}/callback/${provider}`,
+    // Path=/ is what earns the __Host- prefix
+    path: "/",
     maxAge: OAUTH_STATE_TTL,
     secure
   })
@@ -173,7 +172,9 @@ export async function readStateCookie(
   stateParameter: string | null,
   provider: string
 ) {
-  const raw = readCookie(headers, internals.config.cookie.stateName)
+  const raw =
+    readCookie(headers, `__Host-${internals.config.cookie.stateName}`) ??
+    readCookie(headers, internals.config.cookie.stateName)
   if (!raw || !stateParameter) throw new AuthApiError("invalidState")
 
   const payload = decodeStatePayload(raw)
@@ -227,14 +228,6 @@ export async function readStateCookie(
 }
 
 /** Expires the state cookie once the flow is finished, successfully or not. */
-export function clearStateCookie(
-  internals: AuthInternals,
-  provider: string,
-  secure: boolean
-) {
-  return clearCookie(
-    internals.config.cookie.stateName,
-    `${internals.config.basePath}/callback/${provider}`,
-    secure
-  )
+export function clearStateCookie(internals: AuthInternals, secure: boolean) {
+  return clearCookie(internals.config.cookie.stateName, "/", secure)
 }

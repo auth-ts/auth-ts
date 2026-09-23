@@ -4,7 +4,8 @@ import {
   mintToken,
   readRefreshCookie,
   readSetCookies,
-  request
+  request,
+  STATE_COOKIE
 } from "../helpers/request"
 import { required } from "../helpers/required"
 import { selectRow } from "../helpers/rows"
@@ -37,7 +38,7 @@ async function signInWithGitHub(
     request("POST", "/api/auth/sign-in/provider/github")
   )
   const stateCookie = required(
-    readSetCookies(startResponse).get("auth-ts.state"),
+    readSetCookies(startResponse).get(STATE_COOKIE),
     "state"
   ).value
   const { state } = decodeState(stateCookie)
@@ -45,7 +46,7 @@ async function signInWithGitHub(
   stubGitHub(identity)
   const callbackResponse = await context.auth.handler(
     request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
-      cookies: { "auth-ts.state": stateCookie }
+      cookies: { [STATE_COOKIE]: stateCookie }
     })
   )
   vi.restoreAllMocks()

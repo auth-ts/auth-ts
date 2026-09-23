@@ -195,7 +195,27 @@ describe("issueSession", () => {
       requestURL: "http://localhost:3000/api/auth/sign-in/code"
     })
 
-    expect(readRefreshCookie(issued)?.attributes).not.toContain("Secure")
+    const [name, cookie] = required(
+      [...readSetCookies(issued)].find(([name]) => name.includes("refresh")),
+      "refresh cookie"
+    )
+    expect(cookie.attributes).not.toContain("Secure")
+    // No Secure, so no __Host- either: the browser would refuse the pair.
+    expect(name).toBe(`auth-ts.refresh.${user.id}`)
+  })
+
+  it("prefixes the cookie with __Host- wherever Secure and Path=/ apply", async () => {
+    const { internals, db } = await createTestInternals()
+    const user = await insertUser(db, { email: "ada@example.com" })
+
+    const issued = await issueSession(internals, {
+      user,
+      amr: ["otp"],
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+
+    expect(readSetCookies(issued).has(refreshCookie(user.id))).toBe(true)
   })
 
   it("mints an access token that verifies and carries sub, type, and role", async () => {
@@ -310,7 +330,9 @@ describe("issueSession", () => {
       requestURL: REQUEST_URL
     })
 
-    expect(readSetCookies(issued).has("auth-ts.refresh.accounts")).toBe(false)
+    expect(readSetCookies(issued).has("__Host-auth-ts.refresh.accounts")).toBe(
+      false
+    )
   })
 })
 

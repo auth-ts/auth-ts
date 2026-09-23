@@ -16,7 +16,7 @@ import { parseDurationSeconds } from "./parse-duration"
  * {@link serializeHintCookie}, and says why it may be read by script.
  */
 export interface CookieAttributes {
-  /** Cookie name, e.g. `"auth-ts.refresh"`. */
+  /** Cookie name, e.g. `"auth-ts.refresh"`; see {@link hostPrefixed} for what the browser stores. */
   name: string
   /** Raw cookie value; percent-encoded on the way out. */
   value: string
@@ -29,6 +29,21 @@ export interface CookieAttributes {
    * sends `Secure`; the resolver decides this from the request URL, not the caller.
    */
   secure?: boolean
+}
+
+/**
+ * The name a cookie is set under: `__Host-` prefixed wherever the browser
+ * allows it.
+ *
+ * A browser accepts a `__Host-` cookie only when it is `Secure`, `Path=/` and
+ * carries no `Domain`, and then only from the host itself — so a compromised
+ * sibling subdomain cannot plant one, which is what would otherwise sign a
+ * visitor with no session into an attacker's account. The prefix is dropped
+ * where the browser would refuse the cookie outright: plain-HTTP localhost,
+ * and a `cookie.path` narrowed to the mount. Readers accept both names.
+ */
+export function hostPrefixed(name: string, secure: boolean, path: string) {
+  return secure && path === "/" ? `__Host-${name}` : name
 }
 
 function serializeAttributes(
@@ -49,13 +64,10 @@ export function serializeCookie(cookie: CookieAttributes) {
       ? undefined
       : parseDurationSeconds(cookie.maxAge)
   const encodedValue = encodeURIComponent(cookie.value)
-  const attributes = serializeAttributes(
-    cookie.path,
-    cookie.secure ?? true,
-    maxAgeSeconds
-  )
+  const secure = cookie.secure ?? true
+  const attributes = serializeAttributes(cookie.path, secure, maxAgeSeconds)
 
-  return `${cookie.name}=${encodedValue}; ${attributes}`
+  return `${hostPrefixed(cookie.name, secure, cookie.path)}=${encodedValue}; ${attributes}`
 }
 
 /** Where a hint cookie applies, which is all that setting and clearing it share. */
@@ -119,7 +131,7 @@ function hintCookie(
  * and the user stays signed in after clicking sign out.
  */
 export function clearCookie(name: string, path: string, secure = true) {
-  return `${name}=; ${serializeAttributes(path, secure, 0)}`
+  return `${hostPrefixed(name, secure, path)}=; ${serializeAttributes(path, secure, 0)}`
 }
 
 /**
