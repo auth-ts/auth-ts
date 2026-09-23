@@ -6,9 +6,9 @@ export interface IpAddressOptions {
    *
    * `x-forwarded-for` covers most reverse proxies and is the default. A
    * single-value header the platform guarantees it controls is stronger —
-   * `cf-connecting-ip` on Cloudflare, `true-client-ip` on Akamai — because a
-   * client cannot append to it past the edge, so prefer one when your platform
-   * sets it.
+   * `cf-connecting-ip` on Cloudflare, `true-client-ip` on Akamai, `x-real-ip`
+   * on Railway and behind nginx — because a client cannot append to it past
+   * the edge, so prefer one when your platform sets it.
    *
    * An entry may carry a port — `203.0.113.7:54321`, `[2001:db8::1]:443` — as
    * Azure's front door and IIS ARR write it. The port is dropped, and the bare

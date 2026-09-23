@@ -364,7 +364,8 @@ chain readable, both under `ipAddress`:
 
 Stronger than either: point `headers` at a single-value header your platform
 sets and a client cannot append to — `cf-connecting-ip` on Cloudflare,
-`true-client-ip` on Akamai. Neither form verifies who actually connected, only
+`true-client-ip` on Akamai, `x-real-ip` on Railway and behind nginx, which is
+the one the book's author reads. Neither form verifies who actually connected, only
 how the header is read, so keep the app reachable only through those proxies.
 
 Whatever arrives is validated as an IP address before it becomes a rate-limit
