@@ -6,8 +6,7 @@ import { HINT_COOKIE_NAME } from "../shared/hint-cookie"
 import type { CallerInput } from "./authenticate"
 import { verifyBearer } from "./authenticate"
 import { readRefreshCookies } from "./session-cookies"
-import { parseSessionToken, sessionAge } from "./session-token"
-import { slideSession } from "./slide-session"
+import { sessionAge, validateSessionToken } from "./session-token"
 
 /**
  * The minimal carrier for anything that reads the refresh cookie.
@@ -62,39 +61,6 @@ export function readRefreshToken(
 }
 
 /**
- * Finds a live session by a raw refresh token and, at most hourly, marks it used.
- *
- * The session is matched on its id, its secret, and an expiry still ahead of
- * now, so expiry is enforced here rather than trusted to a cleanup sweep — an
- * expired row simply matches nothing, and a dead session cannot be revived by
- * the write that would have extended it.
- *
- * Sliding on the way through means being in the application keeps a session
- * alive, to the hour.
- */
-async function liveSession(
-  internals: AuthInternals,
-  headers: Headers,
-  rawToken: string | undefined
-): Promise<Omit<ResolvedSession, "user"> | null> {
-  if (!rawToken) {
-    internals.log.debug("no refresh credential on request")
-    return null
-  }
-
-  const credential = await parseSessionToken(rawToken)
-  const [session] = credential
-    ? await slideSession(internals, credential, headers)
-    : []
-  if (!session) {
-    internals.log.debug("no live session for this refresh credential")
-    return null
-  }
-
-  return { session }
-}
-
-/**
  * Resolves the session held under one user's name, and only if it is theirs.
  *
  * Naming a user is a claim, and the row is what
@@ -109,20 +75,20 @@ export async function resolveSessionRowForUser(
   internals: AuthInternals,
   headers: Headers,
   userId: string
-): Promise<Omit<ResolvedSession, "user"> | null> {
-  const resolved = await liveSession(
+): Promise<AuthSession | null> {
+  const session = await validateSessionToken(
     internals,
-    headers,
-    readRefreshToken(internals, headers, userId)?.token
+    readRefreshToken(internals, headers, userId)?.token,
+    headers
   )
-  if (!resolved) return null
+  if (!session) return null
 
-  if (resolved.session.userId !== userId) {
+  if (session.userId !== userId) {
     internals.log.warn("refresh cookie names a user it does not belong to")
     return null
   }
 
-  return resolved
+  return session
 }
 
 /**
@@ -141,17 +107,17 @@ export async function resolveSession(
   headers: Headers
 ): Promise<ResolvedSession | null> {
   const picked = readRefreshToken(internals, headers)
-  const [resolved, named] = await Promise.all([
-    liveSession(internals, headers, picked?.token),
+  const [session, named] = await Promise.all([
+    validateSessionToken(internals, picked?.token, headers),
     picked ? selectOne(internals, "users", { id: { eq: picked.userId } }) : null
   ])
-  if (!resolved) return null
+  if (!session) return null
 
   const user =
-    named?.id === resolved.session.userId
+    named?.id === session.userId
       ? named
       : await selectOne(internals, "users", {
-          id: { eq: resolved.session.userId }
+          id: { eq: session.userId }
         })
   if (!user) {
     // Core deletes a user's sessions before the user, so a session pointing at
@@ -160,7 +126,7 @@ export async function resolveSession(
     return null
   }
 
-  return { ...resolved, user }
+  return { session, user }
 }
 
 /**
@@ -194,7 +160,7 @@ export async function resolveCallerSession(
  * fallback would answer with whichever session the browser happens to hold,
  * which is a different question, and would slide it on the way past.
  *
- * The expiry check has to be here as well as in `slideSession`: `selectOne` by
+ * The expiry check has to be here as well as in `validateSessionToken`: `selectOne` by
  * id would happily return a row whose lifetime has run out.
  *
  * @returns The session and user, or `null` when no live token named a live one.

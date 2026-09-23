@@ -10,8 +10,7 @@ import { bytesToBase64 } from "../shared/base64url"
 import { presentedSessions } from "./presented-sessions"
 import type { ResolvedSession } from "./resolve-session"
 import { refreshCookieName, refreshCookies } from "./session-cookies"
-import { sessionAge } from "./session-token"
-import { sessionStamp } from "./slide-session"
+import { sessionAge, sessionStamp } from "./session-token"
 
 /** What issuing a session produced. */
 export interface IssueResult {

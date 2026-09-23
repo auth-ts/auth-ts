@@ -79,21 +79,21 @@ export const switchUser = defineEndpoint({
     // Resolved through the same path as any other request, so a cookie whose
     // session has expired or been revoked is a 404 rather than a switch onto
     // nothing. The hint cookie written below is what makes it the active one.
-    const resolved = await resolveSessionRowForUser(
+    const session = await resolveSessionRowForUser(
       internals,
       headers,
       input.userId
     )
-    if (!resolved) throw notFound()
+    if (!session) throw notFound()
 
     // The session's own owner, not the id that was asked for. They are equal
     // by the time this runs, and minting a token is not the place to assume it.
     const user = await selectOne(internals, "users", {
-      id: { eq: resolved.session.userId }
+      id: { eq: session.userId }
     })
     if (!user) throw notFound()
 
-    const token = await mintAccessToken(internals, user, resolved.session)
+    const token = await mintAccessToken(internals, user, session)
     const responseHeaders = new Headers()
     // Re-sent unchanged: the value is the same cookie the browser already has,
     // and writing it is how the hint comes to name this user.

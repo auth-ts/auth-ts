@@ -1,6 +1,8 @@
 import type { AuthSession } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
+import { defer } from "../lib/defer"
 import { constantTimeEqual, hexToBytes } from "../lib/hash"
+import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
 import { base64ToBytes } from "../shared/base64url"
@@ -79,4 +81,55 @@ export async function findSession(
   }
 
   return authSession
+}
+
+const SLIDE_INTERVAL = "1h"
+
+/** User-agent and validated client IP for a session row, from the request headers. */
+export function sessionStamp(internals: AuthInternals, headers: Headers) {
+  const userAgent = headers.get("user-agent")
+  const ipAddress = getIpAddress(headers, internals.config.ipAddress)
+
+  return {
+    ...(userAgent ? { userAgent } : {}),
+    ...(ipAddress ? { ipAddress } : {})
+  }
+}
+
+/** The live session a token names, stamped at most hourly; `null` otherwise. */
+export async function validateSessionToken(
+  internals: AuthInternals,
+  authSessionToken: string | undefined,
+  headers: Headers
+): Promise<AuthSession | null> {
+  if (!authSessionToken) {
+    internals.log.debug("no refresh credential on request")
+    return null
+  }
+
+  const credential = await parseSessionToken(authSessionToken)
+  const authSession = credential && (await findSession(internals, credential))
+  if (!authSession) {
+    internals.log.debug("no live session for this refresh credential")
+    return null
+  }
+
+  if (
+    Date.now() - authSession.updatedAt.getTime() <
+    parseDuration(SLIDE_INTERVAL)
+  ) {
+    return authSession
+  }
+
+  const written = { updatedAt: new Date(), ...sessionStamp(internals, headers) }
+  const write = internals.db.update({
+    table: "sessions",
+    // Never revives a session revoked meanwhile
+    where: { id: { eq: authSession.id }, ...sessionAge(internals).live },
+    values: written
+  })
+  if (internals.config.waitUntil) defer(internals, "session slide", write)
+  else await write
+
+  return { ...authSession, ...written }
 }
