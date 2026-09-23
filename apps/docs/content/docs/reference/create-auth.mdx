@@ -266,9 +266,10 @@ machine where you want to try them. Nothing is invented in production.
 
 ## Verification codes
 
-Codes are six symbols from a thirty-two-symbol alphabet by default: uppercase
-letters and digits without I, O, 0 and 1. Switch to digits when you want the
-one-time-code autofill phones offer, and lengthen the code if you do:
+Codes are eight symbols from a thirty-two-symbol alphabet by default, the
+book's 40 bits: uppercase letters and digits without I, O, 0 and 1. Switch to
+digits when you want the one-time-code autofill phones offer, and lengthen the
+code if you do; digits fall below the book's bar at any length short of 12:
 
 ```ts
 createAuth({
@@ -284,7 +285,7 @@ rate, nonstop guessing reaches even odds after roughly:
 
 | Code | Values | Time to a 50% chance |
 | --- | --- | --- |
-| 6 alphanumeric | 1.1 billion | ~1,000 years |
+| 8 alphanumeric | 1.1 trillion | ~1,000,000 years |
 | 8 digits | 100 million | ~95 years |
 | 6 digits | 1 million | ~1 year |
 

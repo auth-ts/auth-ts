@@ -134,7 +134,7 @@ describe("sendVerificationCode", () => {
     const attempt = await send(internals)
 
     const sent = required(sentCodes[0], "sent code")
-    expect(sent.code).toHaveLength(6)
+    expect(sent.code).toHaveLength(8)
     for (const symbol of sent.code) {
       expect(CODE_ALPHABETS.alphanumeric).toContain(symbol)
     }

@@ -45,15 +45,14 @@ cannot replace yours, spend yours, or guess at yours, so there is no limit on
 how many codes an address may have in flight and nothing an attacker can do to
 keep you from starting a sign-in.
 
-What is limited is **guessing, per address, from anyone**: five guesses in
-five minutes by default, and the sixth is refused before it is compared. That
-is the one budget an attacker holds against an account, and at six symbols from
-thirty-two it takes on the order of a thousand years of nonstop guessing —
-emailing the target every hour to keep a live code — to reach even
-odds. Under that attack the real user's guess may be refused for the rest of
-the window; their code is never touched. No slow hashing — the ten-minute
-lifetime and the guess budget do that job, and bcrypt here would only slow down
-honest sign-ins.
+What is limited is **guessing, per address, from anyone**: five guesses, then
+one a minute by default, and a refused guess is never compared. That is the
+one budget an attacker holds against an account, and at the book's eight
+symbols from thirty-two it takes on the order of a million years of nonstop
+guessing — emailing the target every hour to keep a live code — to reach even
+odds. Under that attack the real user's guess may be refused for a minute;
+their code is never touched. Codes live an hour and are stored under scrypt,
+so a leaked table cannot be read back into live codes.
 
 Purposes are checked on verify, so a sign-in code can never confirm an
 identity, and the two carry separate attempt cookies so requesting one does not

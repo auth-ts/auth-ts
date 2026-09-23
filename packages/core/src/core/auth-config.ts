@@ -107,16 +107,17 @@ function resolveVerificationCode(
   options: VerificationCodeOptions | undefined
 ): Required<VerificationCodeOptions> {
   const alphabet = options?.alphabet ?? "alphanumeric"
-  const length = options?.length ?? 6
+  const length = options?.length ?? 8
+  const shortest = alphabet === "numeric" ? 6 : 8
 
   if (alphabet !== "alphanumeric" && alphabet !== "numeric") {
     throw new AuthConfigError(
       `verificationCode.alphabet must be "alphanumeric" or "numeric".`
     )
   }
-  if (!Number.isInteger(length) || length < 6 || length > 12) {
+  if (!Number.isInteger(length) || length < shortest || length > 12) {
     throw new AuthConfigError(
-      "verificationCode.length must be an integer from 6 to 12."
+      `verificationCode.length must be an integer from ${shortest} to 12 for ${alphabet} codes.`
     )
   }
 
