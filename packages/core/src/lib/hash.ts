@@ -2,10 +2,18 @@ import { base64urlToBytes, bytesToBase64url } from "../shared/base64url"
 
 const textEncoder = new TextEncoder()
 
-function toHex(buffer: ArrayBuffer | Uint8Array) {
+/** Lowercase hex of a digest, the form every hash column stores. */
+export function toHex(buffer: ArrayBuffer | Uint8Array) {
   return Array.from(new Uint8Array(buffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")
+}
+
+/** The bytes a {@link toHex} string encodes. */
+export function hexToBytes(hex: string) {
+  return Uint8Array.from(hex.match(/../g) ?? [], (pair) =>
+    Number.parseInt(pair, 16)
+  )
 }
 
 /**
@@ -92,22 +100,23 @@ export async function scryptVerify(value: string, stored: string) {
     expected.length
   )
 
-  return timingSafeEqualHex(toHex(derived), toHex(expected))
+  return constantTimeEqual(derived, expected)
 }
 
+// Lucia's auth_session.ts, 0BSD
 /**
- * Compares two hex digests in time that does not depend on where they differ.
+ * Compares two digests in time that does not depend on where they differ.
  *
- * A `===` here would return as soon as it found a mismatching character, and the
+ * A `===` here would return as soon as it found a mismatching byte, and the
  * timing of that return leaks how much of a guess was correct.
  */
-export function timingSafeEqualHex(left: string, right: string) {
-  if (left.length !== right.length) return false
-
-  let difference = 0
-  for (let index = 0; index < left.length; index++) {
-    difference |= left.charCodeAt(index) ^ right.charCodeAt(index)
+export function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.byteLength !== b.byteLength) {
+    return false
   }
-
-  return difference === 0
+  let c = 0
+  for (let i = 0; i < a.byteLength; i++) {
+    c |= (a[i] ?? 0) ^ (b[i] ?? 0)
+  }
+  return c === 0
 }

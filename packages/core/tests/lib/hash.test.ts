@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest"
 import {
+  constantTimeEqual,
+  hexToBytes,
   scryptDerive,
   scryptHash,
   scryptVerify,
   sha256Hex,
-  timingSafeEqualHex
+  toHex
 } from "../../src/lib/hash"
 
 describe("sha256Hex", () => {
@@ -69,11 +71,20 @@ describe("scrypt", () => {
   })
 })
 
-describe("timingSafeEqualHex", () => {
+describe("constantTimeEqual", () => {
   it("compares equal and unequal digests correctly", () => {
-    expect(timingSafeEqualHex("abcd", "abcd")).toBe(true)
-    expect(timingSafeEqualHex("abcd", "abce")).toBe(false)
-    expect(timingSafeEqualHex("abcd", "abcde")).toBe(false)
-    expect(timingSafeEqualHex("", "")).toBe(true)
+    const bytes = (...values: number[]) => Uint8Array.from(values)
+    expect(constantTimeEqual(bytes(1, 2, 3), bytes(1, 2, 3))).toBe(true)
+    expect(constantTimeEqual(bytes(1, 2, 3), bytes(1, 2, 4))).toBe(false)
+    expect(constantTimeEqual(bytes(1, 2, 3), bytes(1, 2, 3, 0))).toBe(false)
+    expect(constantTimeEqual(bytes(), bytes())).toBe(true)
+  })
+})
+
+describe("hex", () => {
+  it("round-trips bytes", () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32))
+    expect(toHex(bytes)).toMatch(/^[0-9a-f]{64}$/)
+    expect(hexToBytes(toHex(bytes))).toEqual(bytes)
   })
 })

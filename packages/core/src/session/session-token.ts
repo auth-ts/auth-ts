@@ -1,30 +1,44 @@
 import type { AuthSession } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
-import { sha256Hex, timingSafeEqualHex } from "../lib/hash"
+import { constantTimeEqual, hexToBytes } from "../lib/hash"
 import { selectOne } from "../lib/select-one"
+import { base64ToBytes } from "../shared/base64url"
 
-/** The two halves of a session token: the row's id, and `sha256` of its secret. */
+// Lucia's auth_session.ts, 0BSD
+/** The two halves of a session token: the row's id, and SHA-256 of its secret. */
 export interface SessionCredential {
   id: string
-  secretHash: string
+  secretHash: Uint8Array
 }
 
 /**
  * Splits `id.secret` and hashes the secret.
  *
- * The split is at the last `.`: the secret is base64url and cannot contain
- * one, but an id from `generateId` can. A token with no `.` is read as an id
- * with an empty secret, which no row's hash will ever equal — so a cookie
- * that does not parse still names something to look up and find nothing.
+ * @returns The credential, or `null` for anything that is not `id.base64`.
  */
 export async function parseSessionToken(
-  rawToken: string
-): Promise<SessionCredential> {
-  const at = rawToken.lastIndexOf(".")
-  const id = at === -1 ? rawToken : rawToken.slice(0, at)
-  const secret = at === -1 ? "" : rawToken.slice(at + 1)
+  authSessionToken: string
+): Promise<SessionCredential | null> {
+  const tokenParts = authSessionToken.split(".")
+  if (tokenParts.length !== 2) {
+    return null
+  }
+  const [authSessionId = "", encodedAuthSessionSecret = ""] = tokenParts
 
-  return { id, secretHash: await sha256Hex(secret) }
+  const authSessionSecret = base64ToBytes(encodedAuthSessionSecret)
+  if (!authSessionSecret) {
+    return null
+  }
+
+  const authSessionSecretHashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    authSessionSecret
+  )
+
+  return {
+    id: authSessionId,
+    secretHash: new Uint8Array(authSessionSecretHashBuffer)
+  }
 }
 
 /**
@@ -39,13 +53,21 @@ export async function findSession(
   { id, secretHash }: SessionCredential,
   { live = true }: { live?: boolean } = {}
 ): Promise<AuthSession | null> {
-  const session = await selectOne(internals, "sessions", {
+  const authSession = await selectOne(internals, "sessions", {
     id: { eq: id },
     ...(live ? { expiresAt: { gt: new Date() } } : {})
   })
-  if (!session || !timingSafeEqualHex(secretHash, session.secretHash)) {
+  if (authSession === null) {
     return null
   }
 
-  return session
+  const secretCorrect = constantTimeEqual(
+    secretHash,
+    hexToBytes(authSession.secretHash)
+  )
+  if (!secretCorrect) {
+    return null
+  }
+
+  return authSession
 }

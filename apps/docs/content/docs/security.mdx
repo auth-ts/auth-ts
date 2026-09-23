@@ -139,9 +139,11 @@ plain-HTTP `localhost`, where a browser would refuse the cookie outright and
 local development would not work at all. Every other origin gets it, including
 an endpoint called in-process where there is no request URL to judge by.
 
-The token is `id.secret`. The database sees the id and `sha256` of the secret,
-so a leaked table yields nothing replayable, and the id can be logged and shown
-in a device list because it proves nothing on its own. The cookie is not the
+The token is `id.secret`, and the code is Lucia's `auth_session.ts` with the
+database calls swapped in: thirty-two random bytes, base64 in the token,
+SHA-256 in the row, compared in constant time. The id is whatever your store
+names the row. A leaked table yields nothing replayable, and the id can be
+logged and shown in a device list because it proves nothing on its own. The cookie is not the
 symmetric case: it *is* the credential. `HttpOnly` keeps script from reading it, but whatever does
 obtain it — a stolen browser profile, a device backup, a proxy terminating
 TLS — holds the session until that session is revoked or expires. Hashing

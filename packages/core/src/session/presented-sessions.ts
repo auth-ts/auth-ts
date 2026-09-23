@@ -5,9 +5,11 @@ import type { SessionCredential } from "./session-token"
 import { findSession, parseSessionToken } from "./session-token"
 
 /** One refresh cookie this browser presented, and the session its token found. */
-export interface PresentedSession extends SessionCredential {
+export interface PresentedSession {
   /** The cookie's name. A claim: only `session.userId` settles it. */
   userId: string
+  /** `null` for a cookie that is not `id.secret` — nothing to read or revoke. */
+  credential: SessionCredential | null
   session: AuthSession | null
 }
 
@@ -26,11 +28,12 @@ export function presentedSessions(
     [...readRefreshCookies(internals, headers)].map(
       async ([userId, rawToken]) => {
         const credential = await parseSessionToken(rawToken)
-        const session = read
-          ? await findSession(internals, credential, { live })
-          : null
+        const session =
+          read && credential
+            ? await findSession(internals, credential, { live })
+            : null
 
-        return { userId, ...credential, session }
+        return { userId, credential, session }
       }
     )
   )

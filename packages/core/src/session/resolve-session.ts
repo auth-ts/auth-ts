@@ -82,11 +82,10 @@ async function liveSession(
     return null
   }
 
-  const [session] = await slideSession(
-    internals,
-    await parseSessionToken(rawToken),
-    headers
-  )
+  const credential = await parseSessionToken(rawToken)
+  const [session] = credential
+    ? await slideSession(internals, credential, headers)
+    : []
   if (!session) {
     internals.log.debug("no live session for this refresh credential")
     return null

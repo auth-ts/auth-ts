@@ -7,8 +7,8 @@ icon: Lightbulb
 ## Two tokens
 
 **The refresh token** is the session: the row's id and 32 random bytes, joined
-as `id.secret`, delivered to the browser only as an `HttpOnly`, `Secure`,
-`SameSite=Lax`, host-only cookie. It is
+as `id.secret` the way Lucia's `auth_session.ts` does, delivered to the browser
+only as an `HttpOnly`, `Secure`, `SameSite=Lax`, host-only cookie. It is
 rooted at `/` so a page request carries it, which is what lets a loader or a
 server component call `getToken` during rendering; `cookie.path` narrows it to
 the auth mount if you would rather the token stayed out of the `Cookie` header

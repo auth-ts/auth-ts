@@ -2,12 +2,12 @@ import { requireOwnedClaimsAbsent } from "../core/auth-config"
 import type { AuthSession, AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { signToken } from "../jwt/sign-token"
-import { randomBytesBase64url } from "../lib/generate-random"
-import { sha256Hex } from "../lib/hash"
+import { toHex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { sweepExpired } from "../lib/sweep-expired"
+import { bytesToBase64 } from "../shared/base64url"
 import { presentedSessions } from "./presented-sessions"
 import type { ResolvedSession } from "./resolve-session"
 import { refreshCookieName, refreshCookies } from "./session-cookies"
@@ -57,18 +57,23 @@ export interface IssueSessionInput {
  * attributes, session stamping, and multi-account behaviour are defined once
  * rather than re-implemented per method with slightly different mistakes.
  *
- * The token is `id.secret`. The database is given the id and `sha256(secret)`;
- * possession of the secret proves identity, and the stored hash proves nothing
- * on its own, so a leaked table cannot be replayed. The id is an address, not a
- * credential: it can be logged, listed, and revoked by.
+ * The token is `id.secret`, as in Lucia's `auth_session.ts`: thirty-two
+ * random bytes, base64 in the token, SHA-256 in the row. Possession of the
+ * secret proves identity, and the stored hash proves nothing on its own, so a
+ * leaked table cannot be replayed. The id is an address, not a credential: it
+ * can be logged, listed, and revoked by, and it is whatever your store names
+ * the row.
  */
 export async function issueSession(
   internals: AuthInternals,
   { user, headers, requestURL, caller, amr }: IssueSessionInput
 ): Promise<IssueResult> {
   const { config } = internals
-  const secret = randomBytesBase64url(32)
-  const secretHash = await sha256Hex(secret)
+  const secret = new Uint8Array(32)
+  crypto.getRandomValues(secret)
+  const secretHash = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", secret)
+  )
   const now = new Date()
 
   // A cookie about to be overwritten leaves its session unreachable from this
@@ -83,7 +88,7 @@ export async function issueSession(
   const [session, , held] = await Promise.all([
     insertRow(internals, "sessions", {
       userId: user.id,
-      secretHash,
+      secretHash: toHex(secretHash),
       amr,
       expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
       ...sessionStamp(internals, headers)
@@ -94,12 +99,14 @@ export async function issueSession(
       read: config.multiUser
     })
   ])
-  const rawToken = `${session.id}.${secret}`
+  const rawToken = `${session.id}.${bytesToBase64(secret)}`
   const stranded = held.filter(
     ({ session }) => !config.multiUser || session?.userId === user.id
   )
   const superseded = new Map(
-    stranded.map(({ id, secretHash }) => [id, secretHash])
+    stranded.flatMap(({ credential }) =>
+      credential ? [[credential.id, toHex(credential.secretHash)] as const] : []
+    )
   )
   if (caller?.user.type === "guest") {
     superseded.set(caller.session.id, caller.session.secretHash)

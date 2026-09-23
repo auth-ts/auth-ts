@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { verifyToken } from "../../src/jwt/verify-token"
+import { toHex } from "../../src/lib/hash"
 import { issueSession } from "../../src/session/issue-session"
 import {
   resolveCallerSession,
@@ -118,10 +119,16 @@ describe("issueSession", () => {
     })
     const refreshToken = refreshTokenOf(issued)
     const stored = required(db.sessions()[0], "stored session")
-    const secret = refreshToken.slice(stored.id.length + 1)
+    const [id, secret = ""] = refreshToken.split(".")
 
-    expect(refreshToken.startsWith(`${stored.id}.`)).toBe(true)
-    expect(stored.secretHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(id).toBe(stored.id)
+    // Thirty-two bytes as standard, padded base64.
+    expect(secret).toMatch(/^[A-Za-z0-9+/]{43}=$/)
+    expect(stored.secretHash).toBe(
+      toHex(
+        await crypto.subtle.digest("SHA-256", Buffer.from(secret, "base64"))
+      )
+    )
     expect(JSON.stringify(db.sessions())).not.toContain(secret)
   })
 
@@ -381,7 +388,13 @@ describe("resolveSession", () => {
     })
     const stored = required(db.sessions()[0], "stored session")
 
-    for (const token of [`${stored.id}.AAAA`, `${stored.id}.`, stored.id]) {
+    for (const token of [
+      `${stored.id}.AAAA`,
+      `${stored.id}.`,
+      `${stored.id}.***`,
+      `${stored.id}.AAAA.AAAA`,
+      stored.id
+    ]) {
       const headers = new Headers({
         cookie: `${refreshCookie(user.id)}=${token}`
       })
