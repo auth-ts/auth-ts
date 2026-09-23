@@ -118,6 +118,12 @@ function LoginPage() {
             <p className="text-sm text-base-content/60">
               We'll email you a one-time code. No password to remember.
             </p>
+            {user?.type === "guest" ? (
+              <p className="mt-2 text-sm text-base-content/60">
+                You're signed in as a guest. Sign in to keep everything you've
+                made so far.
+              </p>
+            ) : null}
           </div>
 
           {stage === "email" ? (
