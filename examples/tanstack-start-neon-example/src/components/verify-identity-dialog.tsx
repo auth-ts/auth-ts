@@ -10,6 +10,7 @@ import { NoticeAlert } from "./notice"
 export type VerifiedAction = () => Promise<{ status: string }>
 
 const RESEND_SECONDS = 30
+const UNEXPECTED = "An unexpected error occurred. Please try again."
 
 function errorNotice(error: unknown, fallback: string): Notice {
   return {
@@ -24,30 +25,49 @@ function errorNotice(error: unknown, fallback: string): Notice {
  * hour, so a second revoke goes straight through.
  */
 export function useVerifiedAction(destination: string) {
-  const [pending, setPending] = useState<VerifiedAction | null>(null)
+  const [pending, setPending] = useState<{
+    action: VerifiedAction
+    settle: (error?: unknown) => void
+  } | null>(null)
   const [sendNotice, setSendNotice] = useState<Notice | null>(null)
 
+  // Settles once the retry after verifying does, so its error reaches the caller.
   const run = async (action: VerifiedAction) => {
     const result = await action()
     if (result.status !== "verificationRequired") return
 
     setSendNotice(null)
-    setPending(() => action)
+    const settled = new Promise<void>((resolve, reject) =>
+      setPending({
+        action,
+        settle: (error) => (error === undefined ? resolve() : reject(error))
+      })
+    )
     try {
       await authClient.sendIdentityCode()
     } catch (error) {
-      setSendNotice(errorNotice(error, "Could not send the code."))
+      setSendNotice(errorNotice(error, UNEXPECTED))
     }
+    return settled
   }
 
   const dialog = pending ? (
     <VerifyIdentityDialog
       destination={destination}
       initialNotice={sendNotice}
-      onCancel={() => setPending(null)}
-      onVerified={async () => {
+      onCancel={() => {
         setPending(null)
-        await pending()
+        pending.settle()
+      }}
+      onVerified={async () => {
+        try {
+          await pending.action()
+          pending.settle()
+        } catch (error) {
+          pending.settle(error)
+        } finally {
+          setPending(null)
+        }
       }}
     />
   ) : null
