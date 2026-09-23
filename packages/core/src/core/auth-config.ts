@@ -99,6 +99,7 @@ export const DEFAULT_GUESSES: RateLimitBucket = { capacity: 5, refill: "1m" }
 const DEFAULT_RATE_LIMIT: Required<RateLimitOptions> = {
   guesses: DEFAULT_GUESSES,
   sends: { capacity: 5, refill: "30m" },
+  identitySends: { capacity: 5, refill: "1m" },
   guestsPerIP: { capacity: 30, refill: "2m" }
 }
 

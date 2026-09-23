@@ -165,6 +165,7 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
         deliverTo: identifier,
         key: identifier.value,
         purpose: spec.purpose,
+        limit: { key: `send:${identifier.value}`, bucket: "sends" },
         locale: resolveLocale(
           headers.get("accept-language"),
           internals.config.localization

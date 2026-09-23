@@ -84,6 +84,7 @@ export const sendSignInCode = defineEndpoint({
       deliverTo: identifier,
       key: identifier.value,
       purpose: "signIn",
+      limit: { key: `send:${identifier.value}`, bucket: "sends" },
       locale: resolveLocale(
         headers.get("accept-language"),
         internals.config.localization

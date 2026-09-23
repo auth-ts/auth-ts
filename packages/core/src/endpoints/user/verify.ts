@@ -67,6 +67,7 @@ export const sendIdentityCode = defineEndpoint({
       deliverTo: identifier,
       key: caller.sessionId,
       purpose: "identity",
+      limit: { key: `identity:${caller.userId}`, bucket: "identitySends" },
       locale: resolveLocale(
         headers.get("accept-language"),
         internals.config.localization

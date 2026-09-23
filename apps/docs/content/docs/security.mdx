@@ -71,8 +71,12 @@ outage leaves nothing bound to the token the person is about to present.
 
 On by default, and the book's design: a token bucket per key, five tokens and
 one back every minute for guesses, keyed the way the author's app keys its
-buckets — on the address for a sign-in code, on the user for an identity code,
-on the address for sends (five, then one every half hour). The one bucket keyed
+buckets — on the address for a sign-in code, on the user for an identity code.
+Sends are keyed the same way: five to an address, then one every half hour, and
+separately five "confirm it's you" codes per user, then one a minute, so a
+stranger asking for codes to your address cannot block you from confirming who
+you are. A guess is charged only once the caller's attempt has found its code,
+so nobody without that attempt can spend the budget. The one bucket keyed
 on the client's IP is guest sign-in, because a guest has nothing else to key
 on; its default is GoTrue's thirty an hour.
 

@@ -809,12 +809,21 @@ describe("identity verification, revoking a device, deleting the account", () =>
     expect(context.db.sessions()).toHaveLength(2)
   })
 
-  it("rate limits identity codes per address, from the same budget as sign-in codes", async () => {
-    // The sign-in below spends one token on the address.
+  it("limits identity codes per user, apart from the address's sign-in sends", async () => {
     const context = await createTestServer({
-      rateLimit: { sends: { capacity: 3, refill: "30m" } }
+      rateLimit: {
+        sends: { capacity: 1, refill: "30m" },
+        identitySends: { capacity: 2, refill: "1m" }
+      }
     })
     const session = await signIn(context)
+    // A stranger asking for sign-in codes to the address cannot block this.
+    const stranger = await context.auth.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    expect(stranger.status).toBe(429)
     const before = context.sentCodes.length
     const send = () =>
       context.auth.handler(

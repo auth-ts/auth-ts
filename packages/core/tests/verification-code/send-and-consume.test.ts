@@ -95,6 +95,7 @@ describe("sendVerificationCode", () => {
       deliverTo: emailIdentifier,
       key: emailIdentifier.value,
       purpose: "signIn",
+      limit: { key: "send:test", bucket: "sends" },
       locale: "en",
       headers
     })
@@ -174,6 +175,7 @@ describe("sendVerificationCode", () => {
       deliverTo: emailIdentifier,
       key: "session-a",
       purpose: "identity",
+      limit: { key: "identity:test", bucket: "identitySends" },
       locale: "en",
       headers: new Headers()
     })
@@ -215,6 +217,7 @@ describe("sendVerificationCode", () => {
       deliverTo: emailIdentifier,
       key: emailIdentifier.value,
       purpose: "identity",
+      limit: { key: "identity:test", bucket: "identitySends" },
       locale: "de",
       headers
     })
@@ -269,6 +272,7 @@ describe("sendVerificationCode", () => {
         deliverTo: { kind: "email", value: address },
         key: address,
         purpose: "signIn",
+        limit: { key: `send:${address}`, bucket: "sends" },
         locale: "en",
         headers: new Headers()
       })
@@ -303,6 +307,7 @@ describe("markIdentityVerified", () => {
       deliverTo: emailIdentifier,
       key: "session-a",
       purpose: "identity",
+      limit: { key: "identity:test", bucket: "identitySends" },
       locale: "en",
       headers: new Headers()
     })
@@ -348,6 +353,7 @@ describe("consumeVerificationCode", () => {
       deliverTo: emailIdentifier,
       key: emailIdentifier.value,
       purpose: "signIn",
+      limit: { key: `send:${emailIdentifier.value}`, bucket: "sends" },
       locale: "en",
       headers: new Headers()
     })
@@ -453,6 +459,7 @@ describe("consumeVerificationCode", () => {
         deliverTo: emailIdentifier,
         key: emailIdentifier.value,
         purpose: "signIn",
+        limit: { key: "send:test", bucket: "sends" },
         locale: "en",
         headers: new Headers()
       })

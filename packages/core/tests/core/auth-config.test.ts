@@ -548,6 +548,7 @@ describe("resolved defaults", () => {
     expect(config.rateLimit).toMatchObject({
       guesses: { capacity: 9, refill: "1h" },
       sends: { capacity: 5, refill: "30m" },
+      identitySends: { capacity: 5, refill: "1m" },
       guestsPerIP: { capacity: 30, refill: "2m" }
     })
   })

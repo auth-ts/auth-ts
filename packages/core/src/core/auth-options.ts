@@ -369,6 +369,13 @@ export interface RateLimitOptions {
    */
   sends?: RateLimitBucket
   /**
+   * "Confirm it's you" codes per user, apart from `sends`, as the author's app
+   * keeps them: a stranger requesting sign-in codes for an address cannot
+   * block its owner from confirming who they are.
+   * @default { capacity: 5, refill: "1m" }
+   */
+  identitySends?: RateLimitBucket
+  /**
    * Guest sign-ins from one client address — the one bucket keyed on the IP,
    * because a guest has nothing else to key on. GoTrue's default.
    * @default { capacity: 30, refill: "2m" }
@@ -480,7 +487,7 @@ export interface AuthOptions<
   /**
    * Set `false` to disable the built-in limiter and bring your own.
    *
-   * That turns off `sends` and `guestsPerIP`. Turning them off is the
+   * That turns off `sends`, `identitySends` and `guestsPerIP`. Turning them off is the
    * recommended posture when something in front of this server already limits
    * `/sign-in/send-code` and `/sign-in/guest` — a Cloudflare rule or a Durable
    * Object stops a burst before it reaches you at all.

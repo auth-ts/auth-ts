@@ -43,6 +43,8 @@ export interface SendVerificationCodeInput {
   purpose: VerificationPurpose
   locale: string
   headers: Headers
+  /** Which send bucket this charges, and under what key. */
+  limit: { key: string; bucket: "sends" | "identitySends" }
 }
 
 /**
@@ -56,8 +58,8 @@ export interface SendVerificationCodeInput {
  * Every send is its own attempt: a fresh token goes back to the caller, and
  * the code can only be redeemed by whoever presents it. Nothing is deleted on
  * send, so a stranger requesting a code for your address cannot replace or
- * spend the one you are holding. Sends are limited per address, as the
- * author's app limits mail: five, then one every half hour, whoever asks.
+ * spend the one you are holding. Sends are limited as the author's app
+ * limits mail: per address for a sign-in, per user for an identity check.
  *
  * @returns The attempt token the caller must present with the code.
  * @throws {AuthApiError} `rateLimited` when the address has had its sends.
@@ -67,14 +69,10 @@ export async function sendVerificationCode(
   input: SendVerificationCodeInput
 ) {
   const { config } = internals
-  const { deliverTo, key, purpose, locale, headers } = input
+  const { deliverTo, key, purpose, locale, headers, limit } = input
 
   if (config.rateLimit !== false) {
-    await checkRateLimit(
-      internals,
-      `send:${deliverTo.value}`,
-      config.rateLimit.sends
-    )
+    await checkRateLimit(internals, limit.key, config.rateLimit[limit.bucket])
   }
 
   const attempt = randomBytesBase64url(32)
