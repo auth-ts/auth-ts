@@ -99,7 +99,7 @@ export async function handleRequest(
     headers.set("content-type", "application/json")
     return new Response(JSON.stringify(result.data), { status, headers })
   } catch (error) {
-    return toErrorResponse(internals, error, locale)
+    return toErrorResponse(internals, error, locale, endpoint, request)
   }
 }
 
@@ -121,7 +121,9 @@ function responseHeaders(init?: Headers) {
 function toErrorResponse(
   internals: AuthInternals,
   error: unknown,
-  locale: string
+  locale: string,
+  endpoint: AnyEndpoint,
+  request: Request
 ) {
   const { config } = internals
   const headers = responseHeaders(
@@ -148,6 +150,8 @@ function toErrorResponse(
   // internal error message is exactly the kind of thing that leaks a query or a
   // connection string to whoever is poking at the endpoint.
   internals.log.error("unhandled error in auth endpoint", {
+    method: request.method,
+    path: endpoint.path,
     error: String(error)
   })
 

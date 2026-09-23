@@ -165,6 +165,12 @@ describe("an unhandled throw", () => {
           String(call.data?.error).includes("relay access denied")
       )
     ).toBe(true)
+    // Named by route pattern, so no ids or query strings reach the log.
+    expect(
+      context.logCalls.find(
+        (call) => call.message === "unhandled error in auth endpoint"
+      )?.data
+    ).toMatchObject({ method: "POST", path: "/sign-in/send-code" })
   })
 })
 
