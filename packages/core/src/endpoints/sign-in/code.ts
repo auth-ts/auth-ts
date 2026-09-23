@@ -2,13 +2,14 @@ import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { readBody } from "../../http/read-body"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
+import { clearCookie, shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { convertGuest } from "../../session/convert-guest"
 import { issueSession } from "../../session/issue-session"
 import { notifySignedIn } from "../../session/notify-signed-in"
 import { resolveCallerSession } from "../../session/resolve-session"
 import type { AttemptInput } from "../../shared/attempt-cookie"
-import { readAttempt } from "../../shared/attempt-cookie"
+import { attemptCookieName, readAttempt } from "../../shared/attempt-cookie"
 import { findOrCreateUser } from "../../user/find-or-create-user"
 import { consumeVerificationCode } from "../../verification-code/consume-verification-code"
 import type { IdentifierBody } from "../../verification-code/resolve-code-identifier"
@@ -135,6 +136,14 @@ export const signInWithCode = defineEndpoint({
     })
     if (!created) await notifySignedIn(internals, { ...issued, headers })
 
+    issued.headers.append(
+      "set-cookie",
+      clearCookie(
+        attemptCookieName("signIn"),
+        internals.config.basePath,
+        shouldUseSecureCookies(input.requestURL)
+      )
+    )
     return {
       data: { user: issued.user, token: issued.token },
       headers: issued.headers

@@ -39,6 +39,11 @@ describe("verification code sign-in over HTTP", () => {
     expect(body.user.type).toBe("user")
     expect(await auth.verifyToken(body.token)).toBeTruthy()
 
+    // The spent attempt goes with the code, as the author's client clears it.
+    expect(
+      readSetCookies(verifyResponse).get("auth-ts.attempt")?.attributes
+    ).toContain("Max-Age=0")
+
     // The access token crosses in the body; the refresh token never does.
     const cookie = readRefreshCookie(verifyResponse)
     expect(cookie?.attributes).toContain("HttpOnly")
