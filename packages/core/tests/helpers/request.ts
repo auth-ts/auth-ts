@@ -120,7 +120,7 @@ export function readRefreshCookie(
 
 /** The id half of a refresh token, which is the session row's id. */
 export function sessionIdOf(refreshToken: string) {
-  return refreshToken.split(".")[0] ?? ""
+  return refreshToken.slice(0, refreshToken.lastIndexOf("."))
 }
 
 /** Exchanges a refresh cookie for an access token, the way a client boots. */

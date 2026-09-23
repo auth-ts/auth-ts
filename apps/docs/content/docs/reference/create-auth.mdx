@@ -32,8 +32,8 @@ a config, construction throws an `AuthConfigError`.
 Unset by default, and unset is usually right: rows go to your store without an
 `id` and your own column default fills it — `uuidv7()`, a `$defaultFn`, an
 identity column, whatever the table already does. `insert` hands the stored row
-back, so the library reads the id it was given rather than assuming one. A
-session id must not contain `.`: the token is `id.secret` and splits on it.
+back, so the library reads the id it was given rather than assuming one. Ids
+may be any string.
 
 ```ts
 createAuth({

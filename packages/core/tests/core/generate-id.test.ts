@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest"
 import type { AuthTable } from "../../src/core/auth-database"
 import { createTestServer } from "../helpers/create-test-server"
-import { request } from "../helpers/request"
+import {
+  readRefreshCookie,
+  refreshCookieFor,
+  request,
+  sessionIdOf
+} from "../helpers/request"
+import { required } from "../helpers/required"
 import { selectRows } from "../helpers/rows"
 
 describe("generateId", () => {
@@ -31,6 +37,29 @@ describe("generateId", () => {
     expect(context.db.users()[0]?.id).toBe("users_1")
     expect(context.db.sessions()[0]?.id).toBe("sessions_2")
     expect(seen).toEqual(["users", "sessions"])
+  })
+
+  it("takes any string, dots included, as a session id", async () => {
+    const context = await createTestServer({
+      guest: true,
+      generateId: (table) => `${table}.v1.${crypto.randomUUID()}`
+    })
+
+    const signIn = await context.auth.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const refresh = required(readRefreshCookie(signIn), "refresh").value
+    expect(sessionIdOf(refresh)).toMatch(/^sessions\.v1\./)
+
+    const token = await context.auth.handler(
+      request("GET", "/api/auth/token", {
+        cookies: refreshCookieFor(refresh)
+      })
+    )
+    expect(token.status).toBe(200)
+    expect(((await token.json()) as { token?: string }).token).toEqual(
+      expect.any(String)
+    )
   })
 
   it("is awaited, so an id may come from somewhere that takes a moment", async () => {

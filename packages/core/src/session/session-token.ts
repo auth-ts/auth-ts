@@ -16,11 +16,13 @@ export interface SessionCredential {
 export async function parseSessionToken(
   authSessionToken: string
 ): Promise<SessionCredential | null> {
-  const tokenParts = authSessionToken.split(".")
-  if (tokenParts.length !== 2) {
+  // Base64 has no dot, so any id works
+  const separator = authSessionToken.lastIndexOf(".")
+  if (separator === -1) {
     return null
   }
-  const [authSessionId = "", encodedAuthSessionSecret = ""] = tokenParts
+  const authSessionId = authSessionToken.slice(0, separator)
+  const encodedAuthSessionSecret = authSessionToken.slice(separator + 1)
 
   const authSessionSecret = base64ToBytes(encodedAuthSessionSecret)
   if (!authSessionSecret) {
