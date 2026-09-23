@@ -231,20 +231,35 @@ describe("shouldUseSecureCookies", () => {
 })
 
 describe("readRefreshCookies", () => {
-  it("prefers the __Host- cookie when a plain one names the same user", () => {
-    // A page script can set the plain name; only the server can set __Host-.
-    const config = {
-      cookie: { name: "auth-ts.refresh", path: "/" }
-    } as Parameters<typeof refreshCookieName>[0]
-    const headers = new Headers({
-      cookie:
-        "auth-ts.refresh.ada=planted; __Host-auth-ts.refresh.ada=real; auth-ts.refresh.grace=old"
-    })
+  const read = (path: string, host: string) =>
+    readRefreshCookies(
+      {
+        config: { cookie: { name: "auth-ts.refresh", path } }
+      } as never,
+      new Headers({
+        host,
+        cookie:
+          "auth-ts.refresh.ada=planted; __Host-auth-ts.refresh.ada=real; auth-ts.refresh.grace=planted"
+      })
+    )
 
-    const tokens = readRefreshCookies({ config } as never, headers)
+  it("ignores plain names where the server writes __Host- ones", () => {
+    // A sibling subdomain can set the plain name; only this host can set __Host-.
+    const tokens = read("/", "app.example.com")
 
     expect(tokens.get("ada")).toBe("real")
-    expect(tokens.get("grace")).toBe("old")
+    expect(tokens.has("grace")).toBe(false)
+  })
+
+  it("reads plain names on plain-HTTP localhost, where the server writes them", () => {
+    const tokens = read("/", "localhost:3000")
+
+    expect(tokens.get("ada")).toBe("real")
+    expect(tokens.get("grace")).toBe("planted")
+  })
+
+  it("reads plain names under a narrowed path, which cannot carry __Host-", () => {
+    expect(read("/api/auth", "app.example.com").get("grace")).toBe("planted")
   })
 })
 

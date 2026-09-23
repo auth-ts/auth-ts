@@ -13,6 +13,7 @@ export function request(
 ) {
   const origin = options.origin ?? "https://app.example.com"
   const headers = new Headers(options.headers)
+  if (!headers.has("host")) headers.set("host", new URL(origin).host)
 
   if (options.cookies && Object.keys(options.cookies).length > 0) {
     headers.set(

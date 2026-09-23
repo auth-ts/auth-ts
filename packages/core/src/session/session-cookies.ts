@@ -56,15 +56,19 @@ function decodeSegment(segment: string) {
 /**
  * Every refresh token this browser presented, by the user it belongs to.
  *
- * Read under the `__Host-` name and the plain one, and where both name the
- * same user the `__Host-` cookie wins: a page script cannot set that one, so
- * it is the one the server wrote.
+ * Read under the `__Host-` name, and under the plain one only where the server
+ * writes plain names. A plain cookie anywhere else was planted by a sibling
+ * subdomain, which is the login fixation the prefix exists to stop.
  */
 export function readRefreshCookies(internals: AuthInternals, headers: Headers) {
   const prefix = `${internals.config.cookie.name}.`
   const tokens = new Map<string, string>()
+  const host = headers.get("host")
+  const plain =
+    internals.config.cookie.path !== "/" ||
+    (host !== null && !shouldUseSecureCookies(`http://${host}`))
 
-  for (const hosted of [false, true]) {
+  for (const hosted of plain ? [false, true] : [true]) {
     for (const [name, value] of requestCookies(headers)) {
       const expected = hosted ? `__Host-${prefix}` : prefix
       if (!name.startsWith(expected) || !value) continue
