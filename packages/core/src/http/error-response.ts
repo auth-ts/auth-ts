@@ -8,8 +8,10 @@
 export type AuthErrorCode =
   /** A fixed-window rate limit was exceeded. */
   | "rateLimited"
-  /** Wrong, expired, already-used, or for a different purpose. */
+  /** Expired, already used, for another purpose, or requested by another client. */
   | "invalidCode"
+  /** The code is live and this client's, but not the one that was sent. */
+  | "incorrectCode"
   /** The action needs identity confirmed first: `/user/verify/send-code`, `/user/verify`, then retry. */
   | "verificationRequired"
   /** No session, or a session that no longer resolves. */
@@ -67,6 +69,7 @@ export type AuthErrorCode =
 export const ERROR_STATUS: Record<AuthErrorCode, number> = {
   rateLimited: 429,
   invalidCode: 401,
+  incorrectCode: 401,
   verificationRequired: 403,
   unauthenticated: 401,
   providerConflict: 409,

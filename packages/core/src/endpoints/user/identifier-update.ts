@@ -221,7 +221,7 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
       400: "InvalidField",
       401: {
         description:
-          "The code is wrong, expired, or already used, or the caller is not signed in. `code` says which.",
+          "`incorrectCode` for a wrong code; `invalidCode` when it expired, was used, or was requested elsewhere; `unauthenticated` when not signed in.",
         schema: "AuthError"
       },
       403: "VerificationRequired",

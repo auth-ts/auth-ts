@@ -127,7 +127,8 @@ export const verifyIdentityDocs: EndpointDocs<VerifyIdentityInput> = {
   responses: {
     204: { description: "Verified.", setsCookie: "attempt" },
     401: {
-      description: "The code is wrong, expired, or already used.",
+      description:
+        "`incorrectCode` for a wrong code; `invalidCode` when it expired, was used, or was requested elsewhere.",
       schema: "AuthError"
     },
     429: "RateLimited"

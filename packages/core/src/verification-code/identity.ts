@@ -29,7 +29,7 @@ export interface VerifyIdentityCodeInput {
  * is bound to both without a table of its own. Overwriting `codeHash` is what
  * makes the code single-use — nothing matches `"verified"`.
  *
- * @throws {AuthApiError} `rateLimited` past the guess budget, `invalidCode` on any other failure.
+ * @throws {AuthApiError} `rateLimited` past the guess budget, `incorrectCode` for a wrong code, `invalidCode` on any other failure.
  */
 export async function markIdentityVerified(
   internals: AuthInternals,

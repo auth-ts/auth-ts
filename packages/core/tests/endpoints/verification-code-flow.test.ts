@@ -89,7 +89,7 @@ describe("verification code sign-in over HTTP", () => {
     expect(db.users()).toHaveLength(0)
   })
 
-  it("rejects a wrong code with the standard envelope", async () => {
+  it("rejects a wrong code as incorrect, in the standard envelope", async () => {
     const { auth, sentCodes } = await createTestServer()
     await auth.handler(
       request("POST", "/api/auth/sign-in/send-code", {
@@ -114,7 +114,7 @@ describe("verification code sign-in over HTTP", () => {
     // `name` + `message` make the body a complete structural `Error`, so a raw
     // fetch caller can throw it into anything typed `Error` without wrapping.
     expect(body.name).toBe("AuthError")
-    expect(body.code).toBe("invalidCode")
+    expect(body.code).toBe("incorrectCode")
     expect(body.message.length).toBeGreaterThan(0)
     expect(body.message).not.toContain("ada@example.com")
   })

@@ -242,7 +242,7 @@ describe("sendVerificationCode", () => {
         attempt: second,
         guessKey: "ada@example.com"
       })
-    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    ).rejects.toThrowError(expect.objectContaining({ code: "incorrectCode" }))
     await consumeVerificationCode(internals, {
       identifier: "ada@example.com",
       code: required(sentCodes[0], "first").code,
@@ -442,7 +442,7 @@ describe("consumeVerificationCode", () => {
 
       for (let count = 0; count < 5; count++) {
         await expect(guess(WRONG_CODE)).rejects.toThrowError(
-          expect.objectContaining({ code: "invalidCode" })
+          expect.objectContaining({ code: "incorrectCode" })
         )
       }
       expect(await guessTokens(db, "ada@example.com")).toBe(0)
@@ -488,7 +488,7 @@ describe("consumeVerificationCode", () => {
 
     for (let count = 0; count < 5; count++) {
       await expect(guess(WRONG_CODE)).rejects.toThrowError(
-        expect.objectContaining({ code: "invalidCode" })
+        expect.objectContaining({ code: "incorrectCode" })
       )
     }
     await expect(guess(code)).rejects.toThrowError(

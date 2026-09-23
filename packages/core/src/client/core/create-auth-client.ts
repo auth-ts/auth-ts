@@ -217,7 +217,7 @@ export interface AuthClient {
    * Verifies the code `sendIdentityCode` sent. For the next hour, this session
    * in this browser can revoke devices and delete the account.
    *
-   * @throws {AuthError} `invalidCode` for a wrong or expired code, or
+   * @throws {AuthError} `incorrectCode` for a wrong code, `invalidCode` for an expired one, or
    * `rateLimited`.
    */
   verifyIdentity: (input: VerifyIdentityInput) => Promise<void>
@@ -237,7 +237,7 @@ export interface AuthClient {
    * Verifies the code `sendEmailUpdateCode` sent and re-keys the account to
    * the new address. Codes sent to the old address stop working.
    *
-   * @throws {AuthError} `invalidCode`, `emailTaken`, or `rateLimited`.
+   * @throws {AuthError} `incorrectCode`, `invalidCode`, `emailTaken`, or `rateLimited`.
    */
   verifyEmailUpdate: (
     input: VerifyEmailUpdateInput

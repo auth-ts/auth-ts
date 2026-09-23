@@ -24,9 +24,10 @@ export interface ConsumeVerificationCodeInput {
 /**
  * Finds the code this attempt was sent and checks it, without spending it.
  *
- * Every failure returns the same `invalidCode` error — missing, expired, wrong
- * purpose, wrong attempt, or simply wrong. Distinguishing them would tell an
- * attacker which addresses have codes outstanding.
+ * A wrong code is `incorrectCode`, as the author's app answers; everything
+ * else — no attempt, expired, spent, another purpose or another client's
+ * attempt — is `invalidCode`. The row is found by the caller's own attempt,
+ * so the split says nothing about anyone else's codes.
  *
  * Guesses are limited per address or user once the attempt has found its
  * row, whatever `rateLimit` says, as the author's app charges only a caller
@@ -38,7 +39,7 @@ export interface ConsumeVerificationCodeInput {
  * the other.
  *
  * @returns The matching row, for the caller to spend or keep.
- * @throws {AuthApiError} `rateLimited` past the guess budget, `invalidCode` on any other failure.
+ * @throws {AuthApiError} `rateLimited` past the guess budget, `incorrectCode` for a wrong code, `invalidCode` on any other failure.
  */
 export async function matchVerificationCode(
   internals: AuthInternals,
@@ -53,7 +54,10 @@ export async function matchVerificationCode(
     attemptHash: { eq: await sha256Hex(input.attempt) },
     ...liveCode()
   })
-  if (!stored) throw new AuthApiError("invalidCode")
+  // An identity marker keeps its row but no longer holds a code
+  if (!stored?.codeHash.startsWith("$scrypt$")) {
+    throw new AuthApiError("invalidCode")
+  }
 
   await checkRateLimit(
     internals,
@@ -62,7 +66,7 @@ export async function matchVerificationCode(
   )
 
   if (!(await scryptVerify(input.code.toUpperCase(), stored.codeHash))) {
-    throw new AuthApiError("invalidCode")
+    throw new AuthApiError("incorrectCode")
   }
 
   return stored
@@ -71,7 +75,7 @@ export async function matchVerificationCode(
 /**
  * Verifies and spends a verification code.
  *
- * @throws {AuthApiError} `rateLimited` past the guess budget, `invalidCode` on any other failure.
+ * @throws {AuthApiError} `rateLimited` past the guess budget, `incorrectCode` for a wrong code, `invalidCode` on any other failure.
  */
 export async function consumeVerificationCode(
   internals: AuthInternals,

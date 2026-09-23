@@ -170,7 +170,7 @@ describe("changing the email address", () => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const wrong = await verify(context, session, { code: "WRONG1" })
       expect(wrong.status).toBe(401)
-      expect(await codeOf(wrong)).toBe("invalidCode")
+      expect(await codeOf(wrong)).toBe("incorrectCode")
     }
     const limited = await verify(context, session, { code: "WRONG1" })
     expect(limited.status).toBe(429)
