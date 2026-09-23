@@ -5,6 +5,7 @@ import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
+import { sessionAge } from "../../session/session-token"
 import type { AttemptInput } from "../../shared/attempt-cookie"
 import { readAttempt } from "../../shared/attempt-cookie"
 import { requireVerifiedIdentity } from "../../verification-code/identity"
@@ -63,7 +64,7 @@ export const revokeSession = defineEndpoint({
     const caller = await authenticate(internals, input)
     const session = await selectOne(internals, "sessions", {
       id: { eq: caller.sessionId },
-      expiresAt: { gt: new Date() }
+      ...sessionAge(internals).live
     })
     if (!session) throw unauthenticated()
 

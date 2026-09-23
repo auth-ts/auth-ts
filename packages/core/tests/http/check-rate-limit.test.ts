@@ -39,12 +39,7 @@ describe("checkRateLimit", () => {
     const { internals, db } = await createTestInternals()
     const deletes = vi.spyOn(db, "delete")
 
-    await countAttempt(
-      internals,
-      "verificationCode:attempts:hash",
-      new Date(Date.now() + 60_000),
-      5
-    )
+    await countAttempt(internals, "verificationCode:attempts:hash", 5)
 
     expect(
       deletes.mock.calls.filter(([input]) => input.table === "attempts")
@@ -86,8 +81,16 @@ describe("checkRateLimit", () => {
   })
 
   it("puts the window in the key, so a new window is a new set of rows", async () => {
-    const { internals, db } = await createTestInternals()
     const window = { max: 1, window: "1s" } as const
+    // The sweep collects rows older than the longest configured window.
+    const { internals, db } = await createTestInternals({
+      rateLimit: {
+        guessPerIdentifier: window,
+        sendCodePerIP: window,
+        signInCodePerIP: window,
+        guestPerIP: window
+      }
+    })
 
     await checkRateLimit(internals, KEY, window)
     await expect(checkRateLimit(internals, KEY, window)).rejects.toMatchObject({
@@ -97,7 +100,8 @@ describe("checkRateLimit", () => {
     // Windows are aligned to the clock rather than started by the first
     // request, so crossing the boundary is what resets the count — no stored
     // `resetAt` is read, and nothing has to be written back. The first attempt
-    // of the fresh window also sweeps, so the spent window's rows are gone.
+    // of the fresh window also sweeps, and every window here is a second long,
+    // so the spent window's rows are gone.
     await new Promise((resolve) => setTimeout(resolve, 1100))
     await expect(
       checkRateLimit(internals, KEY, window)

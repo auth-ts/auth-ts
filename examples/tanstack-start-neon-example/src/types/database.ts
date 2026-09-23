@@ -12,21 +12,18 @@ export type Database = {
       attempts: {
         Row: {
           createdAt: string
-          expiresAt: string
           id: string
           key: string
           updatedAt: string
         }
         Insert: {
           createdAt?: string
-          expiresAt: string
           id?: string
           key: string
           updatedAt?: string
         }
         Update: {
           createdAt?: string
-          expiresAt?: string
           id?: string
           key?: string
           updatedAt?: string
@@ -119,7 +116,6 @@ export type Database = {
         Row: {
           amr: string[] | null
           createdAt: string
-          expiresAt: string
           id: string
           ipAddress: string | null
           secretHash: string
@@ -130,7 +126,6 @@ export type Database = {
         Insert: {
           amr?: string[] | null
           createdAt?: string
-          expiresAt: string
           id?: string
           ipAddress?: string | null
           secretHash: string
@@ -141,7 +136,6 @@ export type Database = {
         Update: {
           amr?: string[] | null
           createdAt?: string
-          expiresAt?: string
           id?: string
           ipAddress?: string | null
           secretHash?: string
@@ -243,7 +237,6 @@ export type Database = {
           attemptHash: string
           codeHash: string
           createdAt: string
-          expiresAt: string
           id: string
           identifier: string
           purpose: string
@@ -253,7 +246,6 @@ export type Database = {
           attemptHash: string
           codeHash: string
           createdAt?: string
-          expiresAt: string
           id?: string
           identifier: string
           purpose?: string
@@ -263,7 +255,6 @@ export type Database = {
           attemptHash?: string
           codeHash?: string
           createdAt?: string
-          expiresAt?: string
           id?: string
           identifier?: string
           purpose?: string

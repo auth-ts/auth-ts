@@ -1,6 +1,7 @@
 import type { AuthSession } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { constantTimeEqual, hexToBytes } from "../lib/hash"
+import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
 import { base64ToBytes } from "../shared/base64url"
 
@@ -42,6 +43,28 @@ export async function parseSessionToken(
 }
 
 /**
+ * What a session's lifetime counts from, as the two conditions core asks.
+ *
+ * `session.ttl` is policy, not a column: sliding sessions live `ttl` past
+ * their last hour of use, fixed ones `ttl` past creation, and changing the
+ * option changes every session at once.
+ */
+export function sessionAge(internals: AuthInternals) {
+  const { sliding, ttl } = internals.config.session
+  const cutoff = new Date(Date.now() - parseDuration(ttl))
+
+  return sliding
+    ? {
+        live: { updatedAt: { gt: cutoff } },
+        stale: { updatedAt: { lt: cutoff } }
+      }
+    : {
+        live: { createdAt: { gt: cutoff } },
+        stale: { createdAt: { lt: cutoff } }
+      }
+}
+
+/**
  * The session a credential names, or `null` when its id or secret is wrong.
  *
  * The row is read by primary key; the secret is what proves the caller may
@@ -55,7 +78,7 @@ export async function findSession(
 ): Promise<AuthSession | null> {
   const authSession = await selectOne(internals, "sessions", {
     id: { eq: id },
-    ...(live ? { expiresAt: { gt: new Date() } } : {})
+    ...(live ? sessionAge(internals).live : {})
   })
   if (authSession === null) {
     return null

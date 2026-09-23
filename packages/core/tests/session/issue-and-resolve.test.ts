@@ -421,7 +421,7 @@ describe("resolveSession", () => {
     await db.update({
       table: "sessions",
       where: { id: { eq: required(stored, "stored session").id } },
-      values: { expiresAt: new Date(Date.now() - 1000) }
+      values: { updatedAt: new Date(0) }
     })
 
     const resolved = await resolveSession(
@@ -431,9 +431,34 @@ describe("resolveSession", () => {
 
     expect(resolved).toBeNull()
     const [after] = await selectRows(db, "sessions")
-    expect(required(after, "session").expiresAt.getTime()).toBeLessThan(
-      Date.now()
-    )
+    expect(required(after, "session").updatedAt.getTime()).toBe(0)
+  })
+
+  it("applies a shortened session.ttl to sessions already issued", async () => {
+    // The lifetime is policy in code, not a value frozen into the row.
+    const { internals, db } = await createTestInternals({
+      session: { ttl: "10d" }
+    })
+    const shortened = await createTestInternals({
+      database: db,
+      session: { ttl: "1h" }
+    })
+    const user = await insertUser(db, { email: "ada@example.com" })
+    const issued = await issueSession(internals, {
+      user,
+      amr: ["otp"],
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+    await db.update({
+      table: "sessions",
+      where: {},
+      values: { updatedAt: new Date(Date.now() - 2 * 3_600_000) }
+    })
+    const headers = new Headers({ cookie: cookieHeaderOf(issued) })
+
+    expect(await resolveSession(shortened.internals, headers)).toBeNull()
+    expect(await resolveSession(internals, headers)).toBeTruthy()
   })
 
   it("refuses a session whose user no longer exists", async () => {
@@ -485,25 +510,22 @@ describe("sliding behind waitUntil", () => {
 
   it("answers from a read and hands the write to waitUntil", async () => {
     const { internals, db, deferred, headers } = await signedIn()
-    const stale = new Date(Date.now() + 60_000)
+    const stale = new Date(Date.now() - 2 * 3_600_000)
     await db.update({
       table: "sessions",
       where: {},
-      values: {
-        expiresAt: stale,
-        updatedAt: new Date(Date.now() - 2 * 3_600_000)
-      }
+      values: { updatedAt: stale }
     })
 
     const resolved = await resolveSession(internals, headers)
 
-    expect(resolved?.session.expiresAt.getTime()).toBeGreaterThan(
+    expect(resolved?.session.updatedAt.getTime()).toBeGreaterThan(
       stale.getTime()
     )
     expect(deferred.length).toBeGreaterThan(0)
     await Promise.all(deferred)
     const [after] = db.sessions()
-    expect(required(after, "session").expiresAt.getTime()).toBeGreaterThan(
+    expect(required(after, "session").updatedAt.getTime()).toBeGreaterThan(
       stale.getTime()
     )
   })
@@ -571,24 +593,19 @@ describe("sliding once an hour", () => {
       const sessionWrites = () =>
         update.mock.calls.filter(([input]) => input.table === "sessions")
       const row = () => required(db.sessions()[0], "session")
-      const atSignIn = {
-        updatedAt: row().updatedAt.getTime(),
-        expiresAt: row().expiresAt.getTime()
-      }
+      const atSignIn = row().updatedAt.getTime()
 
       // Used again within the hour: answered from the read, nothing written.
       vi.advanceTimersByTime(30 * 60_000)
       expect(await resolveSession(internals, headers)).not.toBeNull()
       expect(sessionWrites()).toHaveLength(0)
-      expect(row().updatedAt.getTime()).toBe(atSignIn.updatedAt)
-      expect(row().expiresAt.getTime()).toBe(atSignIn.expiresAt)
+      expect(row().updatedAt.getTime()).toBe(atSignIn)
 
-      // An hour on, the use is recorded and the expiry moves with it.
+      // An hour on, the use is recorded, and the lifetime counts from it.
       vi.advanceTimersByTime(31 * 60_000)
       expect(await resolveSession(internals, headers)).not.toBeNull()
       expect(sessionWrites()).toHaveLength(1)
-      expect(row().updatedAt.getTime()).toBeGreaterThan(atSignIn.updatedAt)
-      expect(row().expiresAt.getTime()).toBeGreaterThan(atSignIn.expiresAt)
+      expect(row().updatedAt.getTime()).toBeGreaterThan(atSignIn)
     } finally {
       vi.useRealTimers()
     }

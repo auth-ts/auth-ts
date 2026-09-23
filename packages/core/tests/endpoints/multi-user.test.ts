@@ -610,7 +610,7 @@ describe("superseding a session", () => {
         ([input]) =>
           input.table === "sessions" &&
           "id" in input.where &&
-          !("expiresAt" in input.where)
+          !("updatedAt" in input.where)
       )
     ).toHaveLength(0)
   })

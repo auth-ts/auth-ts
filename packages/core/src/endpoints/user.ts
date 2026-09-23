@@ -7,6 +7,7 @@ import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 import { clearedRefreshCookies } from "../session/session-cookies"
+import { sessionAge } from "../session/session-token"
 import type { AttemptInput } from "../shared/attempt-cookie"
 import { readAttempt } from "../shared/attempt-cookie"
 // Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
@@ -188,7 +189,7 @@ export const deleteUser = defineEndpoint({
       selectOne(internals, "users", { id: { eq: caller.userId } }),
       selectOne(internals, "sessions", {
         id: { eq: caller.sessionId },
-        expiresAt: { gt: new Date() }
+        ...sessionAge(internals).live
       })
     ])
     if (!user || !session) throw unauthenticated()

@@ -108,18 +108,18 @@ describe("the table types the four functions take", () => {
     usersWhere({ email: {} })
   })
 
-  it("takes a range on expiresAt, and on nothing else", () => {
+  it("takes a range on the timestamps, and on nothing else", () => {
     expectTypeOf(
-      sessionsWhere({ expiresAt: { gt: new Date() } })
+      sessionsWhere({ updatedAt: { gt: new Date() } })
     ).toEqualTypeOf<AuthWhere<"date", Numeric, "sessions">>()
-    sessionsWhere({ expiresAt: { eq: new Date() } })
-    sessionsWhere({ expiresAt: { gt: new Date(), lt: new Date() } })
+    sessionsWhere({ createdAt: { eq: new Date() } })
+    sessionsWhere({ createdAt: { gt: new Date(), lt: new Date() } })
     // @ts-expect-error a bound has to be given
-    sessionsWhere({ expiresAt: {} })
+    sessionsWhere({ updatedAt: {} })
 
-    // @ts-expect-error createdAt compares for equality, like every other column
-    sessionsWhere({ createdAt: { gt: new Date() } })
-    // @ts-expect-error a declared field is not an expiry either
+    // @ts-expect-error a text column compares for equality only
+    sessionsWhere({ secretHash: { gt: "0" } })
+    // @ts-expect-error a declared field is not a timestamp either
     usersWhere({ plan: { gt: 3 } })
   })
 

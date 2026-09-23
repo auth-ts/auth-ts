@@ -518,7 +518,7 @@ describe("consumeVerificationCode", () => {
     await db.update({
       table: "verifications",
       where: { id: { eq: required(stored, "stored").id } },
-      values: { expiresAt: new Date(Date.now() - 1000) }
+      values: { createdAt: new Date(0) }
     })
 
     await expect(

@@ -28,10 +28,10 @@ const user = async (fields: Record<string, unknown> = {}) => {
   return required(row, "inserted user")
 }
 
-const attempt = (key: string, expiresAt = new Date(Date.now() + 60_000)) =>
+const attempt = (key: string) =>
   db.insert({
     table: "attempts",
-    values: { key, expiresAt, createdAt: new Date(), updatedAt: new Date() }
+    values: { key, createdAt: new Date(), updatedAt: new Date() }
   })
 
 const read = <T extends "users" | "sessions" | "verifications" | "attempts">(
@@ -158,9 +158,8 @@ describe("select", () => {
         identifier,
         codeHash: "old",
         attemptHash: "old",
-        expiresAt: older,
         purpose: "signIn",
-        createdAt: new Date(),
+        createdAt: older,
         updatedAt: new Date()
       }
     })
@@ -170,9 +169,8 @@ describe("select", () => {
         identifier,
         codeHash: "new",
         attemptHash: "new",
-        expiresAt: newer,
         purpose: "signIn",
-        createdAt: new Date(),
+        createdAt: newer,
         updatedAt: new Date()
       }
     })
@@ -181,7 +179,7 @@ describe("select", () => {
       table: "verifications",
       where: { identifier: { eq: identifier } },
       limit: 1,
-      orderBy: { expiresAt: "desc" }
+      orderBy: { createdAt: "desc" }
     })
 
     expect(newest?.codeHash).toBe("new")
@@ -281,7 +279,6 @@ describe("delete", () => {
         userId: ada.id,
         secretHash: "hash",
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,
         ipAddress: null,
         updatedAt: new Date()

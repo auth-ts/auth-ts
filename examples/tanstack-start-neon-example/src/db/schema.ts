@@ -65,10 +65,6 @@ export const sessions = pgTable.withRLS(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     secretHash: text("secretHash").notNull(),
-    expiresAt: timestamp("expiresAt", {
-      withTimezone: true,
-      mode: "string"
-    }).notNull(),
     userAgent: text("userAgent"),
     ipAddress: text("ipAddress"),
     amr: text("amr").array(),
@@ -82,7 +78,7 @@ export const sessions = pgTable.withRLS(
   },
   (table) => [
     index("sessionsUserIdIndex").on(table.userId),
-    index("sessionsExpiresAtIndex").on(table.expiresAt),
+    index("sessionsUpdatedAtIndex").on(table.updatedAt),
     pgPolicy("selectOwnSessions", {
       for: "select",
       to: authenticatedRole,
@@ -98,10 +94,6 @@ export const verifications = pgTable.withRLS(
     identifier: text("identifier").notNull(),
     codeHash: text("codeHash").notNull(),
     attemptHash: text("attemptHash").notNull(),
-    expiresAt: timestamp("expiresAt", {
-      withTimezone: true,
-      mode: "string"
-    }).notNull(),
     purpose: text("purpose")
       .$type<VerificationPurpose>()
       .notNull()
@@ -120,7 +112,7 @@ export const verifications = pgTable.withRLS(
       table.purpose,
       table.attemptHash
     ),
-    index("verificationsExpiresAtIndex").on(table.expiresAt),
+    index("verificationsUpdatedAtIndex").on(table.updatedAt),
     check("verificationsPurposeCheck", sql`"purpose" in ('signIn', 'identity')`)
   ]
 )
@@ -131,10 +123,6 @@ export const attempts = pgTable.withRLS(
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
     key: text("key").notNull(),
-    expiresAt: timestamp("expiresAt", {
-      withTimezone: true,
-      mode: "string"
-    }).notNull(),
     createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
@@ -145,7 +133,7 @@ export const attempts = pgTable.withRLS(
   },
   (table) => [
     index("attemptsKeyIndex").on(table.key),
-    index("attemptsExpiresAtIndex").on(table.expiresAt)
+    index("attemptsCreatedAtIndex").on(table.createdAt)
   ]
 )
 

@@ -4,6 +4,7 @@ import { sha256Hex } from "../lib/hash"
 import { parseDuration } from "../lib/parse-duration"
 import { selectOne } from "../lib/select-one"
 import { matchVerificationCode } from "./consume-verification-code"
+import { liveCode } from "./send-verification-code"
 
 /** How long a verified identity lets its session act without asking again. */
 export const IDENTITY_TTL = "1h"
@@ -41,12 +42,8 @@ export async function markIdentityVerified(
 
   const [marked] = await internals.db.update({
     table: "verifications",
-    where: { id: { eq: stored.id }, expiresAt: { gt: new Date() } },
-    values: {
-      codeHash: VERIFIED,
-      expiresAt: new Date(Date.now() + parseDuration(IDENTITY_TTL)),
-      updatedAt: new Date()
-    }
+    where: { id: { eq: stored.id }, ...liveCode() },
+    values: { codeHash: VERIFIED, updatedAt: new Date() }
   })
   if (!marked) throw new AuthApiError("invalidCode")
 }
@@ -71,7 +68,7 @@ export async function requireVerifiedIdentity(
     identifier: { eq: sessionId },
     purpose: { eq: "identity" },
     attemptHash: { eq: await sha256Hex(attempt) },
-    expiresAt: { gt: new Date() }
+    updatedAt: { gt: new Date(Date.now() - parseDuration(IDENTITY_TTL)) }
   })
   if (marker?.codeHash !== VERIFIED) {
     throw new AuthApiError("verificationRequired")

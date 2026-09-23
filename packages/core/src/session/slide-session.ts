@@ -3,7 +3,7 @@ import { defer } from "../lib/defer"
 import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
 import type { SessionCredential } from "./session-token"
-import { findSession } from "./session-token"
+import { findSession, sessionAge } from "./session-token"
 
 /**
  * How often a live session's row is written on use.
@@ -29,15 +29,16 @@ export function sessionStamp(internals: AuthInternals, headers: Headers) {
 /**
  * Finds a live session by its credential and, at most once an hour, marks it used.
  *
- * The read enforces liveness: a row whose `expiresAt` has passed matches
- * nothing. The write, when it is due, keeps the same predicate, so a session
- * revoked between the two cannot be revived by the write that was meant to
- * record activity on a live one.
+ * The read enforces liveness: a row older than its lifetime matches nothing.
+ * The write, when it is due, keeps the same predicate, so a session revoked
+ * between the two cannot be revived by the write that was meant to record
+ * activity on a live one.
  *
  * Recording the use is bookkeeping and happens whenever an hour has passed;
- * extending expiry is policy and answers to `session.sliding`. A deployment on
- * a fixed re-authentication interval still wants a device list that says when
- * each device was last seen.
+ * whether that use extends the session is policy and answers to
+ * `session.sliding`, which decides if the lifetime counts from `updatedAt` or
+ * from `createdAt`. A deployment on a fixed re-authentication interval still
+ * wants a device list that says when each device was last seen.
  *
  * With `waitUntil` configured the write runs behind the response. What an
  * interrupted isolate can lose is one use-stamp — bookkeeping, never liveness.
@@ -49,7 +50,6 @@ export async function slideSession(
   credential: SessionCredential,
   headers: Headers
 ) {
-  const { sliding, ttl } = internals.config.session
   const { waitUntil } = internals.config
 
   const session = await findSession(internals, credential)
@@ -61,14 +61,10 @@ export async function slideSession(
     return [session]
   }
 
-  const written = {
-    updatedAt: new Date(),
-    ...sessionStamp(internals, headers),
-    ...(sliding ? { expiresAt: new Date(Date.now() + parseDuration(ttl)) } : {})
-  }
+  const written = { updatedAt: new Date(), ...sessionStamp(internals, headers) }
   const write = internals.db.update({
     table: "sessions",
-    where: { id: { eq: session.id }, expiresAt: { gt: new Date() } },
+    where: { id: { eq: session.id }, ...sessionAge(internals).live },
     values: written
   })
   if (waitUntil) defer(internals, "session slide", write)

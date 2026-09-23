@@ -30,9 +30,9 @@ cost of not having an adapter package.
 | table | columns | unique | indexed | swept |
 | --- | --- | --- | --- | --- |
 | `users` | `id`, `email`, `phoneNumber`, `name`, `image`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
-| `sessions` | `id`, `userId`, `secretHash`, `expiresAt`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | | `userId`, `expiresAt` | `expiresAt` |
-| `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `(identifier, purpose, attemptHash)`, `expiresAt` | `expiresAt` |
-| `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
+| `sessions` | `id`, `userId`, `secretHash`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | | `userId`, `updatedAt` | `updatedAt` |
+| `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `createdAt`, `updatedAt` | | `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
+| `attempts` | `id`, `key`, `createdAt`, `updatedAt` | | `key`, `createdAt` | `createdAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
 | `identitySecrets` | `id`, `identityId`, `accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |
 
@@ -86,11 +86,11 @@ index, because the missing constraint only shows under a race.
 ## The rules
 
 - **`where` is column/condition pairs, all of which must match.** Every column
-  takes `{ eq }`, with one exception: `expiresAt` also takes a `{ lt }`, a
-  `{ gt }`, or both, with exclusive bounds.
+  takes `{ eq }`, with one exception: `createdAt` and `updatedAt` also take a
+  `{ lt }`, a `{ gt }`, or both, with exclusive bounds.
 
   ```ts
-  where: { id: { eq: id }, expiresAt: { gt: new Date() } }
+  where: { id: { eq: id }, updatedAt: { gt: tenDaysAgo } }
   ```
 
   A condition names its operator, so your implementation maps keys to
@@ -99,11 +99,13 @@ index, because the missing constraint only shows under a race.
   condition, so mapping over `Object.entries` is the whole job.
 
   That is the whole operator surface: no `OR`, no `in`, no negation. The
-  exception exists because a live session is one whose expiry is still ahead,
-  and asking that in the same statement that touches the row is what makes
-  resolving a session a single round trip — instead of reading to find out
-  whether it may write, then writing. The type confines it to `expiresAt`, so
-  that is the only column your implementation has to handle both ways.
+  exception exists because lifetimes are constants in the library, not columns
+  in your table — a live session is one used within `session.ttl`, a live code
+  one created within its lifetime — and asking that in the same statement that
+  touches the row is what makes resolving a session a single round trip,
+  instead of reading to find out whether it may write, then writing. The type
+  confines it to the two timestamps, so those are the only columns your
+  implementation has to handle both ways.
 
   **`null` is never a value here**, even though the columns are nullable, so
   your implementation needs no `IS NULL` branch. That is deliberate rather than
@@ -146,12 +148,12 @@ index, because the missing constraint only shows under a race.
   empty array. That single atomic conditional delete is the one concurrency
   property this contract asks of your store.
 - **`delete` with a range is the sweep.** The library cleans up after itself by
-  issuing `delete` where `expiresAt` is `{ lt: now }`, on the requests that
-  insert new rows: a sign-in sweeps `sessions`, a code send sweeps
-  `verifications`, the first attempt of each rate-limit window sweeps
-  `attempts`. There is nothing extra to implement and no schedule to own — but
-  it does mean an index on `expiresAt` is load-bearing for those tables, not
-  just for reads. Pass `waitUntil` to
+  issuing `delete` where `updatedAt` (or `createdAt`, for `attempts`) is
+  `{ lt: cutoff }`, on the requests that insert new rows: a sign-in sweeps
+  `sessions`, a code send sweeps `verifications`, the first attempt of each
+  rate-limit window sweeps `attempts`. There is nothing extra to implement and
+  no schedule to own — but it does mean the index on that timestamp is
+  load-bearing for those tables, not just for reads. Pass `waitUntil` to
   [`createAuth`](/docs/reference/create-auth) and the sweep runs
   behind the response instead of ahead of it.
 - **Nothing sweeps `users`.** A guest's session is their only credential, so a
@@ -336,7 +338,7 @@ source of truth.
 
 ## Timestamps
 
-Core thinks in `Date`: it compares `expiresAt` to now and writes `new Date()`.
+Core thinks in `Date`: it compares `updatedAt` to a cutoff and writes `new Date()`.
 Some stores hold a timestamp as text instead — drizzle with `mode: "string"`,
 PostgREST, most document stores. Rather than parse in every function, name the
 mode once and the helper converts at the boundary:
@@ -352,7 +354,7 @@ export const authDatabase = defineAuthDatabase({
 
 Under `"string"` the four functions are typed in ISO 8601 strings: rows come
 back with `createdAt: string`, and the `Date`s core writes — a value, or a
-bound on `expiresAt` — arrive as strings. What the functions return is parsed
+bound on `updatedAt` — arrive as strings. What the functions return is parsed
 back to `Date` before core sees it, so the contract on this page is unchanged.
 The strings must carry a zone, which `timestamptz` does; a bare `timestamp` is
 read as local time.

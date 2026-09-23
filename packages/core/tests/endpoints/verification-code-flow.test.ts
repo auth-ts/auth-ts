@@ -578,9 +578,6 @@ describe("GET /token", () => {
     expect(read.status).toBe(200)
 
     const after = required(db.sessions()[0], "session")
-    expect(after.expiresAt.getTime()).toBeGreaterThan(
-      before.expiresAt.getTime()
-    )
     expect(after.updatedAt.getTime()).toBeGreaterThan(
       before.updatedAt.getTime()
     )

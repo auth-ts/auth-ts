@@ -87,7 +87,6 @@ const session = (userId: string, secretHash: string) => ({
   secretHash,
   createdAt: new Date(),
   updatedAt: new Date(),
-  expiresAt: future(),
   userAgent: null,
   ipAddress: null
 })
@@ -102,10 +101,10 @@ const identity = (userId: string, providerUserId: string) => ({
 })
 
 /** Whether these rows came back at exactly these times, in exactly this order. */
-function ordered(rows: { expiresAt: Date }[], times: number[]) {
+function ordered(rows: { createdAt: Date }[], times: number[]) {
   return (
     rows.length === times.length &&
-    rows.every((row, index) => row.expiresAt.getTime() === times[index])
+    rows.every((row, index) => row.createdAt.getTime() === times[index])
   )
 }
 
@@ -186,13 +185,8 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
       const times = [3, 1, 2].map(
         (minutes) => new Date(Date.now() + minutes * 60_000)
       )
-      for (const expiresAt of times) {
-        await create(db, "attempts", {
-          key,
-          expiresAt,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
+      for (const createdAt of times) {
+        await create(db, "attempts", { key, createdAt, updatedAt: new Date() })
       }
       try {
         const page = (direction: "asc" | "desc", limit: number) =>
@@ -200,7 +194,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
             table: "attempts",
             where: { key: { eq: key } },
             limit,
-            orderBy: { expiresAt: direction }
+            orderBy: { createdAt: direction }
           })
 
         const ascending = times.map((date) => date.getTime()).sort()
@@ -263,13 +257,8 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
       const times = [1, 2, 3].map(
         (minutes) => new Date(Date.now() + minutes * 60_000)
       )
-      for (const expiresAt of times) {
-        await create(db, "attempts", {
-          key,
-          expiresAt,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
+      for (const createdAt of times) {
+        await create(db, "attempts", { key, createdAt, updatedAt: new Date() })
       }
       const [first, second, third] = times as [Date, Date, Date]
       try {
@@ -281,32 +270,32 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
               table: "attempts",
               where,
               limit: 10,
-              orderBy: { expiresAt: "asc" }
+              orderBy: { createdAt: "asc" }
             })
           ).length
 
         expect(
-          (await count({ key: { eq: key }, expiresAt: { gt: second } })) === 1,
+          (await count({ key: { eq: key }, createdAt: { gt: second } })) === 1,
           "gt must exclude its own bound and everything below it"
         )
         expect(
-          (await count({ key: { eq: key }, expiresAt: { lt: second } })) === 1,
+          (await count({ key: { eq: key }, createdAt: { lt: second } })) === 1,
           "lt must exclude its own bound and everything above it"
         )
         expect(
           (await count({
             key: { eq: key },
-            expiresAt: { gt: first, lt: third }
+            createdAt: { gt: first, lt: third }
           })) === 1,
           "lt and gt together must bound both ends"
         )
         expect(
-          (await count({ key: { eq: key }, expiresAt: { gt: third } })) === 0,
+          (await count({ key: { eq: key }, createdAt: { gt: third } })) === 0,
           "a range past every row must match nothing"
         )
         expect(
-          (await count({ key: { eq: key }, expiresAt: { eq: second } })) === 1,
-          "eq on expiresAt must still compare for equality, not order"
+          (await count({ key: { eq: key }, createdAt: { eq: second } })) === 1,
+          "eq on createdAt must still compare for equality, not order"
         )
       } finally {
         await db.delete({ table: "attempts", where: { key: { eq: key } } })
@@ -493,15 +482,14 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
     name: "delete honours a range, removing what has expired and keeping what has not",
     async run(db) {
       const identifier = `${unique()}@example.test`
-      for (const expiresAt of [past(), future()]) {
+      for (const updatedAt of [past(), future()]) {
         await create(db, "verifications", {
           identifier,
           codeHash: `${unique()}`,
           attemptHash: `${unique()}`,
-          expiresAt,
           purpose: "signIn",
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt
         })
       }
       try {
@@ -509,15 +497,15 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           table: "verifications",
           where: {
             identifier: { eq: identifier },
-            expiresAt: { lt: new Date() }
+            updatedAt: { lt: new Date() }
           }
         })
 
         expect(
           removed.length === 1 &&
             removed[0] !== undefined &&
-            removed[0].expiresAt.getTime() < Date.now(),
-          "deleting where expiresAt is past must remove exactly the expired row. The sweep that keeps sessions, codes, and attempts from accumulating is this one delete."
+            removed[0].updatedAt.getTime() < Date.now(),
+          "deleting where updatedAt is past a bound must remove exactly the old row. The sweep that keeps sessions, codes, and attempts from accumulating is this one delete."
         )
 
         const left = await db.select({
@@ -529,7 +517,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
         expect(
           left.length === 1 &&
             left[0] !== undefined &&
-            left[0].expiresAt.getTime() > Date.now(),
+            left[0].updatedAt.getTime() > Date.now(),
           "the delete removed the row that had not expired yet, signing people out early"
         )
       } finally {

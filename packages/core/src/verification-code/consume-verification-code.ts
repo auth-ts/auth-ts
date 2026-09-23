@@ -8,6 +8,7 @@ import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit } from "../http/check-rate-limit"
 import { scryptVerify, sha256Hex } from "../lib/hash"
 import { selectOne } from "../lib/select-one"
+import { liveCode } from "./send-verification-code"
 
 /** What verifying a code needs to know. */
 export interface ConsumeVerificationCodeInput {
@@ -56,7 +57,7 @@ export async function matchVerificationCode(
     identifier: { eq: input.identifier },
     purpose: { eq: input.purpose },
     attemptHash: { eq: await sha256Hex(input.attempt) },
-    expiresAt: { gt: new Date() }
+    ...liveCode()
   })
   if (!stored) throw new AuthApiError("invalidCode")
 

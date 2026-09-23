@@ -1,3 +1,4 @@
+import { DEFAULT_GUESS_LIMIT } from "../core/auth-config"
 import type { AuthInternals } from "../core/auth-internals"
 import type { RateLimitWindow } from "../core/auth-options"
 import { insertRow } from "../lib/insert-row"
@@ -28,11 +29,10 @@ import { AuthApiError } from "./auth-api-error"
 export async function countAttempt(
   internals: AuthInternals,
   key: string,
-  expiresAt: Date,
   limit: number
 ) {
   const [inserted, attempts] = await Promise.all([
-    insertRow(internals, "attempts", { key, expiresAt }),
+    insertRow(internals, "attempts", { key }),
     internals.db.select({
       table: "attempts",
       where: { key: { eq: key } },
@@ -49,7 +49,17 @@ export async function countAttempt(
   // the table grows fastest — the sweep still runs once per key rather than
   // once per request. Here rather than in `checkRateLimit`, so wrong-guess
   // budgets under `rateLimit: false` are collected too.
-  if (counted === 1) await sweepExpired(internals, "attempts")
+  if (counted === 1) {
+    const { rateLimit } = internals.config
+    const windows =
+      rateLimit === false ? [DEFAULT_GUESS_LIMIT] : Object.values(rateLimit)
+    const longest = Math.max(
+      ...windows.map(({ window }) => parseDuration(window))
+    )
+    await sweepExpired(internals, "attempts", {
+      createdAt: { lt: new Date(Date.now() - longest) }
+    })
+  }
 
   return counted
 }
@@ -90,7 +100,6 @@ export async function checkRateLimit(
   const counted = await countAttempt(
     internals,
     `${key}:${windowStart}`,
-    endsAt,
     window.max
   )
 

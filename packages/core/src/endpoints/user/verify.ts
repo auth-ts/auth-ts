@@ -6,6 +6,7 @@ import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticate } from "../../session/authenticate"
+import { sessionAge } from "../../session/session-token"
 import type { AttemptInput } from "../../shared/attempt-cookie"
 import { attemptCookie, readAttempt } from "../../shared/attempt-cookie"
 import { markIdentityVerified } from "../../verification-code/identity"
@@ -64,7 +65,7 @@ export const sendIdentityCode = defineEndpoint({
       selectOne(internals, "users", { id: { eq: caller.userId } }),
       selectOne(internals, "sessions", {
         id: { eq: caller.sessionId },
-        expiresAt: { gt: new Date() }
+        ...sessionAge(internals).live
       })
     ])
     // A session revoked since the token was minted refuses too, or a

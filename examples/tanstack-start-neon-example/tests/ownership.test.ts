@@ -63,8 +63,7 @@ beforeAll(async () => {
     [grace, "grace"]
   ]) {
     await client.query(
-      `insert into "sessions" ("userId", "secretHash", "expiresAt")
-       values ($1, $2, now() + interval '30 days')`,
+      `insert into "sessions" ("userId", "secretHash") values ($1, $2)`,
       [userId, `hash-${tag}`]
     )
     await client.query(

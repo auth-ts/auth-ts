@@ -8,7 +8,6 @@ const storedSession: StoredSession = {
   id: "session-1",
   userId: "user-1",
   secretHash: "hash",
-  expiresAt: "2030-01-01T00:00:00.000Z",
   userAgent: null,
   ipAddress: null,
   amr: null,
@@ -35,7 +34,7 @@ describe("defineAuthDatabase with string timestamps", () => {
 
     const [selected] = await db.select({
       table: "sessions",
-      where: { expiresAt: { gt: new Date(0) } },
+      where: { updatedAt: { gt: new Date(0) } },
       limit: 1,
       orderBy: { id: "asc" }
     })
@@ -44,7 +43,6 @@ describe("defineAuthDatabase with string timestamps", () => {
       values: {
         userId: "user-1",
         secretHash: "hash",
-        expiresAt: new Date("2030-01-01T00:00:00.000Z"),
         userAgent: null,
         ipAddress: null,
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -53,12 +51,12 @@ describe("defineAuthDatabase with string timestamps", () => {
     })
 
     expect(seen[0]?.where).toEqual({
-      expiresAt: { gt: "1970-01-01T00:00:00.000Z" }
+      updatedAt: { gt: "1970-01-01T00:00:00.000Z" }
     })
     expect(seen[1]?.values).toMatchObject({
       createdAt: "2026-01-01T00:00:00.000Z"
     })
-    expect(selected?.expiresAt).toBeInstanceOf(Date)
+    expect(selected?.updatedAt).toBeInstanceOf(Date)
     expect(inserted?.createdAt).toBeInstanceOf(Date)
   })
 })

@@ -99,7 +99,11 @@ export type AuthUser<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = CoreUserFields & AdditionalFields<S>
 
-/** A session row. The token is `id.secret`; core stores `sha256` of the secret, never the secret. */
+/**
+ * A session row. The token is `id.secret`; core stores `sha256` of the secret,
+ * never the secret. It lives `session.ttl` past `updatedAt`, or past
+ * `createdAt` with `sliding: false` — the lifetime is policy, not a column.
+ */
 export interface AuthSession {
   id: string
   userId: string
@@ -109,7 +113,6 @@ export interface AuthSession {
    * it; `updatedAt` is when the session was last used, to the hour.
    */
   createdAt: Date
-  expiresAt: Date
   userAgent?: string | null
   ipAddress?: string | null
   /**
@@ -154,7 +157,6 @@ export interface AuthVerification {
   codeHash: string
   /** SHA-256 of the attempt token handed to the client that requested the code. */
   attemptHash: string
-  expiresAt: Date
   purpose: VerificationPurpose
   /** Written by core on insert. */
   createdAt: Date
@@ -172,7 +174,6 @@ export interface AuthVerification {
 export interface AuthAttempt {
   id: string
   key: string
-  expiresAt: Date
   /** Written by core on insert. */
   createdAt: Date
   /** Written by core on insert and on every update it makes. */
@@ -300,7 +301,7 @@ export type AuthRow<
 export type AuthDatabaseOperator = "eq" | "lt" | "gt"
 
 /**
- * `{ eq }` on any column; `{ lt }`, `{ gt }`, or both on `expiresAt`.
+ * `{ eq }` on any column; `{ lt }`, `{ gt }`, or both on `createdAt` and `updatedAt`.
  *
  * Every condition names its operator, so an implementation maps keys to
  * operators and never has to tell a value from a range by looking at it. The
@@ -308,10 +309,10 @@ export type AuthDatabaseOperator = "eq" | "lt" | "gt"
  * and `{}` is not a condition, so `Object.entries` is the whole of a `where`.
  *
  * Order is the only comparison the contract has beyond equality, and it exists
- * because expiry is the one question core cannot ask with `eq`. Both bounds are
- * exclusive. {@link AuthWhere} confines it to `expiresAt` rather than offering
- * it on every column, so an implementation has one column to think about
- * instead of the whole row.
+ * because age is the one question core cannot ask with `eq`. Both bounds are
+ * exclusive. {@link AuthWhere} confines it to the two timestamps core writes
+ * rather than offering it on every column, so an implementation has two
+ * columns to think about instead of the whole row.
  */
 export type AuthCondition<V> =
   | { eq: V }
@@ -322,10 +323,10 @@ export type AuthCondition<V> =
 /**
  * A query: column/condition pairs, **all** of which must match.
  *
- * Every column takes `{ eq }`, and `expiresAt` also takes an order — that one
- * exception is what lets core find a live session, expiry still ahead, in the
- * same statement that updates it, rather than reading first to find out
- * whether it may write.
+ * Every column takes `{ eq }`, and `createdAt` and `updatedAt` also take an
+ * order — that one exception is what lets core find a live session, used
+ * within its lifetime, in the same statement that updates it, rather than
+ * reading first to find out whether it may write.
  *
  * **`null` is not a value here**, though the columns are nullable. Core looks
  * accounts up by an identifier, and an identifier that came back null would
@@ -341,9 +342,9 @@ export type AuthWhere<
 > = T extends AuthTable
   ? {
       // Index signatures make Object.entries infer any.
-      [K in keyof AuthRow<M, S, T> as string extends K
-        ? never
-        : K]?: K extends "expiresAt"
+      [K in keyof AuthRow<M, S, T> as string extends K ? never : K]?: K extends
+        | "createdAt"
+        | "updatedAt"
         ? AuthCondition<NonNullable<AuthRow<M, S, T>[K]>>
         : { eq: NonNullable<AuthRow<M, S, T>[K]> }
     }
@@ -450,9 +451,9 @@ export type AuthDeleteInput<
  * | table | unique | indexed | swept |
  * | --- | --- | --- | --- |
  * | `users` | `email`, `phoneNumber` | | |
- * | `sessions` | | `userId`, `expiresAt` | `expiresAt` |
- * | `verifications` | | `(identifier, purpose, attemptHash)`, `expiresAt` | `expiresAt` |
- * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
+ * | `sessions` | | `userId`, `updatedAt` | `updatedAt` |
+ * | `verifications` | | `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
+ * | `attempts` | | `key`, `createdAt` | `createdAt` |
  * | `identities` | `(provider, providerUserId)` | `userId` | |
  *
  * **The uniqueness column is not hygiene, it is the design.** Core composes a
@@ -525,9 +526,9 @@ export interface AuthDatabase<
    * builders reject.
    *
    * Returns the rows it wrote, as {@link AuthDatabase.delete} does. That is what lets
-   * one statement both find and touch a row: core asks for a session whose
-   * `expiresAt` is still ahead, and learns from what comes back whether there
-   * was one — rather than reading to find out if it may write, then writing.
+   * one statement both find and touch a row: core asks for a session used
+   * within its lifetime, and learns from what comes back whether there was
+   * one — rather than reading to find out if it may write, then writing.
    */
   update<T extends AuthTable>(input: {
     table: T
@@ -655,9 +656,9 @@ type Loose = Record<string, unknown>
 
 const timestampColumns: Record<AuthTable, string[]> = {
   users: ["createdAt", "updatedAt"],
-  sessions: ["createdAt", "updatedAt", "expiresAt"],
-  verifications: ["createdAt", "updatedAt", "expiresAt"],
-  attempts: ["createdAt", "updatedAt", "expiresAt"],
+  sessions: ["createdAt", "updatedAt"],
+  verifications: ["createdAt", "updatedAt"],
+  attempts: ["createdAt", "updatedAt"],
   identities: ["createdAt", "updatedAt"],
   identitySecrets: [
     "createdAt",

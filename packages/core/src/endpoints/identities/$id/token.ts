@@ -17,6 +17,7 @@ import { PROVIDER_DEADLINE_MS } from "../../../oauth/providers/provider-response
 import type { EndpointDocs } from "../../../openapi/endpoint-docs"
 import type { CallerInput } from "../../../session/authenticate"
 import { authenticate } from "../../../session/authenticate"
+import { sessionAge } from "../../../session/session-token"
 
 /**
  * How much of an access token's remaining life is treated as already spent.
@@ -97,7 +98,7 @@ export const getProviderToken = defineEndpoint({
     const [session, identity, secrets] = await Promise.all([
       selectOne(internals, "sessions", {
         id: { eq: caller.sessionId },
-        expiresAt: { gt: new Date() }
+        ...sessionAge(internals).live
       }),
       selectOne(internals, "identities", {
         id: { eq: input.id },

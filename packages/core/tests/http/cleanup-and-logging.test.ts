@@ -11,11 +11,11 @@ import { required } from "../helpers/required"
 /** Lets any work a request scheduled after its response settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-/** Whether a delete is the sweep — the only delete keyed on an expiry range. */
-const isSweep = ({ where }: { where: object }) => {
-  const { expiresAt } = where as { expiresAt?: AuthCondition<Date> }
-  return expiresAt !== undefined && "lt" in expiresAt
-}
+/** Whether a delete is the sweep — the only delete keyed on an age bound. */
+const isSweep = ({ where }: { where: object }) =>
+  Object.values(where as Record<string, AuthCondition<Date>>).some(
+    (condition) => "lt" in condition
+  )
 
 describe("sweeping", () => {
   type TestContext = Awaited<ReturnType<typeof createTestServer>>
@@ -38,11 +38,10 @@ describe("sweeping", () => {
       values: {
         userId: "someone-long-gone",
         secretHash: "stale-hash",
-        expiresAt: new Date(Date.now() - 1000),
         userAgent: null,
         ipAddress: null,
-        createdAt: new Date(Date.now() - 2000),
-        updatedAt: new Date(Date.now() - 2000)
+        createdAt: new Date(0),
+        updatedAt: new Date(0)
       }
     })
 
@@ -54,9 +53,7 @@ describe("sweeping", () => {
 
     const remaining = context.db.sessions()
     expect(remaining).toHaveLength(1)
-    expect(
-      required(remaining[0], "session").expiresAt.getTime()
-    ).toBeGreaterThan(Date.now())
+    expect(required(remaining[0], "session").secretHash).not.toBe("stale-hash")
   })
 
   it("sending a code sweeps expired verification rows", async () => {
@@ -67,10 +64,9 @@ describe("sweeping", () => {
         identifier: "grace@example.com",
         codeHash: "stale-code",
         attemptHash: "stale-attempt",
-        expiresAt: new Date(Date.now() - 1000),
         purpose: "signIn",
-        createdAt: new Date(Date.now() - 2000),
-        updatedAt: new Date(Date.now() - 2000)
+        createdAt: new Date(0),
+        updatedAt: new Date(0)
       }
     })
 

@@ -4,13 +4,13 @@ import type { AuthInternals } from "../core/auth-internals"
 import { signToken } from "../jwt/sign-token"
 import { toHex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
-import { parseDuration } from "../lib/parse-duration"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { sweepExpired } from "../lib/sweep-expired"
 import { bytesToBase64 } from "../shared/base64url"
 import { presentedSessions } from "./presented-sessions"
 import type { ResolvedSession } from "./resolve-session"
 import { refreshCookieName, refreshCookies } from "./session-cookies"
+import { sessionAge } from "./session-token"
 import { sessionStamp } from "./slide-session"
 
 /** What issuing a session produced. */
@@ -74,7 +74,6 @@ export async function issueSession(
   const secretHash = new Uint8Array(
     await crypto.subtle.digest("SHA-256", secret)
   )
-  const now = new Date()
 
   // A cookie about to be overwritten leaves its session unreachable from this
   // browser, so it is deleted rather than left to run out its lifetime
@@ -90,10 +89,9 @@ export async function issueSession(
       userId: user.id,
       secretHash: toHex(secretHash),
       amr,
-      expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
       ...sessionStamp(internals, headers)
     }),
-    sweepExpired(internals, "sessions"),
+    sweepExpired(internals, "sessions", sessionAge(internals).stale),
     presentedSessions(internals, headers, {
       live: false,
       read: config.multiUser

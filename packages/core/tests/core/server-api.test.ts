@@ -42,15 +42,12 @@ describe("getToken as a function", () => {
   it("returns the token and the user, and slides the session it read", async () => {
     const context = await createTestServer({ session: { ttl: "30d" } })
     const { refreshToken } = await signIn(context)
-    const before = required(
-      context.db.sessions()[0],
-      "session"
-    ).expiresAt.getTime()
     // Last used over an hour ago, so the slide is due.
+    const stale = new Date(Date.now() - 2 * 60 * 60_000)
     await context.db.update({
       table: "sessions",
       where: {},
-      values: { updatedAt: new Date(Date.now() - 2 * 60 * 60_000) }
+      values: { updatedAt: stale }
     })
 
     const result = required(
@@ -62,30 +59,28 @@ describe("getToken as a function", () => {
     const after = required(
       context.db.sessions()[0],
       "session"
-    ).expiresAt.getTime()
+    ).updatedAt.getTime()
 
     expect(result.user.email).toBe("ada@example.com")
     expect(await context.auth.verifyToken(result.token)).toBeTruthy()
-    expect(after).toBeGreaterThan(before)
+    expect(after).toBeGreaterThan(stale.getTime())
   })
 
-  it("does not slide when sliding is off", async () => {
+  it("counts the lifetime from creation when sliding is off", async () => {
     vi.useFakeTimers()
     try {
       const context = await createTestServer({
-        session: { ttl: "30d", sliding: false }
+        session: { ttl: "2h", sliding: false }
       })
       const { refreshToken } = await signIn(context)
-      const before = required(context.db.sessions()[0], "session").expiresAt
+      const headers = () => cookieHeaders(refreshToken)
 
-      vi.advanceTimersByTime(60 * 60_000)
-      await context.auth.getToken({
-        headers: cookieHeaders(refreshToken)
-      })
+      vi.advanceTimersByTime(61 * 60_000)
+      expect(await context.auth.getToken({ headers: headers() })).toBeTruthy()
 
-      expect(
-        required(context.db.sessions()[0], "session").expiresAt.getTime()
-      ).toBe(before.getTime())
+      // Used an hour ago, but two hours old: a fixed interval does not care.
+      vi.advanceTimersByTime(61 * 60_000)
+      expect(await context.auth.getToken({ headers: headers() })).toBeNull()
     } finally {
       vi.useRealTimers()
     }

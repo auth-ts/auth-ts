@@ -2,12 +2,15 @@ import type { AuthInternals } from "../core/auth-internals"
 import { defer } from "./defer"
 
 /**
- * Deletes a table's expired rows, riding on the request that is inserting one.
+ * Deletes a table's rows past their lifetime, riding on the request that is
+ * inserting one.
  *
- * Garbage accrues only through inserts, so sweeping at insert time keys the
- * sweep rate to the growth rate — and sweeping the whole table rather than the
- * caller's rows is what collects the tail left by people who never come back.
- * Hygiene, never a security boundary: expiry is enforced on read regardless,
+ * Lifetimes live in code and rows only record when, so the caller says which
+ * timestamp and how old; a row is dead the moment a read stops accepting it,
+ * and this collects it later. Garbage accrues only through inserts, so
+ * sweeping at insert time keys the sweep rate to the growth rate — and
+ * sweeping the whole table rather than the caller's rows is what collects the
+ * tail left by people who never come back. Hygiene, never a security boundary,
  * which is why a failure is logged rather than allowed to fail a sign-in.
  *
  * Only the library's own tables are swept. A `users` row this leaves behind —
@@ -22,11 +25,8 @@ import { defer } from "./defer"
  */
 export function sweepExpired(
   internals: AuthInternals,
-  table: "sessions" | "verifications" | "attempts"
+  table: "sessions" | "verifications" | "attempts",
+  where: { createdAt: { lt: Date } } | { updatedAt: { lt: Date } }
 ) {
-  return defer(
-    internals,
-    "sweep",
-    internals.db.delete({ table, where: { expiresAt: { lt: new Date() } } })
-  )
+  return defer(internals, "sweep", internals.db.delete({ table, where }))
 }

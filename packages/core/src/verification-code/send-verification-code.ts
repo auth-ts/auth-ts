@@ -7,6 +7,7 @@ import { scryptHash, sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
 import { parseDuration } from "../lib/parse-duration"
 import { sweepExpired } from "../lib/sweep-expired"
+import { IDENTITY_TTL } from "./identity"
 import type { CodeIdentifier } from "./resolve-code-identifier"
 
 /**
@@ -17,6 +18,15 @@ import type { CodeIdentifier } from "./resolve-code-identifier"
  * still waiting. A knob here would only ever be turned the wrong way.
  */
 export const VERIFICATION_CODE_TTL = "10m"
+
+/** The condition a code still within its lifetime satisfies. */
+export function liveCode() {
+  return {
+    createdAt: {
+      gt: new Date(Date.now() - parseDuration(VERIFICATION_CODE_TTL))
+    }
+  }
+}
 
 /** What sending a code needs to know. */
 export interface SendVerificationCodeInput {
@@ -68,12 +78,23 @@ export async function sendVerificationCode(
     config.verificationCode.alphabet,
     config.verificationCode.length
   )
-  const swept = sweepExpired(internals, "verifications")
+  // A verified identity code outlives an unspent one, so the sweep waits
+  // for the longer of the two.
+  const swept = sweepExpired(internals, "verifications", {
+    updatedAt: {
+      lt: new Date(
+        Date.now() -
+          Math.max(
+            parseDuration(VERIFICATION_CODE_TTL),
+            parseDuration(IDENTITY_TTL)
+          )
+      )
+    }
+  })
   const stored = await insertRow(internals, "verifications", {
     identifier: key,
     codeHash: await scryptHash(code),
     attemptHash: await sha256Hex(attempt),
-    expiresAt: new Date(Date.now() + parseDuration(VERIFICATION_CODE_TTL)),
     purpose
   })
   await swept

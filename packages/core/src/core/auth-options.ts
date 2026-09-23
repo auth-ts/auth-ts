@@ -170,7 +170,13 @@ export interface JwksOptions {
 
 /** Refresh-token lifetime. */
 export interface SessionOptions {
-  /** @default "10d" */
+  /**
+   * How long a session lives past its last hour of use, or past creation with
+   * `sliding: false`. Policy rather than a column: changing it applies to
+   * every session at once.
+   *
+   * @default "10d"
+   */
   ttl?: Duration
   /**
    * Push expiry out as the session is used, so `ttl` measures inactivity

@@ -6,7 +6,7 @@ import { HINT_COOKIE_NAME } from "../shared/hint-cookie"
 import type { CallerInput } from "./authenticate"
 import { verifyBearer } from "./authenticate"
 import { readRefreshCookies } from "./session-cookies"
-import { parseSessionToken } from "./session-token"
+import { parseSessionToken, sessionAge } from "./session-token"
 import { slideSession } from "./slide-session"
 
 /**
@@ -211,7 +211,7 @@ export async function resolveTokenSession(
   const [session, named] = await Promise.all([
     selectOne(internals, "sessions", {
       id: { eq: caller.sessionId },
-      expiresAt: { gt: new Date() }
+      ...sessionAge(internals).live
     }),
     selectOne(internals, "users", { id: { eq: caller.userId } })
   ])

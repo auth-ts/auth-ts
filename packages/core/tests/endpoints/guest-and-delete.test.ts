@@ -529,7 +529,6 @@ describe("identity verification, revoking a device, deleting the account", () =>
           userId,
           secretHash,
           createdAt: new Date(),
-          expiresAt: new Date(Date.now() + 60_000),
           userAgent: null,
           ipAddress: null,
           updatedAt: new Date()
@@ -661,7 +660,6 @@ describe("identity verification, revoking a device, deleting the account", () =>
           values: {
             userId: (await rowOf(context, session)).userId,
             secretHash: "another-device",
-            expiresAt: new Date(Date.now() + 60_000),
             createdAt: new Date(),
             updatedAt: new Date()
           }
@@ -766,7 +764,6 @@ describe("identity verification, revoking a device, deleting the account", () =>
         values: {
           userId: grace.id,
           secretHash: "grace-laptop",
-          expiresAt: new Date(Date.now() + 60_000),
           createdAt: new Date(),
           updatedAt: new Date()
         }
