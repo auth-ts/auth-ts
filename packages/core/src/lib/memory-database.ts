@@ -36,7 +36,6 @@ type StoredRow = Record<string, unknown> & { id: string }
  */
 const UNIQUE_COLUMNS: { [T in AuthTable]?: string[][] } = {
   users: [["email"], ["phoneNumber"]],
-  sessions: [["tokenHash"]],
   identities: [["provider", "providerUserId"]]
 }
 

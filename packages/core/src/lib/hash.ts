@@ -11,11 +11,11 @@ function toHex(buffer: ArrayBuffer | Uint8Array) {
 /**
  * Hashes a value with SHA-256 and returns lowercase hex.
  *
- * Refresh tokens are stored this way, so a leaked table cannot be replayed as a
- * session. That is all it buys: the hash is unkeyed, so anyone holding a token
- * can find its row, and the token stays a bearer credential either way. Thirty
- * two random bytes need no slowing down — short codes do, which is why those
- * get {@link scryptHash} instead.
+ * Session secrets and attempt tokens are stored this way, so a leaked table
+ * cannot be replayed. That is all it buys: the hash is unkeyed, and the token
+ * stays a bearer credential either way. Thirty-two random bytes need no
+ * slowing down — short codes do, which is why those get {@link scryptHash}
+ * instead.
  */
 export async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(

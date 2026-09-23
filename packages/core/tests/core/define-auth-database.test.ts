@@ -7,7 +7,7 @@ type StoredSession = AuthRow<"string", Record<string, never>, "sessions">
 const storedSession: StoredSession = {
   id: "session-1",
   userId: "user-1",
-  tokenHash: "hash",
+  secretHash: "hash",
   expiresAt: "2030-01-01T00:00:00.000Z",
   userAgent: null,
   ipAddress: null,
@@ -43,7 +43,7 @@ describe("defineAuthDatabase with string timestamps", () => {
       table: "sessions",
       values: {
         userId: "user-1",
-        tokenHash: "hash",
+        secretHash: "hash",
         expiresAt: new Date("2030-01-01T00:00:00.000Z"),
         userAgent: null,
         ipAddress: null,

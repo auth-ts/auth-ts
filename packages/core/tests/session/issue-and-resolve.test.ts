@@ -106,7 +106,7 @@ describe("issueSession", () => {
     ).not.toContain("domain")
   })
 
-  it("stores only the hash of the token, never the token", async () => {
+  it("hands out id.secret and stores only the hash of the secret", async () => {
     const { internals, db } = await createTestInternals()
     const user = await insertUser(db, { email: "ada@example.com" })
 
@@ -117,11 +117,41 @@ describe("issueSession", () => {
       requestURL: REQUEST_URL
     })
     const refreshToken = refreshTokenOf(issued)
-    const [stored] = db.sessions()
+    const stored = required(db.sessions()[0], "stored session")
+    const secret = refreshToken.slice(stored.id.length + 1)
 
-    expect(stored?.tokenHash).toMatch(/^[0-9a-f]{64}$/)
-    expect(stored?.tokenHash).not.toBe(refreshToken)
-    expect(JSON.stringify(db.sessions())).not.toContain(refreshToken)
+    expect(refreshToken.startsWith(`${stored.id}.`)).toBe(true)
+    expect(stored.secretHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(JSON.stringify(db.sessions())).not.toContain(secret)
+  })
+
+  it("leaves a session alone when a cookie merely names its id", async () => {
+    // The id is an address, not a credential: a browser that writes another
+    // user's session id into a cookie of its own and then signs in must not
+    // get that session retired as one of "its" superseded ones.
+    const { internals, db } = await createTestInternals()
+    const ada = await insertUser(db, { email: "ada@example.com" })
+    const grace = await insertUser(db, { email: "grace@example.com" })
+    await issueSession(internals, {
+      user: ada,
+      amr: ["otp"],
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+    const adas = required(db.sessions()[0], "ada's session")
+
+    await issueSession(internals, {
+      user: grace,
+      amr: ["otp"],
+      headers: new Headers({
+        cookie: `${refreshCookie(ada.id)}=${adas.id}.AAAA`
+      }),
+      requestURL: REQUEST_URL
+    })
+
+    expect(
+      await selectRow(db, "sessions", { id: { eq: adas.id } })
+    ).toBeTruthy()
   })
 
   it("stamps user agent and the client ip from proxy headers", async () => {
@@ -331,13 +361,32 @@ describe("resolveSession", () => {
     const [stored] = db.sessions()
     await db.delete({
       table: "sessions",
-      where: { tokenHash: { eq: required(stored, "stored session").tokenHash } }
+      where: { id: { eq: required(stored, "stored session").id } }
     })
 
     const headers = new Headers({
       cookie: cookieHeaderOf(issued)
     })
     expect(await resolveSession(internals, headers)).toBeNull()
+  })
+
+  it("refuses the right id with the wrong secret", async () => {
+    const { internals, db } = await createTestInternals()
+    const user = await insertUser(db, { email: "ada@example.com" })
+    await issueSession(internals, {
+      user,
+      amr: ["otp"],
+      headers: new Headers(),
+      requestURL: REQUEST_URL
+    })
+    const stored = required(db.sessions()[0], "stored session")
+
+    for (const token of [`${stored.id}.AAAA`, `${stored.id}.`, stored.id]) {
+      const headers = new Headers({
+        cookie: `${refreshCookie(user.id)}=${token}`
+      })
+      expect(await resolveSession(internals, headers)).toBeNull()
+    }
   })
 
   it("refuses an expired session without extending it", async () => {

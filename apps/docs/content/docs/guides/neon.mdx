@@ -95,8 +95,9 @@ Do not force row-level security here — the server connects as the owner and mu
 still read every one of these.
 
 Nothing in those three tables can authenticate anybody, which is what makes
-reading them whole safe. `sessions.tokenHash` is a SHA-256 of thirty-two random
-bytes: knowing it does not let you present the token it came from. The provider
+reading them whole safe. `sessions.secretHash` is a SHA-256 of the thirty-two
+random bytes in the token: knowing it does not let you present the token it
+came from. The provider
 tokens live in `identitySecrets`, which nothing grants.
 
 That is the point of the split. Protection is a table nobody writes a policy

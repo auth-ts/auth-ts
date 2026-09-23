@@ -2,7 +2,8 @@ import type { AuthInternals } from "../core/auth-internals"
 import { defer } from "../lib/defer"
 import { getIpAddress } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
-import { selectOne } from "../lib/select-one"
+import type { SessionCredential } from "./session-token"
+import { findSession } from "./session-token"
 
 /**
  * How often a live session's row is written on use.
@@ -26,7 +27,7 @@ export function sessionStamp(internals: AuthInternals, headers: Headers) {
 }
 
 /**
- * Finds a live session by its token hash and, at most once an hour, marks it used.
+ * Finds a live session by its credential and, at most once an hour, marks it used.
  *
  * The read enforces liveness: a row whose `expiresAt` has passed matches
  * nothing. The write, when it is due, keeps the same predicate, so a session
@@ -45,16 +46,13 @@ export function sessionStamp(internals: AuthInternals, headers: Headers) {
  */
 export async function slideSession(
   internals: AuthInternals,
-  tokenHash: string,
+  credential: SessionCredential,
   headers: Headers
 ) {
   const { sliding, ttl } = internals.config.session
   const { waitUntil } = internals.config
 
-  const session = await selectOne(internals, "sessions", {
-    tokenHash: { eq: tokenHash },
-    expiresAt: { gt: new Date() }
-  })
+  const session = await findSession(internals, credential)
   if (!session) return []
   if (
     Date.now() - session.updatedAt.getTime() <
@@ -70,7 +68,7 @@ export async function slideSession(
   }
   const write = internals.db.update({
     table: "sessions",
-    where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } },
+    where: { id: { eq: session.id }, expiresAt: { gt: new Date() } },
     values: written
   })
   if (waitUntil) defer(internals, "session slide", write)

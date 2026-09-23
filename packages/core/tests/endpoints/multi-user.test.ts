@@ -609,7 +609,7 @@ describe("superseding a session", () => {
       selects.mock.calls.filter(
         ([input]) =>
           input.table === "sessions" &&
-          "tokenHash" in input.where &&
+          "id" in input.where &&
           !("expiresAt" in input.where)
       )
     ).toHaveLength(0)

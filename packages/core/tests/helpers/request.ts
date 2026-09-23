@@ -106,6 +106,11 @@ export function readRefreshCookie(
   return refreshEntryOf(cookies)
 }
 
+/** The id half of a refresh token, which is the session row's id. */
+export function sessionIdOf(refreshToken: string) {
+  return refreshToken.slice(0, refreshToken.lastIndexOf("."))
+}
+
 /** Exchanges a refresh cookie for an access token, the way a client boots. */
 export async function mintToken(
   auth: { handler: (request: Request) => Promise<Response> },

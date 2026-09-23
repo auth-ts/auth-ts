@@ -64,7 +64,7 @@ export const sessions = pgTable.withRLS(
     userId: uuid("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    tokenHash: text("tokenHash").notNull().unique(),
+    secretHash: text("secretHash").notNull(),
     expiresAt: timestamp("expiresAt", {
       withTimezone: true,
       mode: "string"

@@ -122,7 +122,7 @@ export type Database = {
           expiresAt: string
           id: string
           ipAddress: string | null
-          tokenHash: string
+          secretHash: string
           updatedAt: string
           userAgent: string | null
           userId: string
@@ -133,7 +133,7 @@ export type Database = {
           expiresAt: string
           id?: string
           ipAddress?: string | null
-          tokenHash: string
+          secretHash: string
           updatedAt?: string
           userAgent?: string | null
           userId: string
@@ -144,7 +144,7 @@ export type Database = {
           expiresAt?: string
           id?: string
           ipAddress?: string | null
-          tokenHash?: string
+          secretHash?: string
           updatedAt?: string
           userAgent?: string | null
           userId?: string

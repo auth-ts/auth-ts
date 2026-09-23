@@ -16,7 +16,7 @@ async function seed() {
     table: "sessions",
     values: {
       userId: user.id,
-      tokenHash: "hash",
+      secretHash: "hash",
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 60_000),
       userAgent: null,
@@ -101,7 +101,7 @@ describe("deleteUser", () => {
       table: "sessions",
       values: {
         userId: grace.id,
-        tokenHash: "grace-hash",
+        secretHash: "grace-hash",
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,

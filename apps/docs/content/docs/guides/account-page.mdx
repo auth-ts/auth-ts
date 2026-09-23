@@ -27,9 +27,9 @@ users, sessions, and identities are yours to query.
 verifications, attempts, and identitySecrets are never granted.
 ```
 
-Nothing in the first three is a credential. `sessions.tokenHash` is a SHA-256 of
-thirty-two random bytes, so knowing it does not let anyone present the token it
-came from. The provider tokens live in `identitySecrets`, which has no policy at
+Nothing in the first three is a credential. `sessions.secretHash` is a SHA-256
+of the thirty-two random bytes in the token, so knowing it does not let anyone
+present the token it came from. The provider tokens live in `identitySecrets`, which has no policy at
 all. See [the Neon guide](/docs/guides/neon) for the SQL.
 
 The consequence worth knowing: `select()` with no column list is safe on all

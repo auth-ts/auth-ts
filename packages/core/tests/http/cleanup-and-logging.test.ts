@@ -37,7 +37,7 @@ describe("sweeping", () => {
       table: "sessions",
       values: {
         userId: "someone-long-gone",
-        tokenHash: "stale-hash",
+        secretHash: "stale-hash",
         expiresAt: new Date(Date.now() - 1000),
         userAgent: null,
         ipAddress: null,
@@ -211,7 +211,7 @@ describe("logging redaction", () => {
     await settle()
 
     const logged = JSON.stringify(context.logCalls)
-    const codeHash = required(context.db.sessions()[0], "session")?.tokenHash
+    const codeHash = required(context.db.sessions()[0], "session")?.secretHash
 
     expect(context.logCalls.length).toBeGreaterThan(0)
     expect(logged).not.toContain(refreshToken)

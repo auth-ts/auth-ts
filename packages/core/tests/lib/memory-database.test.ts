@@ -279,7 +279,7 @@ describe("delete", () => {
       table: "sessions",
       values: {
         userId: ada.id,
-        tokenHash: "hash",
+        secretHash: "hash",
         createdAt: new Date(),
         expiresAt: new Date(Date.now() + 60_000),
         userAgent: null,

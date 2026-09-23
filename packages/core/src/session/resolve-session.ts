@@ -1,12 +1,12 @@
 import type { AuthSession, AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
-import { sha256Hex } from "../lib/hash"
 import { readCookie } from "../lib/parse-cookies"
 import { selectOne } from "../lib/select-one"
 import { HINT_COOKIE_NAME } from "../shared/hint-cookie"
 import type { CallerInput } from "./authenticate"
 import { verifyBearer } from "./authenticate"
 import { readRefreshCookies } from "./session-cookies"
+import { parseSessionToken } from "./session-token"
 import { slideSession } from "./slide-session"
 
 /**
@@ -22,12 +22,10 @@ export interface HeadersInput {
   headers: Headers
 }
 
-/** A resolved session together with its user and the hash that found it. */
+/** A resolved session together with its user. */
 export interface ResolvedSession {
   session: AuthSession
   user: AuthUser
-  /** The lookup key. Never sent to the browser — `session.id` is the safe address. */
-  tokenHash: string
 }
 
 /**
@@ -66,10 +64,10 @@ export function readRefreshToken(
 /**
  * Finds a live session by a raw refresh token and, at most hourly, marks it used.
  *
- * The session is matched on the hash and on an expiry still ahead of now, so
- * expiry is enforced here rather than trusted to a cleanup sweep — an expired
- * row simply matches nothing, and a dead session cannot be revived by the
- * write that would have extended it.
+ * The session is matched on its id, its secret, and an expiry still ahead of
+ * now, so expiry is enforced here rather than trusted to a cleanup sweep — an
+ * expired row simply matches nothing, and a dead session cannot be revived by
+ * the write that would have extended it.
  *
  * Sliding on the way through means being in the application keeps a session
  * alive, to the hour.
@@ -84,14 +82,17 @@ async function liveSession(
     return null
   }
 
-  const tokenHash = await sha256Hex(rawToken)
-  const [session] = await slideSession(internals, tokenHash, headers)
+  const [session] = await slideSession(
+    internals,
+    await parseSessionToken(rawToken),
+    headers
+  )
   if (!session) {
     internals.log.debug("no live session for this refresh credential")
     return null
   }
 
-  return { session, tokenHash }
+  return { session }
 }
 
 /**
@@ -103,7 +104,7 @@ async function liveSession(
  * refresh token under somebody else's name and be answered with a session — and
  * through it an access token — that is not theirs.
  *
- * @returns The session and the hash it was found by, or `null`.
+ * @returns The session, or `null`.
  */
 export async function resolveSessionRowForUser(
   internals: AuthInternals,
@@ -222,5 +223,5 @@ export async function resolveTokenSession(
       ? named
       : await selectOne(internals, "users", { id: { eq: session.userId } })
 
-  return user ? { session, user, tokenHash: session.tokenHash } : null
+  return user ? { session, user } : null
 }

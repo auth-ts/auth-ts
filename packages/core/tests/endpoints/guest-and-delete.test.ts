@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest"
-import { sha256Hex } from "../../src/lib/hash"
 import { createTestServer } from "../helpers/create-test-server"
 import {
   mintToken,
   readRefreshCookie,
   refreshCookieFor,
   refreshCookies,
-  request
+  request,
+  sessionIdOf
 } from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
@@ -273,11 +273,11 @@ describe("guest conversion", () => {
     await context.db.delete({
       table: "sessions",
       where: {
-        tokenHash: {
+        id: {
           eq: required(
             context.db.sessions().find((row) => row.userId !== second.user.id),
             "first guest session"
-          ).tokenHash
+          ).id
         }
       }
     })
@@ -455,7 +455,7 @@ describe("identity verification, revoking a device, deleting the account", () =>
   const rowOf = async (context: Context, session: Session) =>
     required(
       await selectRow(context.db, "sessions", {
-        tokenHash: { eq: await sha256Hex(session.refreshToken) }
+        id: { eq: sessionIdOf(session.refreshToken) }
       }),
       "session row"
     )
@@ -522,12 +522,12 @@ describe("identity verification, revoking a device, deleting the account", () =>
       }),
       "ada"
     )
-    const insertSession = (userId: string, tokenHash: string) =>
+    const insertSession = (userId: string, secretHash: string) =>
       context.db.insert({
         table: "sessions",
         values: {
           userId,
-          tokenHash,
+          secretHash,
           createdAt: new Date(),
           expiresAt: new Date(Date.now() + 60_000),
           userAgent: null,
@@ -660,7 +660,7 @@ describe("identity verification, revoking a device, deleting the account", () =>
           table: "sessions",
           values: {
             userId: (await rowOf(context, session)).userId,
-            tokenHash: "another-device",
+            secretHash: "another-device",
             expiresAt: new Date(Date.now() + 60_000),
             createdAt: new Date(),
             updatedAt: new Date()
@@ -765,7 +765,7 @@ describe("identity verification, revoking a device, deleting the account", () =>
         table: "sessions",
         values: {
           userId: grace.id,
-          tokenHash: "grace-laptop",
+          secretHash: "grace-laptop",
           expiresAt: new Date(Date.now() + 60_000),
           createdAt: new Date(),
           updatedAt: new Date()

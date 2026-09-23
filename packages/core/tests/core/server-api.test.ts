@@ -272,7 +272,7 @@ describe("a token whose session is gone", () => {
 
     await context.db.delete({
       table: "sessions",
-      where: { tokenHash: { eq: session.tokenHash } }
+      where: { id: { eq: session.id } }
     })
 
     // The token still verifies — it is the row its `sid` names that is gone.

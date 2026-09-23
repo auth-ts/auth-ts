@@ -57,17 +57,18 @@ export interface IssueSessionInput {
  * attributes, session stamping, and multi-account behaviour are defined once
  * rather than re-implemented per method with slightly different mistakes.
  *
- * The database is given only `sha256(token)`. Possession of the raw token proves
- * identity; the stored hash proves nothing on its own, so a leaked table cannot
- * be replayed and a leaked token cannot be located in the table.
+ * The token is `id.secret`. The database is given the id and `sha256(secret)`;
+ * possession of the secret proves identity, and the stored hash proves nothing
+ * on its own, so a leaked table cannot be replayed. The id is an address, not a
+ * credential: it can be logged, listed, and revoked by.
  */
 export async function issueSession(
   internals: AuthInternals,
   { user, headers, requestURL, caller, amr }: IssueSessionInput
 ): Promise<IssueResult> {
   const { config } = internals
-  const rawToken = randomBytesBase64url(32)
-  const tokenHash = await sha256Hex(rawToken)
+  const secret = randomBytesBase64url(32)
+  const secretHash = await sha256Hex(secret)
   const now = new Date()
 
   // A cookie about to be overwritten leaves its session unreachable from this
@@ -77,11 +78,12 @@ export async function issueSession(
   // only this user's own previous one, and which is which comes from each row
   // rather than from the name its cookie arrived under, so a mislabelled cookie
   // retires the session it actually holds instead of being counted as somebody
-  // else's and left behind.
+  // else's and left behind. Deleting by id and secret hash together is what
+  // keeps a cookie that merely names somebody's session id from retiring it.
   const [session, , held] = await Promise.all([
     insertRow(internals, "sessions", {
       userId: user.id,
-      tokenHash,
+      secretHash,
       amr,
       expiresAt: new Date(now.getTime() + parseDuration(config.session.ttl)),
       ...sessionStamp(internals, headers)
@@ -92,21 +94,26 @@ export async function issueSession(
       read: config.multiUser
     })
   ])
+  const rawToken = `${session.id}.${secret}`
   const stranded = held.filter(
     ({ session }) => !config.multiUser || session?.userId === user.id
   )
-  const superseded = new Set(stranded.map(({ tokenHash }) => tokenHash))
-  if (caller?.user.type === "guest") superseded.add(caller.tokenHash)
+  const superseded = new Map(
+    stranded.map(({ id, secretHash }) => [id, secretHash])
+  )
+  if (caller?.user.type === "guest") {
+    superseded.set(caller.session.id, caller.session.secretHash)
+  }
   // Only once the replacement exists: if creating it had failed, the caller
   // would still hold a working session rather than none.
-  superseded.delete(tokenHash)
+  superseded.delete(session.id)
 
   const [token] = await Promise.all([
     mintAccessToken(internals, user, session),
-    ...[...superseded].map((hash) =>
+    ...[...superseded].map(([id, secretHash]) =>
       internals.db.delete({
         table: "sessions",
-        where: { tokenHash: { eq: hash } }
+        where: { id: { eq: id }, secretHash: { eq: secretHash } }
       })
     )
   ])

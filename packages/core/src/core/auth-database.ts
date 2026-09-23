@@ -99,11 +99,11 @@ export type AuthUser<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = CoreUserFields & AdditionalFields<S>
 
-/** A refresh-token row. Core stores only the hash of the token, never the token. */
+/** A session row. The token is `id.secret`; core stores `sha256` of the secret, never the secret. */
 export interface AuthSession {
   id: string
   userId: string
-  tokenHash: string
+  secretHash: string
   /**
    * When this session was created. Core writes it on insert and never updates
    * it; `updatedAt` is when the session was last used, to the hour.
@@ -450,7 +450,7 @@ export type AuthDeleteInput<
  * | table | unique | indexed | swept |
  * | --- | --- | --- | --- |
  * | `users` | `email`, `phoneNumber` | | |
- * | `sessions` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
+ * | `sessions` | | `userId`, `expiresAt` | `expiresAt` |
  * | `verifications` | | `(identifier, purpose, attemptHash)`, `expiresAt` | `expiresAt` |
  * | `attempts` | | `key`, `expiresAt` | `expiresAt` |
  * | `identities` | `(provider, providerUserId)` | `userId` | |

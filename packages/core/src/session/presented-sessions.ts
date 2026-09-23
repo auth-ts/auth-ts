@@ -1,14 +1,13 @@
 import type { AuthSession } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
-import { sha256Hex } from "../lib/hash"
-import { selectOne } from "../lib/select-one"
 import { readRefreshCookies } from "./session-cookies"
+import type { SessionCredential } from "./session-token"
+import { findSession, parseSessionToken } from "./session-token"
 
 /** One refresh cookie this browser presented, and the session its token found. */
-export interface PresentedSession {
+export interface PresentedSession extends SessionCredential {
   /** The cookie's name. A claim: only `session.userId` settles it. */
   userId: string
-  tokenHash: string
   session: AuthSession | null
 }
 
@@ -16,7 +15,7 @@ export interface PresentedSession {
  * Every refresh cookie the request carries, resolved to its session row.
  *
  * `live` drops rows past their expiry. `read: false` skips the store and
- * reports `session: null`, for a caller that only needs the hashes.
+ * reports `session: null`, for a caller that only needs the credentials.
  */
 export function presentedSessions(
   internals: AuthInternals,
@@ -26,15 +25,12 @@ export function presentedSessions(
   return Promise.all(
     [...readRefreshCookies(internals, headers)].map(
       async ([userId, rawToken]) => {
-        const tokenHash = await sha256Hex(rawToken)
+        const credential = await parseSessionToken(rawToken)
         const session = read
-          ? await selectOne(internals, "sessions", {
-              tokenHash: { eq: tokenHash },
-              ...(live ? { expiresAt: { gt: new Date() } } : {})
-            })
+          ? await findSession(internals, credential, { live })
           : null
 
-        return { userId, tokenHash, session }
+        return { userId, ...credential, session }
       }
     )
   )

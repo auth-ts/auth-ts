@@ -30,7 +30,7 @@ cost of not having an adapter package.
 | table | columns | unique | indexed | swept |
 | --- | --- | --- | --- | --- |
 | `users` | `id`, `email`, `phoneNumber`, `name`, `image`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
-| `sessions` | `id`, `userId`, `tokenHash`, `expiresAt`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | `tokenHash` | `userId`, `expiresAt` | `expiresAt` |
+| `sessions` | `id`, `userId`, `secretHash`, `expiresAt`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | | `userId`, `expiresAt` | `expiresAt` |
 | `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `expiresAt`, `createdAt`, `updatedAt` | | `(identifier, purpose, attemptHash)`, `expiresAt` | `expiresAt` |
 | `attempts` | `id`, `key`, `expiresAt`, `createdAt`, `updatedAt` | | `key`, `expiresAt` | `expiresAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
@@ -41,8 +41,9 @@ cost of not having an adapter package.
 > `users`, `sessions`, and `identities` are yours to query.
 > `verifications`, `attempts`, and `identitySecrets` are never granted.
 
-Nothing in the first three can authenticate anyone. `sessions.tokenHash` is a
-SHA-256 of thirty-two random bytes, so it cannot be replayed and does not need
+Nothing in the first three can authenticate anyone. The session token is
+`id.secret`; `sessions.id` is an address and `sessions.secretHash` is a SHA-256
+of thirty-two random bytes, so neither can be replayed and neither needs
 hiding. The second three hold either a credential or the identifier somebody is
 signing in with, and no application needs to read them.
 
@@ -89,7 +90,7 @@ index, because the missing constraint only shows under a race.
   `{ gt }`, or both, with exclusive bounds.
 
   ```ts
-  where: { tokenHash: { eq: tokenHash }, expiresAt: { gt: new Date() } }
+  where: { id: { eq: id }, expiresAt: { gt: new Date() } }
   ```
 
   A condition names its operator, so your implementation maps keys to

@@ -82,9 +82,9 @@ async function withUser(
   }
 }
 
-const session = (userId: string, tokenHash: string) => ({
+const session = (userId: string, secretHash: string) => ({
   userId,
-  tokenHash,
+  secretHash,
   createdAt: new Date(),
   updatedAt: new Date(),
   expiresAt: future(),
@@ -372,12 +372,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
     run: (db) =>
       withUser(db, (owner) =>
         withUser(db, async (stranger) => {
-          const tokenHash = unique()
-          const held = await create(
-            db,
-            "sessions",
-            session(owner.id, tokenHash)
-          )
+          const held = await create(db, "sessions", session(owner.id, unique()))
           try {
             expect(
               (
@@ -391,7 +386,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           } finally {
             await db.delete({
               table: "sessions",
-              where: { tokenHash: { eq: tokenHash } }
+              where: { id: { eq: held.id } }
             })
           }
         })
@@ -427,29 +422,6 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
         { phoneNumber }
       )
     }
-  },
-  {
-    name: "sessions.tokenHash is unique",
-    run: (db) =>
-      withUser(db, async (owner) => {
-        const tokenHash = unique()
-        try {
-          await create(db, "sessions", session(owner.id, tokenHash))
-          await refuses(
-            () =>
-              db.insert({
-                table: "sessions",
-                values: session(owner.id, tokenHash)
-              }),
-            "two sessions were stored with the same token hash. One refresh token would then resolve to two rows, and revoking the session a browser holds would leave it signed in."
-          )
-        } finally {
-          await db.delete({
-            table: "sessions",
-            where: { tokenHash: { eq: tokenHash } }
-          })
-        }
-      })
   },
   {
     name: "identities are unique on (provider, providerUserId)",
