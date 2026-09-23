@@ -80,10 +80,12 @@ function LoginPage() {
       await authClient.sendSignInCode({ email })
       setPending(null)
       setStage("code")
-      setNotice({
-        text: "Check the server console for your code.",
-        tone: "info"
-      })
+      if (import.meta.env.DEV) {
+        setNotice({
+          text: "Check the server console for your code.",
+          tone: "info"
+        })
+      }
     } catch (error) {
       report(error)
     }
@@ -132,9 +134,13 @@ function LoginPage() {
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body gap-5">
           <div>
-            <h1 className="card-title text-2xl">Sign in</h1>
+            <h1 className="card-title text-2xl">
+              {stage === "email" ? "Sign in" : "Sign in with email code"}
+            </h1>
             <p className="text-sm text-base-content/60">
-              We'll email you a one-time code. No password to remember.
+              {stage === "email"
+                ? "We'll email you a one-time code. No password to remember."
+                : `We sent a one-time code to ${email}.`}
             </p>
             {user?.type === "guest" ? (
               <p className="mt-2 text-sm text-base-content/60">
@@ -153,14 +159,16 @@ function LoginPage() {
               }}
             >
               <fieldset className="fieldset">
-                <legend className="fieldset-legend">Email</legend>
+                <legend className="fieldset-legend">
+                  Email address (lowercase)
+                </legend>
                 <input
                   type="email"
                   required
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
+                  maxLength={100}
                   className="input w-full"
                 />
               </fieldset>
@@ -176,7 +184,7 @@ function LoginPage() {
                 ) : (
                   <>
                     <EnvelopeIcon className="size-4" />
-                    Email me a code
+                    Continue
                   </>
                 )}
               </button>
@@ -205,10 +213,8 @@ function LoginPage() {
                         .toUpperCase()
                     )
                   }
-                  placeholder="A1B2C3"
                   className="input w-full text-center font-mono text-lg tracking-[0.4em]"
                 />
-                <p className="label">Sent to {email}</p>
               </fieldset>
               <button
                 type="submit"
@@ -222,7 +228,7 @@ function LoginPage() {
                 ) : (
                   <>
                     <ArrowRightEndOnRectangleIcon className="size-4" />
-                    Sign in
+                    Continue
                   </>
                 )}
               </button>
@@ -232,7 +238,7 @@ function LoginPage() {
                 className="btn btn-ghost btn-sm w-full"
               >
                 <ArrowLeftIcon className="size-4" />
-                Use a different address
+                Cancel
               </button>
             </form>
           )}

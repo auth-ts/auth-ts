@@ -120,10 +120,10 @@ function VerifyIdentityDialog({
       <div className="modal-box flex flex-col gap-4">
         <h3 className="flex items-center gap-2 text-lg font-semibold">
           <ShieldCheckIcon className="size-5" />
-          Confirm it's you
+          Verify your identity
         </h3>
         <p className="text-sm text-base-content/70">
-          Enter the code we sent to {destination}. It covers this browser for
+          We sent a one-time code to {destination}. It covers this browser for
           the next hour.
         </p>
         {shown ? <NoticeAlert notice={shown} /> : null}
@@ -134,24 +134,26 @@ function VerifyIdentityDialog({
             void submit()
           }}
         >
-          <input
-            autoFocus
-            autoComplete="one-time-code"
-            autoCapitalize="characters"
-            spellCheck={false}
-            required
-            value={code}
-            onChange={(event) =>
-              setCode(
-                event.target.value
-                  .replaceAll(" ", "")
-                  .replaceAll("-", "")
-                  .toUpperCase()
-              )
-            }
-            placeholder="A1B2C3"
-            className="input w-full text-center font-mono text-lg tracking-[0.4em]"
-          />
+          <label className="flex flex-col gap-1 text-sm">
+            Code
+            <input
+              autoFocus
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              spellCheck={false}
+              required
+              value={code}
+              onChange={(event) =>
+                setCode(
+                  event.target.value
+                    .replaceAll(" ", "")
+                    .replaceAll("-", "")
+                    .toUpperCase()
+                )
+              }
+              className="input w-full text-center font-mono text-lg tracking-[0.4em]"
+            />
+          </label>
           <div className="modal-action mt-0 flex-wrap">
             <button
               type="button"
@@ -176,7 +178,7 @@ function VerifyIdentityDialog({
               {submitting ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : null}
-              Confirm
+              Continue
             </button>
           </div>
         </form>
