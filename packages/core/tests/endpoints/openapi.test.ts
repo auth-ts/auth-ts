@@ -30,6 +30,9 @@ describe("the OpenAPI endpoints", () => {
     const reference = await auth.handler(request("GET", "/api/auth/reference"))
     expect(reference.status).toBe(200)
     expect(reference.headers.get("content-type")).toContain("text/html")
+    expect(reference.headers.get("content-security-policy")).toBe(
+      "base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+    )
   })
 
   it("builds the document once per server, not per request", async () => {

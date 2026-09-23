@@ -25,7 +25,12 @@ export const getReference = defineEndpoint({
 
     return {
       data: undefined,
-      headers: new Headers({ "content-type": "text/html; charset=utf-8" }),
+      headers: new Headers({
+        "content-type": "text/html; charset=utf-8",
+        // The author's directives that leave Scalar working
+        "content-security-policy":
+          "base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+      }),
       // The scripts sit inside an explicit body. Left to float, they parse into
       // the head and run while `document.body` is still null, which the viewer
       // mounts into — a blank page and three null dereferences in the console.
