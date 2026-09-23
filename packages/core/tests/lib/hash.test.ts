@@ -42,7 +42,7 @@ describe("scrypt", () => {
     const first = await scryptHash("ABC123")
     const second = await scryptHash("ABC123")
     expect(first).toMatch(
-      /^\$scrypt\$ln=14,r=8,p=1\$[A-Za-z0-9_-]{22}\$[A-Za-z0-9_-]{43}$/
+      /^\$scrypt\$ln=14,r=8,p=1\$[A-Za-z0-9_-]{43}\$[A-Za-z0-9_-]{43}$/
     )
     expect(first).not.toBe(second)
     expect(first).not.toContain("ABC123")
@@ -59,7 +59,7 @@ describe("scrypt", () => {
   })
 
   it("reads the cost from the string, so it can be raised without a migration", async () => {
-    // A row written at a lighter cost still verifies after the default moves.
+    // A row written at a lighter cost and shorter salt still verifies.
     const salt = new Uint8Array(16)
     const key = await scryptDerive("ABC123", salt, { ln: 10, r: 8, p: 1 }, 32)
     const encode = (bytes: Uint8Array) =>

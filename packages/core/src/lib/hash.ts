@@ -75,7 +75,7 @@ export async function scryptDerive(
  * without a migration.
  */
 export async function scryptHash(value: string) {
-  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const salt = crypto.getRandomValues(new Uint8Array(32))
   const key = await scryptDerive(value, salt, SCRYPT, SCRYPT.keyLength)
 
   return `$scrypt$ln=${SCRYPT.ln},r=${SCRYPT.r},p=${SCRYPT.p}$${bytesToBase64url(salt)}$${bytesToBase64url(key)}`

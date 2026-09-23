@@ -16,7 +16,7 @@ at a time, with the overflow rejected rather than reduced: never
 shrinks it. `verificationCode` switches to digits for phones that autofill
 one-time codes, and sets the length.
 
-Stored under **scrypt** at 16 MiB (`N=2^14, r=8, p=1`, a fresh 16-byte salt,
+Stored under **scrypt** at 16 MiB (`N=2^14, r=8, p=1`, a fresh 32-byte salt,
 parameters carried in the string), never as a fast hash. A short code has few
 enough values that a SHA-256 of it falls to a GPU in seconds; at scrypt's cost
 a leaked table takes far longer to reverse than its codes live, and nothing
