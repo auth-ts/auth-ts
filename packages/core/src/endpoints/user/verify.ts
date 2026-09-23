@@ -164,6 +164,7 @@ export const verifyIdentity = defineEndpoint({
     if (!attempt) throw new AuthApiError("invalidCode")
     await markIdentityVerified(internals, {
       sessionId: caller.sessionId,
+      userId: caller.userId,
       code: input.code,
       attempt
     })

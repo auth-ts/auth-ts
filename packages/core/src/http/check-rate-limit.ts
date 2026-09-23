@@ -1,117 +1,112 @@
-import { DEFAULT_GUESS_LIMIT } from "../core/auth-config"
+import { DEFAULT_GUESSES } from "../core/auth-config"
 import type { AuthInternals } from "../core/auth-internals"
-import type { RateLimitWindow } from "../core/auth-options"
+import type { RateLimitBucket } from "../core/auth-options"
 import { insertRow } from "../lib/insert-row"
 import { getIpAddress, getIpAddressKey } from "../lib/ip-address"
 import { parseDuration } from "../lib/parse-duration"
+import { selectOne } from "../lib/select-one"
 import { sweepExpired } from "../lib/sweep-expired"
 import { AuthApiError } from "./auth-api-error"
 
-/**
- * Records one attempt against a key and reports how many that key now holds.
- *
- * Append-and-count: every attempt is an insert under a fresh id, and counting
- * is a bounded read. Inserts never conflict, so nothing is read-modify-written
- * and no attempt can be lost — which is what a counter column would need an
- * atomic increment for, and what a generic `update` with literal values could
- * never express.
- *
- * The insert and the read run together, one round-trip rather than two. A read
- * that raced past its own insert simply counts it back in, so this attempt is
- * always in the number — which the callers' accounting depends on.
- *
- * The read is capped at `limit + 1` because core never needs the exact number,
- * only whether more than `limit` exist. That cap is also what keeps an attacker
- * from turning every request into a ten-thousand-row read.
- *
- * @returns The number of attempts on record, saturating at `limit + 1`.
- */
-export async function countAttempt(
-  internals: AuthInternals,
-  key: string,
-  limit: number
-) {
-  const [inserted, attempts] = await Promise.all([
-    insertRow(internals, "attempts", { key }),
-    internals.db.select({
-      table: "attempts",
-      where: { key: { eq: key } },
-      limit: limit + 1,
-      orderBy: { id: "asc" }
-    })
-  ])
-
-  const counted = attempts.some(({ id }) => id === inserted.id)
-    ? attempts.length
-    : Math.min(attempts.length + 1, limit + 1)
-
-  // The first attempt on a fresh key sweeps, so under a flood — the moment
-  // the table grows fastest — the sweep still runs once per key rather than
-  // once per request. Here rather than in `checkRateLimit`, so wrong-guess
-  // budgets under `rateLimit: false` are collected too.
-  if (counted === 1) {
-    const { rateLimit } = internals.config
-    const windows =
-      rateLimit === false ? [DEFAULT_GUESS_LIMIT] : Object.values(rateLimit)
-    const longest = Math.max(
-      ...windows.map(({ window }) => parseDuration(window))
-    )
-    await sweepExpired(internals, "attempts", {
-      createdAt: { lt: new Date(Date.now() - longest) }
-    })
-  }
-
-  return counted
-}
+/** How many lost races a consume tolerates before refusing. */
+const TRIES = 3
 
 /**
- * Counts one request against a fixed window, throwing when the window is full.
+ * Takes one token from a bucket, throwing when it is empty.
  *
- * Fixed windows rather than a token bucket or sliding log: precision at the
- * window boundary buys nothing against the threats here — email flooding and
- * code guessing, both of which are about volume over minutes. The window is
- * part of the key rather than a column, so counting stays an equality read and
- * a window that has passed is simply a set of old rows waiting for the sweep.
+ * A token bucket rather than a window, as the book asks: `capacity` tokens,
+ * one back every `refill`, so a user who typed one wrong code tries again a
+ * minute later instead of waiting for a window to end. The bucket is a row —
+ * `tokenCount` and `lastRefilledAt` — because on a serverless runtime memory
+ * is not shared between requests.
  *
- * What this does not promise is exactness. Each request's read sees every
- * insert committed before it ran, so N *simultaneous* requests can each read a
- * number below the cap in the instant before the others land. The overshoot is
- * bounded by one burst's concurrency, it cannot be repeated — the moment the
- * burst settles, the rest of the window is refused — and for the threats these
- * windows exist to stop, "perhaps twenty sends instead of three, once" is not a
- * different security posture. An exact counter would need an atomic increment
- * the contract deliberately does not ask for.
+ * Consuming is a read and a conditional write. The update names the
+ * `tokenCount` and `lastRefilledAt` it read, so two requests that read the
+ * same bucket cannot both take the last token: the second finds the row
+ * changed, writes nothing, and reads again. Both values came back from the
+ * store, so a timestamp column of any precision compares equal to itself. A
+ * missing row is inserted with one token spent; two requests that both found
+ * nothing are settled by the unique index on `key`. Losing every retry refuses
+ * the request, which is the safe direction.
  *
- * @throws {AuthApiError} `rateLimited` with the seconds until the window resets.
+ * A refused request writes nothing. A bucket that has refilled is the same as
+ * no row, and the first request on a fresh key deletes every row old enough
+ * to be full — so the table holds only buckets in use.
+ *
+ * @throws {AuthApiError} `rateLimited` with the seconds until the next token.
  */
 export async function checkRateLimit(
   internals: AuthInternals,
   key: string,
-  window: RateLimitWindow
+  bucket: RateLimitBucket
 ) {
-  const now = Date.now()
-  // Windows are aligned to the clock rather than started by the first request,
-  // so every caller counting the same key agrees on which window they are in
-  // without reading a stored `resetAt` first.
-  const windowMs = parseDuration(window.window)
-  const windowStart = Math.floor(now / windowMs) * windowMs
-  const endsAt = new Date(windowStart + windowMs)
+  const refillInterval = parseDuration(bucket.refill)
 
-  const counted = await countAttempt(
-    internals,
-    `${key}:${windowStart}`,
-    window.max
-  )
+  for (let attempt = 0; attempt < TRIES; attempt++) {
+    const now = new Date()
+    const node = await selectOne(internals, "rateLimits", { key: { eq: key } })
 
-  // The count includes this request, so the cap is exceeded at max + 1 — and a
-  // refused request is still counted, which is what stops a caller who is
-  // already over the limit from getting a fresh allowance by continuing.
-  if (counted > window.max) {
-    const retryAfter = Math.max(1, Math.ceil((endsAt.getTime() - now) / 1000))
-    internals.log.warn("rate limit exceeded", { key: key.split(":")[0] })
+    if (!node) {
+      try {
+        await insertRow(internals, "rateLimits", {
+          key,
+          tokenCount: bucket.capacity - 1,
+          lastRefilledAt: now
+        })
+      } catch {
+        continue
+      }
+      const { rateLimit } = internals.config
+      const buckets =
+        rateLimit === false ? [DEFAULT_GUESSES] : Object.values(rateLimit)
+      const fullAfter = Math.max(
+        ...buckets.map(
+          ({ capacity, refill }) => capacity * parseDuration(refill)
+        )
+      )
+      await sweepExpired(internals, "rateLimits", {
+        updatedAt: { lt: new Date(now.getTime() - fullAfter) }
+      })
+      return
+    }
 
-    throw new AuthApiError("rateLimited", { retryAfter })
+    // Bucket arithmetic from the author's limit.go
+    const tokenRefillCount = Math.floor(
+      (now.getTime() - node.lastRefilledAt.getTime()) / refillInterval
+    )
+    const tokenCount = Math.min(
+      node.tokenCount + tokenRefillCount,
+      bucket.capacity
+    )
+    const lastRefilledAt = new Date(
+      node.lastRefilledAt.getTime() + refillInterval * tokenRefillCount
+    )
+
+    if (tokenCount < 1) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil(
+          (lastRefilledAt.getTime() + refillInterval - now.getTime()) / 1000
+        )
+      )
+      internals.log.warn("rate limit exceeded", { key: key.split(":")[0] })
+      throw new AuthApiError("rateLimited", { retryAfter })
+    }
+
+    const [written] = await internals.db.update({
+      table: "rateLimits",
+      where: {
+        id: { eq: node.id },
+        tokenCount: { eq: node.tokenCount },
+        lastRefilledAt: { eq: node.lastRefilledAt }
+      },
+      values: { tokenCount: tokenCount - 1, lastRefilledAt, updatedAt: now }
+    })
+    if (written) return
   }
+
+  internals.log.warn("rate limit contended", { key: key.split(":")[0] })
+  throw new AuthApiError("rateLimited", { retryAfter: 1 })
 }
 
 /**

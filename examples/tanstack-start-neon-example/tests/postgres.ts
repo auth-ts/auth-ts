@@ -5,9 +5,9 @@ import {
 } from "drizzle-kit/api-postgres"
 import { drizzle } from "drizzle-orm/pglite"
 import {
-  attempts,
   identities,
   identitySecrets,
+  rateLimits,
   sessions,
   users,
   verifications
@@ -27,7 +27,7 @@ const statements = await generateMigration(
     users,
     sessions,
     verifications,
-    attempts,
+    rateLimits,
     identities,
     identitySecrets
   })

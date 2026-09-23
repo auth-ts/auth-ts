@@ -1,7 +1,7 @@
 import type { VerificationPurpose } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
-import { checkRateLimit, ipRateLimitKey } from "../http/check-rate-limit"
+import { checkRateLimit } from "../http/check-rate-limit"
 import { randomBytesBase64url, randomCode } from "../lib/generate-random"
 import { scryptHash, sha256Hex } from "../lib/hash"
 import { insertRow } from "../lib/insert-row"
@@ -54,11 +54,11 @@ export interface SendVerificationCodeInput {
  * Every send is its own attempt: a fresh token goes back to the caller, and
  * the code can only be redeemed by whoever presents it. Nothing is deleted on
  * send, so a stranger requesting a code for your address cannot replace or
- * spend the one you are holding. That is what makes it safe to never limit
- * sends per address — the only per-address limit is on guesses.
+ * spend the one you are holding. Sends are limited per address, as the
+ * author's app limits mail: five, then one every half hour, whoever asks.
  *
  * @returns The attempt token the caller must present with the code.
- * @throws {AuthApiError} `rateLimited` when the per-IP limit is exceeded.
+ * @throws {AuthApiError} `rateLimited` when the address has had its sends.
  */
 export async function sendVerificationCode(
   internals: AuthInternals,
@@ -68,9 +68,11 @@ export async function sendVerificationCode(
   const { deliverTo, key, purpose, locale, headers } = input
 
   if (config.rateLimit !== false) {
-    const ipKey = ipRateLimitKey(internals, headers, "sendCode")
-    if (ipKey)
-      await checkRateLimit(internals, ipKey, config.rateLimit.sendCodePerIP)
+    await checkRateLimit(
+      internals,
+      `send:${deliverTo.value}`,
+      config.rateLimit.sends
+    )
   }
 
   const attempt = randomBytesBase64url(32)

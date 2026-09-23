@@ -64,7 +64,7 @@ export const signInAsGuest = defineEndpoint({
     if (config.rateLimit !== false) {
       const ipKey = ipRateLimitKey(internals, headers, "guest")
       if (ipKey)
-        await checkRateLimit(internals, ipKey, config.rateLimit.guestPerIP)
+        await checkRateLimit(internals, ipKey, config.rateLimit.guestsPerIP)
     }
 
     // A browser that is signed in never becomes a guest on top of it: the

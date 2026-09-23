@@ -263,40 +263,46 @@ export interface UserOptions<
   additionalFields?: S
 }
 
-/** One fixed-window rate limit. */
-export interface RateLimitWindow {
-  max: number
-  window: Duration
+/** A token bucket: `capacity` tokens, one back every `refill`. */
+export interface RateLimitBucket {
+  capacity: number
+  refill: Duration
 }
 
 /**
- * Built-in abuse limits, on by default.
+ * Built-in abuse limits, on by default — the book's token buckets, keyed the
+ * way the author's app keys them: on the user or the address, and on the
+ * client's IP only where nothing else identifies the caller.
  *
- * Scope is authentication abuse only — email spam and credential brute force.
- * This is not a general API limiter; broad limits belong in infrastructure in
- * front of everything, these routes included.
+ * Scope is authentication abuse only — email spam and code guessing. This is
+ * not a general API limiter; broad limits belong in infrastructure in front of
+ * everything, these routes included.
  */
 export interface RateLimitOptions {
   /**
-   * Guesses at codes for one email address or phone number, from anyone.
+   * Wrong codes per address when signing in, per user when confirming
+   * identity, from anyone.
    *
    * The one limit that bounds brute force: a code is bound to the client that
    * requested it, so this is the only budget an attacker can spend against an
-   * address. Under attack the real user's guess may be refused for the rest of
-   * the window; requesting a code never is. Stays on under `rateLimit: false`,
+   * address. Under attack the real user waits a minute for a token; requesting
+   * a code is never refused on their behalf. Stays on under `rateLimit: false`,
    * because nothing in front of this server can key on the address.
-   * @default { max: 5, window: "5m" }
+   * @default { capacity: 5, refill: "1m" }
    */
-  guessPerIdentifier?: RateLimitWindow
-  /** @default { max: 30, window: "10m" } */
-  sendCodePerIP?: RateLimitWindow
+  guesses?: RateLimitBucket
   /**
-   * Guesses from one address, across every identifier: blocks spraying.
-   * @default { max: 30, window: "10m" }
+   * Codes sent to one address, from anyone: five, then one every half hour,
+   * as the author's app limits mail to an address.
+   * @default { capacity: 5, refill: "30m" }
    */
-  signInCodePerIP?: RateLimitWindow
-  /** @default { max: 30, window: "10m" } */
-  guestPerIP?: RateLimitWindow
+  sends?: RateLimitBucket
+  /**
+   * Guest sign-ins from one client address — the one bucket keyed on the IP,
+   * because a guest has nothing else to key on. GoTrue's default.
+   * @default { capacity: 30, refill: "2m" }
+   */
+  guestsPerIP?: RateLimitBucket
 }
 
 /**
@@ -403,14 +409,13 @@ export interface AuthOptions<
   /**
    * Set `false` to disable the built-in limiter and bring your own.
    *
-   * That turns off the per-IP windows. Turning them off is the recommended
-   * posture when something in front of this server already limits
-   * `/sign-in/send-code` and `/sign-in/code` — a Cloudflare rule or a Durable
-   * Object counts a burst more precisely than a database round trip can, and
-   * stops it before it reaches you at all.
+   * That turns off `sends` and `guestsPerIP`. Turning them off is the
+   * recommended posture when something in front of this server already limits
+   * `/sign-in/send-code` and `/sign-in/guest` — a Cloudflare rule or a Durable
+   * Object stops a burst before it reaches you at all.
    *
-   * `guessPerIdentifier` stays on regardless: it is what makes a short code
-   * safe, and nothing in front of this server can key on the address.
+   * `guesses` stays on regardless: it is what makes a short code safe, and
+   * nothing in front of this server can key on the address.
    */
   rateLimit?: RateLimitOptions | false
   /** Alphabet and length of the codes `sendCode` delivers. */

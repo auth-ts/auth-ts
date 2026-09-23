@@ -32,14 +32,14 @@ cost of not having an adapter package.
 | `users` | `id`, `email`, `phoneNumber`, `name`, `image`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
 | `sessions` | `id`, `userId`, `secretHash`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | | `userId`, `updatedAt` | `updatedAt` |
 | `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `createdAt`, `updatedAt` | | `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
-| `attempts` | `id`, `key`, `createdAt`, `updatedAt` | | `key`, `createdAt` | `createdAt` |
+| `rateLimits` | `id`, `key`, `tokenCount`, `lastRefilledAt`, `createdAt`, `updatedAt` | `key` | `updatedAt` | `updatedAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
 | `identitySecrets` | `id`, `identityId`, `accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |
 
 **Three of these tables are yours to query. Three are not.**
 
 > `users`, `sessions`, and `identities` are yours to query.
-> `verifications`, `attempts`, and `identitySecrets` are never granted.
+> `verifications`, `rateLimits`, and `identitySecrets` are never granted.
 
 Nothing in the first three can authenticate anyone. The session token is
 `id.secret`; `sessions.id` is an address and `sessions.secretHash` is a SHA-256
@@ -148,10 +148,10 @@ index, because the missing constraint only shows under a race.
   empty array. That single atomic conditional delete is the one concurrency
   property this contract asks of your store.
 - **`delete` with a range is the sweep.** The library cleans up after itself by
-  issuing `delete` where `updatedAt` (or `createdAt`, for `attempts`) is
-  `{ lt: cutoff }`, on the requests that insert new rows: a sign-in sweeps
-  `sessions`, a code send sweeps `verifications`, the first attempt of each
-  rate-limit window sweeps `attempts`. There is nothing extra to implement and
+  issuing `delete` where `updatedAt` is `{ lt: cutoff }`, on the requests
+  that insert new rows: a sign-in sweeps `sessions`, a code send sweeps
+  `verifications`, the first request on a fresh rate-limit key sweeps
+  `rateLimits`. There is nothing extra to implement and
   no schedule to own — but it does mean the index on that timestamp is
   load-bearing for those tables, not just for reads. Pass `waitUntil` to
   [`createAuth`](/docs/reference/create-auth) and the sweep runs
@@ -173,29 +173,29 @@ index, because the missing constraint only shows under a race.
      and not exists (select 1 from "sessions" s where s."userId" = u."id");
   ```
 
-## Rate limiting is a log, not a counter
+## Rate limiting is a bucket per key
 
-The `attempts` table holds one row per counted request, under a key that
-contains the window: `sendCode:ip:203.0.113.7:1755864000000`. Counting is an
-insert and a read capped at `max + 1`; a window that has passed is simply a set
-of old rows, and the first attempt of each fresh window is what sweeps them —
-once per key per window, never once per request, so a flood cannot amplify its
-own bookkeeping. Nothing is read-modify-written, so no attempt
-can be lost and no atomic increment is required of your store — which is what
-lets rate limiting stay inside these four functions instead of needing a
-special-purpose fifth.
+The `rateLimits` table holds one row per token bucket — the book's design, and
+the author's `bucketNodeStruct` as a row: `key`, `tokenCount`, `lastRefilledAt`.
+Taking a token is a `select` by key, the refill arithmetic, and an `update`
+whose `where` names the `tokenCount` and `lastRefilledAt` it just read. Only one
+of two simultaneous requests finds the row as it was; the other writes nothing
+and reads again, and after three lost races is refused. That is a
+compare-and-swap built from `{ eq }` and the rule that `update` returns what it
+wrote, so no atomic increment is required of your store — which is what lets
+rate limiting stay inside these four functions instead of needing a
+special-purpose fifth. Both compared values came back from your store, so a
+timestamp column of any precision compares equal to itself.
 
-The honest trade: this is not exact. Each request's read sees every insert
-committed before it ran, so requests that are genuinely simultaneous can each
-read a number below the cap in the instant before the others land. The overshoot
-is bounded by that burst's concurrency and cannot be repeated — once it settles,
-the rest of the window is refused. For the guess limit that is roughly twenty
-guesses instead of five, once, against a billion values.
+A missing row is inserted with one token spent; two requests that both found
+nothing are settled by the unique index on `key`, which is why it is required.
+A refused request writes nothing, and a bucket that has refilled is the same as
+no row: the first request on a fresh key deletes every row old enough to be
+full, so the table holds only buckets in use.
 
-If you want exactness, put it in front: a rule at your edge on `/sign-in/send-code`
-and `/sign-in/code` counts a burst more precisely than any database round trip, and
-you can then set `rateLimit: false`. The per-address guess limit stays on
-regardless — nothing in front of this server can key on the address.
+If you already limit `/sign-in/send-code` and `/sign-in/guest` at your edge, set
+`rateLimit: false`. The guess bucket stays on regardless — nothing in front of
+this server can key on the address.
 
 ## Writing your implementation
 
@@ -211,7 +211,7 @@ the whole read path from the reference application:
 ```ts
 import { defineAuthDatabase } from "@auth-ts/core"
 
-import { attempts, identities, identitySecrets, sessions, users, verifications } from "./db/schema"
+import { identities, identitySecrets, rateLimits, sessions, users, verifications } from "./db/schema"
 
 // Checked, not widened: a missing table fails here, and each table keeps its
 // own type. This is also where a schema whose names differ gets mapped.
@@ -219,7 +219,7 @@ const authSchema = {
   users,
   sessions,
   verifications,
-  attempts,
+  rateLimits,
   identities,
   identitySecrets
 } satisfies Record<AuthTable, AnyPgTable>
@@ -286,9 +286,9 @@ export const authDatabase = defineAuthDatabase({
           where.email?.eq,
           limit
         ])
-      // and AuthWhere<"date", S, "attempts"> in this one.
-      case "attempts":
-        return run(`select * from attempts where key = $1 limit $2`, [
+      // and AuthWhere<"date", S, "rateLimits"> in this one.
+      case "rateLimits":
+        return run(`select * from "rateLimits" where key = $1 limit $2`, [
           where.key?.eq,
           limit
         ])
@@ -375,7 +375,7 @@ The core fields of a user. Your declared additional fields sit beside them on
 
 <auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthVerification" />
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthAttempt" />
+<auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthRateLimit" />
 
 <auto-type-table path="../../../../../packages/core/src/core/auth-database.ts" name="AuthIdentity" />
 

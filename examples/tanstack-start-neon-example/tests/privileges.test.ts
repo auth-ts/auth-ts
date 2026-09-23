@@ -11,11 +11,12 @@ import * as schema from "../src/db/schema"
 const client = new PGlite()
 
 /** RLS with no policy denies everything. */
-const SERVER_ONLY = ["verifications", "attempts", "identitySecrets"]
+const SERVER_ONLY = ["verifications", "rateLimits", "identitySecrets"]
 
 /** Denial needs a row to deny. */
 const seedRow: Record<string, string> = {
-  attempts: `insert into "attempts" ("key") values ('k')`,
+  rateLimits: `insert into "rateLimits" ("key", "tokenCount", "lastRefilledAt")
+               values ('k', 4, now())`,
   verifications: `insert into "verifications"
                     ("identifier", "codeHash", "attemptHash", "purpose")
                   values ('a@example.test', 'x', 'y', 'signIn')`,

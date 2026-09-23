@@ -1,5 +1,4 @@
 import { AuthApiError } from "../../http/auth-api-error"
-import { checkRateLimit, ipRateLimitKey } from "../../http/check-rate-limit"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { readBody } from "../../http/read-body"
 import { validateAdditionalFields } from "../../http/validate-additional-fields"
@@ -99,23 +98,13 @@ export const signInWithCode = defineEndpoint({
       input.additionalFields
     )
 
-    if (internals.config.rateLimit !== false) {
-      const ipKey = ipRateLimitKey(internals, headers, "signInCode")
-      if (ipKey) {
-        await checkRateLimit(
-          internals,
-          ipKey,
-          internals.config.rateLimit.signInCodePerIP
-        )
-      }
-    }
-
     const [, active] = await Promise.all([
       consumeVerificationCode(internals, {
         identifier: identifier.value,
         code: input.code,
         purpose: "signIn",
-        attempt: readAttempt(input, "signIn")
+        attempt: readAttempt(input, "signIn"),
+        guessKey: identifier.value
       }),
       resolveCallerSession(internals, input)
     ])

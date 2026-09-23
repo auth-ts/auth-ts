@@ -15,6 +15,8 @@ const VERIFIED = "verified"
 /** What verifying an identity code needs to know. */
 export interface VerifyIdentityCodeInput {
   sessionId: string
+  /** Whose guess budget this spends. */
+  userId: string
   code: string
   attempt: string | null
 }
@@ -37,7 +39,8 @@ export async function markIdentityVerified(
     identifier: input.sessionId,
     code: input.code,
     purpose: "identity",
-    attempt: input.attempt
+    attempt: input.attempt,
+    guessKey: input.userId
   })
 
   const [marked] = await internals.db.update({

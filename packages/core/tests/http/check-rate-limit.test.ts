@@ -1,115 +1,147 @@
 import { describe, expect, it, vi } from "vitest"
-import { checkRateLimit, countAttempt } from "../../src/http/check-rate-limit"
+import { checkRateLimit } from "../../src/http/check-rate-limit"
 import { createTestInternals } from "../helpers/create-test-internals"
-import { selectRows } from "../helpers/rows"
+import { required } from "../helpers/required"
+import { selectRow, selectRows } from "../helpers/rows"
 
-const KEY = "sendCode:ip:203.0.113.7"
-const WINDOW = { max: 3, window: "10m" } as const
+const KEY = "send:ada@example.com"
+const BUCKET = { capacity: 3, refill: "1m" } as const
 
 describe("checkRateLimit", () => {
-  it("counts every request, including the ones it refuses", async () => {
-    const { internals, db } = await createTestInternals()
+  it("hands out capacity tokens, then refuses with the time to the next one", async () => {
+    vi.useFakeTimers()
+    try {
+      const { internals, db } = await createTestInternals()
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await checkRateLimit(internals, KEY, WINDOW)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await checkRateLimit(internals, KEY, BUCKET)
+      }
+      vi.advanceTimersByTime(15_000)
+      await expect(
+        checkRateLimit(internals, KEY, BUCKET)
+      ).rejects.toMatchObject({ code: "rateLimited", retryAfter: 45 })
+
+      // One bucket, one row, however many requests.
+      const rows = await selectRows(db, "rateLimits")
+      expect(rows).toHaveLength(1)
+      expect(required(rows[0], "bucket").tokenCount).toBe(0)
+    } finally {
+      vi.useRealTimers()
     }
-    await expect(checkRateLimit(internals, KEY, WINDOW)).rejects.toMatchObject({
+  })
+
+  it("refills one token per interval and never past capacity", async () => {
+    vi.useFakeTimers()
+    try {
+      const { internals, db } = await createTestInternals()
+      const tokens = async () =>
+        required(
+          await selectRow(db, "rateLimits", { key: { eq: KEY } }),
+          "bucket"
+        ).tokenCount
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await checkRateLimit(internals, KEY, BUCKET)
+      }
+      expect(await tokens()).toBe(0)
+
+      vi.advanceTimersByTime(60_000)
+      await checkRateLimit(internals, KEY, BUCKET)
+      expect(await tokens()).toBe(0)
+      await expect(
+        checkRateLimit(internals, KEY, BUCKET)
+      ).rejects.toMatchObject({ code: "rateLimited" })
+
+      // An hour idle refills to capacity, not to sixty.
+      vi.advanceTimersByTime(60 * 60_000)
+      await checkRateLimit(internals, KEY, BUCKET)
+      expect(await tokens()).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("writes nothing when it refuses", async () => {
+    const { internals, db } = await createTestInternals()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await checkRateLimit(internals, KEY, BUCKET)
+    }
+    const updates = vi.spyOn(db, "update")
+    const inserts = vi.spyOn(db, "insert")
+
+    await expect(checkRateLimit(internals, KEY, BUCKET)).rejects.toMatchObject({
       code: "rateLimited"
     })
 
-    // A refused request still leaves its row, so continuing to hammer the
-    // endpoint cannot win back an allowance.
-    expect(await selectRows(db, "attempts")).toHaveLength(4)
+    expect(updates).not.toHaveBeenCalled()
+    expect(inserts).not.toHaveBeenCalled()
   })
 
-  it("sweeps only on the first attempt of a window, so a flood cannot amplify it", async () => {
+  it("never hands out more than capacity under concurrency", async () => {
+    // Every consumer reads the same bucket; the conditional update lets only
+    // one of them take each token, and the losers read again.
     const { internals, db } = await createTestInternals()
-    const deletes = vi.spyOn(db, "delete")
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await checkRateLimit(internals, KEY, WINDOW)
+    const originalUpdate = db.update.bind(db)
+    db.update = async (input) => {
+      await new Promise((resolve) => setTimeout(resolve, 2))
+      return originalUpdate(input)
     }
+    await checkRateLimit(internals, KEY, BUCKET)
 
+    const results = await Promise.allSettled(
+      Array.from({ length: 10 }, () => checkRateLimit(internals, KEY, BUCKET))
+    )
+
+    const admitted = results.filter((result) => result.status === "fulfilled")
+    expect(admitted.length).toBeGreaterThanOrEqual(1)
+    expect(admitted.length).toBeLessThanOrEqual(2)
     expect(
-      deletes.mock.calls.filter(([input]) => input.table === "attempts")
-    ).toHaveLength(1)
+      required(
+        await selectRow(db, "rateLimits", { key: { eq: KEY } }),
+        "bucket"
+      ).tokenCount
+    ).toBe(2 - admitted.length)
   })
 
-  it("sweeps from countAttempt itself, so wrong-guess rows are collected under rateLimit: false", async () => {
-    const { internals, db } = await createTestInternals()
-    const deletes = vi.spyOn(db, "delete")
-
-    await countAttempt(internals, "verificationCode:attempts:hash", 5)
-
-    expect(
-      deletes.mock.calls.filter(([input]) => input.table === "attempts")
-    ).toHaveLength(1)
-  })
-
-  it("loses no attempt under concurrency, because attempts are only ever appended", async () => {
-    // A read-increment-write counter loses parallel attempts.
+  it("settles two first requests on a fresh key through the unique key", async () => {
     const { internals, db } = await createTestInternals()
     const originalInsert = db.insert.bind(db)
     db.insert = async (input) => {
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      await new Promise((resolve) => setTimeout(resolve, 2))
       return originalInsert(input)
     }
 
-    await Promise.allSettled(
-      Array.from({ length: 10 }, () => checkRateLimit(internals, KEY, WINDOW))
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () => checkRateLimit(internals, KEY, BUCKET))
     )
 
-    expect(await selectRows(db, "attempts")).toHaveLength(10)
-    // Once the burst settles the window is over-full, so everything after it
-    // is refused. The overshoot is bounded by the burst itself, which is the
-    // trade append-and-count makes and the docs state.
-    await expect(checkRateLimit(internals, KEY, WINDOW)).rejects.toMatchObject({
-      code: "rateLimited"
-    })
+    expect(
+      results.filter((result) => result.status === "fulfilled").length
+    ).toBeGreaterThanOrEqual(1)
+    expect(await selectRows(db, "rateLimits")).toHaveLength(1)
   })
 
-  it("reports retryAfter from the end of the window, not from a stored row", async () => {
-    const { internals } = await createTestInternals()
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await checkRateLimit(internals, KEY, WINDOW)
-    }
+  it("sweeps full buckets on a fresh key only, so a flood cannot amplify it", async () => {
+    vi.useFakeTimers()
+    try {
+      const { internals, db } = await createTestInternals()
+      const deletes = vi.spyOn(db, "delete")
 
-    await expect(checkRateLimit(internals, KEY, WINDOW)).rejects.toMatchObject({
-      code: "rateLimited",
-      retryAfter: expect.any(Number)
-    })
-  })
-
-  it("puts the window in the key, so a new window is a new set of rows", async () => {
-    const window = { max: 1, window: "1s" } as const
-    // The sweep collects rows older than the longest configured window.
-    const { internals, db } = await createTestInternals({
-      rateLimit: {
-        guessPerIdentifier: window,
-        sendCodePerIP: window,
-        signInCodePerIP: window,
-        guestPerIP: window
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await checkRateLimit(internals, KEY, BUCKET)
       }
-    })
+      expect(
+        deletes.mock.calls.filter(([input]) => input.table === "rateLimits")
+      ).toHaveLength(1)
 
-    await checkRateLimit(internals, KEY, window)
-    await expect(checkRateLimit(internals, KEY, window)).rejects.toMatchObject({
-      code: "rateLimited"
-    })
+      // Long enough for every configured bucket to have refilled.
+      vi.advanceTimersByTime(3 * 60 * 60_000)
+      await checkRateLimit(internals, "send:grace@example.com", BUCKET)
 
-    // Windows are aligned to the clock rather than started by the first
-    // request, so crossing the boundary is what resets the count — no stored
-    // `resetAt` is read, and nothing has to be written back. The first attempt
-    // of the fresh window also sweeps, and every window here is a second long,
-    // so the spent window's rows are gone.
-    await new Promise((resolve) => setTimeout(resolve, 1100))
-    await expect(
-      checkRateLimit(internals, KEY, window)
-    ).resolves.toBeUndefined()
-
-    const keys = new Set(
-      (await selectRows(db, "attempts")).map((row) => row.key)
-    )
-    expect(keys.size).toBe(1)
+      const keys = (await selectRows(db, "rateLimits")).map((row) => row.key)
+      expect(keys).toEqual(["send:grace@example.com"])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -45,6 +45,25 @@ async function refuses(attempt: () => Promise<unknown>, message: string) {
 const future = () => new Date(Date.now() + 60_000)
 const past = () => new Date(Date.now() - 60_000)
 
+/** A verification row that only varies in when it was created. */
+const code = (identifier: string, createdAt = new Date()) => ({
+  identifier,
+  codeHash: unique(),
+  attemptHash: unique(),
+  purpose: "signIn" as const,
+  createdAt,
+  updatedAt: new Date()
+})
+
+/** A rate-limit bucket with one token spent. */
+const bucket = (key: string) => ({
+  key,
+  tokenCount: 4,
+  lastRefilledAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date()
+})
+
 /** Every column core writes on a users row, so a check varies only what it means to. */
 const person = (fields: Record<string, unknown> = {}) => ({
   createdAt: new Date(),
@@ -181,18 +200,18 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
   {
     name: "select honours limit and both directions of orderBy",
     async run(db) {
-      const key = unique()
+      const identifier = `${unique()}@example.test`
       const times = [3, 1, 2].map(
         (minutes) => new Date(Date.now() + minutes * 60_000)
       )
       for (const createdAt of times) {
-        await create(db, "attempts", { key, createdAt, updatedAt: new Date() })
+        await create(db, "verifications", code(identifier, createdAt))
       }
       try {
         const page = (direction: "asc" | "desc", limit: number) =>
           db.select({
-            table: "attempts",
-            where: { key: { eq: key } },
+            table: "verifications",
+            where: { identifier: { eq: identifier } },
             limit,
             orderBy: { createdAt: direction }
           })
@@ -216,7 +235,10 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           "limit did not cap from the start of the order"
         )
       } finally {
-        await db.delete({ table: "attempts", where: { key: { eq: key } } })
+        await db.delete({
+          table: "verifications",
+          where: { identifier: { eq: identifier } }
+        })
       }
     }
   },
@@ -253,21 +275,21 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
   {
     name: "a range matches on order, and only within its bounds",
     async run(db) {
-      const key = unique()
+      const identifier = `${unique()}@example.test`
       const times = [1, 2, 3].map(
         (minutes) => new Date(Date.now() + minutes * 60_000)
       )
       for (const createdAt of times) {
-        await create(db, "attempts", { key, createdAt, updatedAt: new Date() })
+        await create(db, "verifications", code(identifier, createdAt))
       }
       const [first, second, third] = times as [Date, Date, Date]
       try {
         const count = async (
-          where: AuthWhere<"date", AdditionalFieldsSchema, "attempts">
+          where: AuthWhere<"date", AdditionalFieldsSchema, "verifications">
         ) =>
           (
             await db.select({
-              table: "attempts",
+              table: "verifications",
               where,
               limit: 10,
               orderBy: { createdAt: "asc" }
@@ -275,30 +297,45 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           ).length
 
         expect(
-          (await count({ key: { eq: key }, createdAt: { gt: second } })) === 1,
+          (await count({
+            identifier: { eq: identifier },
+            createdAt: { gt: second }
+          })) === 1,
           "gt must exclude its own bound and everything below it"
         )
         expect(
-          (await count({ key: { eq: key }, createdAt: { lt: second } })) === 1,
+          (await count({
+            identifier: { eq: identifier },
+            createdAt: { lt: second }
+          })) === 1,
           "lt must exclude its own bound and everything above it"
         )
         expect(
           (await count({
-            key: { eq: key },
+            identifier: { eq: identifier },
             createdAt: { gt: first, lt: third }
           })) === 1,
           "lt and gt together must bound both ends"
         )
         expect(
-          (await count({ key: { eq: key }, createdAt: { gt: third } })) === 0,
+          (await count({
+            identifier: { eq: identifier },
+            createdAt: { gt: third }
+          })) === 0,
           "a range past every row must match nothing"
         )
         expect(
-          (await count({ key: { eq: key }, createdAt: { eq: second } })) === 1,
+          (await count({
+            identifier: { eq: identifier },
+            createdAt: { eq: second }
+          })) === 1,
           "eq on createdAt must still compare for equality, not order"
         )
       } finally {
-        await db.delete({ table: "attempts", where: { key: { eq: key } } })
+        await db.delete({
+          table: "verifications",
+          where: { identifier: { eq: identifier } }
+        })
       }
     }
   },
@@ -394,6 +431,49 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           ),
         { email }
       )
+    }
+  },
+  {
+    name: "rateLimits.key is unique",
+    async run(db) {
+      const key = unique()
+      await create(db, "rateLimits", bucket(key))
+      try {
+        await refuses(
+          () => db.insert({ table: "rateLimits", values: bucket(key) }),
+          "two buckets were stored under one key. Two first requests on a fresh key both find nothing and both insert; this constraint is what makes the loser read again instead of starting a second bucket."
+        )
+      } finally {
+        await db.delete({ table: "rateLimits", where: { key: { eq: key } } })
+      }
+    }
+  },
+  {
+    name: "update matches on every column it is given, so a stale bucket write changes nothing",
+    async run(db) {
+      const seen = await create(db, "rateLimits", bucket(unique()))
+      try {
+        await db.update({
+          table: "rateLimits",
+          where: { id: { eq: seen.id } },
+          values: { tokenCount: 3 }
+        })
+        const stale = await db.update({
+          table: "rateLimits",
+          where: {
+            id: { eq: seen.id },
+            tokenCount: { eq: 4 },
+            lastRefilledAt: { eq: seen.lastRefilledAt }
+          },
+          values: { tokenCount: 3 }
+        })
+        expect(
+          stale.length === 0,
+          "an update naming tokenCount matched a row whose tokenCount had moved on. A token is taken by writing only if the row is as it was read; a stale write that lands hands the same token out twice."
+        )
+      } finally {
+        await db.delete({ table: "rateLimits", where: { id: { eq: seen.id } } })
+      }
     }
   },
   {
@@ -505,7 +585,7 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
           removed.length === 1 &&
             removed[0] !== undefined &&
             removed[0].updatedAt.getTime() < Date.now(),
-          "deleting where updatedAt is past a bound must remove exactly the old row. The sweep that keeps sessions, codes, and attempts from accumulating is this one delete."
+          "deleting where updatedAt is past a bound must remove exactly the old row. The sweep that keeps sessions, codes, and rate-limit buckets from accumulating is this one delete."
         )
 
         const left = await db.select({

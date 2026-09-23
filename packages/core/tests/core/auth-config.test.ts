@@ -148,7 +148,7 @@ describe("construction failures", () => {
 
   it("warns at construction only when tracking is off, not by default", () => {
     // Deriving an address needs no configuration, so the default must not nag.
-    // Turning tracking off leaves the per-IP limits configured and inert, which
+    // Turning tracking off leaves the guest limit configured and inert, which
     // is the one case construction can see; a deployment where no usable header
     // ever arrives is a request-time discovery, warned about there.
     const warnings = (overrides: Record<string, unknown>) => {
@@ -160,7 +160,7 @@ describe("construction failures", () => {
         },
         ...overrides
       })
-      return calls.filter((message) => message.includes("per-IP rate limits"))
+      return calls.filter((message) => message.includes("per-IP rate limit"))
     }
 
     expect(warnings({})).toHaveLength(0)
@@ -212,9 +212,9 @@ describe("construction failures", () => {
     expect(() =>
       createAuth({
         ...baseOptions(),
-        rateLimit: { sendCodePerIP: { max: 30, window: "1 month" } }
+        rateLimit: { sends: { capacity: 30, refill: "1 month" } }
       })
-    ).toThrow(/rateLimit.sendCodePerIP.window/)
+    ).toThrow(/rateLimit.sends.refill/)
   })
 
   it("rejects a token or session lifetime under one second, which rounds to zero", () => {
@@ -255,9 +255,9 @@ describe("construction failures", () => {
     expect(() =>
       createAuth({
         ...baseOptions(),
-        rateLimit: { sendCodePerIP: { max: 30, window: "-10m" } }
+        rateLimit: { sends: { capacity: 30, refill: "-10m" } }
       })
-    ).toThrow(/rateLimit\.sendCodePerIP\.window/)
+    ).toThrow(/rateLimit\.sends\.refill/)
   })
 
   it("rejects a duration too large for a Date, naming the option", () => {
@@ -269,23 +269,22 @@ describe("construction failures", () => {
     ).toThrow(/session\.ttl.*out of range/)
   })
 
-  it("rejects a zero rate-limit window, which would silently disable the limit", () => {
-    // The store resets the count whenever `resetAt <= now()`, so a window that
-    // ends the instant it starts counts every request as the first one, so
-    // zero is never a setting here — only a mistake.
+  it("rejects a zero refill, which would silently disable the limit", () => {
+    // A bucket that refills in no time is always full, so zero is never a
+    // setting here — only a mistake.
     expect(() =>
       createAuth({
         ...baseOptions(),
-        rateLimit: { sendCodePerIP: { max: 30, window: "0s" } }
+        rateLimit: { sends: { capacity: 30, refill: "0s" } }
       })
-    ).toThrow(/rateLimit\.sendCodePerIP\.window must be a positive duration/)
+    ).toThrow(/rateLimit\.sends\.refill must be a positive duration/)
     // Sub-millisecond rounds to the same thing once added to a Date.
     expect(() =>
       createAuth({
         ...baseOptions(),
-        rateLimit: { signInCodePerIP: { max: 30, window: "0.0001s" } }
+        rateLimit: { guesses: { capacity: 30, refill: "0.0001s" } }
       })
-    ).toThrow(/rateLimit\.signInCodePerIP\.window must be a positive duration/)
+    ).toThrow(/rateLimit\.guesses\.refill must be a positive duration/)
   })
 
   it("defaults the verification code to six alphanumeric symbols and bounds the length", () => {
@@ -314,19 +313,19 @@ describe("construction failures", () => {
     ).toThrow(/verificationCode\.alphabet/)
   })
 
-  it("rejects a non-positive or fractional rate-limit max", () => {
+  it("rejects a non-positive or fractional bucket capacity", () => {
     expect(() =>
       createAuth({
         ...baseOptions(),
-        rateLimit: { sendCodePerIP: { max: 0, window: "10m" } }
+        rateLimit: { sends: { capacity: 0, refill: "10m" } }
       })
-    ).toThrow(/rateLimit.sendCodePerIP.max/)
+    ).toThrow(/rateLimit.sends.capacity/)
     expect(() =>
       createAuth({
         ...baseOptions(),
-        rateLimit: { signInCodePerIP: { max: 2.5, window: "10m" } }
+        rateLimit: { guesses: { capacity: 2.5, refill: "10m" } }
       })
-    ).toThrow(/rateLimit.signInCodePerIP.max/)
+    ).toThrow(/rateLimit.guesses.capacity/)
   })
 
   it("refuses sub, iat, and exp as configured default claims", () => {
@@ -458,11 +457,11 @@ describe("construction failures", () => {
     // read `.max` off `undefined` and every send failed with internalError.
     const { config } = createAuth({
       ...baseOptions(),
-      rateLimit: { sendCodePerIP: undefined }
+      rateLimit: { sends: undefined }
     })
 
     expect(config.rateLimit).toMatchObject({
-      sendCodePerIP: { max: 30, window: "10m" }
+      sends: { capacity: 5, refill: "30m" }
     })
   })
 
@@ -543,12 +542,13 @@ describe("resolved defaults", () => {
   it("merges partial rate limits over the defaults", () => {
     const { config } = createAuth({
       ...baseOptions(),
-      rateLimit: { guessPerIdentifier: { max: 9, window: "1h" } }
+      rateLimit: { guesses: { capacity: 9, refill: "1h" } }
     })
 
     expect(config.rateLimit).toMatchObject({
-      guessPerIdentifier: { max: 9, window: "1h" },
-      sendCodePerIP: { max: 30, window: "10m" }
+      guesses: { capacity: 9, refill: "1h" },
+      sends: { capacity: 5, refill: "30m" },
+      guestsPerIP: { capacity: 30, refill: "2m" }
     })
   })
 

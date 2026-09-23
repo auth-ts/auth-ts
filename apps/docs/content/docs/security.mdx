@@ -57,24 +57,28 @@ outage leaves nothing bound to the token the person is about to present.
 
 ## Rate limiting
 
-On by default, backed by your database through one insert and one bounded read —
-approximate under a simultaneous burst, by design, in the way described below.
-Sending is limited per IP, guessing per address and per IP, and guest sign-in
-per IP. Nothing is limited per account except guesses, so an attacker cannot
-lock an address out of receiving codes.
+On by default, and the book's design: a token bucket per key, five tokens and
+one back every minute for guesses, keyed the way the author's app keys its
+buckets — on the address for a sign-in code, on the user for an identity code,
+on the address for sends (five, then one every half hour). The one bucket keyed
+on the client's IP is guest sign-in, because a guest has nothing else to key
+on; its default is GoTrue's thirty an hour.
 
-Each counted request appends a row to `attempts` under a key containing the
-window, and the check reads at most `max + 1` of them. Nothing is
-read-modify-written, so no request can be lost — but the count is not exact
-either: requests that are genuinely simultaneous can each read a number below
-the cap before the others land. The overshoot is bounded by that one burst and
-cannot be repeated. If you want exactness, enforce it at your edge on
-`/sign-in/send-code` and `/sign-in/code` and set `rateLimit: false`; the
-per-address guess limit stays on regardless, because nothing in front of this
-server can key on the address.
+Each bucket is one row in `rateLimits`: `tokenCount` and `lastRefilledAt`.
+Taking a token is a read and an update that names both values it read, so two
+requests that read the same bucket cannot both take the last token — the second
+finds the row changed, writes nothing, and reads again; after three lost races
+it is refused, which is the safe direction. No atomic increment is asked of your
+store, and no failed attempts are tracked, as the book says they need not be. A
+refused request writes nothing; a bucket that has refilled is the same as no
+row, and the first request on a fresh key deletes rows old enough to be full.
 
-Scope is authentication abuse only — email flooding and credential guessing. It
-is not a general API limiter; that belongs in infrastructure in front of
+If you already limit `/sign-in/send-code` and `/sign-in/guest` at your edge,
+set `rateLimit: false`; the guess bucket stays on regardless, because nothing in
+front of this server can key on the address.
+
+Scope is authentication abuse only — email flooding and code guessing. It is
+not a general API limiter; that belongs in infrastructure in front of
 everything, these routes included.
 
 ## OAuth
@@ -374,7 +378,7 @@ or any signed-in user can read every code in your system.
 The split is per table:
 
 > `users`, `sessions`, and `identities` are yours to query.
-> `verifications`, `attempts`, and `identitySecrets` are never granted.
+> `verifications`, `rateLimits`, and `identitySecrets` are never granted.
 
 Nothing in the first three can authenticate anybody, so reading them whole is
 safe. The second three hold a credential or the identifier somebody is signing

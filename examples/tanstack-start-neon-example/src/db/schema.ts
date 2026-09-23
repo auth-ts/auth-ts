@@ -6,6 +6,7 @@ import {
   boolean,
   check,
   index,
+  integer,
   pgPolicy,
   pgTable,
   text,
@@ -118,11 +119,16 @@ export const verifications = pgTable.withRLS(
 )
 
 // No policy: key holds emails and IPs
-export const attempts = pgTable.withRLS(
-  "attempts",
+export const rateLimits = pgTable.withRLS(
+  "rateLimits",
   {
     id: uuid("id").primaryKey().default(sql`uuidv7()`),
-    key: text("key").notNull(),
+    key: text("key").notNull().unique(),
+    tokenCount: integer("tokenCount").notNull(),
+    lastRefilledAt: timestamp("lastRefilledAt", {
+      withTimezone: true,
+      mode: "string"
+    }).notNull(),
     createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
@@ -131,10 +137,7 @@ export const attempts = pgTable.withRLS(
       .defaultNow()
       .$onUpdate(() => new Date().toISOString())
   },
-  (table) => [
-    index("attemptsKeyIndex").on(table.key),
-    index("attemptsCreatedAtIndex").on(table.createdAt)
-  ]
+  (table) => [index("rateLimitsUpdatedAtIndex").on(table.updatedAt)]
 )
 
 export const identities = pgTable.withRLS(

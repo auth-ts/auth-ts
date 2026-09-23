@@ -25,7 +25,7 @@ import { defer } from "./defer"
  */
 export function sweepExpired(
   internals: AuthInternals,
-  table: "sessions" | "verifications" | "attempts",
+  table: "sessions" | "verifications" | "rateLimits",
   where: { createdAt: { lt: Date } } | { updatedAt: { lt: Date } }
 ) {
   return defer(internals, "sweep", internals.db.delete({ table, where }))

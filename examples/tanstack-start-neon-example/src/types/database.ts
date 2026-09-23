@@ -9,23 +9,29 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      attempts: {
+      rateLimits: {
         Row: {
           createdAt: string
           id: string
           key: string
+          lastRefilledAt: string
+          tokenCount: number
           updatedAt: string
         }
         Insert: {
           createdAt?: string
           id?: string
           key: string
+          lastRefilledAt: string
+          tokenCount: number
           updatedAt?: string
         }
         Update: {
           createdAt?: string
           id?: string
           key?: string
+          lastRefilledAt?: string
+          tokenCount?: number
           updatedAt?: string
         }
         Relationships: []

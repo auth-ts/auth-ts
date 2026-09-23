@@ -68,7 +68,7 @@ describe("guest sign-in", () => {
     const context = await createTestServer({
       ...guestOptions,
       ipAddress: { trustedProxies: 1 },
-      rateLimit: { guestPerIP: { max: 2, window: "10m" } }
+      rateLimit: { guestsPerIP: { capacity: 2, refill: "10m" } }
     })
     const headers = { "x-forwarded-for": "203.0.113.7" }
 
@@ -776,36 +776,25 @@ describe("identity verification, revoking a device, deleting the account", () =>
     expect(context.db.sessions()).toHaveLength(2)
   })
 
-  it("rate limits identity codes per client address rather than per account", async () => {
-    vi.useFakeTimers()
-    // Pinned to the start of a window: the limiter's windows are aligned to the
-    // clock rather than started by the first request, so a run that straddled a
-    // boundary would hand the last call a fresh allowance.
-    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
-    try {
-      const context = await createTestServer({
-        ipAddress: { trustedProxies: 1 },
-        rateLimit: { sendCodePerIP: { max: 2, window: "10m" } }
-      })
-      const session = await signIn(context)
-      const before = context.sentCodes.length
-      const from = (address: string) =>
-        context.auth.handler(
-          request("POST", "/api/auth/user/verify/send-code", {
-            cookies: refreshCookieFor(session.refreshToken),
-            token: session.token,
-            headers: { "x-forwarded-for": address }
-          })
-        )
+  it("rate limits identity codes per address, from the same budget as sign-in codes", async () => {
+    // The sign-in below spends one token on the address.
+    const context = await createTestServer({
+      rateLimit: { sends: { capacity: 3, refill: "30m" } }
+    })
+    const session = await signIn(context)
+    const before = context.sentCodes.length
+    const send = () =>
+      context.auth.handler(
+        request("POST", "/api/auth/user/verify/send-code", {
+          cookies: refreshCookieFor(session.refreshToken),
+          token: session.token
+        })
+      )
 
-      expect((await from("203.0.113.7")).status).toBe(200)
-      expect((await from("203.0.113.7")).status).toBe(200)
-      expect((await from("203.0.113.7")).status).toBe(429)
-      expect((await from("203.0.113.8")).status).toBe(200)
-      expect(context.sentCodes.length - before).toBe(3)
-    } finally {
-      vi.useRealTimers()
-    }
+    expect((await send()).status).toBe(200)
+    expect((await send()).status).toBe(200)
+    expect((await send()).status).toBe(429)
+    expect(context.sentCodes.length - before).toBe(2)
   })
 
   it("refuses to delete a guest who has no way to verify", async () => {

@@ -61,7 +61,7 @@ and every code straight from the REST endpoint.
 The rule is per table, not per column:
 
 > `users`, `sessions`, and `identities` are yours to query.
-> `verifications`, `attempts`, and `identitySecrets` are never granted.
+> `verifications`, `rateLimits`, and `identitySecrets` are never granted.
 
 Enable row-level security everywhere. Three of the tables get **no policy**,
 which denies every role but the owner — your server connects as the owner and
@@ -69,7 +69,7 @@ keeps working, and the Data API sees nothing:
 
 ```sql
 alter table "verifications" enable row level security;
-alter table "attempts" enable row level security;
+alter table "rateLimits" enable row level security;
 alter table "identitySecrets" enable row level security;
 ```
 

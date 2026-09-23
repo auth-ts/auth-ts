@@ -249,14 +249,13 @@ export function createAuth<
 }
 
 /**
- * Says out loud that the per-IP limits are configured and cannot fire.
+ * Says out loud that the per-IP limit is configured and cannot fire.
  *
  * `ipAddress.disableTracking` derives no address at all, which leaves
- * `sendCodePerIP`, `signInCodePerIP`, and `guestPerIP` inert and
- * `session.ipAddress` null — a safe failure, and exactly the kind that is never
- * noticed until someone sprays `/sign-in/send-code` across a thousand addresses. A
- * warning rather than an error, because turning tracking off on purpose is a
- * legitimate thing to do and `rateLimit` is on by default.
+ * `guestsPerIP` inert and `session.ipAddress` null — a safe failure, and
+ * exactly the kind that is never noticed until someone creates guests in
+ * bulk. A warning rather than an error, because turning tracking off on
+ * purpose is a legitimate thing to do and `rateLimit` is on by default.
  *
  * The other way the limits go quiet — a deployment where no header ever carries
  * a usable address — cannot be seen from here: it takes a request to find out.
@@ -267,8 +266,8 @@ function warnAboutInertIpLimits(internals: AuthInternals) {
   if (config.rateLimit === false || !config.ipAddress.disableTracking) return
 
   internals.log.warn(
-    "per-IP rate limits are configured but will not apply: ipAddress.disableTracking is on, so no client address is derived. " +
-      "sendCodePerIP, signInCodePerIP, and guestPerIP are inert and session.ipAddress will be null."
+    "the per-IP rate limit is configured but will not apply: ipAddress.disableTracking is on, so no client address is derived. " +
+      "guestsPerIP is inert and session.ipAddress will be null."
   )
 }
 

@@ -1,4 +1,4 @@
-import { DEFAULT_GUESS_LIMIT } from "../core/auth-config"
+import { DEFAULT_GUESSES } from "../core/auth-config"
 import type {
   AuthVerification,
   VerificationPurpose
@@ -17,6 +17,8 @@ export interface ConsumeVerificationCodeInput {
   purpose: VerificationPurpose
   /** The token the send handed out; without one there is nothing to verify against. */
   attempt: string | null
+  /** What the guess budget is keyed on: the address for a sign-in, the user for an identity check. */
+  guessKey: string
 }
 
 /**
@@ -26,10 +28,10 @@ export interface ConsumeVerificationCodeInput {
  * purpose, wrong attempt, or simply wrong. Distinguishing them would tell an
  * attacker which addresses have codes outstanding.
  *
- * Guesses are limited per identifier before anything is read, whatever
+ * Guesses are limited per address or user before anything is read, whatever
  * `rateLimit` says: a code is bound to its requester, so this budget is the
- * only one an attacker can spend against an address, and it has to hold even
- * when the per-IP windows are handled in front of the server.
+ * only one an attacker can spend against an address, and nothing in front of
+ * the server can key on it.
  *
  * The purpose check is what stops a sign-in code from verifying identity and
  * vice versa; without it a code obtained for one flow would silently work in
@@ -45,10 +47,8 @@ export async function matchVerificationCode(
   const { config } = internals
   await checkRateLimit(
     internals,
-    `${input.purpose}:guess:${input.identifier}`,
-    config.rateLimit === false
-      ? DEFAULT_GUESS_LIMIT
-      : config.rateLimit.guessPerIdentifier
+    `guess:${input.guessKey}`,
+    config.rateLimit === false ? DEFAULT_GUESSES : config.rateLimit.guesses
   )
 
   if (!input.attempt) throw new AuthApiError("invalidCode")

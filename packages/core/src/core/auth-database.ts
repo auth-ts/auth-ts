@@ -165,15 +165,19 @@ export interface AuthVerification {
 }
 
 /**
- * One counted attempt — a rate-limit request or a wrong guess against a code.
+ * One rate-limit bucket — the author's `bucketNodeStruct` as a row.
  *
- * A log rather than a counter: rows are only ever inserted and counted, which
- * needs no atomic increment and no conditional upsert. The window is part of
- * `key`, so counting is an equality read and an old window is just old rows.
+ * `tokenCount` tokens remain, and one comes back every refill interval
+ * counted from `lastRefilledAt`. Consuming is a read and an update that names
+ * both values it read, so no atomic increment is asked of the store; a bucket
+ * that has refilled is the same as no row, which is what the sweep deletes.
  */
-export interface AuthAttempt {
+export interface AuthRateLimit {
   id: string
+  /** What the bucket is for and whose: `guess:<address>`, `send:<address>`, `guest:ip:<address>`. */
   key: string
+  tokenCount: number
+  lastRefilledAt: Date
   /** Written by core on insert. */
   createdAt: Date
   /** Written by core on insert and on every update it makes. */
@@ -246,7 +250,7 @@ export const authTables = [
   "users",
   "sessions",
   "verifications",
-  "attempts",
+  "rateLimits",
   "identities",
   "identitySecrets"
 ] as const
@@ -261,7 +265,7 @@ export interface AuthTables<
   users: AuthUser<S>
   sessions: AuthSession
   verifications: AuthVerification
-  attempts: AuthAttempt
+  rateLimits: AuthRateLimit
   identities: AuthIdentity
   identitySecrets: AuthIdentitySecret
 }
@@ -453,14 +457,15 @@ export type AuthDeleteInput<
  * | `users` | `email`, `phoneNumber` | | |
  * | `sessions` | | `userId`, `updatedAt` | `updatedAt` |
  * | `verifications` | | `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
- * | `attempts` | | `key`, `createdAt` | `createdAt` |
+ * | `rateLimits` | `key` | `updatedAt` | `updatedAt` |
  * | `identities` | `(provider, providerUserId)` | `userId` | |
  *
  * **The uniqueness column is not hygiene, it is the design.** Core composes a
  * read and a write rather than asking your store for an upsert, so two first
  * sign-ins for one email both find nothing and both insert. The constraint is
  * what turns that race into a failed request instead of two accounts for one
- * person. The same holds for `(provider, providerUserId)`.
+ * person. The same holds for `(provider, providerUserId)`, and for
+ * `rateLimits.key`, which settles two first requests on one bucket.
  *
  * The one concurrency property core requires is that {@link AuthDatabase.delete} is
  * atomic and returns what it removed: that is what makes a verification code usable
@@ -583,7 +588,7 @@ export interface AuthDatabase<
  *     switch (table) {
  *       // `where` narrows with `table`: Partial<AuthUser> here,
  *       case "users": return run(`… where email = $1`, [where.email])
- *       case "attempts": return run(`… where key = $1 limit $2`, [where.key, limit])
+ *       case "rateLimits": return run(`… where key = $1 limit $2`, [where.key, limit])
  *       …
  *     }
  *   },
@@ -658,7 +663,7 @@ const timestampColumns: Record<AuthTable, string[]> = {
   users: ["createdAt", "updatedAt"],
   sessions: ["createdAt", "updatedAt"],
   verifications: ["createdAt", "updatedAt"],
-  attempts: ["createdAt", "updatedAt"],
+  rateLimits: ["createdAt", "updatedAt", "lastRefilledAt"],
   identities: ["createdAt", "updatedAt"],
   identitySecrets: [
     "createdAt",

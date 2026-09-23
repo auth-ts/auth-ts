@@ -11,7 +11,7 @@ import { resolveCodeIdentifier } from "../../src/verification-code/resolve-code-
 import { sendVerificationCode } from "../../src/verification-code/send-verification-code"
 import { createTestInternals } from "../helpers/create-test-internals"
 import { required } from "../helpers/required"
-import { selectRows } from "../helpers/rows"
+import { selectRow, selectRows } from "../helpers/rows"
 
 const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 
@@ -19,13 +19,12 @@ const emailIdentifier = { kind: "email", value: "ada@example.com" } as const
 const storedCodes = (db: MemoryDatabase) =>
   selectRows(db, "verifications", { identifier: { eq: emailIdentifier.value } })
 
-/** How many rows the guess limiter holds for an identifier. */
-const countGuesses = async (db: MemoryDatabase, identifier: string) => {
-  const rows = await selectRows(db, "attempts")
-
-  return rows.filter((row) => row.key.startsWith(`signIn:guess:${identifier}:`))
-    .length
-}
+/** Tokens left in an identifier's guess bucket. */
+const guessTokens = async (db: MemoryDatabase, identifier: string) =>
+  required(
+    await selectRow(db, "rateLimits", { key: { eq: `guess:${identifier}` } }),
+    "guess bucket"
+  ).tokenCount
 
 /** A code no generator would draw: outside the alphabet, so never a collision. */
 const WRONG_CODE = "??????"
@@ -169,7 +168,8 @@ describe("sendVerificationCode", () => {
         identifier: "ada@example.com",
         code: sent.code,
         purpose: "signIn",
-        attempt
+        attempt,
+        guessKey: "ada@example.com"
       })
     ).resolves.toBeUndefined()
   })
@@ -196,7 +196,8 @@ describe("sendVerificationCode", () => {
           identifier,
           code,
           purpose: "identity",
-          attempt
+          attempt,
+          guessKey: "user-1"
         })
       ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     }
@@ -205,7 +206,8 @@ describe("sendVerificationCode", () => {
         identifier: "session-a",
         code,
         purpose: "identity",
-        attempt
+        attempt,
+        guessKey: "user-1"
       })
     ).resolves.toBeUndefined()
   })
@@ -245,52 +247,59 @@ describe("sendVerificationCode", () => {
         identifier: "ada@example.com",
         code: required(sentCodes[0], "first").code,
         purpose: "signIn",
-        attempt: second
+        attempt: second,
+        guessKey: "ada@example.com"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     await consumeVerificationCode(internals, {
       identifier: "ada@example.com",
       code: required(sentCodes[0], "first").code,
       purpose: "signIn",
-      attempt: first
+      attempt: first,
+      guessKey: "ada@example.com"
     })
     await consumeVerificationCode(internals, {
       identifier: "ada@example.com",
       code: required(sentCodes[2], "third").code,
       purpose: "signIn",
-      attempt: third
+      attempt: third,
+      guessKey: "ada@example.com"
     })
     expect(await storedCodes(db)).toHaveLength(1)
   })
 
-  it("never limits sends per address, only per client address", async () => {
+  it("limits sends per address, whoever asks, and leaves other addresses alone", async () => {
     const { internals, sentCodes } = await createTestInternals({
-      ipAddress: { trustedProxies: 1 },
-      rateLimit: { sendCodePerIP: { max: 2, window: "10m" } }
+      rateLimit: { sends: { capacity: 2, refill: "30m" } }
     })
-    const from = (address: string) =>
-      send(internals, new Headers({ "x-forwarded-for": address }))
+    const to = (address: string) =>
+      sendVerificationCode(internals, {
+        deliverTo: { kind: "email", value: address },
+        key: address,
+        purpose: "signIn",
+        locale: "en",
+        headers: new Headers()
+      })
 
-    await from("203.0.113.7")
-    await from("203.0.113.7")
-    await expect(from("203.0.113.7")).rejects.toThrowError(
+    await to("ada@example.com")
+    await to("ada@example.com")
+    await expect(to("ada@example.com")).rejects.toThrowError(
       expect.objectContaining({ code: "rateLimited" })
     )
-    // A different client asking for the same address is not affected.
-    await from("203.0.113.8")
+    await to("grace@example.com")
     expect(sentCodes).toHaveLength(3)
   })
 
-  it("skips the per-IP window when rateLimit is false, and writes no attempt rows", async () => {
+  it("skips the send bucket when rateLimit is false, and writes no bucket rows", async () => {
     const { internals, db, sentCodes } = await createTestInternals({
-      rateLimit: false,
-      ipAddress: { trustedProxies: 1 }
+      rateLimit: false
     })
-    const headers = new Headers({ "x-forwarded-for": "203.0.113.7" })
 
-    for (let count = 0; count < 40; count++) await send(internals, headers)
+    for (let count = 0; count < 40; count++) {
+      await send(internals, new Headers())
+    }
 
-    expect(await selectRows(db, "attempts")).toHaveLength(0)
+    expect(await selectRows(db, "rateLimits")).toHaveLength(0)
     expect(sentCodes).toHaveLength(40)
   })
 })
@@ -314,6 +323,7 @@ describe("markIdentityVerified", () => {
     )
     await markIdentityVerified(internals, {
       sessionId: "session-a",
+      userId: "user-1",
       code,
       attempt
     })
@@ -322,7 +332,12 @@ describe("markIdentityVerified", () => {
     ).resolves.toBeUndefined()
 
     await expect(
-      markIdentityVerified(internals, { sessionId: "session-a", code, attempt })
+      markIdentityVerified(internals, {
+        sessionId: "session-a",
+        userId: "user-1",
+        code,
+        attempt
+      })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     await expect(
       requireVerifiedIdentity(internals, "session-b", attempt)
@@ -358,7 +373,8 @@ describe("consumeVerificationCode", () => {
       identifier: "ada@example.com",
       code,
       purpose: "signIn",
-      attempt
+      attempt,
+      guessKey: "ada@example.com"
     })
 
     expect(await storedCodes(db)).toHaveLength(0)
@@ -367,7 +383,8 @@ describe("consumeVerificationCode", () => {
         identifier: "ada@example.com",
         code,
         purpose: "signIn",
-        attempt
+        attempt,
+        guessKey: "ada@example.com"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -380,7 +397,8 @@ describe("consumeVerificationCode", () => {
         identifier: "ada@example.com",
         code: code.toLowerCase(),
         purpose: "signIn",
-        attempt
+        attempt,
+        guessKey: "ada@example.com"
       })
     ).resolves.toBeUndefined()
   })
@@ -394,7 +412,8 @@ describe("consumeVerificationCode", () => {
           identifier: "ada@example.com",
           code,
           purpose: "signIn",
-          attempt: presented
+          attempt: presented,
+          guessKey: "ada@example.com"
         })
       ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
     }
@@ -409,7 +428,8 @@ describe("consumeVerificationCode", () => {
         identifier: "ada@example.com",
         code,
         purpose: "identity",
-        attempt
+        attempt,
+        guessKey: "ada@example.com"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -424,7 +444,8 @@ describe("consumeVerificationCode", () => {
           identifier: "ada@example.com",
           code: value,
           purpose: "signIn",
-          attempt: token
+          attempt: token,
+          guessKey: "ada@example.com"
         })
 
       for (let count = 0; count < 5; count++) {
@@ -432,7 +453,7 @@ describe("consumeVerificationCode", () => {
           expect.objectContaining({ code: "invalidCode" })
         )
       }
-      expect(await countGuesses(db, "ada@example.com")).toBe(5)
+      expect(await guessTokens(db, "ada@example.com")).toBe(0)
 
       // The sixth is refused before it is even compared — with the right code,
       // and from a different attempt on the same address.
@@ -448,12 +469,12 @@ describe("consumeVerificationCode", () => {
         [WRONG_CODE, stranger]
       ] as const) {
         await expect(guess(value, token)).rejects.toThrowError(
-          expect.objectContaining({ code: "rateLimited", retryAfter: 300 })
+          expect.objectContaining({ code: "rateLimited", retryAfter: 60 })
         )
       }
-      // The code itself was never spent, and the window passing restores it.
+      // The code itself was never spent, and a minute buys one more try.
       expect(await storedCodes(db)).toHaveLength(2)
-      vi.advanceTimersByTime(5 * 60_000)
+      vi.advanceTimersByTime(60_000)
       await expect(guess(code)).resolves.toBeUndefined()
     } finally {
       vi.useRealTimers()
@@ -469,7 +490,8 @@ describe("consumeVerificationCode", () => {
         identifier: "ada@example.com",
         code: value,
         purpose: "signIn",
-        attempt
+        attempt,
+        guessKey: "ada@example.com"
       })
 
     for (let count = 0; count < 5; count++) {
@@ -499,7 +521,8 @@ describe("consumeVerificationCode", () => {
         identifier: "ada@example.com",
         code,
         purpose: "signIn",
-        attempt
+        attempt,
+        guessKey: "ada@example.com"
       })
 
     const results = await Promise.allSettled([submit(), submit()])
@@ -526,7 +549,8 @@ describe("consumeVerificationCode", () => {
         identifier: "ada@example.com",
         code,
         purpose: "signIn",
-        attempt
+        attempt,
+        guessKey: "ada@example.com"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
@@ -539,7 +563,8 @@ describe("consumeVerificationCode", () => {
         identifier: "nobody@example.com",
         code: "ABCDEF",
         purpose: "signIn",
-        attempt: "anything"
+        attempt: "anything",
+        guessKey: "nobody@example.com"
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })

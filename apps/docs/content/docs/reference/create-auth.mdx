@@ -52,8 +52,8 @@ row's `id`.
 There is no cleanup schedule to own. The library sweeps expired rows itself,
 through your own [`AuthDatabase.delete`](/docs/reference/auth-database), on the requests
 that create new ones: a sign-in sweeps `sessions`, a code send sweeps
-`verifications`, and the first attempt of each rate-limit window sweeps
-`attempts`. Garbage accrues only through inserts, so sweeping at insert time
+`verifications`, and the first request on a fresh rate-limit key sweeps
+`rateLimits`. Garbage accrues only through inserts, so sweeping at insert time
 keys the sweep rate to the growth rate — including the rows left by people who
 never come back. Only the library's own tables are swept; `users` is never one
 of them, so an unreachable guest row is yours to collect.
@@ -279,7 +279,7 @@ createAuth({
 
 Each code is bound to the client that requested it, so the only limit an
 attacker can spend against an address is the guess limit
-(`rateLimit.guessPerIdentifier`, five per five minutes by default). At that
+(`rateLimit.guesses`, five tokens and one back a minute by default). At that
 rate, nonstop guessing reaches even odds after roughly:
 
 | Code | Values | Time to a 50% chance |

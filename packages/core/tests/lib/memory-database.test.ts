@@ -28,13 +28,32 @@ const user = async (fields: Record<string, unknown> = {}) => {
   return required(row, "inserted user")
 }
 
-const attempt = (key: string) =>
+const bucket = (key: string) =>
   db.insert({
-    table: "attempts",
-    values: { key, createdAt: new Date(), updatedAt: new Date() }
+    table: "rateLimits",
+    values: {
+      key,
+      tokenCount: 4,
+      lastRefilledAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
   })
 
-const read = <T extends "users" | "sessions" | "verifications" | "attempts">(
+const code = (identifier: string) =>
+  db.insert({
+    table: "verifications",
+    values: {
+      identifier,
+      codeHash: `code-${Math.random()}`,
+      attemptHash: `attempt-${Math.random()}`,
+      purpose: "signIn",
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  })
+
+const read = <T extends "users" | "sessions" | "verifications" | "rateLimits">(
   table: T,
   where: Record<string, unknown> = {},
   limit = 100
@@ -96,13 +115,11 @@ describe("insert", () => {
     expect(db.users()).toHaveLength(2)
   })
 
-  it("lets many attempts share a key, which is the whole point of the log", async () => {
-    await attempt("sendCode:id:ada@example.com:0")
-    await attempt("sendCode:id:ada@example.com:0")
+  it("refuses a second bucket under one key", async () => {
+    await bucket("send:ada@example.com")
 
-    expect(
-      await read("attempts", { key: { eq: "sendCode:id:ada@example.com:0" } })
-    ).toHaveLength(2)
+    await expect(bucket("send:ada@example.com")).rejects.toThrow(/unique/)
+    expect(await read("rateLimits")).toHaveLength(1)
   })
 })
 
@@ -257,17 +274,17 @@ describe("delete", () => {
   })
 
   it("removes every match, not just the first", async () => {
-    await attempt("burst")
-    await attempt("burst")
-    await attempt("other")
+    await code("ada@example.com")
+    await code("ada@example.com")
+    await code("grace@example.com")
 
     const removed = await db.delete({
-      table: "attempts",
-      where: { key: { eq: "burst" } }
+      table: "verifications",
+      where: { identifier: { eq: "ada@example.com" } }
     })
 
     expect(removed).toHaveLength(2)
-    expect(await read("attempts")).toHaveLength(1)
+    expect(await read("verifications")).toHaveLength(1)
   })
 
   it("matches on every column, so an id that belongs to someone else matches nothing", async () => {
@@ -301,11 +318,11 @@ describe("delete", () => {
 describe("reset", () => {
   it("empties every table", async () => {
     await user({ email: "ada@example.com" })
-    await attempt("key")
+    await bucket("key")
 
     db.reset()
 
     expect(db.users()).toEqual([])
-    expect(await read("attempts")).toEqual([])
+    expect(await read("rateLimits")).toEqual([])
   })
 })

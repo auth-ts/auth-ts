@@ -20,8 +20,8 @@ import type {
   JwtOptions,
   ProviderCredentials,
   ProvidersOptions,
+  RateLimitBucket,
   RateLimitOptions,
-  RateLimitWindow,
   SessionOptions,
   SmsOptions,
   VerificationCodeOptions
@@ -93,14 +93,13 @@ const RESERVED_USER_FIELDS = [
   "image"
 ] as const
 
-/** The guess budget per identifier, applied even under `rateLimit: false`. */
-export const DEFAULT_GUESS_LIMIT: RateLimitWindow = { max: 5, window: "5m" }
+/** The guess budget per address or user, applied even under `rateLimit: false`. */
+export const DEFAULT_GUESSES: RateLimitBucket = { capacity: 5, refill: "1m" }
 
 const DEFAULT_RATE_LIMIT: Required<RateLimitOptions> = {
-  guessPerIdentifier: DEFAULT_GUESS_LIMIT,
-  sendCodePerIP: { max: 30, window: "10m" },
-  signInCodePerIP: { max: 30, window: "10m" },
-  guestPerIP: { max: 30, window: "10m" }
+  guesses: DEFAULT_GUESSES,
+  sends: { capacity: 5, refill: "30m" },
+  guestsPerIP: { capacity: 30, refill: "2m" }
 }
 
 function resolveVerificationCode(
@@ -309,9 +308,9 @@ function requireProviders(providers: ProvidersOptions) {
  * Merges rate-limit overrides over the defaults and validates the result.
  *
  * Two things a plain spread gets wrong. An explicit `undefined` — easy to
- * produce from `{ sendCodePerIP: process.env.X ? ... : undefined }` — would
- * overwrite the default with nothing, and the limiter would then read `.max`
- * off `undefined` on the first request. And the durations inside each window
+ * produce from `{ sends: process.env.X ? ... : undefined }` — would
+ * overwrite the default with nothing, and the limiter would then read
+ * `.capacity` off `undefined` on the first request. And the durations inside each bucket
  * would skip the validation every other duration option receives, so a typo
  * like `"10 minutes"` would be accepted here and explode at request time,
  * which is exactly what this function exists to prevent.
@@ -324,22 +323,19 @@ function resolveRateLimit(
   ) as RateLimitOptions
   const merged = { ...DEFAULT_RATE_LIMIT, ...defined }
 
-  for (const [name, limit] of Object.entries(merged)) {
-    if (!Number.isInteger(limit.max) || limit.max < 1) {
+  for (const [name, bucket] of Object.entries(merged)) {
+    if (!Number.isInteger(bucket.capacity) || bucket.capacity < 1) {
       throw new AuthConfigError(
-        `rateLimit.${name}.max must be a positive integer.`
+        `rateLimit.${name}.capacity must be a positive integer.`
       )
     }
-    requireDuration(limit.window, `rateLimit.${name}.window`)
-    // Zero is a real value for other durations, but not for a window. The store
-    // starts a fresh window whenever `resetAt <= now()`, so a window that ends
-    // the instant it starts resets the count to 1 on every request and the
-    // limit never fires — silently. Below a millisecond rounds to the same
-    // thing once it is added to a `Date`, so the bound is one millisecond, not
-    // zero.
-    if (parseDuration(limit.window) < 1) {
+    requireDuration(bucket.refill, `rateLimit.${name}.refill`)
+    // A refill that takes no time keeps the bucket full, so the limit never
+    // fires — silently. Below a millisecond rounds to the same thing once it
+    // is added to a `Date`, so the bound is one millisecond, not zero.
+    if (parseDuration(bucket.refill) < 1) {
       throw new AuthConfigError(
-        `rateLimit.${name}.window must be a positive duration. ${JSON.stringify(limit.window)} ends the moment it starts, so the count would reset on every request and the limit would never fire. To turn rate limiting off, set rateLimit: false.`
+        `rateLimit.${name}.refill must be a positive duration. ${JSON.stringify(bucket.refill)} refills the bucket the moment a token is taken, so the limit would never fire. To turn rate limiting off, set rateLimit: false.`
       )
     }
   }
