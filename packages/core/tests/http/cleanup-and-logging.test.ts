@@ -137,7 +137,9 @@ describe("an unhandled throw", () => {
     )
 
     expect(response.status).toBe(500)
-    expect(response.headers.get("content-type")).toBe("application/json")
+    expect(response.headers.get("content-type")).toBe(
+      "application/json; charset=utf-8"
+    )
     expect(await response.json()).toEqual({
       name: "AuthError",
       code: "internalError",

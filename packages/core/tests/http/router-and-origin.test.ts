@@ -436,13 +436,15 @@ describe("origin check", () => {
 })
 
 describe("caching", () => {
-  it("marks every response no-store, except the public key set", async () => {
+  it("marks every response uncacheable, except the public key set", async () => {
     const { auth } = await createTestServer({
       jwks: { json: { keys: [] } }
     })
 
     const refused = await auth.handler(request("GET", "/api/auth/user"))
-    expect(refused.headers.get("cache-control")).toBe("no-store")
+    expect(refused.headers.get("cache-control")).toBe(
+      "no-cache, no-store, must-revalidate"
+    )
 
     const served = await auth.handler(request("GET", "/api/auth/jwks"))
     expect(served.headers.get("cache-control")).toBe("public, max-age=3600")

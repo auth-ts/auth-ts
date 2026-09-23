@@ -96,7 +96,7 @@ export async function handleRequest(
       return new Response(null, { status, headers })
     }
 
-    headers.set("content-type", "application/json")
+    headers.set("content-type", "application/json; charset=utf-8")
     return new Response(JSON.stringify(result.data), { status, headers })
   } catch (error) {
     return toErrorResponse(internals, error, locale, endpoint, request)
@@ -106,13 +106,15 @@ export async function handleRequest(
 /**
  * The headers every response starts from.
  *
- * `no-store` because responses here carry tokens and per-user bodies on a
+ * The author's `no-cache, no-store, must-revalidate`, because responses here carry tokens and per-user bodies on a
  * cookie-authenticated GET, which is exactly what a shared cache would serve to
  * the next person. An endpoint that sets its own policy — `jwks` — keeps it.
  */
 function responseHeaders(init?: Headers) {
   const headers = new Headers(init)
-  if (!headers.has("cache-control")) headers.set("cache-control", "no-store")
+  if (!headers.has("cache-control")) {
+    headers.set("cache-control", "no-cache, no-store, must-revalidate")
+  }
 
   return headers
 }

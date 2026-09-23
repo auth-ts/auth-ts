@@ -122,7 +122,7 @@ export function errorResponse(
   options: { retryAfter?: number; headers?: Headers; requestId?: string } = {}
 ) {
   const headers = new Headers(options.headers)
-  headers.set("content-type", "application/json")
+  headers.set("content-type", "application/json; charset=utf-8")
   if (options.retryAfter !== undefined)
     headers.set("retry-after", String(options.retryAfter))
 
