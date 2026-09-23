@@ -261,7 +261,13 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
 
       const previous = user[spec.kind]
       const [updated, sessions] = await Promise.all([
-        updateUser(internals, user, { [spec.kind]: identifier.value }),
+        updateUser(internals, user, { [spec.kind]: identifier.value }).catch(
+          async (error: unknown) => {
+            // Lost a race for the address
+            await newIdentifier(internals, spec, identifier.value)
+            throw error
+          }
+        ),
         listUserSessions(internals, user.id)
       ])
       for (const key of [previous, ...sessions.map((session) => session.id)]) {

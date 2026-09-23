@@ -161,6 +161,27 @@ describe("changing the email address", () => {
     expect(context.db.users()[0]?.email).toBe(OLD)
   })
 
+  it("answers emailTaken when another account wins the address mid-update", async () => {
+    const context = await createTestServer()
+    const session = await signIn(context)
+    await verifyIdentity(context, session)
+    await sendCode(context, session)
+    const code = lastCode(context)
+
+    // The other account lands between the re-check and this write.
+    const update = context.db.update.bind(context.db)
+    vi.spyOn(context.db, "update").mockImplementation(async (query) => {
+      if ("email" in query.values && query.values.email === NEW) {
+        await insertUser(context.db, { email: NEW })
+      }
+      return update(query)
+    })
+
+    const response = await verify(context, session, { code })
+    expect(response.status).toBe(409)
+    expect(await codeOf(response)).toBe("emailTaken")
+  })
+
   it("limits guesses per new address, five then 429", async () => {
     const context = await createTestServer()
     const session = await signIn(context)
