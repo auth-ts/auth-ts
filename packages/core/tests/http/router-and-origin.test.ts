@@ -158,18 +158,23 @@ describe("matchRoute", () => {
 })
 
 describe("origin check", () => {
-  // CORS headers decide who may read a response, not who may send a request.
-  // A simple POST carries the cookie without a preflight, so state-changing
-  // requests are refused unless their Origin is one this server serves.
-  it("refuses a state-changing request from an origin it does not serve", async () => {
+  // The book's check: every non-GET request must say Sec-Fetch-Site:
+  // same-origin. The browser sets the header and forbids a page from touching
+  // it, so a cross-site page cannot forge it. Origin is consulted only as the
+  // allowlist for the requests that cannot say same-origin.
+  const guest = (headers: Record<string, string>, origin?: string) =>
+    request("POST", "/api/auth/sign-in/guest", { headers, origin })
+
+  it("refuses a cross-site request, whatever its Origin claims", async () => {
     const { auth } = await createTestServer({
       guest: true,
       jwks: { json: { keys: [] } }
     })
 
     const refused = await auth.handler(
-      request("POST", "/api/auth/sign-in/guest", {
-        headers: { origin: "https://evil.example.com" }
+      guest({
+        "sec-fetch-site": "cross-site",
+        origin: "https://evil.example.com"
       })
     )
     expect(refused.status).toBe(403)
@@ -181,9 +186,7 @@ describe("origin check", () => {
     expect(
       (
         await auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            headers: { origin: "null" }
-          })
+          guest({ "sec-fetch-site": "cross-site", origin: "null" })
         )
       ).status
     ).toBe(403)
@@ -193,11 +196,101 @@ describe("origin check", () => {
       (
         await auth.handler(
           request("GET", "/api/auth/jwks", {
-            headers: { origin: "https://evil.example.com" }
+            headers: {
+              "sec-fetch-site": "cross-site",
+              origin: "https://evil.example.com"
+            }
           })
         )
       ).status
     ).toBe(200)
+  })
+
+  it("refuses a request with no Sec-Fetch-Site and no Origin", async () => {
+    // A browser too old for the header is refused rather than trusted; a
+    // client that is not a browser says the header itself.
+    const { auth } = await createTestServer({ guest: true })
+    const bare = (headers: Record<string, string>) =>
+      new Request("https://app.example.com/api/auth/sign-in/guest", {
+        method: "POST",
+        headers
+      })
+
+    expect((await auth.handler(bare({}))).status).toBe(403)
+    expect(
+      (await auth.handler(bare({ "sec-fetch-site": "same-origin" }))).status
+    ).toBe(200)
+  })
+
+  it("trusts same-origin over any Origin header, which a browser never contradicts", async () => {
+    const { auth } = await createTestServer({ guest: true })
+    expect(
+      (
+        await auth.handler(
+          guest({
+            "sec-fetch-site": "same-origin",
+            origin: "https://evil.example.com"
+          })
+        )
+      ).status
+    ).toBe(200)
+  })
+
+  it("falls back to an allowlisted Origin for an older browser or a sibling origin", async () => {
+    // No header at all, own origin: the browser predates Sec-Fetch-Site.
+    const sameOrigin = await createTestServer({ guest: true })
+    expect(
+      (
+        await sameOrigin.auth.handler(
+          guest({ "sec-fetch-site": "", origin: "https://app.example.com" })
+        )
+      ).status
+    ).toBe(200)
+
+    // Behind a proxy the runtime sees an internal URL; the browser names the
+    // public one, which is what baseURL is for.
+    const proxied = await createTestServer({
+      guest: true,
+      baseURL: "https://auth.example.com"
+    })
+    expect(
+      (
+        await proxied.auth.handler(
+          guest(
+            {
+              "sec-fetch-site": "same-site",
+              origin: "https://auth.example.com"
+            },
+            "http://10.0.0.5:3000"
+          )
+        )
+      ).status
+    ).toBe(200)
+
+    const crossOrigin = await createTestServer({
+      guest: true,
+      trustedOrigins: ["https://spa.example.com"]
+    })
+    expect(
+      (
+        await crossOrigin.auth.handler(
+          guest({
+            "sec-fetch-site": "same-site",
+            origin: "https://spa.example.com"
+          })
+        )
+      ).status
+    ).toBe(200)
+    expect(
+      (
+        await crossOrigin.auth.handler(
+          guest({
+            "sec-fetch-site": "same-site",
+            origin: "https://other.example.com"
+          })
+        )
+      ).status
+    ).toBe(403)
   })
 
   it("ignores a forwarded origin unless the proxy headers are trusted", async () => {
@@ -208,14 +301,15 @@ describe("origin check", () => {
     expect(
       (
         await auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            origin: "http://10.0.0.5:3000",
-            headers: {
+          guest(
+            {
+              "sec-fetch-site": "cross-site",
               origin: "https://attacker.example.com",
               "x-forwarded-host": "attacker.example.com",
               "x-forwarded-proto": "https"
-            }
-          })
+            },
+            "http://10.0.0.5:3000"
+          )
         )
       ).status
     ).toBe(403)
@@ -233,14 +327,15 @@ describe("origin check", () => {
     expect(
       (
         await auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            origin: "http://10.0.0.5:3000",
-            headers: {
+          guest(
+            {
+              "sec-fetch-site": "cross-site",
               origin: "https://app.example.com",
               "x-forwarded-host": "app.example.com",
               "x-forwarded-proto": "https"
-            }
-          })
+            },
+            "http://10.0.0.5:3000"
+          )
         )
       ).status
     ).toBe(200)
@@ -249,111 +344,30 @@ describe("origin check", () => {
     expect(
       (
         await auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            origin: "http://10.0.0.5:3000",
-            headers: {
+          guest(
+            {
+              "sec-fetch-site": "cross-site",
               origin: "https://attacker.example.com",
               "x-forwarded-host": "app.example.com",
               "x-forwarded-proto": "https"
-            }
-          })
+            },
+            "http://10.0.0.5:3000"
+          )
         )
       ).status
     ).toBe(403)
   })
 
-  it("allows its own origin, a configured baseURL, and a trusted origin", async () => {
-    const sameOrigin = await createTestServer({ guest: true })
-    expect(
-      (
-        await sameOrigin.auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            headers: { origin: "https://app.example.com" }
-          })
-        )
-      ).status
-    ).toBe(200)
-
-    // Behind a proxy the runtime sees an internal URL; the browser names the
-    // public one, which is what baseURL is for.
-    const proxied = await createTestServer({
-      guest: true,
-      baseURL: "https://auth.example.com"
-    })
-    expect(
-      (
-        await proxied.auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            origin: "http://10.0.0.5:3000",
-            headers: { origin: "https://auth.example.com" }
-          })
-        )
-      ).status
-    ).toBe(200)
-
-    const crossOrigin = await createTestServer({
-      guest: true,
-      trustedOrigins: ["https://spa.example.com"]
-    })
-    expect(
-      (
-        await crossOrigin.auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            headers: { origin: "https://spa.example.com" }
-          })
-        )
-      ).status
-    ).toBe(200)
-    expect(
-      (
-        await crossOrigin.auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            headers: { origin: "https://other.example.com" }
-          })
-        )
-      ).status
-    ).toBe(403)
-  })
-
-  it("passes a request with no Origin header, which is a non-browser client with no cookie to abuse", async () => {
-    const { auth } = await createTestServer({ guest: true })
-    expect(
-      (await auth.handler(request("POST", "/api/auth/sign-in/guest"))).status
-    ).toBe(200)
-  })
-
-  it("falls back to Referer when a privacy setting has stripped Origin", async () => {
-    const { auth } = await createTestServer({ guest: true })
-    expect(
-      (
-        await auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            headers: { referer: "https://evil.example.com/page" }
-          })
-        )
-      ).status
-    ).toBe(403)
-    expect(
-      (
-        await auth.handler(
-          request("POST", "/api/auth/sign-in/guest", {
-            headers: { referer: "https://app.example.com/page" }
-          })
-        )
-      ).status
-    ).toBe(200)
-  })
-
-  it("requires a body to be JSON, so a cross-origin body cannot avoid the preflight", async () => {
+  it("requires a body to be JSON in utf-8, so a cross-origin body cannot avoid the preflight", async () => {
     // A page can send text/plain, a form encoding, or a typeless Blob without
     // a preflight; it cannot send application/json without one. So the browser
-    // enforces this layer itself, even when Origin has been stripped.
+    // enforces this layer itself.
     const { auth } = await createTestServer({ guest: true })
     const post = (headers: Record<string, string>, body: string) =>
       auth.handler(
         new Request("https://app.example.com/api/auth/sign-in/code", {
           method: "POST",
-          headers,
+          headers: { "sec-fetch-site": "same-origin", ...headers },
           body
         })
       )
@@ -376,15 +390,24 @@ describe("origin check", () => {
     expect(
       (await post({ "content-length": String(payload.length) }, payload)).status
     ).toBe(415)
+    // The one charset a parameter may name is utf-8.
+    expect(
+      (
+        await post(
+          { "content-type": "application/json; charset=latin1" },
+          payload
+        )
+      ).status
+    ).toBe(415)
 
-    // JSON — with or without a charset parameter — reaches the endpoint.
+    // JSON — with or without the utf-8 charset — reaches the endpoint.
     expect(
       (await post({ "content-type": "application/json" }, payload)).status
     ).toBe(401)
     expect(
       (
         await post(
-          { "content-type": "Application/JSON; charset=utf-8" },
+          { "content-type": "Application/JSON; charset=UTF-8" },
           payload
         )
       ).status

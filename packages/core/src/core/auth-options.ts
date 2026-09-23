@@ -443,7 +443,9 @@ export interface AuthOptions<
   /**
    * Origins besides this server's own that may make state-changing requests.
    *
-   * Needed when the application is on a different origin from the auth server.
+   * Every non-GET request must say `Sec-Fetch-Site: same-origin`; this is the
+   * book's allowlist for the requests that cannot, an application on a sibling
+   * origin or a browser too old for the header, judged by their `Origin`.
    * Exact origins — `https://app.example.com` — and never `*`: an origin listed
    * here can act with the user's cookie, which is the thing the check exists to
    * stop.

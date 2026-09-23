@@ -79,6 +79,8 @@ export function createFetchJson(
       // taken a `Set-Cookie` with it.
       const cookie = await jar?.header()
       if (cookie) headers.set("cookie", cookie)
+      // Not a browser, so the server's same-origin check hears it from us.
+      if (jar) headers.set("sec-fetch-site", "same-origin")
 
       try {
         return await fetch(`${base}${path}`, {

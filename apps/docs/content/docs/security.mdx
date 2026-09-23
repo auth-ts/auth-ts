@@ -172,18 +172,26 @@ whoever can read it can already see the signed-out page it produces. It is the
 only cookie here that may carry a `Domain`, and only for a request from a
 trusted origin on another host, because that app cannot otherwise see it.
 
-**State-changing requests are checked against their `Origin`.** CORS headers
-decide who may *read* a response, not who may *send* a request: a `POST` with a
-simple content type goes out without a preflight, cookie attached. `SameSite=Lax`
-confines that to the same site, which still leaves a sibling subdomain — or a
-browser that does not enforce it — able to sign the user out, sign them into
-someone else's account, or have a guest's session merged into an attacker's. So
-every non-`GET` request that carries an `Origin` (or, failing that, a `Referer`)
-must name the server's own origin — as the runtime sees it, or as a proxy
+**Every state-changing request must say `Sec-Fetch-Site: same-origin`.** CORS
+headers decide who may *read* a response, not who may *send* a request: a
+`POST` with a simple content type goes out without a preflight, cookie
+attached. `SameSite=Lax` confines that to the same site, which still leaves a
+sibling subdomain — or a browser that does not enforce it — able to sign the
+user out, sign them into someone else's account, or have a guest's session
+merged into an attacker's. So the check is the book's, as Lucia's
+`auth_session.ts` has it: on every non-`GET` request the browser's own
+`Sec-Fetch-Site` header must read `same-origin`. The browser sets it on every
+request and forbids a page from touching it, so a cross-site page cannot forge
+it, and a browser too old to send it is refused rather than trusted. Anything
+else is **403 `forbiddenOrigin`** before the body is parsed.
+
+The book's one fallback, for a sibling origin or an older browser, is an
+`Origin` allowlist: a request whose header is not `same-origin` still passes
+when its `Origin` is the server's own — as the runtime sees it, or as a proxy
 forwarded it once `trustedProxyHeaders` is on — its `baseURL`, or one of its
-`trustedOrigins`; anything else is refused with **403 `forbiddenOrigin`** before
-the body is parsed. A request with neither header is a non-browser client, which
-holds no cookie and cannot be made to act for anyone.
+`trustedOrigins`. A client that is not a browser sets the header itself, as the
+`cookieStorage` client does: forgery is a browser attack, and there is no
+browser there to protect.
 
 **`X-Forwarded-Host` is read only when you say a proxy sets it.** Nothing about
 a request distinguishes a forwarded header from one its sender wrote, and the
@@ -205,14 +213,14 @@ internal URL, or an app answering on several approved domains. A `baseURL` wins
 outright when set, so the two are alternatives rather than layers: pin the origin
 or derive it, not both.
 
-**Request bodies must be `application/json`**, or the answer is **415
-`unsupportedMediaType`**. This is the second, independent layer: a page cannot
-send that content type cross-origin without a preflight, so a browser stops most
-of these before any header reaches the server. That is a bonus and not the
+**Request bodies must be `application/json`**, with `utf-8` as the only
+charset a parameter may name, or the answer is **415 `unsupportedMediaType`** —
+the author's check. This is the second, independent layer: a page cannot send
+that content type cross-origin without a preflight, so a browser stops most of
+these before any header reaches the server. That is a bonus and not the
 guarantee — whoever answers the preflight is your application's business — so
-the check runs on every request regardless, including when a privacy extension
-has stripped `Origin`. The client already sends it; bodiless requests such as
-`GET /users` are untouched.
+the check runs on every request regardless. The client already sends it;
+bodiless requests such as `GET /users` are untouched.
 
 **`GET /token` is the one route a cookie alone authenticates**, and being a
 bodiless `GET` it is exempt from both layers above. That is safe for the reason

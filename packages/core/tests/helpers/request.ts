@@ -25,6 +25,12 @@ export function request(
 
   if (options.token) headers.set("authorization", `Bearer ${options.token}`)
 
+  // What a browser says on every same-origin request; a test that means a
+  // cross-site or headerless request names the header itself.
+  if (!["GET", "HEAD"].includes(method) && !headers.has("sec-fetch-site")) {
+    headers.set("sec-fetch-site", "same-origin")
+  }
+
   if (options.body !== undefined)
     headers.set("content-type", "application/json")
 

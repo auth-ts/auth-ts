@@ -235,9 +235,10 @@ Persistence across a cold load, if you want it, is your query client's persister
 A browser holds the refresh cookie itself and never shows it to JavaScript. A
 native app has no such jar, so the client can be one: pass `cookieStorage` and it
 keeps whatever the server sets in the storage you give it, sends it back as the
-`Cookie` header on every auth request, and drops what the server clears. The
-server is none the wiser, and the refresh token still travels nowhere but the
-cookie header.
+`Cookie` header on every auth request, and drops what the server clears. It also
+says `Sec-Fetch-Site: same-origin` itself, since there is no browser to say it
+and the server refuses a state-changing request without it. The server is none
+the wiser, and the refresh token still travels nowhere but the cookie header.
 
 ```ts
 import * as SecureStore from "expo-secure-store"

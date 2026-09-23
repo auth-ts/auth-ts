@@ -32,7 +32,7 @@ export type AuthErrorCode =
   | "notFound"
   /** The HTTP method is not allowed for this path. */
   | "methodNotAllowed"
-  /** A state-changing request came from an origin this server does not serve. */
+  /** A state-changing request was not `Sec-Fetch-Site: same-origin`, nor from an allowlisted origin. */
   | "forbiddenOrigin"
   /** A request body was sent with a content type other than `application/json`. */
   | "unsupportedMediaType"

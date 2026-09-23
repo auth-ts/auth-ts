@@ -33,8 +33,10 @@ export interface AuthClientOptions {
    * A browser holds the refresh cookie itself and never shows it to
    * JavaScript, so leave this unset there. A native app has no such jar: the
    * client keeps whatever the server sets and sends it back as the `Cookie`
-   * header on every auth request, with `credentials: "omit"`. The server is
-   * none the wiser, and the refresh token still travels nowhere else.
+   * header on every auth request, with `credentials: "omit"`, and says
+   * `Sec-Fetch-Site: same-origin` itself, since there is no browser to say it.
+   * The server is none the wiser, and the refresh token still travels nowhere
+   * else.
    *
    * The storage passed here MUST be one the platform protects — the keychain
    * or the keystore. What lands in it is the refresh token, and the refresh

@@ -44,6 +44,8 @@ describe("cookieStorage", () => {
 
     expect(server.requests[0]?.credentials).toBe("include")
     expect(server.requests[0]?.cookie).toBeNull()
+    // The browser sets this one; a page may not.
+    expect(server.requests[0]?.secFetchSite).toBeNull()
   })
 
   it("keeps what the server sets and sends it back, with credentials omitted", async () => {
@@ -63,6 +65,8 @@ describe("cookieStorage", () => {
 
     expect(server.requests[0]?.credentials).toBe("omit")
     expect(server.requests[0]?.cookie).toBeNull()
+    // Not a browser, so it says what a browser would.
+    expect(server.requests[0]?.secFetchSite).toBe("same-origin")
     expect(server.requests[1]?.cookie).toBe("auth-ts.refresh=secret")
     expect(items.get("auth-ts.cookies")).toBe(
       JSON.stringify({ "auth-ts.refresh": "secret" })
