@@ -34,10 +34,8 @@ export interface FindOrCreateUserInput {
  *   the provider actually sent them. A verification code carries neither, so that path
  *   writes nothing at all rather than issuing an empty update.
  *
- * The race this opens — two first sign-ins for one address, both reading
- * nothing, both inserting — is closed by the unique constraint the contract
- * requires on `email` and `phoneNumber`. The loser gets a constraint violation
- * and a failed request; without the constraint it would get a second account.
+ * Two first sign-ins racing both insert; the unique constraint on `email`
+ * and `phoneNumber` refuses one, and that one reads back the winner's row.
  */
 export async function findOrCreateUser(
   internals: AuthInternals,
@@ -45,9 +43,12 @@ export async function findOrCreateUser(
 ): Promise<{ user: AuthUser; created: boolean }> {
   const { identifier, name, image, additionalFields } = input
 
-  const existing = await selectOne(internals, "users", {
-    [identifier.kind]: { eq: identifier.value }
-  })
+  const find = () =>
+    selectOne(internals, "users", {
+      [identifier.kind]: { eq: identifier.value }
+    })
+
+  const existing = await find()
   if (existing) {
     return {
       user: await updateUser(internals, existing, { name, image }),
@@ -55,18 +56,24 @@ export async function findOrCreateUser(
     }
   }
 
-  const user = await insertRow(internals, "users", {
-    email: null,
-    phoneNumber: null,
-    name: null,
-    image: null,
-    primaryUserId: null,
-    ...additionalFields,
-    [identifier.kind]: identifier.value,
-    ...(name === undefined ? {} : { name }),
-    ...(image === undefined ? {} : { image }),
-    type: "user"
-  })
+  try {
+    const user = await insertRow(internals, "users", {
+      email: null,
+      phoneNumber: null,
+      name: null,
+      image: null,
+      primaryUserId: null,
+      ...additionalFields,
+      [identifier.kind]: identifier.value,
+      ...(name === undefined ? {} : { name }),
+      ...(image === undefined ? {} : { image }),
+      type: "user"
+    })
 
-  return { user, created: true }
+    return { user, created: true }
+  } catch (error) {
+    const raced = await find()
+    if (!raced) throw error
+    return { user: raced, created: false }
+  }
 }

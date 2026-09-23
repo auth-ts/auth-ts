@@ -85,20 +85,16 @@ describe("findOrCreateUser", () => {
     expect(signedIn.plan).toBe("pro")
   })
 
-  it("leaves the duplicate race to the unique constraint rather than resolving it itself", async () => {
-    // Both calls read nothing and both insert. Core cannot prevent that without
-    // a lock the contract does not have, so the constraint decides — a failed
-    // request rather than two accounts for one person.
+  it("settles two first sign-ins on one user: the constraint refuses one, which reads the winner", async () => {
     const { internals, db } = await createTestInternals()
 
-    const results = await Promise.allSettled([
+    const [first, second] = await Promise.all([
       findOrCreateUser(internals, { identifier: ada }),
       findOrCreateUser(internals, { identifier: ada })
     ])
 
-    expect(
-      results.filter((result) => result.status === "rejected")
-    ).not.toHaveLength(2)
+    expect(first.user.id).toBe(second.user.id)
+    expect([first.created, second.created].sort()).toEqual([false, true])
     expect(
       await selectRows(db, "users", { email: { eq: ada.value } })
     ).toHaveLength(1)
