@@ -15,14 +15,20 @@ export interface AttemptInput {
   headers?: Headers
 }
 
+const ATTEMPT_COOKIE_NAMES: Record<VerificationPurpose, string> = {
+  signIn: "auth-ts.attempt",
+  identity: "auth-ts.attempt.identity",
+  emailChange: "auth-ts.attempt.email"
+}
+
 /**
  * The cookie that binds a code to the client that requested it, one per purpose.
  *
- * Separate names, because a sign-in code requested while an identity check is
+ * Separate names, because a code requested while an identity check is
  * outstanding must not overwrite the token the check still needs.
  */
 export function attemptCookieName(purpose: VerificationPurpose) {
-  return purpose === "signIn" ? "auth-ts.attempt" : "auth-ts.attempt.identity"
+  return ATTEMPT_COOKIE_NAMES[purpose]
 }
 
 /**

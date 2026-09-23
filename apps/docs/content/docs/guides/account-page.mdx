@@ -76,8 +76,8 @@ grant update ("name", "image", "updatedAt") on table "users" to authenticated;
 
 Changing `email` or `phoneNumber` is deliberately not a field update at all: an
 identifier is what every sign-in resolves through, so re-keying an account is a
-ceremony — a code verified at the new address — rather than a `PATCH`. `POST
-/user` rejects both for the same reason.
+ceremony rather than a `PATCH`. `POST /user` rejects both; the email ceremony is
+section 6.
 
 ## 3. Devices
 
@@ -148,6 +148,30 @@ provider's client secret and a state cookie:
 ```ts
 await authClient.connectProvider({ provider: "google", redirect: "/account" })
 ```
+
+## 6. Changing the email address
+
+Two calls, both behind "confirm it's you", the way the author's reference app
+does it. The first sends a code to the new address; the account keeps its old
+one until the second verifies that code.
+
+```ts
+const sent = await authClient.sendEmailUpdateCode({ email })
+if (sent.status === "verificationRequired") {
+  // the "confirm it's you" dialog, then call it again
+}
+// collect the code sent to the new address, then:
+const result = await authClient.verifyEmailUpdate({ email, code })
+if (result.status === "updated") {
+  // result.user carries the new address
+}
+```
+
+`emailTaken` says another account already signs in with that address, on
+either call. Once the change lands, codes sent to the old address stop working
+and the old address is told, if `email.sendEmailChangedNotification` is
+configured. Sessions stay signed in. The reference application runs both steps
+in one dialog opened from the profile card.
 
 ## What is still the library's
 

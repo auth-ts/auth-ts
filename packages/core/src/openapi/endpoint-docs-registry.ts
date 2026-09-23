@@ -13,6 +13,10 @@ import { signOutDocs } from "../endpoints/sign-out"
 import { getTokenDocs } from "../endpoints/token"
 import { deleteUserDocs, updateUserDocs } from "../endpoints/user"
 import {
+  sendEmailUpdateCodeDocs,
+  verifyEmailUpdateDocs
+} from "../endpoints/user/email-update"
+import {
   sendIdentityCodeDocs,
   verifyIdentityDocs
 } from "../endpoints/user/verify"
@@ -58,6 +62,8 @@ export const endpointDocs: {
   deleteUser: deleteUserDocs,
   sendIdentityCode: sendIdentityCodeDocs,
   verifyIdentity: verifyIdentityDocs,
+  sendEmailUpdateCode: sendEmailUpdateCodeDocs,
+  verifyEmailUpdate: verifyEmailUpdateDocs,
   revokeSession: revokeSessionDocs,
   listUsers: listUsersDocs,
   switchUser: switchUserDocs,
@@ -89,6 +95,8 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   deleteUser: "Delete the current user",
   sendIdentityCode: "Send an identity code",
   verifyIdentity: "Verify identity",
+  sendEmailUpdateCode: "Send an email update code",
+  verifyEmailUpdate: "Verify an email update",
   revokeSession: "Revoke a session",
   listUsers: "List the signed in users",
   switchUser: "Switch to another signed in user",

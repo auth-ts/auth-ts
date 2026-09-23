@@ -6,16 +6,22 @@ import type {
   DeleteUserResult,
   RevokeSessionInput,
   RevokeSessionResult,
+  SendEmailUpdateCodeInput,
+  SendEmailUpdateCodeResult,
   SignOutInput,
   UpdateUserInput,
+  VerifyEmailUpdateInput,
+  VerifyEmailUpdateResult,
   VerifyIdentityInput
 } from "../methods/account"
 import {
   deleteUser,
   revokeSession,
+  sendEmailUpdateCode,
   sendIdentityCode,
   signOut,
   updateUser,
+  verifyEmailUpdate,
   verifyIdentity
 } from "../methods/account"
 import type { GetTokenOptions, RefreshToken } from "../methods/get-token"
@@ -212,6 +218,27 @@ export interface AuthClient {
    */
   verifyIdentity: (input: VerifyIdentityInput) => Promise<void>
   /**
+   * Sends a code to a new email address, once identity has been verified.
+   *
+   * The same challenge as `deleteUser`. The account keeps its address until
+   * `verifyEmailUpdate` succeeds.
+   *
+   * @throws {AuthError} `invalidEmailAddress`, `emailTaken`, `rateLimited`,
+   * or `guestCannotReceiveCode`.
+   */
+  sendEmailUpdateCode: (
+    input: SendEmailUpdateCodeInput
+  ) => Promise<SendEmailUpdateCodeResult>
+  /**
+   * Verifies the code `sendEmailUpdateCode` sent and re-keys the account to
+   * the new address. Codes sent to the old address stop working.
+   *
+   * @throws {AuthError} `invalidCode`, `emailTaken`, or `rateLimited`.
+   */
+  verifyEmailUpdate: (
+    input: VerifyEmailUpdateInput
+  ) => Promise<VerifyEmailUpdateResult>
+  /**
    * Signs out.
    *
    * A session that is already gone resolves rather than throwing: the caller
@@ -262,6 +289,8 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     revokeSession: (input) => revokeSession(internals, input),
     sendIdentityCode: () => sendIdentityCode(internals),
     verifyIdentity: (input) => verifyIdentity(internals, input),
+    sendEmailUpdateCode: (input) => sendEmailUpdateCode(internals, input),
+    verifyEmailUpdate: (input) => verifyEmailUpdate(internals, input),
     signOut: (input) => signOut(internals, input),
     setLocale: (locale) => {
       internals.locale = locale

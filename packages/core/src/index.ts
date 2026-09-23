@@ -33,6 +33,7 @@ export { authTables, defineAuthDatabase } from "./core/auth-database"
 export type {
   AuthOptions,
   CookieOptions,
+  EmailChangedNotificationContext,
   EmailOptions,
   JwksOptions,
   JwtClaims,

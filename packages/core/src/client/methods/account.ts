@@ -144,6 +144,71 @@ export async function revokeSession(
   return { status: revoked ? "revoked" : "verificationRequired" }
 }
 
+/** Input for sending a code to a new email address. */
+export interface SendEmailUpdateCodeInput extends IdentityAttemptInput {
+  /** The new address. */
+  email: string
+}
+
+/** What sending the code resolved to; `attempt` rides along once sent. */
+export type SendEmailUpdateCodeResult =
+  | { status: "sent"; attempt: string }
+  | { status: "verificationRequired" }
+
+/** Input for verifying the code sent to a new email address. */
+export interface VerifyEmailUpdateInput {
+  /** The new address, as sent. */
+  email: string
+  code: string
+  /** Where no cookie carries it, the attempt token `sendEmailUpdateCode` returned. */
+  attempt?: string
+  /** Where no cookie carries it, the attempt token `sendIdentityCode` returned. */
+  identityAttempt?: string
+}
+
+/** What the change resolved to; the user carries the new address once updated. */
+export type VerifyEmailUpdateResult =
+  | { status: "updated"; user: AuthUser }
+  | { status: "verificationRequired" }
+
+/** `POST /user/email-update/send-code`; the verification challenge is reported as a result, not thrown. */
+export async function sendEmailUpdateCode(
+  internals: AuthClientInternals,
+  input: SendEmailUpdateCodeInput
+): Promise<SendEmailUpdateCodeResult> {
+  let attempt = ""
+  const sent = await verifiedAction(async () => {
+    ;({ attempt } = await internals.fetchJson<SendCodeResult>({
+      method: "POST",
+      path: "/user/email-update/send-code",
+      body: input,
+      authenticated: true
+    }))
+  })
+
+  return sent ? { status: "sent", attempt } : { status: "verificationRequired" }
+}
+
+/** `POST /user/email-update/verify`; the verification challenge is reported as a result, not thrown. */
+export async function verifyEmailUpdate(
+  internals: AuthClientInternals,
+  input: VerifyEmailUpdateInput
+): Promise<VerifyEmailUpdateResult> {
+  let user: AuthUser | undefined
+  const updated = await verifiedAction(async () => {
+    user = await internals.fetchJson<AuthUser>({
+      method: "POST",
+      path: "/user/email-update/verify",
+      body: input,
+      authenticated: true
+    })
+  })
+
+  return updated && user
+    ? { status: "updated", user: reviveUser(user) }
+    : { status: "verificationRequired" }
+}
+
 /** `POST /user/verify/send-code`. */
 export async function sendIdentityCode(
   internals: AuthClientInternals

@@ -1,5 +1,6 @@
 import type {
   AuthOptions,
+  EmailChangedNotificationContext,
   SignedInNotificationContext
 } from "../../src/core/auth-options"
 import type { Auth } from "../../src/core/create-auth"
@@ -10,7 +11,11 @@ import type { CapturedCode } from "./create-test-internals"
 import { generateTestKeys } from "./generate-test-keys"
 import { readSetCookies } from "./request"
 
-const ATTEMPT_COOKIES = ["auth-ts.attempt", "auth-ts.attempt.identity"]
+const ATTEMPT_COOKIES = [
+  "auth-ts.attempt",
+  "auth-ts.attempt.identity",
+  "auth-ts.attempt.email"
+]
 
 /** A real server wired to in-memory storage, with sends and logs captured. */
 export interface TestServer {
@@ -18,6 +23,7 @@ export interface TestServer {
   db: MemoryDatabase
   sentCodes: CapturedCode[]
   sentNotifications: SignedInNotificationContext[]
+  sentEmailChanges: EmailChangedNotificationContext[]
   logCalls: Array<{
     level: string
     message: string
@@ -53,6 +59,7 @@ export async function createTestServer(
     (overrides.database as MemoryDatabase | undefined) ?? createMemoryDatabase()
   const sentCodes: CapturedCode[] = []
   const sentNotifications: SignedInNotificationContext[] = []
+  const sentEmailChanges: EmailChangedNotificationContext[] = []
   const logCalls: TestServer["logCalls"] = []
 
   const auth = createAuth({
@@ -70,6 +77,9 @@ export async function createTestServer(
       },
       sendSignedInNotification: (context) => {
         sentNotifications.push(context)
+      },
+      sendEmailChangedNotification: (context) => {
+        sentEmailChanges.push(context)
       }
     },
     jwt: { privateKey: privateKeyPem },
@@ -104,6 +114,7 @@ export async function createTestServer(
     db,
     sentCodes,
     sentNotifications,
+    sentEmailChanges,
     logCalls
   }
 }

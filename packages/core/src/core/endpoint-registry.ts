@@ -13,6 +13,10 @@ import { sendSignInCode } from "../endpoints/sign-in/send-code"
 import { signOut } from "../endpoints/sign-out"
 import { getToken } from "../endpoints/token"
 import { deleteUser, updateUser } from "../endpoints/user"
+import {
+  sendEmailUpdateCode,
+  verifyEmailUpdate
+} from "../endpoints/user/email-update"
 import { sendIdentityCode, verifyIdentity } from "../endpoints/user/verify"
 import { listUsers } from "../endpoints/users"
 import { switchUser } from "../endpoints/users/switch"
@@ -37,6 +41,8 @@ export const endpointRegistry = {
   deleteUser,
   sendIdentityCode,
   verifyIdentity,
+  sendEmailUpdateCode,
+  verifyEmailUpdate,
   revokeSession,
   listUsers,
   switchUser,

@@ -35,7 +35,19 @@ export interface SendCodeContext {
    */
   headers: Headers
   /** Why the code was sent, so a "confirm it's you" mail can differ from sign-in mail. */
-  purpose: "signIn" | "identity"
+  purpose: "signIn" | "identity" | "emailChange"
+}
+
+/** Everything an email-changed notification is told. */
+export interface EmailChangedNotificationContext {
+  /** The address that was replaced. */
+  email: string
+  /** The user, carrying the new address. */
+  user: AuthUser
+  /** The locale core already resolved for this request. */
+  locale: string
+  /** The request's headers. */
+  headers: Headers
 }
 
 /** Everything a signed-in notification is told about the sign-in. */
@@ -64,6 +76,15 @@ export interface EmailOptions {
    */
   sendSignedInNotification?(
     context: SignedInNotificationContext
+  ): Promise<void> | void
+  /**
+   * Tells the old address that it no longer belongs to the account, as the
+   * author's app does once a change completes. Runs behind the response where
+   * `waitUntil` is configured; a failure is logged, since the change is
+   * already made.
+   */
+  sendEmailChangedNotification?(
+    context: EmailChangedNotificationContext
   ): Promise<void> | void
 }
 

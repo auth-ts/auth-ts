@@ -285,6 +285,69 @@ describe("deleteUser", () => {
   })
 })
 
+describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
+  it("reports the challenge on both as a value, not an error", async () => {
+    const challenge = {
+      status: 403,
+      body: {
+        code: "verificationRequired",
+        message: "Confirm it's you to continue."
+      }
+    }
+    server.on("POST", "/api/auth/user/email-update/send-code", challenge)
+    server.on("POST", "/api/auth/user/email-update/verify", challenge)
+    const client = await signedIn()
+
+    expect(
+      await client.sendEmailUpdateCode({ email: "ada@lovelace.example" })
+    ).toEqual({ status: "verificationRequired" })
+    expect(
+      await client.verifyEmailUpdate({
+        email: "ada@lovelace.example",
+        code: "ABCDEF"
+      })
+    ).toEqual({ status: "verificationRequired" })
+  })
+
+  it("carries the attempt out of the send and the user out of the verify", async () => {
+    server.on("POST", "/api/auth/user/email-update/send-code", {
+      body: { sent: true, attempt: "attempt-2" }
+    })
+    server.on("POST", "/api/auth/user/email-update/verify", {
+      body: { ...user, email: "ada@lovelace.example" }
+    })
+    const client = await signedIn()
+
+    expect(
+      await client.sendEmailUpdateCode({ email: "ada@lovelace.example" })
+    ).toEqual({ status: "sent", attempt: "attempt-2" })
+    const changed = await client.verifyEmailUpdate({
+      email: "ada@lovelace.example",
+      code: "ABCDEF"
+    })
+    expect(changed.status).toBe("updated")
+    expect(changed.status === "updated" && changed.user.email).toBe(
+      "ada@lovelace.example"
+    )
+    expect(server.requests.at(-1)?.body).toEqual({
+      email: "ada@lovelace.example",
+      code: "ABCDEF"
+    })
+  })
+
+  it("still throws for a taken address", async () => {
+    server.on("POST", "/api/auth/user/email-update/send-code", {
+      status: 409,
+      body: { code: "emailTaken", message: "Taken." }
+    })
+    const client = await signedIn()
+
+    await expect(
+      client.sendEmailUpdateCode({ email: "grace@example.com" })
+    ).rejects.toMatchObject({ code: "emailTaken" })
+  })
+})
+
 describe("verifyIdentity and revokeSession", () => {
   it("sends and verifies an identity code", async () => {
     server.on("POST", "/api/auth/user/verify/send-code", {

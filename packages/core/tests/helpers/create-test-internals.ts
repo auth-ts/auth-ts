@@ -1,4 +1,5 @@
 import { resolveAuthConfig } from "../../src/core/auth-config"
+import type { VerificationPurpose } from "../../src/core/auth-database"
 import type { AuthInternals } from "../../src/core/auth-internals"
 import { createAuthInternals } from "../../src/core/auth-internals"
 import type { AuthOptions } from "../../src/core/auth-options"
@@ -13,7 +14,7 @@ export interface CapturedCode {
   destination: string
   code: string
   locale: string
-  purpose: "signIn" | "identity"
+  purpose: VerificationPurpose
   headers: Headers
 }
 

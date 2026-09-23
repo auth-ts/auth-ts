@@ -284,6 +284,17 @@ that is recent. The challenge answers **403 `verificationRequired`**, never a
 2xx, so a client cannot mistake it for success and tell someone their account
 is gone when it is not.
 
+Changing the email address sits behind the same marker and follows the
+author's app: a code goes to the *new* address, filed under it and bound to
+this browser, with sends limited per address so nobody can flood an inbox they
+do not own, and guesses limited per address as the book's verification chapter
+asks. Verifying it re-keys the account, deletes every code filed under the old
+address or the user's sessions — the book has codes invalidated when the
+address changes — and tells the old address through
+`email.sendEmailChangedNotification`. Sessions stay signed in, as they do in
+his app; an address another account signs in with is refused as 409
+`emailTaken`, before the code and again after it.
+
 Signing out this device, or every device, needs nothing: a hijacker who does
 either signs themselves out too.
 

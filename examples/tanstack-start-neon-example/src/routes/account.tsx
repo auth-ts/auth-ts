@@ -4,6 +4,7 @@ import {
   ArrowRightStartOnRectangleIcon,
   ArrowsRightLeftIcon,
   CheckIcon,
+  EnvelopeIcon,
   LinkSlashIcon,
   TrashIcon,
   XMarkIcon
@@ -25,6 +26,7 @@ import type { Notice } from "../components/notice"
 import { NoticeAlert } from "../components/notice"
 import { PendingSpinner } from "../components/pending-spinner"
 import { SignedOutCard } from "../components/signed-out-card"
+import { UpdateEmailDialog } from "../components/update-email-dialog"
 import type { VerifiedAction } from "../components/verify-identity-dialog"
 import { useVerifiedAction } from "../components/verify-identity-dialog"
 import { useUser } from "../hooks/use-user"
@@ -78,7 +80,13 @@ function AccountPage() {
 
       {notice ? <NoticeAlert notice={notice} /> : null}
 
-      <ProfileCard userId={user.id} name={user.name} setNotice={setNotice} />
+      <ProfileCard
+        userId={user.id}
+        name={user.name}
+        email={user.email}
+        setNotice={setNotice}
+        runVerified={verified.run}
+      />
       <ProvidersCard setNotice={setNotice} />
       <SessionsCard setNotice={setNotice} runVerified={verified.run} />
       <SwitchUserCard userId={user.id} />
@@ -92,14 +100,20 @@ function AccountPage() {
 function ProfileCard({
   userId,
   name,
-  setNotice
+  email,
+  setNotice,
+  runVerified
 }: {
   userId: string
   name: string | null
+  email: string | null
   setNotice: SetNotice
+  runVerified: RunVerified
 }) {
   // null until the user edits
   const [draftName, setDraftName] = useState<string | null>(null)
+  const [changingEmail, setChangingEmail] = useState(false)
+  const revalidateUsers = useRevalidateTables([{ table: "users" }])
 
   const rename = useUpdateMutation(client.from("users"), ["id"], null, {
     onSuccess: () => {
@@ -140,6 +154,30 @@ function ProfileCard({
             Save
           </button>
         </form>
+        {email ? (
+          <div className="flex items-center justify-between gap-4 text-sm">
+            <span className="text-base-content/70">{email}</span>
+            <button
+              type="button"
+              onClick={() => setChangingEmail(true)}
+              className="btn btn-outline btn-sm"
+            >
+              <EnvelopeIcon className="size-4" />
+              Update email address
+            </button>
+          </div>
+        ) : null}
+        {changingEmail ? (
+          <UpdateEmailDialog
+            runVerified={runVerified}
+            onCancel={() => setChangingEmail(false)}
+            onUpdated={async () => {
+              setChangingEmail(false)
+              setNotice({ text: "Email address updated.", tone: "success" })
+              await revalidateUsers()
+            }}
+          />
+        ) : null}
       </div>
     </div>
   )

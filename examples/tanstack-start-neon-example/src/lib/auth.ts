@@ -13,6 +13,13 @@ export const auth = createAuth({
         console.log(`${purpose} code for ${email}: ${code}`)
       }
     },
+    sendEmailChangedNotification: ({ email }) => {
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `Your account email address was recently updated (${email}): This email address is no longer tied to your account.`
+        )
+      }
+    },
     sendSignedInNotification: ({ email, session }) => {
       if (process.env.NODE_ENV === "development") {
         console.log(

@@ -189,6 +189,14 @@ describe("getToken as a function", () => {
       () => context.auth.deleteUser({ headers }),
       () => context.auth.sendIdentityCode({ headers }),
       () => context.auth.verifyIdentity({ headers, code: "ABCDEF" }),
+      () =>
+        context.auth.sendEmailUpdateCode({ headers, email: "b@example.com" }),
+      () =>
+        context.auth.verifyEmailUpdate({
+          headers,
+          email: "b@example.com",
+          code: "ABCDEF"
+        }),
       () => context.auth.revokeSession({ headers, id: "any" })
     ]) {
       await expect(call()).rejects.toMatchObject({
@@ -486,7 +494,30 @@ describe("calling with a token instead of a request", () => {
     const { attempt } = await auth.sendIdentityCode({ token })
     const code = required(context.sentCodes.at(-1), "identity code").code
     await auth.verifyIdentity({ token, code, attempt })
-    await auth.deleteUser({ token, attempt })
+
+    // Two tokens in flight: the marker's, and the new address's own.
+    const sent = await auth.sendEmailUpdateCode({
+      token,
+      attempt,
+      email: "ada@lovelace.example"
+    })
+    const changed = await auth.verifyEmailUpdate({
+      token,
+      email: "ada@lovelace.example",
+      code: required(context.sentCodes.at(-1), "email code").code,
+      attempt: sent.attempt,
+      identityAttempt: attempt
+    })
+    expect(changed.email).toBe("ada@lovelace.example")
+
+    // The change took the marker with it, so the deletion asks again.
+    const again = await auth.sendIdentityCode({ token })
+    await auth.verifyIdentity({
+      token,
+      code: required(context.sentCodes.at(-1), "identity code").code,
+      attempt: again.attempt
+    })
+    await auth.deleteUser({ token, attempt: again.attempt })
     expect(context.db.sessions()).toHaveLength(0)
   })
 
