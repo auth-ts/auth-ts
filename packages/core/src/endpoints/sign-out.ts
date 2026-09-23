@@ -5,7 +5,6 @@ import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
 import { presentedSessions } from "../session/presented-sessions"
-import { revokeOtherSessions } from "../session/revoke-other-sessions"
 import { clearedRefreshCookies } from "../session/session-cookies"
 
 /**
@@ -14,7 +13,7 @@ import { clearedRefreshCookies } from "../session/session-cookies"
  * `"local"` is the default because the alternative is a well-known footgun:
  * signing out on a shared computer should not kill the session on your phone.
  */
-export type SignOutScope = "local" | "others" | "global"
+export type SignOutScope = "local" | "global"
 
 /** Body accepted by `POST /sign-out`. */
 export interface SignOutInput extends CallerInput {
@@ -44,9 +43,8 @@ export const signOutDocs: EndpointDocs<SignOutInput> = {
     properties: {
       scope: {
         type: "string",
-        enum: ["local", "others", "global"],
-        description:
-          "This device, other devices, or everywhere. Defaults to `local`."
+        enum: ["local", "global"],
+        description: "This device or everywhere. Defaults to `local`."
       },
       userId: {
         type: "string",
@@ -66,8 +64,13 @@ export const signOutDocs: EndpointDocs<SignOutInput> = {
  * Sign out.
  *
  * Two axes, which compose: `scope` says how far each affected user is signed
- * out — this device, other devices, everywhere — and `userId` says whether that
- * applies to the active user alone or to every user parked in this browser.
+ * out — this device or everywhere — and `userId` says whether that applies to
+ * the active user alone or to every user parked in this browser.
+ *
+ * There is no "every device but this one": from a stolen session that is the
+ * scope that locks the owner out while the thief stays in. `global` costs the
+ * thief their session too, and revoking one device sits behind identity
+ * verification.
  *
  * Worth stating wherever the button is built: revoked devices keep working until
  * their current access token expires, so "signed out everywhere" means within
@@ -122,20 +125,6 @@ export const signOut = defineEndpoint({
 
     const sessionIdFor = ({ userId, session }: (typeof targets)[number]) =>
       userId === caller.userId ? caller.sessionId : session?.id
-
-    // `others` reaches other devices and never this one, so no cookie moves and
-    // whoever is signed in here stays signed in.
-    if (scope === "others") {
-      await Promise.all(
-        targets.map((target) => {
-          const sessionId = sessionIdFor(target)
-          return sessionId
-            ? revokeOtherSessions(internals, target.userId, sessionId)
-            : undefined
-        })
-      )
-      return { data: undefined, status: 204 }
-    }
 
     // A session id is what proves the target is this caller's to revoke: it
     // comes from the token, or from a cookie whose own row named the same user.

@@ -156,8 +156,7 @@ Three things on this page.
 **Signing out** is a cookie operation, and cookies are not rows:
 
 ```ts
-await authClient.signOut()                  // this device
-await authClient.signOut({ scope: "others" })  // every other device
+await authClient.signOut()                     // this device
 await authClient.signOut({ scope: "global" })  // everywhere
 ```
 

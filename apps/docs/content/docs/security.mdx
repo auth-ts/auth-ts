@@ -145,11 +145,13 @@ obtain it — a stolen browser profile, a device backup, a proxy terminating
 TLS — holds the session until that session is revoked or expires. Hashing
 protects the database, not a stolen token.
 
-Revoking a session is a delete of the row, through your data plane — so the
-policy that scopes it to its owner is the same one that scopes every other read
-of `sessions`, rather than a check somebody remembered to write. Revoking the
-one this browser is on leaves a cookie pointing at nothing; the next `/token`
-answers `null` and clears it, and `signOut` is the call that does both at once.
+Signing out reaches this device or every device, nothing in between. "Every
+device but this one" is the scope a stolen session would use to lock the owner
+out while keeping its own foothold; `global` costs the thief their session too,
+and revoking one particular device sits behind identity verification. Revoking
+the one this browser is on leaves a cookie pointing at nothing; the next
+`/token` answers `null` and clears it, and `signOut` is the call that does both
+at once.
 
 **One cookie beside it is readable by script**, on purpose. `auth-ts.hint` holds
 `in` or `out` and nothing else, and is written and retired with the refresh

@@ -324,27 +324,6 @@ describe("multiUser enabled", () => {
     )
   })
 
-  it("writes to no session on the way out, not even the ones it keeps", async () => {
-    const context = await server()
-    const ada = await signIn(context, "ada@example.com")
-    const grace = await signIn(context, "grace@example.com", ada.cookies)
-    const token = await tokenFor(context, grace.cookies)
-    const updates = vi.spyOn(context.db, "update")
-
-    const response = await context.auth.handler(
-      request("POST", "/api/auth/sign-out", {
-        body: { scope: "others" },
-        cookies: grace.cookies,
-        token
-      })
-    )
-
-    expect(response.status).toBe(204)
-    expect(
-      updates.mock.calls.filter(([input]) => input.table === "sessions")
-    ).toHaveLength(0)
-  })
-
   it("reaches every signed in user's other devices under scope: global", async () => {
     const context = await server()
     const ada = await signIn(context, "ada@example.com")
@@ -363,26 +342,6 @@ describe("multiUser enabled", () => {
     )
 
     expect(await selectRows(context.db, "sessions")).toHaveLength(0)
-  })
-
-  it("leaves this browser alone under scope: others", async () => {
-    const context = await server()
-    const ada = await signIn(context, "ada@example.com")
-    const grace = await signIn(context, "grace@example.com", ada.cookies)
-    await signIn(context, "ada@example.com")
-    await signIn(context, "grace@example.com")
-
-    const response = await context.auth.handler(
-      request("POST", "/api/auth/sign-out", {
-        body: { scope: "others" },
-        cookies: grace.cookies,
-        token: await tokenFor(context, grace.cookies)
-      })
-    )
-
-    expect(response.headers.getSetCookie()).toEqual([])
-    expect(await selectRows(context.db, "sessions")).toHaveLength(2)
-    expect(await tokenFor(context, grace.cookies)).toBeTruthy()
   })
 
   it("404s a sign-out naming a user who is not signed in here", async () => {
@@ -490,7 +449,7 @@ describe("a refresh cookie carrying somebody else's name", () => {
   })
 
   it("cannot revoke the named user's sessions at any scope", async () => {
-    for (const scope of ["local", "others", "global"] as const) {
+    for (const scope of ["local", "global"] as const) {
       const context = await createTestServer({ multiUser: true })
       const victim = await signIn(context, "victim@example.com")
       const attacker = await signIn(context, "attacker@example.com")

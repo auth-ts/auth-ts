@@ -214,9 +214,6 @@ export interface AuthClient {
   /**
    * Signs out.
    *
-   * `"others"` deliberately clears nothing locally — it is the "sign out my
-   * other devices" button, and this device is meant to survive it.
-   *
    * A session that is already gone resolves rather than throwing: the caller
    * asked to end up signed out, and they are.
    */

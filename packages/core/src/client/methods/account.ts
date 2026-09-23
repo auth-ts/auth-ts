@@ -25,7 +25,7 @@ export async function updateUser(
 }
 
 /** How far a sign-out reaches, for each account it applies to. */
-export type SignOutScope = "local" | "others" | "global"
+export type SignOutScope = "local" | "global"
 
 /** Input for signing out. */
 export interface SignOutInput {
@@ -40,7 +40,7 @@ export interface SignOutInput {
   userId?: string
 }
 
-/** `POST /sign-out`, then forgets the token unless only other devices went. */
+/** `POST /sign-out`, then forgets the token. */
 export async function signOut(
   internals: AuthClientInternals,
   input: SignOutInput = {}
@@ -61,7 +61,7 @@ export async function signOut(
     }
   }
 
-  if (scope !== "others") internals.tokenStore.clear()
+  internals.tokenStore.clear()
 }
 
 /** Where no cookie carries it, the attempt token `sendIdentityCode` returned. */

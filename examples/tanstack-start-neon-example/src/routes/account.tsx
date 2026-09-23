@@ -82,11 +82,7 @@ function AccountPage() {
       <ProvidersCard setNotice={setNotice} />
       <SessionsCard setNotice={setNotice} runVerified={verified.run} />
       <SwitchUserCard userId={user.id} />
-      <SignOutButtons
-        userId={user.id}
-        signOut={signOut}
-        setNotice={setNotice}
-      />
+      <SignOutButtons userId={user.id} signOut={signOut} />
       <DeleteCard runVerified={verified.run} />
       {verified.dialog}
     </section>
@@ -346,52 +342,24 @@ function SwitchUserCard({ userId }: { userId: string }) {
 
 function SignOutButtons({
   userId,
-  signOut,
-  setNotice
+  signOut
 }: {
   userId: string
   signOut: SignOut
-  setNotice: SetNotice
 }) {
-  const revalidateSessions = useRevalidateTables([{ table: "sessions" }])
-
-  const buttons: {
-    label: string
-    input?: SignOutInput
-    navigates: boolean
-  }[] = [
-    { label: "Sign out", navigates: true },
-    { label: "Sign out this account", input: { userId }, navigates: true },
-    {
-      label: "Sign out other devices",
-      input: { scope: "others" },
-      navigates: false
-    },
-    {
-      label: "Sign out everywhere",
-      input: { scope: "global" },
-      navigates: true
-    }
+  const buttons: { label: string; input?: SignOutInput }[] = [
+    { label: "Sign out" },
+    { label: "Sign out this account", input: { userId } },
+    { label: "Sign out everywhere", input: { scope: "global" } }
   ]
 
   return (
     <div className="flex flex-wrap gap-2">
-      {buttons.map(({ label, input, navigates }) => (
+      {buttons.map(({ label, input }) => (
         <button
           key={label}
           type="button"
-          onClick={async () => {
-            if (navigates) {
-              await signOut(input)
-              return
-            }
-            await authClient.signOut(input)
-            setNotice({
-              text: "Signed out on your other devices.",
-              tone: "success"
-            })
-            await revalidateSessions()
-          }}
+          onClick={() => signOut(input)}
           className="btn btn-outline btn-sm"
         >
           <ArrowRightStartOnRectangleIcon className="size-4" />

@@ -226,18 +226,6 @@ describe("signOut", () => {
     await expect(client.getToken()).rejects.toThrow()
   })
 
-  it("keeps local state for the others scope, which is the point of it", async () => {
-    server.on("POST", "/api/auth/sign-in/code", {
-      body: { user },
-      token: fakeAccessToken()
-    })
-    server.on("POST", "/api/auth/sign-out", { status: 204 })
-    const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
-
-    await client.signOut({ scope: "others" })
-  })
-
   it("names an account only when it is given one", async () => {
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
