@@ -1,6 +1,8 @@
 import type { AuthInternals } from "../core/auth-internals"
 import { unauthenticated } from "../http/auth-api-error"
 import { inspectToken } from "../jwt/verify-token"
+import { selectOne } from "../lib/select-one"
+import { sessionAge } from "./session-token"
 
 /**
  * How a caller identifies itself: a request's headers, an access token, or both.
@@ -106,4 +108,29 @@ export async function authenticate(
   internals.log.debug("refusing a request with no live token", { reason })
 
   throw unauthenticated()
+}
+
+/**
+ * The caller and their user, from a session that is still live.
+ *
+ * For the endpoints that act on the account: a revoked session's token still
+ * verifies until it expires, and this refuses it anyway.
+ *
+ * @throws {AuthApiError} `unauthenticated` when the token, the session or the user is gone.
+ */
+export async function authenticateUser(
+  internals: AuthInternals,
+  input: CallerInput
+) {
+  const caller = await authenticate(internals, input)
+  const [user, session] = await Promise.all([
+    selectOne(internals, "users", { id: { eq: caller.userId } }),
+    selectOne(internals, "sessions", {
+      id: { eq: caller.sessionId },
+      ...sessionAge(internals).live
+    })
+  ])
+  if (!user || !session) throw unauthenticated()
+
+  return { caller, user }
 }

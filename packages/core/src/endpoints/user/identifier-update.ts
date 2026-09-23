@@ -2,7 +2,7 @@ import type { AuthConfig } from "../../core/auth-config"
 import type { VerificationPurpose } from "../../core/auth-database"
 import type { AuthInternals } from "../../core/auth-internals"
 import type { ChangedNotificationContext } from "../../core/auth-options"
-import { AuthApiError, unauthenticated } from "../../http/auth-api-error"
+import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import type { AuthErrorCode } from "../../http/error-response"
 import { readBody } from "../../http/read-body"
@@ -13,9 +13,8 @@ import { clearCookie, shouldUseSecureCookies } from "../../lib/serialize-cookie"
 import type { AnyEndpointDocs } from "../../openapi/endpoint-docs"
 import type { JsonSchema } from "../../openapi/json-schema"
 import type { CallerInput } from "../../session/authenticate"
-import { authenticate } from "../../session/authenticate"
+import { authenticateUser } from "../../session/authenticate"
 import { listUserSessions } from "../../session/list-user-sessions"
-import { sessionAge } from "../../session/session-token"
 import type { AttemptInput } from "../../shared/attempt-cookie"
 import {
   attemptCookie,
@@ -70,15 +69,7 @@ async function verifiedCaller(
   internals: AuthInternals,
   input: CallerInput & { attempt?: string }
 ) {
-  const caller = await authenticate(internals, input)
-  const [user, session] = await Promise.all([
-    selectOne(internals, "users", { id: { eq: caller.userId } }),
-    selectOne(internals, "sessions", {
-      id: { eq: caller.sessionId },
-      ...sessionAge(internals).live
-    })
-  ])
-  if (!user || !session) throw unauthenticated()
+  const { caller, user } = await authenticateUser(internals, input)
   if (!accountIdentifier(user)) {
     throw new AuthApiError("guestCannotReceiveCode")
   }

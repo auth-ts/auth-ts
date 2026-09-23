@@ -5,9 +5,8 @@ import { validateAdditionalFields } from "../http/validate-additional-fields"
 import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
-import { authenticate } from "../session/authenticate"
+import { authenticate, authenticateUser } from "../session/authenticate"
 import { clearedRefreshCookies } from "../session/session-cookies"
-import { sessionAge } from "../session/session-token"
 import type { AttemptInput } from "../shared/attempt-cookie"
 import { readAttempt } from "../shared/attempt-cookie"
 // Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
@@ -181,18 +180,7 @@ export const deleteUser = defineEndpoint({
   },
   run: async (internals, input: DeleteUserInput) => {
     const headers = input.headers ?? new Headers()
-    const caller = await authenticate(internals, input)
-
-    // A session already revoked refuses the delete rather than honouring a
-    // token that outlived it.
-    const [user, session] = await Promise.all([
-      selectOne(internals, "users", { id: { eq: caller.userId } }),
-      selectOne(internals, "sessions", {
-        id: { eq: caller.sessionId },
-        ...sessionAge(internals).live
-      })
-    ])
-    if (!user || !session) throw unauthenticated()
+    const { caller, user } = await authenticateUser(internals, input)
 
     const finishDeletion = async () => {
       await deleteUserAndRows(internals, user)

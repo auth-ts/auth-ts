@@ -1,12 +1,10 @@
-import { AuthApiError, unauthenticated } from "../../http/auth-api-error"
+import { AuthApiError } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { readBody } from "../../http/read-body"
 import { resolveLocale } from "../../http/resolve-locale"
-import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
-import { authenticate } from "../../session/authenticate"
-import { sessionAge } from "../../session/session-token"
+import { authenticateUser } from "../../session/authenticate"
 import type { AttemptInput } from "../../shared/attempt-cookie"
 import { attemptCookie, readAttempt } from "../../shared/attempt-cookie"
 import { markIdentityVerified } from "../../verification-code/identity"
@@ -60,17 +58,7 @@ export const sendIdentityCode = defineEndpoint({
   }),
   run: async (internals, input: SendIdentityCodeInput) => {
     const headers = input.headers ?? new Headers()
-    const caller = await authenticate(internals, input)
-    const [user, session] = await Promise.all([
-      selectOne(internals, "users", { id: { eq: caller.userId } }),
-      selectOne(internals, "sessions", {
-        id: { eq: caller.sessionId },
-        ...sessionAge(internals).live
-      })
-    ])
-    // A session revoked since the token was minted refuses too, or a
-    // signed-out token would keep putting codes in flight.
-    if (!user || !session) throw unauthenticated()
+    const { caller, user } = await authenticateUser(internals, input)
 
     const identifier = accountIdentifier(user)
     if (!identifier) throw new AuthApiError("guestCannotReceiveCode")
@@ -154,7 +142,7 @@ export const verifyIdentity = defineEndpoint({
     return { ...body, headers: request.headers, requestURL: request.url }
   },
   run: async (internals, input: VerifyIdentityInput) => {
-    const caller = await authenticate(internals, input)
+    const { caller } = await authenticateUser(internals, input)
     if (typeof input.code !== "string" || input.code.length === 0) {
       throw new AuthApiError("invalidField", {
         message: "A code is required."

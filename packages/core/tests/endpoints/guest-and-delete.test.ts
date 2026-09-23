@@ -463,6 +463,36 @@ describe("identity verification, revoking a device, deleting the account", () =>
       "session row"
     )
 
+  it("refuses to verify from a session revoked since its token was minted", async () => {
+    const context = await createTestServer()
+    const session = await signIn(context)
+    const cookies = refreshCookieFor(session.refreshToken)
+    await context.auth.handler(
+      request("POST", "/api/auth/user/verify/send-code", {
+        cookies,
+        token: session.token
+      })
+    )
+    const code = required(context.sentCodes.at(-1), "identity code").code
+    await context.db.delete({
+      table: "sessions",
+      where: { id: { eq: sessionIdOf(session.refreshToken) } }
+    })
+
+    const response = await context.auth.handler(
+      request("POST", "/api/auth/user/verify", {
+        cookies,
+        token: session.token,
+        body: { code }
+      })
+    )
+
+    expect(response.status).toBe(401)
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "unauthenticated"
+    )
+  })
+
   it("deletes the account and clears the cookie once identity is verified", async () => {
     const context = await createTestServer()
     const session = await signIn(context)

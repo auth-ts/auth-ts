@@ -1,11 +1,9 @@
-import { notFound, unauthenticated } from "../../http/auth-api-error"
+import { notFound } from "../../http/auth-api-error"
 import { defineEndpoint } from "../../http/define-endpoint"
 import { readBody } from "../../http/read-body"
-import { selectOne } from "../../lib/select-one"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
-import { authenticate } from "../../session/authenticate"
-import { sessionAge } from "../../session/session-token"
+import { authenticateUser } from "../../session/authenticate"
 import type { AttemptInput } from "../../shared/attempt-cookie"
 import { readAttempt } from "../../shared/attempt-cookie"
 import { requireVerifiedIdentity } from "../../verification-code/identity"
@@ -61,12 +59,7 @@ export const revokeSession = defineEndpoint({
     return { ...body, id: params.id ?? "", headers: request.headers }
   },
   run: async (internals, input: RevokeSessionInput) => {
-    const caller = await authenticate(internals, input)
-    const session = await selectOne(internals, "sessions", {
-      id: { eq: caller.sessionId },
-      ...sessionAge(internals).live
-    })
-    if (!session) throw unauthenticated()
+    const { caller } = await authenticateUser(internals, input)
 
     await requireVerifiedIdentity(
       internals,
