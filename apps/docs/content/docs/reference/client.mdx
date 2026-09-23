@@ -220,7 +220,7 @@ Anything that changes who is signed in has to invalidate that key, because
 nothing else will:
 
 ```tsx
-await authClient.signInWithCode({ email, code })
+await authClient.signInWithCode({ code })
 await refetch()          // or queryClient.invalidateQueries(...)
 
 await authClient.signOut()

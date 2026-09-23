@@ -161,7 +161,7 @@ if (sent.status === "verificationRequired") {
   // the "confirm it's you" dialog, then call it again
 }
 // collect the code sent to the new address, then:
-const result = await authClient.verifyEmailUpdate({ email, code })
+const result = await authClient.verifyEmailUpdate({ code })
 if (result.status === "updated") {
   // result.user carries the new address
 }

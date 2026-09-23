@@ -26,7 +26,7 @@ describe("verification code sign-in over HTTP", () => {
 
     const verifyResponse = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email: "ada@example.com", code: sent.code }
+        body: { code: sent.code }
       })
     )
     expect(verifyResponse.status).toBe(200)
@@ -61,7 +61,6 @@ describe("verification code sign-in over HTTP", () => {
       return auth.handler(
         request("POST", "/api/auth/sign-in/code", {
           body: {
-            email: "ada@example.com",
             code: required(sentCodes.at(-1), "code").code
           },
           headers: { "user-agent": userAgent }
@@ -106,7 +105,7 @@ describe("verification code sign-in over HTTP", () => {
 
     const response = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email: "ada@example.com", code: wrongCode }
+        body: { code: wrongCode }
       })
     )
 
@@ -142,7 +141,6 @@ describe("verification code sign-in over HTTP", () => {
     const stranger = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(sentCodes[0], "sent code").code
         },
         cookies: { "auth-ts.attempt": "someone-elses-attempt" }
@@ -153,7 +151,6 @@ describe("verification code sign-in over HTTP", () => {
     const owner = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(sentCodes[0], "sent code").code,
           attempt: sent.attempt
         },
@@ -161,6 +158,39 @@ describe("verification code sign-in over HTTP", () => {
       })
     )
     expect(owner.status).toBe(200)
+  })
+
+  it("finds the address from the attempt, so one attempt cannot verify another address's code", async () => {
+    const { auth, sentCodes, db } = await createTestServer()
+    const send = async (email: string) => {
+      const response = await auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", { body: { email } })
+      )
+      return ((await response.json()) as { attempt: string }).attempt
+    }
+    const adaAttempt = await send("ada@example.com")
+    await send("grace@example.com")
+    const graceCode = required(sentCodes.at(-1), "grace's code").code
+
+    const crossed = await auth.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: { code: graceCode, attempt: adaAttempt }
+      })
+    )
+    expect(crossed.status).toBe(401)
+    expect(db.users()).toHaveLength(0)
+
+    const own = await auth.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: {
+          code: required(sentCodes[0], "ada's code").code,
+          attempt: adaAttempt
+        }
+      })
+    )
+    expect(((await own.json()) as { user: { email: string } }).user.email).toBe(
+      "ada@example.com"
+    )
   })
 
   it("returns 429 with Retry-After once an address has been guessed at too often", async () => {
@@ -175,7 +205,7 @@ describe("verification code sign-in over HTTP", () => {
     const guess = (value: string) =>
       auth.handler(
         request("POST", "/api/auth/sign-in/code", {
-          body: { email: "ada@example.com", code: value }
+          body: { code: value }
         })
       )
 
@@ -207,7 +237,7 @@ describe("verification code sign-in over HTTP", () => {
     for (let attempt = 0; attempt < 6; attempt++) {
       const stranger = await auth.handler(
         request("POST", "/api/auth/sign-in/code", {
-          body: { email: "ada@example.com", code, attempt: "made-up" }
+          body: { code, attempt: "made-up" }
         })
       )
       expect(stranger.status).toBe(401)
@@ -215,7 +245,7 @@ describe("verification code sign-in over HTTP", () => {
 
     const owner = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email: "ada@example.com", code }
+        body: { code }
       })
     )
     expect(owner.status).toBe(200)
@@ -238,14 +268,14 @@ describe("verification code sign-in over HTTP", () => {
     for (let attempt = 0; attempt < 5; attempt++) {
       await auth.handler(
         request("POST", "/api/auth/sign-in/code", {
-          body: { email: "ada@example.com", code: wrong }
+          body: { code: wrong }
         })
       )
     }
 
     const response = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email: "ada@example.com", code: wrong },
+        body: { code: wrong },
         headers: { "accept-language": "de-AT,de;q=0.9" }
       })
     )
@@ -287,7 +317,6 @@ describe("what a session records about proving identity", () => {
     const verified = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(sentCodes.at(-1), "sent code").code
         }
       })
@@ -314,7 +343,6 @@ describe("what a session records about proving identity", () => {
     await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          phoneNumber: "+15555550123",
           code: required(codes.at(-1), "sent code")
         }
       })
@@ -335,7 +363,7 @@ describe("token and user endpoints", () => {
     const sent = required(context.sentCodes[0], "sent code")
     const verifyResponse = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email: "ada@example.com", code: sent.code }
+        body: { code: sent.code }
       })
     )
     const refreshToken = required(
@@ -534,7 +562,6 @@ describe("jwks and discovery", () => {
     const verifyResponse = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(sentCodes[0], "sent").code
         }
       })
@@ -614,7 +641,6 @@ describe("GET /token", () => {
     const signIn = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(sentCodes[0], "sent code").code
         }
       })
@@ -657,7 +683,6 @@ describe("GET /token", () => {
     const signIn = await auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(sentCodes[0], "sent code").code
         }
       })
@@ -694,7 +719,6 @@ describe("where a token comes from", () => {
     const verified = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes[0], "sent code").code
         }
       })

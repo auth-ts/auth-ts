@@ -27,7 +27,7 @@ describe("sweeping", () => {
     await context.auth.handler(sendCode(email))
     return context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email, code: required(context.sentCodes.at(-1), "code").code }
+        body: { code: required(context.sentCodes.at(-1), "code").code }
       })
     )
   }
@@ -187,7 +187,7 @@ describe("logging redaction", () => {
 
     const verifyResponse = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email: "ada@example.com", code: sent.code }
+        body: { code: sent.code }
       })
     )
     const refreshToken = required(

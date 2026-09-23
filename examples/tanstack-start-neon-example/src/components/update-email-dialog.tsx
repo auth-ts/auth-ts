@@ -85,7 +85,7 @@ export function UpdateEmailDialog({
     setNotice(null)
     try {
       await runVerified(async () => {
-        const result = await authClient.verifyEmailUpdate({ email, code })
+        const result = await authClient.verifyEmailUpdate({ code })
         if (result.status === "updated") await onUpdated()
         return result
       })

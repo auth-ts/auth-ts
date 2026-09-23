@@ -12,11 +12,10 @@ import type { AttemptInput } from "../../shared/attempt-cookie"
 import { attemptCookieName, readAttempt } from "../../shared/attempt-cookie"
 import { findOrCreateUser } from "../../user/find-or-create-user"
 import { consumeVerificationCode } from "../../verification-code/consume-verification-code"
-import type { IdentifierBody } from "../../verification-code/resolve-code-identifier"
-import { resolveCodeIdentifier } from "../../verification-code/resolve-code-identifier"
+import type { CodeIdentifier } from "../../verification-code/resolve-code-identifier"
 
 /** Body accepted by `POST /sign-in/code`. */
-export interface SignInWithCodeInput extends IdentifierBody, AttemptInput {
+export interface SignInWithCodeInput extends AttemptInput {
   code: string
   /** Values for fields declared in `user.additionalFields`, applied on creation only. */
   additionalFields?: Record<string, unknown>
@@ -32,13 +31,6 @@ export const signInWithCodeDocs: EndpointDocs<SignInWithCodeInput> = {
   body: {
     type: "object",
     properties: {
-      email: {
-        type: "string",
-        format: "email",
-        description:
-          "Lowercase; letters, digits and . _ + - before one @, a dotted domain after; at most 100 characters. Taken as sent, never modified."
-      },
-      phoneNumber: { type: "string", description: "E.164." },
       code: { type: "string" },
       attempt: {
         type: "string",
@@ -79,8 +71,6 @@ export const signInWithCode = defineEndpoint({
   path: "/sign-in/code",
   parse: async ({ request }): Promise<SignInWithCodeInput> => {
     const body = await readBody<SignInWithCodeInput>(request, [
-      "email",
-      "phoneNumber",
       "code",
       "attempt",
       "additionalFields"
@@ -90,8 +80,6 @@ export const signInWithCode = defineEndpoint({
   },
   run: async (internals, input: SignInWithCodeInput) => {
     const headers = input.headers ?? new Headers()
-    const identifier = resolveCodeIdentifier(internals, input)
-
     if (typeof input.code !== "string" || input.code.length === 0) {
       throw new AuthApiError("invalidField", {
         message: "A code is required."
@@ -106,16 +94,19 @@ export const signInWithCode = defineEndpoint({
       input.additionalFields
     )
 
-    const [, active] = await Promise.all([
+    const [stored, active] = await Promise.all([
       consumeVerificationCode(internals, {
-        identifier: identifier.value,
         code: input.code,
         purpose: "signIn",
-        attempt: readAttempt(input, "signIn"),
-        guessKey: identifier.value
+        attempt: readAttempt(input, "signIn")
       }),
       resolveCallerSession(internals, input)
     ])
+    // Stored numbers are E.164, which has no @
+    const identifier: CodeIdentifier = {
+      kind: stored.identifier.includes("@") ? "email" : "phoneNumber",
+      value: stored.identifier
+    }
     const { user, created } =
       active?.user.type === "guest"
         ? await convertGuest(internals, active.user, {

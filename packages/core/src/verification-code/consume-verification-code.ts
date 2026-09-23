@@ -12,13 +12,14 @@ import { liveCode } from "./send-verification-code"
 
 /** What verifying a code needs to know. */
 export interface ConsumeVerificationCodeInput {
-  identifier: string
+  /** Required where a code is bound to more than its attempt: the session, for identity. */
+  identifier?: string
   code: string
   purpose: VerificationPurpose
   /** The token the send handed out; without one there is nothing to verify against. */
   attempt: string | null
-  /** What the guess budget is keyed on: the address for a sign-in, the user for an identity check. */
-  guessKey: string
+  /** What the guess budget is keyed on; the row's identifier when omitted. */
+  guessKey?: string
 }
 
 /**
@@ -49,9 +50,11 @@ export async function matchVerificationCode(
   if (!input.attempt) throw new AuthApiError("invalidCode")
 
   const stored = await selectOne(internals, "verifications", {
-    identifier: { eq: input.identifier },
-    purpose: { eq: input.purpose },
     attemptHash: { eq: await sha256Hex(input.attempt) },
+    purpose: { eq: input.purpose },
+    ...(input.identifier === undefined
+      ? {}
+      : { identifier: { eq: input.identifier } }),
     ...liveCode()
   })
   // An identity marker keeps its row but no longer holds a code
@@ -61,7 +64,7 @@ export async function matchVerificationCode(
 
   await checkRateLimit(
     internals,
-    `guess:${input.guessKey}`,
+    `guess:${input.guessKey ?? stored.identifier}`,
     config.rateLimit === false ? DEFAULT_GUESSES : config.rateLimit.guesses
   )
 
@@ -91,4 +94,6 @@ export async function consumeVerificationCode(
     where: { id: { eq: stored.id } }
   })
   if (!consumed) throw new AuthApiError("invalidCode")
+
+  return stored
 }

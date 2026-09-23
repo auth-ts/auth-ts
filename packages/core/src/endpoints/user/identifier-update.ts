@@ -38,15 +38,14 @@ export type SendUpdateCodeInput<K extends IdentifierKind> = CallerInput &
   Record<K, unknown> & { requestURL?: string }
 
 /** Body accepted by `POST /user/<route>/verify`. */
-export type VerifyUpdateInput<K extends IdentifierKind> = CallerInput &
-  Record<K, unknown> & {
-    code: string
-    /** The token the send returned, for callers with no cookie jar. */
-    attempt?: string
-    /** The token `/user/verify/send-code` returned, for callers with no cookie jar. */
-    identityAttempt?: string
-    requestURL?: string
-  }
+export interface VerifyUpdateInput extends CallerInput {
+  code: string
+  /** The token the send returned, for callers with no cookie jar. */
+  attempt?: string
+  /** The token `/user/verify/send-code` returned, for callers with no cookie jar. */
+  identityAttempt?: string
+  requestURL?: string
+}
 
 interface UpdateSpec<K extends IdentifierKind> {
   kind: K
@@ -194,7 +193,6 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
     body: {
       type: "object",
       properties: {
-        [spec.kind]: spec.property,
         code: { type: "string" },
         attempt: {
           type: "string",
@@ -202,7 +200,7 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
         },
         identityAttempt: { type: "string", description: IDENTITY_ATTEMPT }
       },
-      required: [spec.kind, "code"]
+      required: ["code"]
     },
     responses: {
       200: {
@@ -225,18 +223,16 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
   const verify = defineEndpoint({
     method: "POST",
     path: `/user/${spec.route}/verify`,
-    parse: async ({ request }): Promise<VerifyUpdateInput<K>> => {
-      const body = await readBody<
-        Record<K, unknown> & {
-          code: string
-          attempt?: string
-          identityAttempt?: string
-        }
-      >(request, [spec.kind, "code", "attempt", "identityAttempt"])
+    parse: async ({ request }): Promise<VerifyUpdateInput> => {
+      const body = await readBody<{
+        code: string
+        attempt?: string
+        identityAttempt?: string
+      }>(request, ["code", "attempt", "identityAttempt"])
 
       return { ...body, headers: request.headers, requestURL: request.url }
     },
-    run: async (internals, input: VerifyUpdateInput<K>) => {
+    run: async (internals, input: VerifyUpdateInput) => {
       const headers = input.headers ?? new Headers()
       const user = await verifiedCaller(internals, {
         ...input,
@@ -247,17 +243,13 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
           message: "A code is required."
         })
       }
-      const identifier = await newIdentifier(internals, spec, input[spec.kind])
-
-      await consumeVerificationCode(internals, {
-        identifier: identifier.value,
+      const stored = await consumeVerificationCode(internals, {
         code: input.code,
         purpose: spec.purpose,
-        attempt: readAttempt(input, spec.purpose),
-        guessKey: identifier.value
+        attempt: readAttempt(input, spec.purpose)
       })
       // Claimed between the send and the verify: the re-check catches it.
-      await newIdentifier(internals, spec, identifier.value)
+      const identifier = await newIdentifier(internals, spec, stored.identifier)
 
       const previous = user[spec.kind]
       const [updated, sessions] = await Promise.all([
@@ -347,12 +339,8 @@ const phone = updateEndpoints({
 
 /** Body accepted by `POST /user/email-update/send-code`. */
 export type SendEmailUpdateCodeInput = SendUpdateCodeInput<"email">
-/** Body accepted by `POST /user/email-update/verify`. */
-export type VerifyEmailUpdateInput = VerifyUpdateInput<"email">
 /** Body accepted by `POST /user/phone-update/send-code`. */
 export type SendPhoneUpdateCodeInput = SendUpdateCodeInput<"phoneNumber">
-/** Body accepted by `POST /user/phone-update/verify`. */
-export type VerifyPhoneUpdateInput = VerifyUpdateInput<"phoneNumber">
 
 /** How `POST /user/email-update/send-code` appears in the OpenAPI document. */
 export const sendEmailUpdateCodeDocs = email.sendCodeDocs

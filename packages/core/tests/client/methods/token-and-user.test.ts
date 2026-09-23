@@ -385,7 +385,7 @@ describe("a refused token", () => {
       token: fakeAccessToken()
     })
     const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ code: "123456" })
 
     expect(await client.listUsers()).toEqual([])
     expect(
@@ -405,7 +405,7 @@ describe("a refused token", () => {
     server.on("GET", "/api/auth/users", refused)
     server.on("GET", "/api/auth/token", refused)
     const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ code: "123456" })
 
     await expect(client.listUsers()).rejects.toMatchObject({
       code: "unauthenticated"
@@ -557,7 +557,6 @@ describe("refresh", () => {
 
     try {
       const nearingExpiry = await client.signInWithCode({
-        email: "ada@example.com",
         code: "123456"
       })
       let landed = () => {}

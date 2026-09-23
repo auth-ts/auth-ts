@@ -32,7 +32,6 @@ async function verifyWith(
   return context.auth.handler(
     request("POST", "/api/auth/sign-in/code", {
       body: {
-        email,
         code: required(context.sentCodes.at(-1), "code").code,
         additionalFields
       }
@@ -92,7 +91,6 @@ describe("additionalFields on sign-up", () => {
     const retried = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code,
           additionalFields: { referralCode: "ADA10" }
         }
@@ -151,7 +149,6 @@ describe("additionalFields on sign-up", () => {
       request("POST", "/api/auth/sign-in/code", {
         cookies,
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code,
           additionalFields: { referralCode: "ADA10", seats: 3 }
         }
@@ -187,7 +184,6 @@ describe("additionalFields on sign-up", () => {
       request("POST", "/api/auth/sign-in/code", {
         cookies,
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code,
           additionalFields: { referralCode: "STOLEN" }
         }

@@ -371,7 +371,7 @@ describe("origin check", () => {
           body
         })
       )
-    const payload = JSON.stringify({ email: "ada@example.com", code: "123456" })
+    const payload = JSON.stringify({ code: "123456" })
 
     const textPlain = await post({ "content-type": "text/plain" }, payload)
     expect(textPlain.status).toBe(415)

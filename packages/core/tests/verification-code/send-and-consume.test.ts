@@ -164,7 +164,7 @@ describe("sendVerificationCode", () => {
         attempt,
         guessKey: "ada@example.com"
       })
-    ).resolves.toBeUndefined()
+    ).resolves.toBeDefined()
   })
 
   it("files the code under the key, which need not be the address it went to", async () => {
@@ -203,7 +203,7 @@ describe("sendVerificationCode", () => {
         attempt,
         guessKey: "user-1"
       })
-    ).resolves.toBeUndefined()
+    ).resolves.toBeDefined()
   })
 
   it("passes the resolved locale, purpose, and request headers to the sender", async () => {
@@ -398,7 +398,7 @@ describe("consumeVerificationCode", () => {
         attempt,
         guessKey: "ada@example.com"
       })
-    ).resolves.toBeUndefined()
+    ).resolves.toBeDefined()
   })
 
   it("refuses the right code without its attempt token", async () => {
@@ -474,7 +474,7 @@ describe("consumeVerificationCode", () => {
       // The code itself was never spent, and a minute buys one more try.
       expect(await storedCodes(db)).toHaveLength(2)
       vi.advanceTimersByTime(60_000)
-      await expect(guess(code)).resolves.toBeUndefined()
+      await expect(guess(code)).resolves.toBeDefined()
     } finally {
       vi.useRealTimers()
     }

@@ -462,7 +462,7 @@ export type AuthDeleteInput<
  * | --- | --- | --- | --- |
  * | `users` | `email`, `phoneNumber` | | |
  * | `sessions` | | `userId`, `updatedAt` | `updatedAt` |
- * | `verifications` | | `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
+ * | `verifications` | | `attemptHash`, `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
  * | `rateLimits` | `key` | `updatedAt` | `updatedAt` |
  * | `identities` | `(provider, providerUserId)` | `userId` | |
  *

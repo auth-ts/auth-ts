@@ -19,7 +19,7 @@ const signedIn = async () => {
     token: fakeAccessToken()
   })
   const client = createAuthClient()
-  await client.signInWithCode({ email: "ada@example.com", code: "123456" })
+  await client.signInWithCode({ code: "123456" })
 
   return client
 }
@@ -42,7 +42,6 @@ describe("signInWithCode", () => {
     const client = createAuthClient()
 
     const result = await client.signInWithCode({
-      email: "ada@example.com",
       code: "123456"
     })
 
@@ -69,7 +68,6 @@ describe("timestamps on the wire", () => {
     const client = createAuthClient()
 
     const { user: signedIn } = await client.signInWithCode({
-      email: "ada@example.com",
       code: "123456"
     })
     expect(isRealDate(signedIn.createdAt)).toBe(true)
@@ -218,7 +216,7 @@ describe("signOut", () => {
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ code: "123456" })
 
     await client.signOut()
 
@@ -253,7 +251,7 @@ describe("signOut", () => {
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ code: "123456" })
 
     await client.signOut()
 
@@ -303,7 +301,6 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
     ).toEqual({ status: "verificationRequired" })
     expect(
       await client.verifyEmailUpdate({
-        email: "ada@lovelace.example",
         code: "ABCDEF"
       })
     ).toEqual({ status: "verificationRequired" })
@@ -322,17 +319,13 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
       await client.sendEmailUpdateCode({ email: "ada@lovelace.example" })
     ).toEqual({ status: "sent", attempt: "attempt-2" })
     const changed = await client.verifyEmailUpdate({
-      email: "ada@lovelace.example",
       code: "ABCDEF"
     })
     expect(changed.status).toBe("updated")
     expect(changed.status === "updated" && changed.user.email).toBe(
       "ada@lovelace.example"
     )
-    expect(server.requests.at(-1)?.body).toEqual({
-      email: "ada@lovelace.example",
-      code: "ABCDEF"
-    })
+    expect(server.requests.at(-1)?.body).toEqual({ code: "ABCDEF" })
   })
 
   it("routes the phone pair the same way", async () => {
@@ -348,7 +341,6 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
       await client.sendPhoneUpdateCode({ phoneNumber: "+15550100" })
     ).toEqual({ status: "sent", attempt: "attempt-3" })
     const changed = await client.verifyPhoneUpdate({
-      phoneNumber: "+15550100",
       code: "ABCDEF"
     })
     expect(changed.status === "updated" && changed.user.phoneNumber).toBe(
@@ -432,7 +424,7 @@ describe("sessions and accounts", () => {
     })
 
     const client = createAuthClient()
-    await client.signInWithCode({ email: "ada@example.com", code: "123456" })
+    await client.signInWithCode({ code: "123456" })
 
     const result = await client.switchUser({ userId: "user-2" })
 

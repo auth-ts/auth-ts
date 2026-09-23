@@ -23,7 +23,7 @@ async function signIn(context: Context, email = OLD): Promise<Session> {
   )
   const response = await context.auth.handler(
     request("POST", "/api/auth/sign-in/code", {
-      body: { email, code: required(context.sentCodes.at(-1), "code").code }
+      body: { code: required(context.sentCodes.at(-1), "code").code }
     })
   )
   const { token } = (await response.json()) as { token: string }
@@ -74,7 +74,7 @@ const verify = (
     request("POST", "/api/auth/user/email-update/verify", {
       cookies: refreshCookieFor(session.refreshToken),
       token: session.token,
-      body: { email: NEW, ...body }
+      body
     })
   )
 
@@ -241,7 +241,7 @@ describe("changing the email address", () => {
 
     const stale = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
-        body: { email: OLD, code: signInCode }
+        body: { code: signInCode }
       })
     )
     expect(stale.status).toBe(401)
@@ -334,14 +334,10 @@ describe("changing the phone number", () => {
     expect(texts[0]?.destination).toBe("+15550100100")
     expect(texts[0]?.purpose).toBe("phoneChange")
 
-    const wrong = await call("verify", {
-      phoneNumber: "+15550100100",
-      code: "WRONG1"
-    })
+    const wrong = await call("verify", { code: "WRONG1" })
     expect(wrong.status).toBe(401)
 
     const done = await call("verify", {
-      phoneNumber: "+15550100100",
       code: required(texts[0], "text").code
     })
     expect(done.status).toBe(200)

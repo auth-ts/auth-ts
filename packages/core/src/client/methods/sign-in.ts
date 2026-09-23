@@ -7,8 +7,8 @@ export type SendSignInCodeInput =
   | { email: string; phoneNumber?: never }
   | { phoneNumber: string; email?: never }
 
-/** The identifier, the code, and any declared sign-up fields. */
-export type SignInWithCodeInput = SendSignInCodeInput & {
+/** The code, and any declared sign-up fields. */
+export interface SignInWithCodeInput {
   code: string
   /**
    * The attempt token `sendSignInCode` returned. Browsers and `cookieStorage`

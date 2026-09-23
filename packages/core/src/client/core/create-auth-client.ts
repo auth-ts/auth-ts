@@ -11,9 +11,8 @@ import type {
   SendUpdateCodeResult,
   SignOutInput,
   UpdateUserInput,
-  VerifyEmailUpdateInput,
   VerifyIdentityInput,
-  VerifyPhoneUpdateInput,
+  VerifyUpdateInput,
   VerifyUpdateResult
 } from "../methods/account"
 import {
@@ -239,17 +238,13 @@ export interface AuthClient {
    *
    * @throws {AuthError} `incorrectCode`, `invalidCode`, `emailTaken`, or `rateLimited`.
    */
-  verifyEmailUpdate: (
-    input: VerifyEmailUpdateInput
-  ) => Promise<VerifyUpdateResult>
+  verifyEmailUpdate: (input: VerifyUpdateInput) => Promise<VerifyUpdateResult>
   /** `sendEmailUpdateCode` for a phone number, texted through `sms.sendCode`. */
   sendPhoneUpdateCode: (
     input: SendPhoneUpdateCodeInput
   ) => Promise<SendUpdateCodeResult>
   /** `verifyEmailUpdate` for a phone number. */
-  verifyPhoneUpdate: (
-    input: VerifyPhoneUpdateInput
-  ) => Promise<VerifyUpdateResult>
+  verifyPhoneUpdate: (input: VerifyUpdateInput) => Promise<VerifyUpdateResult>
   /**
    * Signs out.
    *

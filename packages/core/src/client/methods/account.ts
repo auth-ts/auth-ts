@@ -170,18 +170,6 @@ export interface VerifyUpdateInput {
   identityAttempt?: string
 }
 
-/** Input for verifying the code sent to a new email address. */
-export interface VerifyEmailUpdateInput extends VerifyUpdateInput {
-  /** The new address, as sent. */
-  email: string
-}
-
-/** Input for verifying the code sent to a new phone number. */
-export interface VerifyPhoneUpdateInput extends VerifyUpdateInput {
-  /** The new number, as sent. */
-  phoneNumber: string
-}
-
 /** What the change resolved to; the user carries the new identifier once updated. */
 export type VerifyUpdateResult =
   | { status: "updated"; user: AuthUser }
@@ -234,7 +222,7 @@ export const sendEmailUpdateCode = (
 /** `POST /user/email-update/verify`; the verification challenge is reported as a result, not thrown. */
 export const verifyEmailUpdate = (
   internals: AuthClientInternals,
-  input: VerifyEmailUpdateInput
+  input: VerifyUpdateInput
 ) => verifyUpdate(internals, "email-update", input)
 
 /** `POST /user/phone-update/send-code`; the verification challenge is reported as a result, not thrown. */
@@ -246,7 +234,7 @@ export const sendPhoneUpdateCode = (
 /** `POST /user/phone-update/verify`; the verification challenge is reported as a result, not thrown. */
 export const verifyPhoneUpdate = (
   internals: AuthClientInternals,
-  input: VerifyPhoneUpdateInput
+  input: VerifyUpdateInput
 ) => verifyUpdate(internals, "phone-update", input)
 
 /** `POST /user/verify/send-code`. */

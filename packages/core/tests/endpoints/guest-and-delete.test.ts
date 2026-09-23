@@ -132,7 +132,6 @@ describe("guests and multiUser never mix", () => {
       const response = await context.auth.handler(
         request("POST", "/api/auth/sign-in/code", {
           body: {
-            email,
             code: required(context.sentCodes.at(-1), "code").code
           }
         })
@@ -203,7 +202,6 @@ describe("guest conversion", () => {
     const verifyResponse = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
         },
         cookies
@@ -248,7 +246,6 @@ describe("guest conversion", () => {
       request("POST", "/api/auth/sign-in/code", {
         token,
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
         }
       })
@@ -289,7 +286,6 @@ describe("guest conversion", () => {
         token,
         cookies: refreshCookieFor(second.refreshToken),
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
         }
       })
@@ -317,7 +313,6 @@ describe("guest conversion", () => {
     const verifyResponse = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
         },
         cookies
@@ -357,7 +352,6 @@ describe("guest conversion", () => {
     const first = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
         }
       })
@@ -375,7 +369,6 @@ describe("guest conversion", () => {
     const second = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "grace@example.com",
           code: required(context.sentCodes.at(-1), "code").code
         },
         cookies
@@ -403,7 +396,6 @@ describe("identity verification, revoking a device, deleting the account", () =>
     const response = await context.auth.handler(
       request("POST", "/api/auth/sign-in/code", {
         body: {
-          email: "ada@example.com",
           code: required(context.sentCodes.at(-1), "code").code
         }
       })

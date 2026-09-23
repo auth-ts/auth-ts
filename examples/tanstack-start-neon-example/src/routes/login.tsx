@@ -95,7 +95,7 @@ function LoginPage() {
     setNotice(null)
     setPending("code")
     try {
-      await authClient.signInWithCode({ email, code })
+      await authClient.signInWithCode({ code })
       await queryClient.invalidateQueries()
       await navigate({ to: "/todos" })
     } catch (error) {

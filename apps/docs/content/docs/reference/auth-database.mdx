@@ -31,7 +31,7 @@ cost of not having an adapter package.
 | --- | --- | --- | --- | --- |
 | `users` | `id`, `email`, `phoneNumber`, `name`, `image`, `type`, `primaryUserId`, `createdAt`, `updatedAt`, + your declared fields | `email`, `phoneNumber` | | |
 | `sessions` | `id`, `userId`, `secretHash`, `userAgent`, `ipAddress`, `amr`, `createdAt`, `updatedAt` | | `userId`, `updatedAt` | `updatedAt` |
-| `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `createdAt`, `updatedAt` | | `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
+| `verifications` | `id`, `identifier`, `codeHash`, `attemptHash`, `purpose`, `createdAt`, `updatedAt` | | `attemptHash`, `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
 | `rateLimits` | `id`, `key`, `tokenCount`, `lastRefilledAt`, `createdAt`, `updatedAt` | `key` | `updatedAt` | `updatedAt` |
 | `identities` | `id`, `userId`, `provider`, `providerUserId`, `label`, `scope`, `createdAt`, `updatedAt` | `(provider, providerUserId)` | `userId` | |
 | `identitySecrets` | `id`, `identityId`, `accessToken`, `accessTokenExpiresAt`, `refreshToken`, `refreshTokenExpiresAt`, `createdAt`, `updatedAt` | `identityId` | | |

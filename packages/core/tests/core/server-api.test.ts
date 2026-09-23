@@ -22,7 +22,6 @@ async function signIn(context: TestContext) {
   const response = await context.auth.handler(
     request("POST", "/api/auth/sign-in/code", {
       body: {
-        email: "ada@example.com",
         code: required(context.sentCodes.at(-1), "code").code
       }
     })
@@ -194,7 +193,6 @@ describe("getToken as a function", () => {
       () =>
         context.auth.verifyEmailUpdate({
           headers,
-          email: "b@example.com",
           code: "ABCDEF"
         }),
       () =>
@@ -202,7 +200,6 @@ describe("getToken as a function", () => {
       () =>
         context.auth.verifyPhoneUpdate({
           headers,
-          phoneNumber: "+15550100",
           code: "ABCDEF"
         }),
       () => context.auth.revokeSession({ headers, id: "any" })
@@ -511,7 +508,6 @@ describe("calling with a token instead of a request", () => {
     })
     const changed = await auth.verifyEmailUpdate({
       token,
-      email: "ada@lovelace.example",
       code: required(context.sentCodes.at(-1), "email code").code,
       attempt: sent.attempt,
       identityAttempt: attempt
