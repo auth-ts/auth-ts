@@ -75,9 +75,10 @@ function concat(chunks: Uint8Array[], length: number) {
 }
 
 function parse(text: string): unknown {
+  if (text === "") return {}
   try {
     return JSON.parse(text)
   } catch {
-    return {}
+    return null
   }
 }

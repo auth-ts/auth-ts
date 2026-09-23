@@ -77,6 +77,23 @@ describe("what a request body may name", () => {
     expect(context.sentCodes).toHaveLength(0)
   })
 
+  it("refuses a body that is not valid JSON, rather than reading it as empty", async () => {
+    const context = await createTestServer()
+    const response = await context.auth.handler(
+      new Request("https://app.example.com/api/auth/sign-out", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "sec-fetch-site": "same-origin"
+        },
+        body: '{"scope":'
+      })
+    )
+
+    expect(response.status).toBe(400)
+    expect((await errorBody(response)).code).toBe("invalidField")
+  })
+
   it("refuses a field that exists on the user but cannot be posted", async () => {
     const context = await createTestServer()
     const ada = await signIn(context, "ada@example.com")
