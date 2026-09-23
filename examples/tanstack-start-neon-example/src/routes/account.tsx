@@ -21,6 +21,7 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
+import { ConfirmDialog } from "../components/confirm-dialog"
 import { GitHubIcon } from "../components/github-icon"
 import type { Notice } from "../components/notice"
 import { NoticeAlert } from "../components/notice"
@@ -91,7 +92,9 @@ function AccountPage() {
       <SessionsCard setNotice={setNotice} runVerified={verified.run} />
       <SwitchUserCard userId={user.id} />
       <SignOutButtons userId={user.id} signOut={signOut} />
-      <DeleteCard runVerified={verified.run} />
+      {user.email || user.phoneNumber ? (
+        <DeleteCard runVerified={verified.run} />
+      ) : null}
       {verified.dialog}
     </section>
   )
@@ -413,8 +416,10 @@ function DeleteCard({ runVerified }: { runVerified: RunVerified }) {
   const navigate = useNavigate()
   // Own notice: the page alert is offscreen
   const [deletionNotice, setDeletionNotice] = useState<Notice | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const removeAccount = async () => {
+    setConfirming(false)
     setDeletionNotice(null)
     try {
       await runVerified(async () => {
@@ -438,22 +443,32 @@ function DeleteCard({ runVerified }: { runVerified: RunVerified }) {
   return (
     <div className="card border border-error/30 bg-base-100 shadow-sm">
       <div className="card-body gap-4">
-        <h2 className="card-title text-error">Delete account</h2>
+        <h2 className="card-title text-error">Delete your account</h2>
         <p className="text-sm text-base-content/60">
-          This removes your account and everything in it. There is no undo.
+          Deleting your account will permanently remove all your data.
         </p>
         {deletionNotice ? <NoticeAlert notice={deletionNotice} /> : null}
         <div className="card-actions">
           <button
             type="button"
-            onClick={removeAccount}
+            onClick={() => setConfirming(true)}
             className="btn btn-error"
           >
             <TrashIcon className="size-4" />
-            Delete my account
+            Delete account
           </button>
         </div>
       </div>
+      {confirming ? (
+        <ConfirmDialog
+          title="Delete your account"
+          body="Are you sure you want to delete your account? This action is permanent and cannot be undone."
+          confirmLabel="Delete account"
+          danger
+          onConfirm={removeAccount}
+          onCancel={() => setConfirming(false)}
+        />
+      ) : null}
     </div>
   )
 }
