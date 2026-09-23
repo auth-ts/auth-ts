@@ -16,15 +16,7 @@ export function hexToBytes(hex: string) {
   )
 }
 
-/**
- * Hashes a value with SHA-256 and returns lowercase hex.
- *
- * Session secrets and attempt tokens are stored this way, so a leaked table
- * cannot be replayed. That is all it buys: the hash is unkeyed, and the token
- * stays a bearer credential either way. Thirty-two random bytes need no
- * slowing down — short codes do, which is why those get {@link scryptHash}
- * instead.
- */
+/** SHA-256 of a value, as lowercase hex. */
 export async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
@@ -33,23 +25,17 @@ export async function sha256Hex(value: string) {
   return toHex(digest)
 }
 
-/**
- * The scrypt cost a code is stored under: 16 MiB, the memory the book's Argon2
- * recommendation asks for, at one lane so throughput is the server's.
- */
+// 16 MiB, the book's Argon2 memory
 const SCRYPT = { ln: 14, r: 8, p: 1, keyLength: 32 }
 
-/**
- * Derives an scrypt key. `node:crypto` is loaded on first use rather than at
- * import, so the package still loads where only Web Crypto exists — only the
- * code flow needs Node, Bun, Deno, or Workers with Node compatibility.
- */
+/** Derives an scrypt key. */
 export async function scryptDerive(
   value: string,
   salt: Uint8Array,
   cost: { ln: number; r: number; p: number },
   keyLength: number
 ): Promise<Uint8Array> {
+  // Lazy, so Web Crypto-only runtimes still load
   const { scrypt } = await import("node:crypto")
   const N = 2 ** cost.ln
 
@@ -64,16 +50,7 @@ export async function scryptDerive(
   })
 }
 
-/**
- * Hashes a verification code with scrypt and returns a PHC-style string.
- *
- * A short code has few enough values that a fast hash of it is reversible
- * from a database read in seconds, keyed or not once the key leaks. scrypt at
- * 16 MiB makes each guess cost real memory and time, so a leaked table cannot
- * be reversed before its codes expire, and nothing else has to stay secret for
- * that to hold. The parameters travel in the string so they can be raised
- * without a migration.
- */
+/** Hashes a code with scrypt into a PHC-style string. */
 export async function scryptHash(value: string) {
   const salt = crypto.getRandomValues(new Uint8Array(32))
   const key = await scryptDerive(value, salt, SCRYPT, SCRYPT.keyLength)
@@ -104,12 +81,7 @@ export async function scryptVerify(value: string, stored: string) {
 }
 
 // Lucia's auth_session.ts, 0BSD
-/**
- * Compares two digests in time that does not depend on where they differ.
- *
- * A `===` here would return as soon as it found a mismatching byte, and the
- * timing of that return leaks how much of a guess was correct.
- */
+/** Compares two digests in constant time. */
 export function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.byteLength !== b.byteLength) {
     return false

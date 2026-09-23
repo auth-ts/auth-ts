@@ -26,45 +26,15 @@ export interface IssueResult {
 export interface IssueSessionInput {
   user: AuthUser
   headers: Headers
-  /**
-   * What proved identity, as RFC 8176 method references — see
-   * {@link AuthSession.amr}. Required so a new sign-in path cannot forget to
-   * say how it authenticated somebody.
-   */
+  /** How identity was proved, as RFC 8176 references. */
   amr: string[]
-  /**
-   * The request's URL, when there is one.
-   *
-   * Read only to decide whether cookies carry `Secure`; absent for an endpoint
-   * called in-process, where {@link shouldUseSecureCookies} assumes they should.
-   */
+  /** Decides whether cookies carry `Secure`. */
   requestURL?: string
-  /**
-   * The session the caller signed in from, if any.
-   *
-   * A guest's is deleted rather than left live: whether they were upgraded in
-   * place or merged into an existing user, the anonymous session has served
-   * its purpose, and a stranded guest in the switcher — or a still-valid
-   * refresh token for one — helps nobody.
-   */
+  /** The caller's session; a guest's is deleted. */
   caller?: ResolvedSession | null
 }
 
-/**
- * Creates a session and mints an access token — the single path every sign-in
- * method ends at.
- *
- * Verification code, guest, OAuth, and account switching all converge here, so cookie
- * attributes, session stamping, and multi-account behaviour are defined once
- * rather than re-implemented per method with slightly different mistakes.
- *
- * The token is `id.secret`, as in Lucia's `auth_session.ts`: thirty-two
- * random bytes, base64 in the token, SHA-256 in the row. Possession of the
- * secret proves identity, and the stored hash proves nothing on its own, so a
- * leaked table cannot be replayed. The id is an address, not a credential: it
- * can be logged, listed, and revoked by, and it is whatever your store names
- * the row.
- */
+/** Creates a session and mints its access token. */
 export async function issueSession(
   internals: AuthInternals,
   { user, headers, requestURL, caller, amr }: IssueSessionInput
@@ -76,15 +46,7 @@ export async function issueSession(
     await crypto.subtle.digest("SHA-256", secret)
   )
 
-  // A cookie about to be overwritten leaves its session unreachable from this
-  // browser, so it is deleted rather than left to run out its lifetime
-  // somewhere nobody can revoke it. Without multiUser that is every session the
-  // browser presented — no row needs reading to know it. With multiUser it is
-  // only this user's own previous one, and which is which comes from each row
-  // rather than from the name its cookie arrived under, so a mislabelled cookie
-  // retires the session it actually holds instead of being counted as somebody
-  // else's and left behind. Deleting by id and secret hash together is what
-  // keeps a cookie that merely names somebody's session id from retiring it.
+  // Retire sessions this cookie write orphans
   const [session, , held] = await Promise.all([
     insertRow(internals, "sessions", {
       userId: user.id,
@@ -110,8 +72,7 @@ export async function issueSession(
   if (caller?.user.type === "guest") {
     superseded.set(caller.session.id, caller.session.secretHash)
   }
-  // Only once the replacement exists: if creating it had failed, the caller
-  // would still hold a working session rather than none.
+  // Only after the replacement exists
   superseded.delete(session.id)
 
   const [token] = await Promise.all([
@@ -148,23 +109,7 @@ export async function issueSession(
   return { token, user, session, headers: responseHeaders }
 }
 
-/**
- * What a token for this user would claim about them.
- *
- * `type` rides along because row-level security reads it; `role` stays whatever
- * the configuration says, because it maps to a real Postgres role. `sid` names
- * the session the token was minted from, so an endpoint authenticated by the
- * token alone still knows which session it is acting for. `amr` says what
- * proved identity, for a policy that treats a texted code and a federated
- * assertion differently — it is here rather than left to `jwt.claims` because
- * a column no token carries cannot be read by the thing it exists for. Nothing
- * that identifies the person rides along: the token is handed to the database,
- * to sync services, and to whatever logs sit between them, and none of them
- * need a name or an address to authorize a query.
- *
- * `primaryUserId` is deliberately never included either — it describes a
- * pending data migration, not who is signed in.
- */
+// No name or address: tokens get logged
 function accessTokenClaims(user: AuthUser, session: AuthSession) {
   return {
     userId: user.id,
@@ -174,12 +119,7 @@ function accessTokenClaims(user: AuthUser, session: AuthSession) {
   }
 }
 
-/**
- * Signs an access token carrying {@link accessTokenClaims}.
- *
- * Takes the session row rather than its id because `jwt.claims` may be a
- * function, and that function is given both halves of what the token is for.
- */
+/** Signs an access token for a user's session. */
 export async function mintAccessToken(
   internals: AuthInternals,
   user: AuthUser,

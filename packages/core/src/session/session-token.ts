@@ -12,11 +12,7 @@ export interface SessionCredential {
   secretHash: Uint8Array
 }
 
-/**
- * Splits `id.secret` and hashes the secret.
- *
- * @returns The credential, or `null` for anything that is not `id.base64`.
- */
+/** Splits `id.secret` and hashes the secret; `null` otherwise. */
 export async function parseSessionToken(
   authSessionToken: string
 ): Promise<SessionCredential | null> {
@@ -42,13 +38,7 @@ export async function parseSessionToken(
   }
 }
 
-/**
- * What a session's lifetime counts from, as the two conditions core asks.
- *
- * `session.ttl` is policy, not a column: sliding sessions live `ttl` past
- * their last hour of use, fixed ones `ttl` past creation, and changing the
- * option changes every session at once.
- */
+/** Where-conditions for live and stale sessions under `session.ttl`. */
 export function sessionAge(internals: AuthInternals) {
   const { sliding, ttl } = internals.config.session
   const cutoff = new Date(Date.now() - parseDuration(ttl))
@@ -64,13 +54,7 @@ export function sessionAge(internals: AuthInternals) {
       }
 }
 
-/**
- * The session a credential names, or `null` when its id or secret is wrong.
- *
- * The row is read by primary key; the secret is what proves the caller may
- * hold it. A wrong secret answers exactly as a missing row does, so a cookie
- * naming somebody else's session id resolves to nothing.
- */
+/** The session a credential names, or `null` on a wrong id or secret. */
 export async function findSession(
   internals: AuthInternals,
   { id, secretHash }: SessionCredential,
