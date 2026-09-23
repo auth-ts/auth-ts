@@ -7,6 +7,7 @@ import { insertRow } from "../lib/insert-row"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { sweepExpired } from "../lib/sweep-expired"
 import { bytesToBase64 } from "../shared/base64url"
+import { deleteSessions } from "./delete-sessions"
 import { presentedSessions } from "./presented-sessions"
 import type { ResolvedSession } from "./resolve-session"
 import { refreshCookieName, refreshCookies } from "./session-cookies"
@@ -77,9 +78,9 @@ export async function issueSession(
   const [token] = await Promise.all([
     mintAccessToken(internals, user, session),
     ...[...superseded].map(([id, secretHash]) =>
-      internals.db.delete({
-        table: "sessions",
-        where: { id: { eq: id }, secretHash: { eq: secretHash } }
+      deleteSessions(internals, {
+        id: { eq: id },
+        secretHash: { eq: secretHash }
       })
     )
   ])

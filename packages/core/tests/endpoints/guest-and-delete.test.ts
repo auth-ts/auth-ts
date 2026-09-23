@@ -515,6 +515,54 @@ describe("identity verification, revoking a device, deleting the account", () =>
     expect(context.sentCodes.length).toBe(before)
   })
 
+  it("takes a revoked session's codes and marker with it, and no one else's", async () => {
+    const context = await createTestServer()
+    const first = await signIn(context)
+    const second = await signIn(context)
+    // The harness keeps the last attempt cookie; the revoker's must be it.
+    await verify(context, second)
+    await verify(context, first)
+    const kept = (await rowOf(context, first)).id
+    const gone = (await rowOf(context, second)).id
+
+    expect((await revoke(context, first, gone)).status).toBe(204)
+    expect(
+      await selectRows(context.db, "verifications", {
+        identifier: { eq: gone }
+      })
+    ).toEqual([])
+    expect(
+      await selectRows(context.db, "verifications", {
+        identifier: { eq: kept }
+      })
+    ).toHaveLength(1)
+  })
+
+  it("takes a signed-out session's codes with it, and every session's under global", async () => {
+    const context = await createTestServer()
+    const first = await signIn(context)
+    const second = await signIn(context)
+    await verify(context, first)
+    await verify(context, second)
+    const markers = () => selectRows(context.db, "verifications", {})
+    const signOut = (session: Session, scope: "local" | "global") =>
+      context.auth.handler(
+        request("POST", "/api/auth/sign-out", {
+          cookies: refreshCookieFor(session.refreshToken),
+          token: session.token,
+          body: { scope }
+        })
+      )
+
+    await signOut(first, "local")
+    expect((await markers()).map((row) => row.identifier)).toEqual([
+      (await rowOf(context, second)).id
+    ])
+
+    await signOut(second, "global")
+    expect(await markers()).toEqual([])
+  })
+
   it("takes the user's codes and identity markers with them", async () => {
     // Core deletes the children itself rather than requiring ON DELETE CASCADE,
     // and a code left behind would sign the address's next owner into nothing.

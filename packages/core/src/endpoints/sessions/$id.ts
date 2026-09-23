@@ -4,6 +4,7 @@ import { readBody } from "../../http/read-body"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import type { CallerInput } from "../../session/authenticate"
 import { authenticateUser } from "../../session/authenticate"
+import { deleteSessions } from "../../session/delete-sessions"
 import type { AttemptInput } from "../../shared/attempt-cookie"
 import { readAttempt } from "../../shared/attempt-cookie"
 import { requireVerifiedIdentity } from "../../verification-code/identity"
@@ -67,9 +68,9 @@ export const revokeSession = defineEndpoint({
       readAttempt(input, "identity")
     )
 
-    const [revoked] = await internals.db.delete({
-      table: "sessions",
-      where: { id: { eq: input.id }, userId: { eq: caller.userId } }
+    const [revoked] = await deleteSessions(internals, {
+      id: { eq: input.id },
+      userId: { eq: caller.userId }
     })
     if (!revoked) throw notFound()
 

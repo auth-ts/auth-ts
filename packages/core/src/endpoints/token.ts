@@ -2,6 +2,7 @@ import type { AuthUser } from "../core/auth-database"
 import { defineEndpoint } from "../http/define-endpoint"
 import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
+import { deleteSessions } from "../session/delete-sessions"
 import { mintAccessToken } from "../session/issue-session"
 import { presentedSessions } from "../session/presented-sessions"
 import type { HeadersInput } from "../session/resolve-session"
@@ -94,10 +95,7 @@ export const getToken = defineEndpoint({
             id: { eq: userId }
           })
           if (user) return null
-          await internals.db.delete({
-            table: "sessions",
-            where: { id: { eq: live.id } }
-          })
+          await deleteSessions(internals, { id: { eq: live.id } })
 
           return userId
         })

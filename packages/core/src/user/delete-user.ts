@@ -1,7 +1,7 @@
 import type { AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { IDENTITY_PAGE_SIZE } from "../oauth/link-identity"
-import { listUserSessions } from "../session/list-user-sessions"
+import { deleteSessions } from "../session/delete-sessions"
 
 /**
  * Deletes a user and everything of theirs core owns.
@@ -19,11 +19,7 @@ import { listUserSessions } from "../session/list-user-sessions"
  * codes and markers under each session, so none outlives the account.
  */
 export async function deleteUser(internals: AuthInternals, user: AuthUser) {
-  const sessions = await listUserSessions(internals, user.id)
-  await internals.db.delete({
-    table: "sessions",
-    where: { userId: { eq: user.id } }
-  })
+  await deleteSessions(internals, { userId: { eq: user.id } })
 
   // The provider tokens go before the identities that address them. A database
   // cascade would do this too, and should; deleting them here means the
@@ -45,11 +41,7 @@ export async function deleteUser(internals: AuthInternals, user: AuthUser) {
     where: { userId: { eq: user.id } }
   })
 
-  for (const identifier of [
-    user.email,
-    user.phoneNumber,
-    ...sessions.map((session) => session.id)
-  ]) {
+  for (const identifier of [user.email, user.phoneNumber]) {
     if (!identifier) continue
     await internals.db.delete({
       table: "verifications",

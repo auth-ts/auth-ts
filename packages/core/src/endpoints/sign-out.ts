@@ -4,6 +4,7 @@ import { readBody } from "../http/read-body"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import type { CallerInput } from "../session/authenticate"
 import { authenticate } from "../session/authenticate"
+import { deleteSessions } from "../session/delete-sessions"
 import { presentedSessions } from "../session/presented-sessions"
 import { clearedRefreshCookies } from "../session/session-cookies"
 
@@ -135,13 +136,12 @@ export const signOut = defineEndpoint({
         const sessionId = sessionIdFor(target)
         if (!sessionId) return undefined
 
-        return internals.db.delete({
-          table: "sessions",
-          where:
-            scope === "global"
-              ? { userId: { eq: target.userId } }
-              : { id: { eq: sessionId } }
-        })
+        return deleteSessions(
+          internals,
+          scope === "global"
+            ? { userId: { eq: target.userId } }
+            : { id: { eq: sessionId } }
+        )
       })
     )
 
