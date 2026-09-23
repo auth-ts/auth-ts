@@ -68,7 +68,8 @@ export async function matchVerificationCode(
     config.rateLimit === false ? DEFAULT_GUESSES : config.rateLimit.guesses
   )
 
-  if (!(await scryptVerify(input.code.toUpperCase(), stored.codeHash))) {
+  const code = input.code.replaceAll(" ", "").replaceAll("-", "").toUpperCase()
+  if (!(await scryptVerify(code, stored.codeHash))) {
     throw new AuthApiError("incorrectCode")
   }
 

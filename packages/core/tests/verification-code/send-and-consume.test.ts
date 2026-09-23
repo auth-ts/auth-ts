@@ -387,13 +387,13 @@ describe("consumeVerificationCode", () => {
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
   })
 
-  it("accepts the code in any case, so a phone keyboard cannot get it wrong", async () => {
+  it("accepts the code in any case, with spaces or hyphens, as the author's clients send it", async () => {
     const { internals, code, attempt } = await sendAndRead()
 
     await expect(
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
-        code: code.toLowerCase(),
+        code: `${code.slice(0, 3).toLowerCase()}- ${code.slice(3)}`,
         purpose: "signIn",
         attempt,
         guessKey: "ada@example.com"
