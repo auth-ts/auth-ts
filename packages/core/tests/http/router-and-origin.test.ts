@@ -69,6 +69,21 @@ describe("matchRoute", () => {
     )
   })
 
+  it("refuses OPTIONS and answers no preflight, which is the app's CORS to do", async () => {
+    const { auth } = await createTestServer()
+    for (const handle of [auth.handler, auth.handlers.sendSignInCode]) {
+      const response = await handle(
+        request("OPTIONS", "/api/auth/sign-in/send-code", {
+          headers: { "sec-fetch-site": "cross-site" }
+        })
+      )
+      expect(response.ok).toBe(false)
+      expect([...response.headers.keys()]).not.toContainEqual(
+        expect.stringMatching(/^access-control-/)
+      )
+    }
+  })
+
   it("keeps the router's 404 for an unknown path, whatever the method", async () => {
     // Regression guard for the handler's method check: the fallback endpoint
     // behind the catch-all must not turn a routing 404 into a 405.

@@ -4,7 +4,7 @@ import { getRequestOrigin } from "../lib/get-base-url"
 import { AuthApiError } from "./auth-api-error"
 
 /** Methods that must not have side effects, and so need no origin check. */
-export const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
+export const SAFE_METHODS = new Set(["GET", "HEAD"])
 
 /**
  * Whether a request carries a body, judged from its headers.
