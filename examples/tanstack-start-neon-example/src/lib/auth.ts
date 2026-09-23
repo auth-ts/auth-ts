@@ -9,8 +9,17 @@ export const auth = createAuth({
   jwt: { alg: "RS256" },
   email: {
     sendCode: ({ email, code, purpose }) => {
+      const [subject, intro] =
+        purpose === "emailChange"
+          ? [
+              "Verify your new account email address",
+              "Your email address verification code is"
+            ]
+          : ["Sign in to your account", "Your sign-in code is"]
       if (process.env.NODE_ENV === "development") {
-        console.log(`${purpose} code for ${email}: ${code}`)
+        console.log(
+          `To ${email}: ${subject}\n${intro}: ${code}\n\nDo not share this code with anyone. If you didn't request this, you can safely ignore this email.`
+        )
       }
     },
     sendEmailChangedNotification: ({ email }) => {
