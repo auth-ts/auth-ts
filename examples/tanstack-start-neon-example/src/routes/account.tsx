@@ -277,6 +277,13 @@ function SessionsCard({
   const revalidateSessions = useRevalidateTables([{ table: "sessions" }])
   const report = useReportError()
   const [revoking, setRevoking] = useState<string | null>(null)
+  const thisDevice = useReactQuery({
+    queryKey: ["sid"],
+    queryFn: async () => {
+      const token = await authClient.getToken()
+      return (token && authClient.decodeToken(token)?.claims.sid) || null
+    }
+  })
 
   const revoke = async (id: string, device: string) => {
     setRevoking(id)
@@ -319,21 +326,25 @@ function SessionsCard({
                   {session.ipAddress ?? "no ip"}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  revoke(session.id, session.userAgent ?? "that device")
-                }
-                disabled={revoking !== null}
-                className="btn btn-ghost btn-sm"
-              >
-                {revoking === session.id ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <XMarkIcon className="size-4" />
-                )}
-                Revoke
-              </button>
+              {session.id === thisDevice.data ? (
+                <span className="badge badge-soft badge-sm">This device</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    revoke(session.id, session.userAgent ?? "that device")
+                  }
+                  disabled={revoking !== null}
+                  className="btn btn-ghost btn-sm"
+                >
+                  {revoking === session.id ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <XMarkIcon className="size-4" />
+                  )}
+                  Revoke
+                </button>
+              )}
             </li>
           ))}
         </ul>
