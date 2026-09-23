@@ -38,6 +38,8 @@ export type AuthErrorCode =
   | "forbiddenOrigin"
   /** A request body was sent with a content type other than `application/json`. */
   | "unsupportedMediaType"
+  /** A request body over 16 KiB. */
+  | "payloadTooLarge"
   /** A guest has no email or phone number, so no code can be sent to them. */
   | "guestCannotReceiveCode"
   /**
@@ -75,6 +77,7 @@ export const ERROR_STATUS: Record<AuthErrorCode, number> = {
   methodNotAllowed: 405,
   forbiddenOrigin: 403,
   unsupportedMediaType: 415,
+  payloadTooLarge: 413,
   guestCannotReceiveCode: 409,
   guestRequiresSignOut: 409,
   providerUnavailable: 502,

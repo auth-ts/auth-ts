@@ -31,6 +31,7 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
   methodNotAllowed: "That method is not allowed here.",
   forbiddenOrigin: "This request came from a site that is not allowed.",
   unsupportedMediaType: "Request bodies must be sent as JSON.",
+  payloadTooLarge: "The request body is too large.",
   guestCannotReceiveCode:
     "Add an email address or phone number before continuing.",
   guestRequiresSignOut: "Sign out before continuing as a guest.",

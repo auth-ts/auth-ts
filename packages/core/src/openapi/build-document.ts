@@ -155,10 +155,11 @@ function operation(
     }
   }
 
-  // The origin check refuses before any endpoint runs, so its two refusals
-  // are documented here rather than repeated on every state-changing route.
+  // The origin check and the body cap refuse before any endpoint runs, so
+  // their refusals are documented here rather than on every route.
   if (!SAFE_METHODS.has(endpoint.method)) {
     responses["403"] ??= componentResponses.Forbidden
+    responses["413"] = componentResponses.PayloadTooLarge
     responses["415"] = componentResponses.UnsupportedMediaType
   }
   responses["405"] = componentResponses.MethodNotAllowed

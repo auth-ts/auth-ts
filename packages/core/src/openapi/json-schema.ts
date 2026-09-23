@@ -50,6 +50,7 @@ export type ComponentResponseName =
   | "Conflict"
   | "GuestCannotReceiveCode"
   | "UnsupportedMediaType"
+  | "PayloadTooLarge"
   | "MethodNotAllowed"
   | "InternalError"
 

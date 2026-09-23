@@ -237,7 +237,11 @@ that content type cross-origin without a preflight, so a browser stops most of
 these before any header reaches the server. That is a bonus and not the
 guarantee — whoever answers the preflight is your application's business — so
 the check runs on every request regardless. The client already sends it;
-bodiless requests such as `GET /users` are untouched.
+bodiless requests such as `GET /users` are untouched. A body over 16 KiB is
+**413 `payloadTooLarge`** before it is parsed — the cap the author's server
+puts on every request — refused by `Content-Length` where there is one and
+otherwise the moment the stream passes it. Header sizes and read timeouts are
+your runtime's to set.
 
 **`GET /token` is the one route a cookie alone authenticates**, and being a
 bodiless `GET` it is exempt from both layers above. That is safe for the reason

@@ -111,3 +111,66 @@ describe("what a request body may name", () => {
     ).toMatchObject({ name: "Ada", plan: "pro" })
   })
 })
+
+describe("how large a request body may be", () => {
+  const post = (init: RequestInit & { body: BodyInit }) =>
+    new Request("https://app.example.com/api/auth/sign-in/send-code", {
+      method: "POST",
+      ...init,
+      headers: {
+        "sec-fetch-site": "same-origin",
+        "content-type": "application/json",
+        ...init.headers
+      }
+    })
+  const padded = (bytes: number) => {
+    const head = '{"email":"ada@example.com","pad":"'
+    return `${head}${"x".repeat(bytes - head.length - 2)}"}`
+  }
+
+  it("takes a body of exactly 16 KiB and refuses one byte more by its length", async () => {
+    const context = await createTestServer()
+
+    // Within the cap the body is parsed, and its unknown key is what refuses it.
+    const atCap = await context.auth.handler(post({ body: padded(16 * 1024) }))
+    expect((await errorBody(atCap)).code).toBe("invalidField")
+
+    const over = await context.auth.handler(
+      post({ body: padded(16 * 1024 + 1) })
+    )
+    expect(over.status).toBe(413)
+    expect((await errorBody(over)).code).toBe("payloadTooLarge")
+  })
+
+  it("stops reading a chunked body the moment it passes the cap", async () => {
+    const context = await createTestServer()
+    const chunk = new TextEncoder().encode("x".repeat(1024))
+    let pulled = 0
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1
+        if (pulled > 64) controller.close()
+        else controller.enqueue(chunk)
+      }
+    })
+
+    const response = await context.auth.handler(
+      post({ body: stream, duplex: "half" } as RequestInit & { body: BodyInit })
+    )
+
+    expect(response.status).toBe(413)
+    expect(pulled).toBeLessThan(64)
+  })
+
+  it("reads an empty body as no fields", async () => {
+    const context = await createTestServer({ guest: true })
+    const response = await context.auth.handler(
+      new Request("https://app.example.com/api/auth/sign-in/guest", {
+        method: "POST",
+        headers: { "sec-fetch-site": "same-origin" }
+      })
+    )
+
+    expect(response.status).toBe(200)
+  })
+})

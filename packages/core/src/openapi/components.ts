@@ -137,6 +137,7 @@ export const componentResponses: Record<
   UnsupportedMediaType: failure(
     "A request body was sent as something other than `application/json`."
   ),
+  PayloadTooLarge: failure("The request body is over 16 KiB."),
   MethodNotAllowed: failure("The method is not allowed for this path."),
   InternalError: failure(
     "Something threw that this library did not anticipate."
