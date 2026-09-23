@@ -5,6 +5,8 @@ import { authDatabase } from "./auth-database"
 export const auth = createAuth({
   database: authDatabase,
   waitUntil,
+  // The key in .env predates the ES256 default
+  jwt: { alg: "RS256" },
   email: {
     sendCode: ({ email, code, purpose }) => {
       if (process.env.NODE_ENV === "development") {
