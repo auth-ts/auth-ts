@@ -190,6 +190,32 @@ describe("verification code sign-in over HTTP", () => {
     expect(body.message).toContain(String(body.retryAfter))
   })
 
+  it("charges no guesses to a caller without the attempt, so nobody can lock the owner out", async () => {
+    const { auth, sentCodes } = await createTestServer()
+    await auth.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const code = required(sentCodes[0], "sent code").code
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const stranger = await auth.handler(
+        request("POST", "/api/auth/sign-in/code", {
+          body: { email: "ada@example.com", code, attempt: "made-up" }
+        })
+      )
+      expect(stranger.status).toBe(401)
+    }
+
+    const owner = await auth.handler(
+      request("POST", "/api/auth/sign-in/code", {
+        body: { email: "ada@example.com", code }
+      })
+    )
+    expect(owner.status).toBe(200)
+  })
+
   it("localizes the message while keeping the code stable", async () => {
     const { auth, sentCodes } = await createTestServer({
       localization: {

@@ -28,10 +28,10 @@ export interface ConsumeVerificationCodeInput {
  * purpose, wrong attempt, or simply wrong. Distinguishing them would tell an
  * attacker which addresses have codes outstanding.
  *
- * Guesses are limited per address or user before anything is read, whatever
- * `rateLimit` says: a code is bound to its requester, so this budget is the
- * only one an attacker can spend against an address, and nothing in front of
- * the server can key on it.
+ * Guesses are limited per address or user once the attempt has found its
+ * row, whatever `rateLimit` says, as the author's app charges only a caller
+ * holding a live flow. Charging earlier would let anyone without an attempt
+ * drain the budget and lock the real user out.
  *
  * The purpose check is what stops a sign-in code from verifying identity and
  * vice versa; without it a code obtained for one flow would silently work in
@@ -45,12 +45,6 @@ export async function matchVerificationCode(
   input: ConsumeVerificationCodeInput
 ): Promise<AuthVerification> {
   const { config } = internals
-  await checkRateLimit(
-    internals,
-    `guess:${input.guessKey}`,
-    config.rateLimit === false ? DEFAULT_GUESSES : config.rateLimit.guesses
-  )
-
   if (!input.attempt) throw new AuthApiError("invalidCode")
 
   const stored = await selectOne(internals, "verifications", {
@@ -60,6 +54,12 @@ export async function matchVerificationCode(
     ...liveCode()
   })
   if (!stored) throw new AuthApiError("invalidCode")
+
+  await checkRateLimit(
+    internals,
+    `guess:${input.guessKey}`,
+    config.rateLimit === false ? DEFAULT_GUESSES : config.rateLimit.guesses
+  )
 
   if (!(await scryptVerify(input.code.toUpperCase(), stored.codeHash))) {
     throw new AuthApiError("invalidCode")
