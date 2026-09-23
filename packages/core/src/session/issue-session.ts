@@ -86,7 +86,7 @@ export async function issueSession(
   if (superseded.size > 0) internals.log.debug("superseded sessions deleted")
 
   const responseHeaders = new Headers()
-  internals.log.debug("session issued", { userType: user.type })
+  internals.log.info("session issued", { userType: user.type, amr })
 
   const secure = shouldUseSecureCookies(requestURL)
   for (const { userId } of stranded) {

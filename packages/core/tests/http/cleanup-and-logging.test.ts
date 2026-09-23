@@ -211,6 +211,43 @@ describe("an unhandled throw", () => {
   })
 })
 
+describe("security events", () => {
+  const find = (
+    logCalls: Awaited<ReturnType<typeof createTestServer>>["logCalls"],
+    message: string
+  ) => logCalls.find((call) => call.message === message)
+
+  it("logs a wrong code, a sign-in, and each refused request", async () => {
+    const context = await createTestServer()
+    await context.auth.handler(
+      request("POST", "/api/auth/sign-in/send-code", {
+        body: { email: "ada@example.com" }
+      })
+    )
+    const code = required(context.sentCodes.at(-1), "code").code
+    const wrong = code === "AAAAAA" ? "BBBBBB" : "AAAAAA"
+    await context.auth.handler(
+      request("POST", "/api/auth/sign-in/code", { body: { code: wrong } })
+    )
+    await context.auth.handler(
+      request("POST", "/api/auth/sign-in/code", { body: { code } })
+    )
+
+    expect(find(context.logCalls, "verification code rejected")).toMatchObject({
+      level: "info",
+      data: { purpose: "signIn" }
+    })
+    expect(find(context.logCalls, "session issued")).toMatchObject({
+      level: "info",
+      data: { userType: "user", amr: ["otp"] }
+    })
+    expect(find(context.logCalls, "request refused")).toMatchObject({
+      level: "debug",
+      data: { method: "POST", path: "/sign-in/code", code: "incorrectCode" }
+    })
+  })
+})
+
 describe("logging redaction", () => {
   it("never lets a token, code, code hash, or cookie value reach the sink at any level", async () => {
     const context = await createTestServer({ guest: true, logLevel: "debug" })

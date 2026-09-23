@@ -131,6 +131,11 @@ function toErrorResponse(
   )
 
   if (isAuthApiError(error)) {
+    internals.log.debug("request refused", {
+      method: request.method,
+      path: endpoint.path,
+      code: error.code
+    })
     const message = getErrorMessage(error.code, locale, config.localization, {
       ...(error.retryAfter === undefined
         ? {}

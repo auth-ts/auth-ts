@@ -70,6 +70,7 @@ export async function matchVerificationCode(
 
   const code = input.code.replaceAll(" ", "").replaceAll("-", "").toUpperCase()
   if (!(await scryptVerify(code, stored.codeHash))) {
+    internals.log.info("verification code rejected", { purpose: input.purpose })
     throw new AuthApiError("incorrectCode")
   }
 
