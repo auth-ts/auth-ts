@@ -38,9 +38,33 @@ export interface SendCodeContext {
   purpose: "signIn" | "identity"
 }
 
+/** Everything a signed-in notification is told about the sign-in. */
+export interface SignedInNotificationContext {
+  /** The account's address. */
+  email: string
+  user: AuthUser
+  /** The session just issued: its `userAgent`, `ipAddress`, `createdAt` and `amr` say where from and how. */
+  session: AuthSession
+  /** The locale core already resolved for this request. */
+  locale: string
+  /** The request's headers. */
+  headers: Headers
+}
+
 /** Email delivery. Supplying this enables email as a sign-in method. */
 export interface EmailOptions {
   sendCode(context: SendCodeContext & { email: string }): Promise<void> | void
+  /**
+   * Tells the account somebody signed in, as the author's app does after every
+   * sign-in. Called for a code or federated sign-in to an account that already
+   * existed, never for one this sign-in created. Runs behind the response
+   * where `waitUntil` is configured, and a failure is logged rather than
+   * failing the sign-in: the session exists by then, and a retry would only
+   * mint a second one.
+   */
+  sendSignedInNotification?(
+    context: SignedInNotificationContext
+  ): Promise<void> | void
 }
 
 /** SMS delivery. Supplying this enables phone as a sign-in method. */

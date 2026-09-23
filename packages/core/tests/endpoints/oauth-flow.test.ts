@@ -317,6 +317,32 @@ describe("oauth callback", () => {
     expect(db.sessions()[0]?.amr).toEqual(["fed"])
   })
 
+  it("tells the account about a returning sign-in, not the first", async () => {
+    const { auth, db, sentNotifications } =
+      await createTestServer(OAUTH_OPTIONS)
+
+    const signIn = async () => {
+      const { stateCookie, state } = await startSignIn(auth)
+      stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+
+      return auth.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          cookies: { [STATE_COOKIE]: stateCookie }
+        })
+      )
+    }
+
+    await signIn()
+    expect(sentNotifications).toHaveLength(0)
+
+    await signIn()
+
+    expect(sentNotifications).toHaveLength(1)
+    expect(sentNotifications[0]?.email).toBe("ada@example.com")
+    expect(sentNotifications[0]?.session.id).toBe(db.sessions().at(-1)?.id)
+    expect(sentNotifications[0]?.session.amr).toEqual(["fed"])
+  })
+
   it("records the handle as the label, and refreshes it when it changes", async () => {
     const { auth, db } = await createTestServer(OAUTH_OPTIONS)
 

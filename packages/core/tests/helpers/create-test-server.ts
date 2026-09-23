@@ -1,4 +1,7 @@
-import type { AuthOptions } from "../../src/core/auth-options"
+import type {
+  AuthOptions,
+  SignedInNotificationContext
+} from "../../src/core/auth-options"
 import type { Auth } from "../../src/core/create-auth"
 import { createAuth } from "../../src/core/create-auth"
 import type { MemoryDatabase } from "../../src/lib/memory-database"
@@ -14,6 +17,7 @@ export interface TestServer {
   auth: Auth
   db: MemoryDatabase
   sentCodes: CapturedCode[]
+  sentNotifications: SignedInNotificationContext[]
   logCalls: Array<{
     level: string
     message: string
@@ -48,6 +52,7 @@ export async function createTestServer(
   const db =
     (overrides.database as MemoryDatabase | undefined) ?? createMemoryDatabase()
   const sentCodes: CapturedCode[] = []
+  const sentNotifications: SignedInNotificationContext[] = []
   const logCalls: TestServer["logCalls"] = []
 
   const auth = createAuth({
@@ -62,6 +67,9 @@ export async function createTestServer(
           purpose,
           headers
         })
+      },
+      sendSignedInNotification: (context) => {
+        sentNotifications.push(context)
       }
     },
     jwt: { privateKey: privateKeyPem },
@@ -91,5 +99,11 @@ export async function createTestServer(
     return response
   }
 
-  return { auth: { ...auth, handler }, db, sentCodes, logCalls }
+  return {
+    auth: { ...auth, handler },
+    db,
+    sentCodes,
+    sentNotifications,
+    logCalls
+  }
 }

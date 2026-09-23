@@ -42,15 +42,20 @@ export interface FindOrCreateUserInput {
 export async function findOrCreateUser(
   internals: AuthInternals,
   input: FindOrCreateUserInput
-): Promise<AuthUser> {
+): Promise<{ user: AuthUser; created: boolean }> {
   const { identifier, name, image, additionalFields } = input
 
   const existing = await selectOne(internals, "users", {
     [identifier.kind]: { eq: identifier.value }
   })
-  if (existing) return updateUser(internals, existing, { name, image })
+  if (existing) {
+    return {
+      user: await updateUser(internals, existing, { name, image }),
+      created: false
+    }
+  }
 
-  return insertRow(internals, "users", {
+  const user = await insertRow(internals, "users", {
     email: null,
     phoneNumber: null,
     name: null,
@@ -62,4 +67,6 @@ export async function findOrCreateUser(
     ...(image === undefined ? {} : { image }),
     type: "user"
   })
+
+  return { user, created: true }
 }

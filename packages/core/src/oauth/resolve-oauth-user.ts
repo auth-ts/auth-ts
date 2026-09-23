@@ -45,7 +45,7 @@ export async function resolveOAuthUser(
   provider: string,
   identity: ProviderIdentity,
   { additionalFields = {}, guest }: ResolveOAuthUserOptions = {}
-): Promise<AuthUser> {
+): Promise<{ user: AuthUser; created: boolean }> {
   const existing = await selectOne(internals, "identities", {
     provider: { eq: provider },
     providerUserId: { eq: identity.providerUserId }
@@ -62,10 +62,13 @@ export async function resolveOAuthUser(
       await linkIdentity(internals, linked.id, provider, identity)
 
       if (guest && guest.id !== linked.id) {
-        return (await mergeGuestInto(internals, guest, linked)).user
+        return {
+          user: (await mergeGuestInto(internals, guest, linked)).user,
+          created: false
+        }
       }
 
-      return linked
+      return { user: linked, created: false }
     }
   }
 
@@ -79,15 +82,16 @@ export async function resolveOAuthUser(
 
   // Merge semantics: an existing verification-code user takes the provider's
   // name and picture on their first OAuth sign-in.
-  const user = guest
-    ? (
-        await convertGuest(internals, guest, {
-          email: identity.email,
-          ...(identity.name ? { name: identity.name } : {}),
-          ...(identity.image ? { image: identity.image } : {}),
-          additionalFields
-        })
-      ).user
+  const resolved = guest
+    ? await convertGuest(internals, guest, {
+        email: identity.email,
+        ...(identity.name ? { name: identity.name } : {}),
+        ...(identity.image ? { image: identity.image } : {}),
+        additionalFields
+      }).then(({ user, outcome }) => ({
+        user,
+        created: outcome === "upgraded"
+      }))
     : await findOrCreateUser(internals, {
         identifier: { kind: "email", value: identity.email },
         ...(identity.name ? { name: identity.name } : {}),
@@ -95,7 +99,7 @@ export async function resolveOAuthUser(
         additionalFields
       })
 
-  await linkIdentity(internals, user.id, provider, identity)
+  await linkIdentity(internals, resolved.user.id, provider, identity)
 
-  return user
+  return resolved
 }

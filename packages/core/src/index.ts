@@ -43,6 +43,7 @@ export type {
   RateLimitOptions,
   SendCodeContext,
   SessionOptions,
+  SignedInNotificationContext,
   SmsOptions,
   UserOptions,
   VerificationCodeOptions

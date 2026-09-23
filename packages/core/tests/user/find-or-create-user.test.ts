@@ -9,8 +9,11 @@ describe("findOrCreateUser", () => {
   it("creates the user on a first sign-in, with the columns core owns spelled out", async () => {
     const { internals, db } = await createTestInternals()
 
-    const user = await findOrCreateUser(internals, { identifier: ada })
+    const { user, created } = await findOrCreateUser(internals, {
+      identifier: ada
+    })
 
+    expect(created).toBe(true)
     expect(user.email).toBe("ada@example.com")
     expect(user.type).toBe("user")
     expect(user.phoneNumber).toBeNull()
@@ -23,7 +26,8 @@ describe("findOrCreateUser", () => {
     const first = await findOrCreateUser(internals, { identifier: ada })
     const second = await findOrCreateUser(internals, { identifier: ada })
 
-    expect(second.id).toBe(first.id)
+    expect(second.created).toBe(false)
+    expect(second.user.id).toBe(first.user.id)
     expect(db.users()).toHaveLength(1)
   })
 
@@ -42,7 +46,7 @@ describe("findOrCreateUser", () => {
     const { internals } = await createTestInternals()
     await findOrCreateUser(internals, { identifier: ada, name: "Ada" })
 
-    const updated = await findOrCreateUser(internals, {
+    const { user: updated } = await findOrCreateUser(internals, {
       identifier: ada,
       name: "Ada Lovelace",
       image: "https://img.example/a.png"
@@ -56,7 +60,7 @@ describe("findOrCreateUser", () => {
     const { internals, db } = await createTestInternals()
     await insertUser(db, { email: "admin@example.com", type: "admin" })
 
-    const signedIn = await findOrCreateUser(internals, {
+    const { user: signedIn } = await findOrCreateUser(internals, {
       identifier: { kind: "email", value: "admin@example.com" }
     })
 
@@ -68,11 +72,11 @@ describe("findOrCreateUser", () => {
       user: { additionalFields: { plan: "string" } }
     })
 
-    const created = await findOrCreateUser(internals, {
+    const { user: created } = await findOrCreateUser(internals, {
       identifier: ada,
       additionalFields: { plan: "pro" }
     })
-    const signedIn = await findOrCreateUser(internals, {
+    const { user: signedIn } = await findOrCreateUser(internals, {
       identifier: ada,
       additionalFields: { plan: "enterprise" }
     })
@@ -103,7 +107,7 @@ describe("findOrCreateUser", () => {
   it("keys on the phone number when that is what was proven", async () => {
     const { internals } = await createTestInternals()
 
-    const user = await findOrCreateUser(internals, {
+    const { user } = await findOrCreateUser(internals, {
       identifier: { kind: "phoneNumber", value: "+15550100" }
     })
 

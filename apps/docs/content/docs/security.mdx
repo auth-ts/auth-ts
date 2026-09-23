@@ -172,6 +172,14 @@ obtain it — a stolen browser profile, a device backup, a proxy terminating
 TLS — holds the session until that session is revoked or expires. Hashing
 protects the database, not a stolen token.
 
+Supply `email.sendSignedInNotification` and the account is told about every
+code or federated sign-in, as the author's app tells its users: it is how
+somebody learns their inbox is being used against them. The callback gets
+the new session row, so the mail can say which device and where from. An
+account this sign-in created is not told; there is nobody to warn yet. The
+mail is sent behind the response and a failed send is logged rather than
+failing the sign-in, since the session already exists.
+
 Signing out reaches this device or every device, nothing in between. "Every
 device but this one" is the scope a stolen session would use to lock the owner
 out while keeping its own foothold; `global` costs the thief their session too,

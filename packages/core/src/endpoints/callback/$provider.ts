@@ -20,6 +20,7 @@ import type { OAuthStatePayload } from "../../oauth/state-cookie"
 import { clearStateCookie, readStateCookie } from "../../oauth/state-cookie"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { issueSession } from "../../session/issue-session"
+import { notifySignedIn } from "../../session/notify-signed-in"
 import type { ResolvedSession } from "../../session/resolve-session"
 import { resolveCallerSession } from "../../session/resolve-session"
 
@@ -175,10 +176,15 @@ export const callbackProvider = defineEndpoint({
       // lives inside resolveOAuthUser so the guest path runs the same
       // identity-first cascade as everyone else — a provider account already
       // linked to an account is never silently re-pointed at the guest.
-      const user = await resolveOAuthUser(internals, input.provider, identity, {
-        additionalFields,
-        ...(active?.user.type === "guest" ? { guest: active.user } : {})
-      })
+      const { user, created } = await resolveOAuthUser(
+        internals,
+        input.provider,
+        identity,
+        {
+          additionalFields,
+          ...(active?.user.type === "guest" ? { guest: active.user } : {})
+        }
+      )
 
       const issued = await issueSession(internals, {
         user,
@@ -187,6 +193,9 @@ export const callbackProvider = defineEndpoint({
         requestURL: input.requestURL,
         caller: active
       })
+      if (!created) {
+        await notifySignedIn(internals, { ...issued, headers: input.headers })
+      }
 
       const headers = new Headers(issued.headers)
       headers.append("set-cookie", clearState)

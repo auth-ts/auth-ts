@@ -17,6 +17,7 @@ import { sessionStamp } from "./slide-session"
 export interface IssueResult {
   token: string
   user: AuthUser
+  session: AuthSession
   /** `Set-Cookie` headers the caller must send. */
   headers: Headers
 }
@@ -144,7 +145,7 @@ export async function issueSession(
     responseHeaders.append("set-cookie", cookie)
   }
 
-  return { token, user, headers: responseHeaders }
+  return { token, user, session, headers: responseHeaders }
 }
 
 /**

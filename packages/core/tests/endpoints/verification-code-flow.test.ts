@@ -45,6 +45,37 @@ describe("verification code sign-in over HTTP", () => {
     expect(JSON.stringify(body)).not.toContain(cookie?.value ?? "impossible")
   })
 
+  it("tells the account about a sign-in, but not about the one that created it", async () => {
+    const { auth, sentCodes, sentNotifications, db } = await createTestServer()
+    const signIn = async (userAgent: string) => {
+      await auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", {
+          body: { email: "ada@example.com" }
+        })
+      )
+      return auth.handler(
+        request("POST", "/api/auth/sign-in/code", {
+          body: {
+            email: "ada@example.com",
+            code: required(sentCodes.at(-1), "code").code
+          },
+          headers: { "user-agent": userAgent }
+        })
+      )
+    }
+
+    await signIn("first device")
+    expect(sentNotifications).toHaveLength(0)
+
+    await signIn("second device")
+
+    const [notice] = sentNotifications
+    expect(notice?.email).toBe("ada@example.com")
+    expect(notice?.session.id).toBe(db.sessions().at(-1)?.id)
+    expect(notice?.session.userAgent).toBe("second device")
+    expect(notice?.locale).toBe("en")
+  })
+
   it("answers 200 for an unknown address, so nothing can be enumerated", async () => {
     const { auth, db } = await createTestServer()
 

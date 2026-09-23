@@ -12,6 +12,13 @@ export const auth = createAuth({
       if (process.env.NODE_ENV === "development") {
         console.log(`${purpose} code for ${email}: ${code}`)
       }
+    },
+    sendSignedInNotification: ({ email, session }) => {
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `New sign-in to your account (${email}): We detected a recent login to your account. If this wasn't you, please secure your account immediately. Session ${session.id}, ${session.userAgent ?? "unknown device"}`
+        )
+      }
     }
   },
   guest: true,

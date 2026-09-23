@@ -215,6 +215,7 @@ describe("guest conversion", () => {
 
     // Same id is the whole point: rows created as a guest stay theirs, with no migration.
     expect(body.user.id).toBe(guest.id)
+    expect(context.sentNotifications).toHaveLength(0)
     expect(body.user.type).toBe("user")
     expect(body.user.email).toBe("ada@example.com")
     expect(context.db.users()).toHaveLength(1)
@@ -325,6 +326,8 @@ describe("guest conversion", () => {
     const body = (await verifyResponse.json()) as { user: { id: string } }
 
     expect(body.user.id).toBe(existing.id)
+    // Somebody else's account was signed into, so its owner is told.
+    expect(context.sentNotifications[0]?.email).toBe("ada@example.com")
 
     const guestRow = await selectRow(context.db, "users", {
       id: { eq: guest.id }

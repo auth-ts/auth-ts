@@ -5,6 +5,7 @@ import { validateAdditionalFields } from "../../http/validate-additional-fields"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { convertGuest } from "../../session/convert-guest"
 import { issueSession } from "../../session/issue-session"
+import { notifySignedIn } from "../../session/notify-signed-in"
 import { resolveCallerSession } from "../../session/resolve-session"
 import type { AttemptInput } from "../../shared/attempt-cookie"
 import { readAttempt } from "../../shared/attempt-cookie"
@@ -113,14 +114,15 @@ export const signInWithCode = defineEndpoint({
       }),
       resolveCallerSession(internals, input)
     ])
-    const user =
+    const { user, created } =
       active?.user.type === "guest"
-        ? (
-            await convertGuest(internals, active.user, {
-              [identifier.kind]: identifier.value,
-              additionalFields
-            })
-          ).user
+        ? await convertGuest(internals, active.user, {
+            [identifier.kind]: identifier.value,
+            additionalFields
+          }).then(({ user, outcome }) => ({
+            user,
+            created: outcome === "upgraded"
+          }))
         : await findOrCreateUser(internals, { identifier, additionalFields })
 
     const issued = await issueSession(internals, {
@@ -130,6 +132,7 @@ export const signInWithCode = defineEndpoint({
       requestURL: input.requestURL,
       caller: active
     })
+    if (!created) await notifySignedIn(internals, { ...issued, headers })
 
     return {
       data: { user: issued.user, token: issued.token },
