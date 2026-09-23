@@ -310,7 +310,9 @@ describe("token and user endpoints", () => {
     for (const [method, path] of [
       ["POST", "/api/auth/user"],
       ["DELETE", "/api/auth/user"],
-      ["POST", "/api/auth/user/send-delete-code"]
+      ["POST", "/api/auth/user/verify/send-code"],
+      ["POST", "/api/auth/user/verify"],
+      ["DELETE", "/api/auth/sessions/any"]
     ] as const) {
       const response = await auth.handler(request(method, path, { cookies }))
 

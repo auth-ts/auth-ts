@@ -4,14 +4,19 @@ import { decodeToken } from "../lib/decode-token"
 import type {
   DeleteUserInput,
   DeleteUserResult,
+  RevokeSessionInput,
+  RevokeSessionResult,
   SignOutInput,
-  UpdateUserInput
+  UpdateUserInput,
+  VerifyIdentityInput
 } from "../methods/account"
 import {
   deleteUser,
-  sendDeleteUserCode,
+  revokeSession,
+  sendIdentityCode,
   signOut,
-  updateUser
+  updateUser,
+  verifyIdentity
 } from "../methods/account"
 import type { GetTokenOptions, RefreshToken } from "../methods/get-token"
 import { createGetToken } from "../methods/get-token"
@@ -166,19 +171,30 @@ export interface AuthClient {
   /** Updates the signed-in user and returns the row as stored. */
   updateUser: (input: UpdateUserInput) => Promise<AuthUser>
   /**
-   * Deletes the account, in two steps.
+   * Deletes the account, once identity has been verified.
    *
-   * The first call gets a `"verificationRequired"` result, at which point you
-   * call `sendDeleteUserCode()` and retry with the code it sends. The
-   * challenge is reported as a value rather than an error because it is an
-   * expected branch of a working flow, not a failure.
+   * Without a verification in the last hour the result is
+   * `"verificationRequired"`: call `sendIdentityCode()`, collect the code,
+   * call `verifyIdentity({ code })`, and retry. The challenge is reported as a
+   * value rather than an error because it is an expected branch of a working
+   * flow, not a failure.
    *
-   * @throws {AuthError} For a wrong code, or when a guest has no way to receive
-   * one.
+   * @throws {AuthError} `guestCannotReceiveCode` for a guest with no way to
+   * verify.
    */
   deleteUser: (input?: DeleteUserInput) => Promise<DeleteUserResult>
   /**
-   * Sends the code that confirms account deletion.
+   * Signs one other device out, once identity has been verified.
+   *
+   * The same challenge as `deleteUser`, and the same hour: one verification
+   * covers every revoke and a deletion after it. To sign this device out,
+   * use `signOut` — only that clears the cookie.
+   *
+   * @throws {AuthError} `notFound` for a session that is not this user's.
+   */
+  revokeSession: (input: RevokeSessionInput) => Promise<RevokeSessionResult>
+  /**
+   * Sends the code that confirms it is really this user.
    *
    * Goes to whichever address is already on the account — there is nothing to
    * choose, so there is nothing to pass.
@@ -186,7 +202,15 @@ export interface AuthClient {
    * @throws {AuthError} `rateLimited`, or `guestCannotReceiveCode` for a guest
    * with no email or phone number on file.
    */
-  sendDeleteUserCode: () => Promise<SendCodeResult>
+  sendIdentityCode: () => Promise<SendCodeResult>
+  /**
+   * Verifies the code `sendIdentityCode` sent. For the next hour, this session
+   * in this browser can revoke devices and delete the account.
+   *
+   * @throws {AuthError} `invalidCode` for a wrong or expired code, or
+   * `rateLimited`.
+   */
+  verifyIdentity: (input: VerifyIdentityInput) => Promise<void>
   /**
    * Signs out.
    *
@@ -238,7 +262,9 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     switchUser: (input) => switchUser(internals, input),
     updateUser: (input) => updateUser(internals, input),
     deleteUser: (input) => deleteUser(internals, input),
-    sendDeleteUserCode: () => sendDeleteUserCode(internals),
+    revokeSession: (input) => revokeSession(internals, input),
+    sendIdentityCode: () => sendIdentityCode(internals),
+    verifyIdentity: (input) => verifyIdentity(internals, input),
     signOut: (input) => signOut(internals, input),
     setLocale: (locale) => {
       internals.locale = locale

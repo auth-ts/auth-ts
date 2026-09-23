@@ -1,5 +1,8 @@
 import { DEFAULT_GUESS_LIMIT } from "../core/auth-config"
-import type { VerificationPurpose } from "../core/auth-database"
+import type {
+  AuthVerification,
+  VerificationPurpose
+} from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { AuthApiError } from "../http/auth-api-error"
 import { checkRateLimit } from "../http/check-rate-limit"
@@ -16,7 +19,7 @@ export interface ConsumeVerificationCodeInput {
 }
 
 /**
- * Verifies and spends a verification code.
+ * Finds the code this attempt was sent and checks it, without spending it.
  *
  * Every failure returns the same `invalidCode` error — missing, expired, wrong
  * purpose, wrong attempt, or simply wrong. Distinguishing them would tell an
@@ -27,16 +30,17 @@ export interface ConsumeVerificationCodeInput {
  * only one an attacker can spend against an address, and it has to hold even
  * when the per-IP windows are handled in front of the server.
  *
- * The purpose check is what stops a sign-in code from authorizing account
- * deletion and vice versa; both are codes for the same identifier, so without
- * it a code obtained for one flow would silently work in the other.
+ * The purpose check is what stops a sign-in code from verifying identity and
+ * vice versa; without it a code obtained for one flow would silently work in
+ * the other.
  *
+ * @returns The matching row, for the caller to spend or keep.
  * @throws {AuthApiError} `rateLimited` past the guess budget, `invalidCode` on any other failure.
  */
-export async function consumeVerificationCode(
+export async function matchVerificationCode(
   internals: AuthInternals,
   input: ConsumeVerificationCodeInput
-) {
+): Promise<AuthVerification> {
   const { config } = internals
   await checkRateLimit(
     internals,
@@ -59,6 +63,20 @@ export async function consumeVerificationCode(
   if (!(await scryptVerify(input.code.toUpperCase(), stored.codeHash))) {
     throw new AuthApiError("invalidCode")
   }
+
+  return stored
+}
+
+/**
+ * Verifies and spends a verification code.
+ *
+ * @throws {AuthApiError} `rateLimited` past the guess budget, `invalidCode` on any other failure.
+ */
+export async function consumeVerificationCode(
+  internals: AuthInternals,
+  input: ConsumeVerificationCodeInput
+) {
+  const stored = await matchVerificationCode(internals, input)
 
   // The conditional delete is what makes the code usable exactly once: two
   // requests can both read the row and both pass the check above, but only

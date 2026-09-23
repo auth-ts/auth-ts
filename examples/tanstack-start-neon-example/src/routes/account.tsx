@@ -25,7 +25,8 @@ import type { Notice } from "../components/notice"
 import { NoticeAlert } from "../components/notice"
 import { PendingSpinner } from "../components/pending-spinner"
 import { SignedOutCard } from "../components/signed-out-card"
-import { useCountdown } from "../hooks/use-countdown"
+import type { VerifiedAction } from "../components/verify-identity-dialog"
+import { useVerifiedAction } from "../components/verify-identity-dialog"
 import { useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 import { client } from "../lib/client"
@@ -34,12 +35,16 @@ export const Route = createFileRoute("/account")({ component: AccountPage })
 
 type SetNotice = (notice: Notice | null) => void
 type SignOut = (input?: SignOutInput) => Promise<void>
+type RunVerified = (action: VerifiedAction) => Promise<void>
 
 function AccountPage() {
   const { data: user, isPending } = useUser()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [notice, setNotice] = useState<Notice | null>(null)
+  const verified = useVerifiedAction(
+    user?.email ?? user?.phoneNumber ?? "your address"
+  )
 
   const signOut: SignOut = async (input) => {
     await authClient.signOut(input)
@@ -75,14 +80,15 @@ function AccountPage() {
 
       <ProfileCard userId={user.id} name={user.name} setNotice={setNotice} />
       <ProvidersCard setNotice={setNotice} />
-      <SessionsCard setNotice={setNotice} />
+      <SessionsCard setNotice={setNotice} runVerified={verified.run} />
       <SwitchUserCard userId={user.id} />
       <SignOutButtons
         userId={user.id}
         signOut={signOut}
         setNotice={setNotice}
       />
-      <DeleteCard />
+      <DeleteCard runVerified={verified.run} />
+      {verified.dialog}
     </section>
   )
 }
@@ -216,14 +222,38 @@ function ProvidersCard({ setNotice }: { setNotice: SetNotice }) {
   )
 }
 
-function SessionsCard({ setNotice }: { setNotice: SetNotice }) {
+function SessionsCard({
+  setNotice,
+  runVerified
+}: {
+  setNotice: SetNotice
+  runVerified: RunVerified
+}) {
   const sessions = useQuery(
     client.from("sessions").select().order("createdAt", { ascending: false })
   )
+  const revalidateSessions = useRevalidateTables([{ table: "sessions" }])
 
-  const revoke = useDeleteMutation(client.from("sessions"), ["id"], null, {
-    onError: () => setNotice({ text: "Could not revoke.", tone: "error" })
-  })
+  const revoke = async (id: string, device: string) => {
+    try {
+      await runVerified(async () => {
+        const result = await authClient.revokeSession({ id })
+        if (result.status === "revoked") {
+          setNotice({
+            text: `Signed out ${device}. It stays signed in until its current token expires, up to ten minutes.`,
+            tone: "success"
+          })
+          await revalidateSessions()
+        }
+        return result
+      })
+    } catch (error) {
+      setNotice({
+        text: isAuthError(error) ? error.message : "Could not revoke.",
+        tone: "error"
+      })
+    }
+  }
 
   return (
     <div className="card bg-base-100 shadow-sm">
@@ -247,7 +277,9 @@ function SessionsCard({ setNotice }: { setNotice: SetNotice }) {
               </div>
               <button
                 type="button"
-                onClick={() => revoke.mutate({ id: session.id })}
+                onClick={() =>
+                  revoke(session.id, session.userAgent ?? "that device")
+                }
                 className="btn btn-ghost btn-sm"
               >
                 <XMarkIcon className="size-4" />
@@ -257,8 +289,9 @@ function SessionsCard({ setNotice }: { setNotice: SetNotice }) {
           ))}
         </ul>
         <p className="text-xs text-base-content/60">
-          Revoked sessions keep working until their current access token expires
-          — ten minutes by default.
+          Revoking asks you to confirm it's you, once an hour. A revoked device
+          keeps working until its current access token expires — ten minutes by
+          default.
         </p>
       </div>
     </div>
@@ -320,9 +353,7 @@ function SignOutButtons({
   signOut: SignOut
   setNotice: SetNotice
 }) {
-  const revalidateSessions = useRevalidateTables([
-    { schema: "public", table: "sessions" }
-  ])
+  const revalidateSessions = useRevalidateTables([{ table: "sessions" }])
 
   const buttons: {
     label: string
@@ -371,38 +402,24 @@ function SignOutButtons({
   )
 }
 
-function DeleteCard() {
+function DeleteCard({ runVerified }: { runVerified: RunVerified }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [deletionCode, setDeletionCode] = useState<string | null>(null)
   // Own notice: the page alert is offscreen
   const [deletionNotice, setDeletionNotice] = useState<Notice | null>(null)
-  const [deletionCooldown, startDeletionCooldown] = useCountdown()
 
   const removeAccount = async () => {
     setDeletionNotice(null)
     try {
-      const result = await authClient.deleteUser(
-        deletionCode ? { code: deletionCode } : {}
-      )
-
-      if (result.status === "verificationRequired") {
-        // Show the field even if sending fails.
-        setDeletionCode("")
-        await authClient.sendDeleteUserCode()
-        setDeletionNotice({
-          text: "For your security, enter the code we just sent.",
-          tone: "info"
-        })
-        return
-      }
-
-      await queryClient.resetQueries()
-      await navigate({ to: "/login" })
+      await runVerified(async () => {
+        const result = await authClient.deleteUser()
+        if (result.status === "deleted") {
+          await queryClient.resetQueries()
+          await navigate({ to: "/login" })
+        }
+        return result
+      })
     } catch (error) {
-      if (isAuthError(error) && error.retryAfter) {
-        startDeletionCooldown(error.retryAfter)
-      }
       setDeletionNotice({
         text: isAuthError(error)
           ? error.message
@@ -420,33 +437,14 @@ function DeleteCard() {
           This removes your account and everything in it. There is no undo.
         </p>
         {deletionNotice ? <NoticeAlert notice={deletionNotice} /> : null}
-        {deletionCode !== null ? (
-          <fieldset className="fieldset">
-            <legend className="fieldset-legend">Confirmation code</legend>
-            <input
-              value={deletionCode}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              onChange={(event) => setDeletionCode(event.target.value)}
-              placeholder="123456"
-              className="input w-48 font-mono tracking-widest"
-            />
-          </fieldset>
-        ) : null}
         <div className="card-actions">
-          {/* Cooldown gates sending, not confirming */}
           <button
             type="button"
             onClick={removeAccount}
-            disabled={deletionCooldown > 0 && !deletionCode}
             className="btn btn-error"
           >
             <TrashIcon className="size-4" />
-            {deletionCooldown > 0 && !deletionCode
-              ? `Try again in ${deletionCooldown}s`
-              : deletionCode !== null
-                ? "Confirm deletion"
-                : "Delete my account"}
+            Delete my account
           </button>
         </div>
       </div>

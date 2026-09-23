@@ -131,8 +131,12 @@ export interface AuthSession {
   updatedAt: Date
 }
 
-/** What a live verification code authorizes. Checked on every verify, so a code cannot cross purposes. */
-export type VerificationPurpose = "signIn" | "deleteUser"
+/**
+ * What a live verification code authorizes. Checked on every verify, so a code
+ * cannot cross purposes. An `identity` code, once verified, stays as the
+ * marker that lets its session revoke devices or delete the account.
+ */
+export type VerificationPurpose = "signIn" | "identity"
 
 /**
  * A verification code, stored as an scrypt string of the code.

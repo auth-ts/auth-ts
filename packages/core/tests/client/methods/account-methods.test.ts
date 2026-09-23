@@ -293,29 +293,57 @@ describe("deleteUser", () => {
     server.on("DELETE", "/api/auth/user", { status: 204 })
     const client = await signedIn()
 
-    expect(await client.deleteUser({ code: "123456" })).toEqual({
-      status: "deleted"
+    expect(await client.deleteUser()).toEqual({ status: "deleted" })
+  })
+})
+
+describe("verifyIdentity and revokeSession", () => {
+  it("sends and verifies an identity code", async () => {
+    server.on("POST", "/api/auth/user/verify/send-code", {
+      body: { sent: true, attempt: "attempt-1" }
     })
+    server.on("POST", "/api/auth/user/verify", { status: 204 })
+    const client = await signedIn()
+
+    expect(await client.sendIdentityCode()).toEqual({ attempt: "attempt-1" })
+    await client.verifyIdentity({ code: "ABCDEF" })
+    expect(server.requests.at(-1)?.body).toEqual({ code: "ABCDEF" })
   })
 
-  it("still throws for a wrong code", async () => {
-    server.on("DELETE", "/api/auth/user", {
+  it("still throws for a wrong code, without refreshing the token", async () => {
+    server.on("POST", "/api/auth/user/verify", {
       status: 401,
       body: { code: "invalidCode", message: "That code is not valid." }
     })
     const client = await signedIn()
 
     // Not retried: a wrong code is a verdict on the request, not on the
-    // credential, so the delete is sent once and no token is refreshed.
-    await expect(client.deleteUser({ code: "000000" })).rejects.toMatchObject({
-      code: "invalidCode"
-    })
+    // credential, so the call is sent once and no token is refreshed.
+    await expect(
+      client.verifyIdentity({ code: "000000" })
+    ).rejects.toMatchObject({ code: "invalidCode" })
     expect(
       server.requests.filter((entry) => entry.path === "/api/auth/token")
     ).toHaveLength(0)
-    expect(
-      server.requests.filter((entry) => entry.path === "/api/auth/user")
-    ).toHaveLength(1)
+  })
+
+  it("reports the challenge on revoke as a value, then revokes", async () => {
+    server.on("DELETE", "/api/auth/sessions/session-2", {
+      status: 403,
+      body: {
+        code: "verificationRequired",
+        message: "Confirm it's you to continue."
+      }
+    })
+    server.on("DELETE", "/api/auth/sessions/session-2", { status: 204 })
+    const client = await signedIn()
+
+    expect(await client.revokeSession({ id: "session-2" })).toEqual({
+      status: "verificationRequired"
+    })
+    expect(await client.revokeSession({ id: "session-2" })).toEqual({
+      status: "revoked"
+    })
   })
 })
 

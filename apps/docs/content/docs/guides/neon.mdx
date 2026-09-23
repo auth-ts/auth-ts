@@ -82,9 +82,11 @@ alter table "identities" enable row level security;
 
 create policy "selectOwnSessions" on "sessions" for select to authenticated
   using ("userId" = (auth.user_id())::uuid);
-create policy "deleteOwnSessions" on "sessions" for delete to authenticated
-  using ("userId" = (auth.user_id())::uuid);
 ```
+
+There is no delete policy on `sessions`. Revoking a device needs a verified
+identity, so it goes through `DELETE /sessions/:id`; a policy would be a
+second, unverified way to do the same thing.
 
 `users` and `identities` take the same shape — see the reference application's
 `src/db/schema.ts` for all six.

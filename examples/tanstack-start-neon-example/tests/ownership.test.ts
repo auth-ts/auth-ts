@@ -110,7 +110,9 @@ describe("row ownership", () => {
     ).toHaveLength(1)
   })
 
-  it("deletes the caller's own session, so revoking a device still works", async () => {
+  it("deletes no session row, not even the caller's own", async () => {
+    // Revoking a device needs a verified identity, so it goes through the
+    // auth server. A policy here would be a second, unverified way in.
     const mine = await client.query<{ id: string }>(
       `select "id" from "sessions" where "userId" = $1`,
       [ada]
@@ -123,7 +125,7 @@ describe("row ownership", () => {
       ])
     )
 
-    expect(deleted.rows).toHaveLength(1)
+    expect(deleted.rows).toHaveLength(0)
   })
 
   it("hides every row from a caller with no user id at all", async () => {

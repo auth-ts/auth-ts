@@ -96,24 +96,30 @@ const currentSessionId = authClient.decodeToken(token)?.claims.sid
 
 ## 4. Revoking a device
 
+Revoking **another** device is an endpoint, not a row delete, because it needs
+a verified identity. A hijacked session could otherwise keep signing the real
+owner out, which is exactly the move per-device sign-out exists to undo.
+
 ```ts
-await postgrest.from("sessions").delete().eq("id", id).throwOnError()
+const result = await authClient.revokeSession({ id })
+if (result.status === "verificationRequired") {
+  await authClient.sendIdentityCode()
+  // collect the code in a "confirm it's you" dialog, then:
+  await authClient.verifyIdentity({ code })
+  await authClient.revokeSession({ id })
+}
 ```
 
-Revoking **another** device is exactly that: the row goes, and that device stops
-being able to refresh. It keeps working until its current access token expires —
-ten minutes by default — which is the same bound the data plane has, and worth
-saying next to the button.
+One verification covers this session in this browser for an hour, so a second
+revoke goes straight through. The revoked device stops being able to refresh at
+once and keeps working until its current access token expires — ten minutes by
+default, which is worth saying next to the button.
 
 Revoking **this** device is a sign-out, because the cookie has to go too:
 
 ```ts
 await authClient.signOut()
 ```
-
-Deleting your own session row without signing out is not broken, only untidy:
-the browser holds a cookie pointing at nothing, and the next `getToken()`
-answers `null` and clears it on the way out.
 
 ## 5. Connected providers
 
@@ -145,7 +151,7 @@ await authClient.connectProvider({ provider: "google", redirect: "/account" })
 
 ## What is still the library's
 
-Two things on this page, and both for the same reason.
+Three things on this page.
 
 **Signing out** is a cookie operation, and cookies are not rows:
 
@@ -155,21 +161,22 @@ await authClient.signOut({ scope: "others" })  // every other device
 await authClient.signOut({ scope: "global" })  // everywhere
 ```
 
-**Deleting the account** is gated on a code, which is a secret the browser is
-never handed:
+**Confirming it's you** is a code, which is a secret the browser is never
+handed. Revoking a device and deleting the account both sit behind it:
 
 ```ts
 const result = await authClient.deleteUser()
 if (result.status === "verificationRequired") {
-  await authClient.sendDeleteUserCode()
-  // collect the code, then:
-  await authClient.deleteUser({ code })
+  await authClient.sendIdentityCode()
+  await authClient.verifyIdentity({ code })
+  await authClient.deleteUser()
 }
 ```
 
-Every deletion goes through the challenge. The code is bound to the session
-that requested it, so a hijacked session on another device cannot use one you
-asked for.
+The verification is bound to the session that asked and to this browser, and
+lasts an hour. There is no "signed in recently" shortcut: a hijacked session is
+exactly the one that is recent. The reference application puts the code in one
+dialog that any of these actions opens.
 
 ## Guest rows
 

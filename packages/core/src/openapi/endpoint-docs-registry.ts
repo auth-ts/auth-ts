@@ -4,6 +4,7 @@ import { callbackProviderDocs } from "../endpoints/callback/$provider"
 import { getProviderTokenDocs } from "../endpoints/identities/$id/token"
 import { connectProviderDocs } from "../endpoints/identities/connect/$provider"
 import { getJwksDocs } from "../endpoints/jwks"
+import { revokeSessionDocs } from "../endpoints/sessions/$id"
 import { signInWithCodeDocs } from "../endpoints/sign-in/code"
 import { signInAsGuestDocs } from "../endpoints/sign-in/guest"
 import { signInWithProviderDocs } from "../endpoints/sign-in/provider/$provider"
@@ -11,7 +12,10 @@ import { sendSignInCodeDocs } from "../endpoints/sign-in/send-code"
 import { signOutDocs } from "../endpoints/sign-out"
 import { getTokenDocs } from "../endpoints/token"
 import { deleteUserDocs, updateUserDocs } from "../endpoints/user"
-import { sendDeleteUserCodeDocs } from "../endpoints/user/send-delete-code"
+import {
+  sendIdentityCodeDocs,
+  verifyIdentityDocs
+} from "../endpoints/user/verify"
 import { listUsersDocs } from "../endpoints/users"
 import { switchUserDocs } from "../endpoints/users/switch"
 import type { AnyEndpointDocs } from "./endpoint-docs"
@@ -52,7 +56,9 @@ export const endpointDocs: {
   signOut: signOutDocs,
   updateUser: updateUserDocs,
   deleteUser: deleteUserDocs,
-  sendDeleteUserCode: sendDeleteUserCodeDocs,
+  sendIdentityCode: sendIdentityCodeDocs,
+  verifyIdentity: verifyIdentityDocs,
+  revokeSession: revokeSessionDocs,
   listUsers: listUsersDocs,
   switchUser: switchUserDocs,
   signInAsGuest: signInAsGuestDocs,
@@ -81,7 +87,9 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   signOut: "Sign out",
   updateUser: "Update the current user",
   deleteUser: "Delete the current user",
-  sendDeleteUserCode: "Send a delete user code",
+  sendIdentityCode: "Send an identity code",
+  verifyIdentity: "Verify identity",
+  revokeSession: "Revoke a session",
   listUsers: "List the signed in users",
   switchUser: "Switch to another signed in user",
   signInAsGuest: "Sign in as a guest",

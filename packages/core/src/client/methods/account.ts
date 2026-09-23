@@ -64,17 +64,47 @@ export async function signOut(
   if (scope !== "others") internals.tokenStore.clear()
 }
 
-/** What a deletion attempt resolved to. */
-export interface DeleteUserResult {
-  /** `"verificationRequired"` means call `sendDeleteUserCode` and retry with the code it sends. */
-  status: "deleted" | "verificationRequired"
+/** Where no cookie carries it, the attempt token `sendIdentityCode` returned. */
+export interface IdentityAttemptInput {
+  attempt?: string
+}
+
+/** What a verified action resolved to. */
+export interface VerifiedActionResult<Done extends string> {
+  /** `"verificationRequired"` means call `sendIdentityCode`, then `verifyIdentity`, and retry. */
+  status: Done | "verificationRequired"
 }
 
 /** Input for account deletion. */
-export interface DeleteUserInput {
-  code?: string
-  /** The attempt token `sendDeleteUserCode` returned, where no cookie carries it. */
-  attempt?: string
+export type DeleteUserInput = IdentityAttemptInput
+
+/** What a deletion attempt resolved to. */
+export type DeleteUserResult = VerifiedActionResult<"deleted">
+
+/** Input for revoking one of the user's sessions. */
+export interface RevokeSessionInput extends IdentityAttemptInput {
+  /** The session's id, from your `sessions` table. */
+  id: string
+}
+
+/** What a revocation attempt resolved to. */
+export type RevokeSessionResult = VerifiedActionResult<"revoked">
+
+/** Input for verifying identity. */
+export interface VerifyIdentityInput extends IdentityAttemptInput {
+  code: string
+}
+
+/** Runs a verified action, reporting the challenge as a result rather than an error. */
+async function verifiedAction(run: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await run()
+    return true
+  } catch (error) {
+    if (error instanceof AuthError && error.code === "verificationRequired")
+      return false
+    throw error
+  }
 }
 
 /** `DELETE /user`; the verification challenge is reported as a result, not thrown. */
@@ -82,33 +112,60 @@ export async function deleteUser(
   internals: AuthClientInternals,
   input: DeleteUserInput = {}
 ): Promise<DeleteUserResult> {
-  try {
-    await internals.fetchJson({
+  const deleted = await verifiedAction(() =>
+    internals.fetchJson({
       method: "DELETE",
       path: "/user",
       body: input,
       authenticated: true
     })
-  } catch (error) {
-    if (error instanceof AuthError && error.code === "verificationRequired")
-      return { status: "verificationRequired" }
-    throw error
-  }
+  )
+  if (!deleted) return { status: "verificationRequired" }
 
   internals.tokenStore.clear()
 
   return { status: "deleted" }
 }
 
-/** `POST /user/send-delete-code`. */
-export async function sendDeleteUserCode(
+/** `DELETE /sessions/:id`; the verification challenge is reported as a result, not thrown. */
+export async function revokeSession(
+  internals: AuthClientInternals,
+  { id, ...body }: RevokeSessionInput
+): Promise<RevokeSessionResult> {
+  const revoked = await verifiedAction(() =>
+    internals.fetchJson({
+      method: "DELETE",
+      path: `/sessions/${encodeURIComponent(id)}`,
+      body,
+      authenticated: true
+    })
+  )
+
+  return { status: revoked ? "revoked" : "verificationRequired" }
+}
+
+/** `POST /user/verify/send-code`. */
+export async function sendIdentityCode(
   internals: AuthClientInternals
 ): Promise<SendCodeResult> {
   const { attempt } = await internals.fetchJson<SendCodeResult>({
     method: "POST",
-    path: "/user/send-delete-code",
+    path: "/user/verify/send-code",
     authenticated: true
   })
 
   return { attempt }
+}
+
+/** `POST /user/verify`. */
+export async function verifyIdentity(
+  internals: AuthClientInternals,
+  input: VerifyIdentityInput
+): Promise<void> {
+  await internals.fetchJson({
+    method: "POST",
+    path: "/user/verify",
+    body: input,
+    authenticated: true
+  })
 }

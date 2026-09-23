@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest"
+import { sha256Hex } from "../../src/lib/hash"
 import { createTestServer } from "../helpers/create-test-server"
 import {
+  mintToken,
   readRefreshCookie,
   refreshCookieFor,
   refreshCookies,
@@ -386,7 +388,7 @@ describe("guest conversion", () => {
   })
 })
 
-describe("account deletion", () => {
+describe("identity verification, revoking a device, deleting the account", () => {
   const signIn = async (
     context: Awaited<ReturnType<typeof createTestServer>>
   ) => {
@@ -412,32 +414,58 @@ describe("account deletion", () => {
     }
   }
 
-  /** The whole two-step delete, for tests that care about what is left behind. */
-  const deleteWithCode = async (
-    context: Awaited<ReturnType<typeof createTestServer>>,
-    session: { refreshToken: string; token: string }
-  ) => {
+  type Context = Awaited<ReturnType<typeof createTestServer>>
+  type Session = { refreshToken: string; token: string }
+
+  /** "Confirm it's you": send the identity code, then verify it. */
+  const verify = async (context: Context, session: Session) => {
     const cookies = refreshCookieFor(session.refreshToken)
     await context.auth.handler(
-      request("POST", "/api/auth/user/send-delete-code", {
+      request("POST", "/api/auth/user/verify/send-code", {
         cookies,
         token: session.token
       })
     )
     return context.auth.handler(
-      request("DELETE", "/api/auth/user", {
+      request("POST", "/api/auth/user/verify", {
         cookies,
         token: session.token,
-        body: { code: required(context.sentCodes.at(-1), "deletion code").code }
+        body: { code: required(context.sentCodes.at(-1), "identity code").code }
       })
     )
   }
 
-  it("deletes the account and clears the cookie once the code is presented", async () => {
+  const deleteAccount = (context: Context, session: Session) =>
+    context.auth.handler(
+      request("DELETE", "/api/auth/user", {
+        cookies: refreshCookieFor(session.refreshToken),
+        token: session.token
+      })
+    )
+
+  const revoke = (context: Context, session: Session, id: string) =>
+    context.auth.handler(
+      request("DELETE", `/api/auth/sessions/${id}`, {
+        cookies: refreshCookieFor(session.refreshToken),
+        token: session.token
+      })
+    )
+
+  /** The session row a sign-in created, found by its token. */
+  const rowOf = async (context: Context, session: Session) =>
+    required(
+      await selectRow(context.db, "sessions", {
+        tokenHash: { eq: await sha256Hex(session.refreshToken) }
+      }),
+      "session row"
+    )
+
+  it("deletes the account and clears the cookie once identity is verified", async () => {
     const context = await createTestServer()
     const session = await signIn(context)
 
-    const response = await deleteWithCode(context, session)
+    expect((await verify(context, session)).status).toBe(204)
+    const response = await deleteAccount(context, session)
 
     expect(response.status).toBe(204)
     expect(context.db.users()).toHaveLength(0)
@@ -447,46 +475,54 @@ describe("account deletion", () => {
     ).toContain("Max-Age=0")
   })
 
-  it("takes the user's verification codes with them, so none outlives the address", async () => {
+  it("answers the challenge outright, never a 2xx and never a side effect", async () => {
+    const context = await createTestServer()
+    const session = await signIn(context)
+    const before = context.sentCodes.length
+
+    const response = await deleteAccount(context, session)
+
+    expect(response.status).toBe(403)
+    expect(((await response.json()) as { code: string }).code).toBe(
+      "verificationRequired"
+    )
+    expect(context.db.users()).toHaveLength(1)
+    expect(context.sentCodes.length).toBe(before)
+  })
+
+  it("takes the user's codes and identity markers with them", async () => {
     // Core deletes the children itself rather than requiring ON DELETE CASCADE,
     // and a code left behind would sign the address's next owner into nothing.
     const context = await createTestServer()
     const session = await signIn(context)
-
-    // An outstanding sign-in code, sent and never verified.
     await context.auth.handler(
       request("POST", "/api/auth/sign-in/send-code", {
-        body: { email: "ada@example.com" },
-        cookies: refreshCookieFor(session.refreshToken)
+        body: { email: "ada@example.com" }
       })
     )
-    expect(
-      await selectRows(context.db, "verifications", {
-        identifier: { eq: "ada@example.com" }
-      })
-    ).not.toEqual([])
+    await verify(context, session)
+    const { id } = await rowOf(context, session)
 
-    const response = await deleteWithCode(context, session)
-
-    expect(response.status).toBe(204)
-    expect(
-      await selectRows(context.db, "verifications", {
-        identifier: { eq: "ada@example.com" }
-      })
-    ).toEqual([])
+    expect((await deleteAccount(context, session)).status).toBe(204)
+    for (const identifier of ["ada@example.com", id]) {
+      expect(
+        await selectRows(context.db, "verifications", {
+          identifier: { eq: identifier }
+        })
+      ).toEqual([])
+    }
   })
 
   it("takes every session of theirs, on every device, and nobody else's", async () => {
     const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
+    const session = await signIn(context)
     const ada = required(
       await selectRow(context.db, "users", {
         email: { eq: "ada@example.com" }
       }),
       "ada"
     )
-    // A second device of Ada's, and a bystander who must be left alone.
-    const session = (userId: string, tokenHash: string) =>
+    const insertSession = (userId: string, tokenHash: string) =>
       context.db.insert({
         table: "sessions",
         values: {
@@ -499,42 +535,19 @@ describe("account deletion", () => {
           updatedAt: new Date()
         }
       })
-    await session(ada.id, "ada-other-device")
+    await insertSession(ada.id, "ada-other-device")
     const grace = await insertUser(context.db, { email: "grace@example.com" })
-    await session(grace.id, "grace-laptop")
+    await insertSession(grace.id, "grace-laptop")
 
-    const response = await deleteWithCode(context, { refreshToken, token })
+    await verify(context, session)
+    expect((await deleteAccount(context, session)).status).toBe(204)
 
-    expect(response.status).toBe(204)
     expect(
       await selectRows(context.db, "sessions", { userId: { eq: ada.id } })
     ).toEqual([])
     expect(
       await selectRows(context.db, "sessions", { userId: { eq: grace.id } })
     ).toHaveLength(1)
-    expect(
-      await selectRow(context.db, "users", { id: { eq: ada.id } })
-    ).toBeNull()
-  })
-
-  it("answers the challenge outright, never a 2xx and never a side effect", async () => {
-    const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
-    const before = context.sentCodes.length
-
-    const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies: refreshCookieFor(refreshToken),
-        token
-      })
-    )
-
-    expect(response.status).toBe(403)
-    expect(((await response.json()) as { code: string }).code).toBe(
-      "verificationRequired"
-    )
-    expect(context.db.users()).toHaveLength(1)
-    expect(context.sentCodes.length).toBe(before)
   })
 
   it("refuses a token whose session has expired but is unswept", async () => {
@@ -558,176 +571,215 @@ describe("account deletion", () => {
     }
   })
 
-  it("sends no deletion code for a session that has already expired", async () => {
+  it("sends nothing for a token whose session is already revoked", async () => {
     const context = await createTestServer()
     const { refreshToken, token } = await signIn(context)
-    const session = required(context.db.sessions()[0], "session")
-    await context.db.update({
-      table: "sessions",
-      where: { id: { eq: session.id } },
-      values: { expiresAt: new Date(Date.now() - 1000) }
-    })
-
-    const sent = await context.auth.handler(
-      request("POST", "/api/auth/user/send-delete-code", {
+    await context.auth.handler(
+      request("POST", "/api/auth/sign-out", {
         cookies: refreshCookieFor(refreshToken),
         token
       })
     )
-
-    expect(sent.status).toBe(401)
-    expect(
-      context.sentCodes.some((code) => code.purpose === "deleteUser")
-    ).toBe(false)
-  })
-
-  it("completes deletion with a code from send-delete-code", async () => {
-    const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
-    const cookies = refreshCookieFor(refreshToken)
-
-    const sent = await context.auth.handler(
-      request("POST", "/api/auth/user/send-delete-code", { cookies, token })
-    )
-    expect(sent.status).toBe(200)
-    const deletionCode = required(
-      context.sentCodes.at(-1),
-      "deletion code"
-    ).code
-    expect(required(context.sentCodes.at(-1), "deletion code").purpose).toBe(
-      "deleteUser"
-    )
-
-    const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies,
-        token,
-        body: { code: deletionCode }
-      })
-    )
-
-    expect(response.status).toBe(204)
-    expect(context.db.users()).toHaveLength(0)
-  })
-
-  it("binds the deletion code to the session that asked for it", async () => {
-    // Two sessions for one user. The code goes to the same address either way,
-    // but it is filed under the session that requested it, so a hijacked
-    // session elsewhere cannot spend a code the owner asked for — or vice versa.
-    const context = await createTestServer()
-    const first = await signIn(context)
-    const second = await signIn(context)
-
-    await context.auth.handler(
-      request("POST", "/api/auth/user/send-delete-code", {
-        cookies: refreshCookieFor(first.refreshToken),
-        token: first.token
-      })
-    )
-    const code = required(context.sentCodes.at(-1), "deletion code").code
-
-    const elsewhere = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies: refreshCookieFor(second.refreshToken),
-        token: second.token,
-        body: { code }
-      })
-    )
-    expect(elsewhere.status).toBe(401)
-    expect(context.db.users()).toHaveLength(1)
-
-    const asker = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies: refreshCookieFor(first.refreshToken),
-        token: first.token,
-        body: { code }
-      })
-    )
-    expect(asker.status).toBe(204)
-    expect(context.db.users()).toHaveLength(0)
-  })
-
-  it("keeps a deletion code apart from a sign-in code for the same address", async () => {
-    const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
-    const cookies = refreshCookieFor(refreshToken)
-
-    await context.auth.handler(
-      request("POST", "/api/auth/user/send-delete-code", { cookies, token })
-    )
-    const deletionCode = required(
-      context.sentCodes.at(-1),
-      "deletion code"
-    ).code
-
-    const resent = await context.auth.handler(
-      request("POST", "/api/auth/sign-in/send-code", {
-        body: { email: "ada@example.com" }
-      })
-    )
-    expect(resent.status).toBe(200)
-    expect(required(context.sentCodes.at(-1), "sign-in code").purpose).toBe(
-      "signIn"
-    )
-
-    const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies,
-        token,
-        body: { code: deletionCode }
-      })
-    )
-
-    expect(response.status).toBe(204)
-    expect(context.db.users()).toHaveLength(0)
-  })
-
-  it("sends nothing for a token whose session is already revoked", async () => {
-    const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
-    const cookies = refreshCookieFor(refreshToken)
-
-    await context.auth.handler(
-      request("POST", "/api/auth/sign-out", { cookies, token })
-    )
     const before = context.sentCodes.length
 
     const response = await context.auth.handler(
-      request("POST", "/api/auth/user/send-delete-code", { token })
+      request("POST", "/api/auth/user/verify/send-code", { token })
     )
 
     expect(response.status).toBe(401)
     expect(context.sentCodes.length).toBe(before)
   })
 
-  it("refuses a sign-in code as a deletion code", async () => {
+  it("binds the verification to the session that asked for it", async () => {
+    // Two sessions of one user. A hijacked session elsewhere cannot borrow
+    // the owner's verification, and cannot spend a code the owner asked for.
     const context = await createTestServer()
-    const { refreshToken, token } = await signIn(context)
-    const cookies = refreshCookieFor(refreshToken)
+    const owner = await signIn(context)
+    const other = await signIn(context)
 
-    // A fresh sign-in code for the same address must not authorize deletion.
+    await context.auth.handler(
+      request("POST", "/api/auth/user/verify/send-code", {
+        cookies: refreshCookieFor(owner.refreshToken),
+        token: owner.token
+      })
+    )
+    const code = required(context.sentCodes.at(-1), "identity code").code
+    const elsewhere = await context.auth.handler(
+      request("POST", "/api/auth/user/verify", {
+        cookies: refreshCookieFor(other.refreshToken),
+        token: other.token,
+        body: { code }
+      })
+    )
+    expect(elsewhere.status).toBe(401)
+
+    await context.auth.handler(
+      request("POST", "/api/auth/user/verify", {
+        cookies: refreshCookieFor(owner.refreshToken),
+        token: owner.token,
+        body: { code }
+      })
+    )
+    expect((await deleteAccount(context, other)).status).toBe(403)
+    expect((await deleteAccount(context, owner)).status).toBe(204)
+  })
+
+  it("binds the verification to the browser that holds the attempt", async () => {
+    const context = await createTestServer()
+    const session = await signIn(context)
+    await verify(context, session)
+
+    const anotherBrowser = await context.auth.handler(
+      request("DELETE", "/api/auth/user", {
+        cookies: {
+          ...refreshCookieFor(session.refreshToken),
+          "auth-ts.attempt.identity": "a-different-browser"
+        },
+        token: session.token
+      })
+    )
+
+    expect(anotherBrowser.status).toBe(403)
+    expect(context.db.users()).toHaveLength(1)
+  })
+
+  it("keeps the verification for an hour and no longer", async () => {
+    vi.useFakeTimers()
+    try {
+      const context = await createTestServer({ session: { ttl: "10d" } })
+      const session = await signIn(context)
+      await verify(context, session)
+      const refreshed = async () => ({
+        ...session,
+        token: await mintToken(context.auth, session.refreshToken)
+      })
+
+      vi.advanceTimersByTime(59 * 60_000)
+      const other = required(
+        await context.db.insert({
+          table: "sessions",
+          values: {
+            userId: (await rowOf(context, session)).userId,
+            tokenHash: "another-device",
+            expiresAt: new Date(Date.now() + 60_000),
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        }),
+        "session"
+      )
+      expect((await revoke(context, await refreshed(), other.id)).status).toBe(
+        204
+      )
+
+      vi.advanceTimersByTime(2 * 60_000)
+      expect((await deleteAccount(context, await refreshed())).status).toBe(403)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("refuses a wrong code and leaves no verification behind", async () => {
+    const context = await createTestServer()
+    const session = await signIn(context)
+    await context.auth.handler(
+      request("POST", "/api/auth/user/verify/send-code", {
+        cookies: refreshCookieFor(session.refreshToken),
+        token: session.token
+      })
+    )
+
+    const wrong = await context.auth.handler(
+      request("POST", "/api/auth/user/verify", {
+        cookies: refreshCookieFor(session.refreshToken),
+        token: session.token,
+        body: { code: "??????" }
+      })
+    )
+
+    expect(wrong.status).toBe(401)
+    expect((await deleteAccount(context, session)).status).toBe(403)
+  })
+
+  it("refuses a sign-in code as an identity code", async () => {
+    const context = await createTestServer()
+    const session = await signIn(context)
     await context.auth.handler(
       request("POST", "/api/auth/sign-in/send-code", {
-        body: { email: "ada@example.com" },
-        cookies
+        body: { email: "ada@example.com" }
       })
     )
     const signInCode = required(context.sentCodes.at(-1), "sign-in code")
     expect(signInCode.purpose).toBe("signIn")
 
     const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies,
-        token,
+      request("POST", "/api/auth/user/verify", {
+        cookies: refreshCookieFor(session.refreshToken),
+        token: session.token,
         body: { code: signInCode.code }
       })
     )
 
     expect(response.status).toBe(401)
-    expect(context.db.users()).toHaveLength(1)
+    expect((await deleteAccount(context, session)).status).toBe(403)
   })
 
-  it("rate limits send-delete-code per client address rather than per account", async () => {
+  it("revokes another of the user's sessions once verified", async () => {
+    const context = await createTestServer()
+    const owner = await signIn(context)
+    const other = await signIn(context)
+    const { id } = await rowOf(context, other)
+
+    expect((await revoke(context, owner, id)).status).toBe(403)
+    expect(context.db.sessions()).toHaveLength(2)
+
+    await verify(context, owner)
+    expect((await revoke(context, owner, id)).status).toBe(204)
+    expect(context.db.sessions()).toHaveLength(1)
+    expect(
+      (
+        await context.auth.handler(
+          request("GET", "/api/auth/token", {
+            cookies: refreshCookieFor(other.refreshToken)
+          })
+        )
+      ).status
+    ).toBe(200)
+    expect(
+      await (
+        await context.auth.handler(
+          request("GET", "/api/auth/token", {
+            cookies: refreshCookieFor(other.refreshToken)
+          })
+        )
+      ).json()
+    ).toBeNull()
+  })
+
+  it("404s on a session that is not the caller's", async () => {
+    const context = await createTestServer()
+    const ada = await signIn(context)
+    const grace = await insertUser(context.db, { email: "grace@example.com" })
+    const hers = required(
+      await context.db.insert({
+        table: "sessions",
+        values: {
+          userId: grace.id,
+          tokenHash: "grace-laptop",
+          expiresAt: new Date(Date.now() + 60_000),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      }),
+      "session"
+    )
+    await verify(context, ada)
+
+    expect((await revoke(context, ada, hers.id)).status).toBe(404)
+    expect(context.db.sessions()).toHaveLength(2)
+  })
+
+  it("rate limits identity codes per client address rather than per account", async () => {
     vi.useFakeTimers()
     // Pinned to the start of a window: the limiter's windows are aligned to the
     // clock rather than started by the first request, so a run that straddled a
@@ -738,14 +790,13 @@ describe("account deletion", () => {
         ipAddress: { trustedProxies: 1 },
         rateLimit: { sendCodePerIP: { max: 2, window: "10m" } }
       })
-      const { refreshToken, token } = await signIn(context)
-      const cookies = refreshCookieFor(refreshToken)
+      const session = await signIn(context)
       const before = context.sentCodes.length
       const from = (address: string) =>
         context.auth.handler(
-          request("POST", "/api/auth/user/send-delete-code", {
-            cookies,
-            token,
+          request("POST", "/api/auth/user/verify/send-code", {
+            cookies: refreshCookieFor(session.refreshToken),
+            token: session.token,
             headers: { "x-forwarded-for": address }
           })
         )
@@ -753,7 +804,6 @@ describe("account deletion", () => {
       expect((await from("203.0.113.7")).status).toBe(200)
       expect((await from("203.0.113.7")).status).toBe(200)
       expect((await from("203.0.113.7")).status).toBe(429)
-      // The account itself is never the thing that is limited.
       expect((await from("203.0.113.8")).status).toBe(200)
       expect(context.sentCodes.length - before).toBe(3)
     } finally {
@@ -761,22 +811,25 @@ describe("account deletion", () => {
     }
   })
 
-  it("refuses to delete a guest who has no way to receive a code", async () => {
-    const context = await createTestServer({
-      guest: true
-    })
+  it("refuses to delete a guest who has no way to verify", async () => {
+    const context = await createTestServer({ guest: true })
     const { refreshToken, token } = await signInGuest(context)
 
-    const response = await context.auth.handler(
-      request("DELETE", "/api/auth/user", {
-        cookies: refreshCookieFor(refreshToken),
-        token
-      })
-    )
+    for (const [method, path] of [
+      ["DELETE", "/api/auth/user"],
+      ["POST", "/api/auth/user/verify/send-code"]
+    ] as const) {
+      const response = await context.auth.handler(
+        request(method, path, {
+          cookies: refreshCookieFor(refreshToken),
+          token
+        })
+      )
 
-    expect(response.status).toBe(409)
-    expect(((await response.json()) as { code: string }).code).toBe(
-      "guestCannotReceiveCode"
-    )
+      expect(response.status).toBe(409)
+      expect(((await response.json()) as { code: string }).code).toBe(
+        "guestCannotReceiveCode"
+      )
+    }
   })
 })

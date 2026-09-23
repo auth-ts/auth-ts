@@ -12,7 +12,7 @@ import { readAttempt } from "../shared/attempt-cookie"
 // Aliased: this file owns the HTTP names `updateUser` and `deleteUser`.
 import { deleteUser as deleteUserAndRows } from "../user/delete-user"
 import { updateUser as updateUserFields } from "../user/update-user"
-import { consumeVerificationCode } from "../verification-code/consume-verification-code"
+import { requireVerifiedIdentity } from "../verification-code/identity"
 import { accountIdentifier } from "../verification-code/resolve-code-identifier"
 
 /**
@@ -131,28 +131,22 @@ export const updateUser = defineEndpoint({
 
 /** Body accepted by `DELETE /user`. */
 export interface DeleteUserInput extends CallerInput, AttemptInput {
-  /** The confirmation code, when a challenge was issued. */
-  code?: string
   requestURL?: string
 }
 
 /** How `DELETE /user` appears in the OpenAPI document. */
 export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
   description:
-    "Fetch a code with /user/send-delete-code first, then repeat the call with it. Only 204 means deleted.",
+    "Verify identity first with /user/verify. Only 204 means deleted.",
   tag: "User",
   auth: "bearer",
   body: {
     type: "object",
     properties: {
-      code: {
-        type: "string",
-        description: "The confirmation code, when one was issued."
-      },
       attempt: {
         type: "string",
         description:
-          "The token `/user/send-delete-code` returned. Browsers send it as a cookie instead."
+          "The token `/user/verify/send-code` returned. Browsers send it as a cookie instead."
       }
     }
   },
@@ -160,39 +154,27 @@ export const deleteUserDocs: EndpointDocs<DeleteUserInput> = {
     204: { description: "Deleted.", setsCookie: "cleared" },
     401: "Unauthenticated",
     403: "VerificationRequired",
-    409: "GuestCannotReceiveCode",
-    429: "RateLimited"
+    409: "GuestCannotReceiveCode"
   }
 }
 
 /**
  * Delete the current user.
  *
- * Two steps, always: a call without a code answers the challenge, the caller
- * fetches one with `POST /user/send-delete-code`, and retries with it. There
- * is no "signed in recently enough" bypass — a hijacked session is exactly
- * the one that is recent.
- *
- * The code is filed under the session that asked for it, so no other session
- * of the same user can redeem it, and its purpose is checked on verify, so a
- * sign-in code never authorizes a deletion.
+ * Behind a verified identity, like revoking a device: a call without one
+ * answers the challenge, the caller verifies with `/user/verify`, and
+ * retries. There is no "signed in recently enough" bypass — a hijacked
+ * session is exactly the one that is recent.
  *
  * The challenge deliberately answers 403 rather than 202: **204 must be the only
  * success shape**, or a client that treats any 2xx as done will clear its state
  * and tell the user their account is gone while it very much is not.
- *
- * This endpoint never sends anything itself — a call without a code refuses
- * outright, with no side effect, so retrying a failed delete cannot fire a
- * storm of codes.
  */
 export const deleteUser = defineEndpoint({
   method: "DELETE",
   path: "/user",
   parse: async ({ request }): Promise<DeleteUserInput> => {
-    const body = await readBody<{ code?: string; attempt?: string }>(request, [
-      "code",
-      "attempt"
-    ])
+    const body = await readBody<{ attempt?: string }>(request, ["attempt"])
 
     return { ...body, headers: request.headers, requestURL: request.url }
   },
@@ -230,14 +212,11 @@ export const deleteUser = defineEndpoint({
     if (!accountIdentifier(user)) {
       throw new AuthApiError("guestCannotReceiveCode")
     }
-    if (!input.code) throw new AuthApiError("verificationRequired")
-
-    await consumeVerificationCode(internals, {
-      identifier: caller.sessionId,
-      code: input.code,
-      purpose: "deleteUser",
-      attempt: readAttempt(input, "deleteUser")
-    })
+    await requireVerifiedIdentity(
+      internals,
+      caller.sessionId,
+      readAttempt(input, "identity")
+    )
     return finishDeletion()
   }
 })

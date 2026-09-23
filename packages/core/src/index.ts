@@ -59,6 +59,7 @@ export type {
   ProviderTokenResult
 } from "./endpoints/identities/$id/token"
 export type { ConnectProviderInput } from "./endpoints/identities/connect/$provider"
+export type { RevokeSessionInput } from "./endpoints/sessions/$id"
 export type { SignInWithCodeInput } from "./endpoints/sign-in/code"
 export type { SignInAsGuestInput } from "./endpoints/sign-in/guest"
 export type {
@@ -72,6 +73,10 @@ export type {
 } from "./endpoints/sign-out"
 export type { TokenInput, TokenResult } from "./endpoints/token"
 export type { DeleteUserInput, UpdateUserInput } from "./endpoints/user"
+export type {
+  SendIdentityCodeInput,
+  VerifyIdentityInput
+} from "./endpoints/user/verify"
 export type { SwitchUserInput } from "./endpoints/users/switch"
 export { AuthApiError } from "./http/auth-api-error"
 export { AuthConfigError } from "./http/auth-config-error"

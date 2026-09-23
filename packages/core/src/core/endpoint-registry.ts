@@ -5,6 +5,7 @@ import { connectProvider } from "../endpoints/identities/connect/$provider"
 import { getJwks } from "../endpoints/jwks"
 import { getOpenAPIDocument } from "../endpoints/openapi"
 import { getReference } from "../endpoints/reference"
+import { revokeSession } from "../endpoints/sessions/$id"
 import { signInWithCode } from "../endpoints/sign-in/code"
 import { signInAsGuest } from "../endpoints/sign-in/guest"
 import { signInWithProvider } from "../endpoints/sign-in/provider/$provider"
@@ -12,7 +13,7 @@ import { sendSignInCode } from "../endpoints/sign-in/send-code"
 import { signOut } from "../endpoints/sign-out"
 import { getToken } from "../endpoints/token"
 import { deleteUser, updateUser } from "../endpoints/user"
-import { sendDeleteUserCode } from "../endpoints/user/send-delete-code"
+import { sendIdentityCode, verifyIdentity } from "../endpoints/user/verify"
 import { listUsers } from "../endpoints/users"
 import { switchUser } from "../endpoints/users/switch"
 
@@ -34,7 +35,9 @@ export const endpointRegistry = {
   signOut,
   updateUser,
   deleteUser,
-  sendDeleteUserCode,
+  sendIdentityCode,
+  verifyIdentity,
+  revokeSession,
   listUsers,
   switchUser,
   signInAsGuest,

@@ -7,7 +7,7 @@ import type { CapturedCode } from "./create-test-internals"
 import { generateTestKeys } from "./generate-test-keys"
 import { readSetCookies } from "./request"
 
-const ATTEMPT_COOKIES = ["auth-ts.attempt", "auth-ts.attempt.delete"]
+const ATTEMPT_COOKIES = ["auth-ts.attempt", "auth-ts.attempt.identity"]
 
 /** A real server wired to in-memory storage, with sends and logs captured. */
 export interface TestServer {

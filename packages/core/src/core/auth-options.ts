@@ -34,8 +34,8 @@ export interface SendCodeContext {
    * branding, `User-Agent` for a "new device" note.
    */
   headers: Headers
-  /** Why the code was sent, so deletion mail can differ from sign-in mail. */
-  purpose: "signIn" | "deleteUser"
+  /** Why the code was sent, so a "confirm it's you" mail can differ from sign-in mail. */
+  purpose: "signIn" | "identity"
 }
 
 /** Email delivery. Supplying this enables email as a sign-in method. */

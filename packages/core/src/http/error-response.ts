@@ -10,7 +10,7 @@ export type AuthErrorCode =
   | "rateLimited"
   /** Wrong, expired, already-used, or for a different purpose. */
   | "invalidCode"
-  /** The action needs identity confirmed first: fetch a code and retry with it. */
+  /** The action needs identity confirmed first: `/user/verify/send-code`, `/user/verify`, then retry. */
   | "verificationRequired"
   /** No session, or a session that no longer resolves. */
   | "unauthenticated"

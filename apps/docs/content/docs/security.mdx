@@ -43,14 +43,14 @@ the window; their code is never touched. No slow hashing — the ten-minute
 lifetime and the guess budget do that job, and bcrypt here would only slow down
 honest sign-ins.
 
-Purposes are checked on verify, so a sign-in code can never authorize a
-deletion, and the two carry separate attempt cookies so requesting one does not
+Purposes are checked on verify, so a sign-in code can never confirm an
+identity, and the two carry separate attempt cookies so requesting one does not
 orphan the other.
 
-`DELETE /user` never sends a code itself. A stale session refuses outright, with
-no side effect, so retrying a failed delete cannot fire a storm of email —
-`/user/send-delete-code` is the one call that puts a code in flight, and it needs
-the caller's own bearer token.
+`/user/verify/send-code` is the one call that puts an identity code in flight,
+and it needs the caller's own bearer token. Revoking a device and deleting the
+account never send anything themselves — without a verification they refuse
+outright, with no side effect, so retrying cannot fire a storm of email.
 
 A code whose delivery fails is rolled back rather than left live, so a sender
 outage leaves nothing bound to the token the person is about to present.
@@ -225,14 +225,21 @@ Additional fields are an allowlist applied on insert only. On an existing user
 they are ignored, because otherwise any sign-in request could rewrite profile
 columns.
 
-Deletion always needs a code, and the code is filed under the session that
-asked for it: no other session of the same user can redeem it, and there is no
-"signed in recently enough" bypass — a hijacked session is exactly the one
-that is recent. The challenge answers **403**, never a 2xx, so a client cannot
-mistake it for success and tell someone their account is gone when it is not.
+Revoking another device and deleting the account both need a verified
+identity: a code from `/user/verify/send-code`, checked by `/user/verify`. What
+that leaves behind is filed under the session that asked and bound to the
+browser holding the attempt cookie, lasts an hour, and is not spent by the
+actions it allows. No other session of the same user can use it, and there is
+no "signed in recently enough" bypass — a hijacked session is exactly the one
+that is recent. The challenge answers **403 `verificationRequired`**, never a
+2xx, so a client cannot mistake it for success and tell someone their account
+is gone when it is not.
 
-Codes carry a purpose. A sign-in code cannot authorize a deletion, and a deletion
-code cannot sign anyone in.
+Signing out this device, or every device, needs nothing: a hijacker who does
+either signs themselves out too.
+
+Codes carry a purpose. A sign-in code cannot confirm an identity, and an
+identity code cannot sign anyone in.
 
 ## Cross-origin
 

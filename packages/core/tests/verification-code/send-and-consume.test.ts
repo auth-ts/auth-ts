@@ -3,6 +3,10 @@ import { CODE_ALPHABETS } from "../../src/lib/generate-random"
 import { sha256Hex } from "../../src/lib/hash"
 import type { MemoryDatabase } from "../../src/lib/memory-database"
 import { consumeVerificationCode } from "../../src/verification-code/consume-verification-code"
+import {
+  markIdentityVerified,
+  requireVerifiedIdentity
+} from "../../src/verification-code/identity"
 import { resolveCodeIdentifier } from "../../src/verification-code/resolve-code-identifier"
 import { sendVerificationCode } from "../../src/verification-code/send-verification-code"
 import { createTestInternals } from "../helpers/create-test-internals"
@@ -177,7 +181,7 @@ describe("sendVerificationCode", () => {
     const attempt = await sendVerificationCode(internals, {
       deliverTo: emailIdentifier,
       key: "session-a",
-      purpose: "deleteUser",
+      purpose: "identity",
       locale: "en",
       headers: new Headers()
     })
@@ -191,7 +195,7 @@ describe("sendVerificationCode", () => {
         consumeVerificationCode(internals, {
           identifier,
           code,
-          purpose: "deleteUser",
+          purpose: "identity",
           attempt
         })
       ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
@@ -200,7 +204,7 @@ describe("sendVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "session-a",
         code,
-        purpose: "deleteUser",
+        purpose: "identity",
         attempt
       })
     ).resolves.toBeUndefined()
@@ -216,14 +220,14 @@ describe("sendVerificationCode", () => {
     await sendVerificationCode(internals, {
       deliverTo: emailIdentifier,
       key: emailIdentifier.value,
-      purpose: "deleteUser",
+      purpose: "identity",
       locale: "de",
       headers
     })
 
     const sent = required(sentCodes[0], "sent code")
     expect(sent.locale).toBe("de")
-    expect(sent.purpose).toBe("deleteUser")
+    expect(sent.purpose).toBe("identity")
     expect(sent.headers.get("host")).toBe("tenant.example.com")
   })
 
@@ -288,6 +292,43 @@ describe("sendVerificationCode", () => {
 
     expect(await selectRows(db, "attempts")).toHaveLength(0)
     expect(sentCodes).toHaveLength(40)
+  })
+})
+
+describe("markIdentityVerified", () => {
+  it("keeps the row as the marker, and the code cannot be used twice", async () => {
+    const { internals, sentCodes } = await createTestInternals()
+    const attempt = await sendVerificationCode(internals, {
+      deliverTo: emailIdentifier,
+      key: "session-a",
+      purpose: "identity",
+      locale: "en",
+      headers: new Headers()
+    })
+    const code = required(sentCodes[0], "sent code").code
+
+    await expect(
+      requireVerifiedIdentity(internals, "session-a", attempt)
+    ).rejects.toThrowError(
+      expect.objectContaining({ code: "verificationRequired" })
+    )
+    await markIdentityVerified(internals, {
+      sessionId: "session-a",
+      code,
+      attempt
+    })
+    await expect(
+      requireVerifiedIdentity(internals, "session-a", attempt)
+    ).resolves.toBeUndefined()
+
+    await expect(
+      markIdentityVerified(internals, { sessionId: "session-a", code, attempt })
+    ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))
+    await expect(
+      requireVerifiedIdentity(internals, "session-b", attempt)
+    ).rejects.toThrowError(
+      expect.objectContaining({ code: "verificationRequired" })
+    )
   })
 })
 
@@ -367,7 +408,7 @@ describe("consumeVerificationCode", () => {
       consumeVerificationCode(internals, {
         identifier: "ada@example.com",
         code,
-        purpose: "deleteUser",
+        purpose: "identity",
         attempt
       })
     ).rejects.toThrowError(expect.objectContaining({ code: "invalidCode" }))

@@ -12,9 +12,14 @@ export type { Logger, LogLevel } from "./client/lib/logger"
 export type {
   DeleteUserInput,
   DeleteUserResult,
+  IdentityAttemptInput,
+  RevokeSessionInput,
+  RevokeSessionResult,
   SignOutInput,
   SignOutScope,
-  UpdateUserInput
+  UpdateUserInput,
+  VerifiedActionResult,
+  VerifyIdentityInput
 } from "./client/methods/account"
 export type { GetTokenOptions, RefreshToken } from "./client/methods/get-token"
 export type {

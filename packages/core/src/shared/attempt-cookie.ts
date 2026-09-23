@@ -5,6 +5,7 @@ import {
   serializeCookie,
   shouldUseSecureCookies
 } from "../lib/serialize-cookie"
+import { IDENTITY_TTL } from "../verification-code/identity"
 import { VERIFICATION_CODE_TTL } from "../verification-code/send-verification-code"
 
 /** What an endpoint that verifies a code may have been handed directly. */
@@ -17,14 +18,19 @@ export interface AttemptInput {
 /**
  * The cookie that binds a code to the client that requested it, one per purpose.
  *
- * Separate names, because a sign-in code requested while a deletion code is
- * outstanding must not overwrite the token the deletion still needs.
+ * Separate names, because a sign-in code requested while an identity check is
+ * outstanding must not overwrite the token the check still needs.
  */
 export function attemptCookieName(purpose: VerificationPurpose) {
-  return purpose === "signIn" ? "auth-ts.attempt" : "auth-ts.attempt.delete"
+  return purpose === "signIn" ? "auth-ts.attempt" : "auth-ts.attempt.identity"
 }
 
-/** The `Set-Cookie` value carrying an attempt token, scoped to the auth mount. */
+/**
+ * The `Set-Cookie` value carrying an attempt token, scoped to the auth mount.
+ *
+ * An identity attempt lives as long as the verification it becomes, so the
+ * browser still holds it when the marker is checked an hour on.
+ */
 export function attemptCookie(
   internals: AuthInternals,
   purpose: VerificationPurpose,
@@ -35,7 +41,7 @@ export function attemptCookie(
     name: attemptCookieName(purpose),
     value: token,
     path: internals.config.basePath,
-    maxAge: VERIFICATION_CODE_TTL,
+    maxAge: purpose === "identity" ? IDENTITY_TTL : VERIFICATION_CODE_TTL,
     secure: shouldUseSecureCookies(requestURL)
   })
 }

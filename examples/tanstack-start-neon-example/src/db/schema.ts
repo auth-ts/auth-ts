@@ -87,11 +87,6 @@ export const sessions = pgTable.withRLS(
       for: "select",
       to: authenticatedRole,
       using: authUuid(table.userId)
-    }),
-    pgPolicy("deleteOwnSessions", {
-      for: "delete",
-      to: authenticatedRole,
-      using: authUuid(table.userId)
     })
   ]
 )
@@ -126,10 +121,7 @@ export const verifications = pgTable.withRLS(
       table.attemptHash
     ),
     index("verificationsExpiresAtIndex").on(table.expiresAt),
-    check(
-      "verificationsPurposeCheck",
-      sql`"purpose" in ('signIn', 'deleteUser')`
-    )
+    check("verificationsPurposeCheck", sql`"purpose" in ('signIn', 'identity')`)
   ]
 )
 

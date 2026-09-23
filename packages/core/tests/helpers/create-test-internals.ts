@@ -13,7 +13,7 @@ export interface CapturedCode {
   destination: string
   code: string
   locale: string
-  purpose: "signIn" | "deleteUser"
+  purpose: "signIn" | "identity"
   headers: Headers
 }
 

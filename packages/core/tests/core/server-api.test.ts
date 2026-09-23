@@ -192,7 +192,9 @@ describe("getToken as a function", () => {
     for (const call of [
       () => context.auth.updateUser({ headers, name: "Ada" }),
       () => context.auth.deleteUser({ headers }),
-      () => context.auth.sendDeleteUserCode({ headers })
+      () => context.auth.sendIdentityCode({ headers }),
+      () => context.auth.verifyIdentity({ headers, code: "ABCDEF" }),
+      () => context.auth.revokeSession({ headers, id: "any" })
     ]) {
       await expect(call()).rejects.toMatchObject({
         code: "unauthenticated",
@@ -486,9 +488,10 @@ describe("calling with a token instead of a request", () => {
     expect(updated.email).toBe("ada@example.com")
 
     // No cookie jar in-process: the attempt token rides in the result and back.
-    const { attempt } = await auth.sendDeleteUserCode({ token })
-    const code = required(context.sentCodes.at(-1), "deletion code").code
-    await auth.deleteUser({ token, code, attempt })
+    const { attempt } = await auth.sendIdentityCode({ token })
+    const code = required(context.sentCodes.at(-1), "identity code").code
+    await auth.verifyIdentity({ token, code, attempt })
+    await auth.deleteUser({ token, attempt })
     expect(context.db.sessions()).toHaveLength(0)
   })
 
