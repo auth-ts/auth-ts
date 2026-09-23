@@ -6,7 +6,7 @@
  * forever and are only ever added to.
  */
 export type AuthErrorCode =
-  /** A fixed-window rate limit was exceeded. */
+  /** A rate-limit bucket ran out of tokens. */
   | "rateLimited"
   /** Expired, already used, for another purpose, or requested by another client. */
   | "invalidCode"

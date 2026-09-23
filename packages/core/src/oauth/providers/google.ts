@@ -42,7 +42,7 @@ const googleKeys = createRemoteJWKSet(
  * Google sign-in, via the standard OIDC authorization code flow.
  *
  * PKCE on the code exchange and a nonce bound into the ID token, both carried
- * in the signed state cookie across the redirect.
+ * in the state cookie across the redirect.
  */
 export const google: OAuthProvider = {
   id: "google",

@@ -8,7 +8,7 @@ const textEncoder = new TextEncoder()
  *
  * Thirty-two random bytes, base64url — 43 characters, inside RFC 7636 §4.1's
  * 43–128 and drawn from exactly the alphabet it allows. It lives only in the
- * signed, `HttpOnly` state cookie, so nothing but this server ever sees it
+ * `HttpOnly` state cookie, so nothing but this server ever sees it
  * before it is sent to the provider's token endpoint.
  */
 export function createCodeVerifier() {
@@ -23,7 +23,7 @@ export function createCodeVerifier() {
  * away the verifier. A provider that is handed the challenge refuses to
  * exchange an authorization code without the matching verifier — so a code
  * intercepted on the way back is worthless to whoever intercepted it, which is
- * what the signed state does not cover on its own.
+ * what the state cookie does not cover on its own.
  */
 export async function codeChallengeS256(verifier: string) {
   const digest = await crypto.subtle.digest(
