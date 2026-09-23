@@ -171,7 +171,14 @@ function LoginPage() {
                   spellCheck={false}
                   required
                   value={code}
-                  onChange={(event) => setCode(event.target.value)}
+                  onChange={(event) =>
+                    setCode(
+                      event.target.value
+                        .replaceAll(" ", "")
+                        .replaceAll("-", "")
+                        .toUpperCase()
+                    )
+                  }
                   placeholder="A1B2C3"
                   className="input w-full text-center font-mono text-lg tracking-[0.4em]"
                 />

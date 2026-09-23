@@ -315,7 +315,7 @@ export interface RateLimitOptions {
  * The shape of the codes `sendCode` delivers.
  *
  * The odds of a brute-force attack at the default guess limit, running
- * nonstop and emailing the target every ten minutes: six `alphanumeric`
+ * nonstop and emailing the target every hour: six `alphanumeric`
  * symbols take about a thousand years to reach a 50% chance; eight digits
  * about ninety-five years; six digits about one year. Choose `numeric` for
  * the one-time-code autofill phones offer, and lengthen it if you do.

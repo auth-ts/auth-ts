@@ -98,7 +98,7 @@ describe("verification code sign-in over HTTP", () => {
     const attempt = readSetCookies(sendResponse).get("auth-ts.attempt")
     expect(attempt?.attributes).toContain("HttpOnly")
     expect(attempt?.attributes).toContain("Path=/api/auth")
-    expect(attempt?.attributes).toContain("Max-Age=600")
+    expect(attempt?.attributes).toContain("Max-Age=3600")
     // The body carries it too, for callers with no cookie jar.
     const sent = (await sendResponse.json()) as { attempt: string }
     expect(sent.attempt).toBe(attempt?.value)

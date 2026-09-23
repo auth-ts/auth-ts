@@ -13,11 +13,13 @@ import type { CodeIdentifier } from "./resolve-code-identifier"
 /**
  * How long a verification code is valid.
  *
- * Not configurable: ten minutes is long enough to switch to an email client and
- * short enough that a guessed code has to be guessed while its requester is
- * still waiting. A knob here would only ever be turned the wrong way.
+ * Not configurable: an hour is the most the book allows and what the author's
+ * app uses — long enough for a slow inbox, and safe because a code is bound
+ * to the client that asked and guesses are limited per address, so its
+ * lifetime does not change the odds. A knob here would only ever be turned
+ * the wrong way.
  */
-export const VERIFICATION_CODE_TTL = "10m"
+export const VERIFICATION_CODE_TTL = "1h"
 
 /** The condition a code still within its lifetime satisfies. */
 export function liveCode() {

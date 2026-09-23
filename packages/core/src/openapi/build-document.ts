@@ -103,7 +103,7 @@ function cookieDescription(
     case "state":
       return "Writes the OAuth state cookie, HttpOnly and SameSite=Lax."
     case "attempt":
-      return "Writes the attempt cookie, HttpOnly and SameSite=Lax, scoped to the auth mount for ten minutes."
+      return "Writes the attempt cookie, HttpOnly and SameSite=Lax, scoped to the auth mount for an hour."
     case "cleared":
       return `Clears \`${name}\`.`
   }
