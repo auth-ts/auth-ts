@@ -150,38 +150,54 @@ export interface SendEmailUpdateCodeInput extends IdentityAttemptInput {
   email: string
 }
 
+/** Input for sending a code to a new phone number. */
+export interface SendPhoneUpdateCodeInput extends IdentityAttemptInput {
+  /** The new number, E.164. */
+  phoneNumber: string
+}
+
 /** What sending the code resolved to; `attempt` rides along once sent. */
-export type SendEmailUpdateCodeResult =
+export type SendUpdateCodeResult =
   | { status: "sent"; attempt: string }
   | { status: "verificationRequired" }
 
-/** Input for verifying the code sent to a new email address. */
-export interface VerifyEmailUpdateInput {
-  /** The new address, as sent. */
-  email: string
+/** The tokens a verify carries where no cookie does. */
+export interface VerifyUpdateInput {
   code: string
-  /** Where no cookie carries it, the attempt token `sendEmailUpdateCode` returned. */
+  /** The attempt token the send returned. */
   attempt?: string
-  /** Where no cookie carries it, the attempt token `sendIdentityCode` returned. */
+  /** The attempt token `sendIdentityCode` returned. */
   identityAttempt?: string
 }
 
-/** What the change resolved to; the user carries the new address once updated. */
-export type VerifyEmailUpdateResult =
+/** Input for verifying the code sent to a new email address. */
+export interface VerifyEmailUpdateInput extends VerifyUpdateInput {
+  /** The new address, as sent. */
+  email: string
+}
+
+/** Input for verifying the code sent to a new phone number. */
+export interface VerifyPhoneUpdateInput extends VerifyUpdateInput {
+  /** The new number, as sent. */
+  phoneNumber: string
+}
+
+/** What the change resolved to; the user carries the new identifier once updated. */
+export type VerifyUpdateResult =
   | { status: "updated"; user: AuthUser }
   | { status: "verificationRequired" }
 
-/** `POST /user/email-update/send-code`; the verification challenge is reported as a result, not thrown. */
-export async function sendEmailUpdateCode(
+async function sendUpdateCode(
   internals: AuthClientInternals,
-  input: SendEmailUpdateCodeInput
-): Promise<SendEmailUpdateCodeResult> {
+  route: string,
+  body: unknown
+): Promise<SendUpdateCodeResult> {
   let attempt = ""
   const sent = await verifiedAction(async () => {
     ;({ attempt } = await internals.fetchJson<SendCodeResult>({
       method: "POST",
-      path: "/user/email-update/send-code",
-      body: input,
+      path: `/user/${route}/send-code`,
+      body,
       authenticated: true
     }))
   })
@@ -189,17 +205,17 @@ export async function sendEmailUpdateCode(
   return sent ? { status: "sent", attempt } : { status: "verificationRequired" }
 }
 
-/** `POST /user/email-update/verify`; the verification challenge is reported as a result, not thrown. */
-export async function verifyEmailUpdate(
+async function verifyUpdate(
   internals: AuthClientInternals,
-  input: VerifyEmailUpdateInput
-): Promise<VerifyEmailUpdateResult> {
+  route: string,
+  body: unknown
+): Promise<VerifyUpdateResult> {
   let user: AuthUser | undefined
   const updated = await verifiedAction(async () => {
     user = await internals.fetchJson<AuthUser>({
       method: "POST",
-      path: "/user/email-update/verify",
-      body: input,
+      path: `/user/${route}/verify`,
+      body,
       authenticated: true
     })
   })
@@ -208,6 +224,30 @@ export async function verifyEmailUpdate(
     ? { status: "updated", user: reviveUser(user) }
     : { status: "verificationRequired" }
 }
+
+/** `POST /user/email-update/send-code`; the verification challenge is reported as a result, not thrown. */
+export const sendEmailUpdateCode = (
+  internals: AuthClientInternals,
+  input: SendEmailUpdateCodeInput
+) => sendUpdateCode(internals, "email-update", input)
+
+/** `POST /user/email-update/verify`; the verification challenge is reported as a result, not thrown. */
+export const verifyEmailUpdate = (
+  internals: AuthClientInternals,
+  input: VerifyEmailUpdateInput
+) => verifyUpdate(internals, "email-update", input)
+
+/** `POST /user/phone-update/send-code`; the verification challenge is reported as a result, not thrown. */
+export const sendPhoneUpdateCode = (
+  internals: AuthClientInternals,
+  input: SendPhoneUpdateCodeInput
+) => sendUpdateCode(internals, "phone-update", input)
+
+/** `POST /user/phone-update/verify`; the verification challenge is reported as a result, not thrown. */
+export const verifyPhoneUpdate = (
+  internals: AuthClientInternals,
+  input: VerifyPhoneUpdateInput
+) => verifyUpdate(internals, "phone-update", input)
 
 /** `POST /user/verify/send-code`. */
 export async function sendIdentityCode(

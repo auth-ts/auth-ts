@@ -197,6 +197,14 @@ describe("getToken as a function", () => {
           email: "b@example.com",
           code: "ABCDEF"
         }),
+      () =>
+        context.auth.sendPhoneUpdateCode({ headers, phoneNumber: "+15550100" }),
+      () =>
+        context.auth.verifyPhoneUpdate({
+          headers,
+          phoneNumber: "+15550100",
+          code: "ABCDEF"
+        }),
       () => context.auth.revokeSession({ headers, id: "any" })
     ]) {
       await expect(call()).rejects.toMatchObject({

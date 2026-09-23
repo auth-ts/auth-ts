@@ -7,22 +7,26 @@ import type {
   RevokeSessionInput,
   RevokeSessionResult,
   SendEmailUpdateCodeInput,
-  SendEmailUpdateCodeResult,
+  SendPhoneUpdateCodeInput,
+  SendUpdateCodeResult,
   SignOutInput,
   UpdateUserInput,
   VerifyEmailUpdateInput,
-  VerifyEmailUpdateResult,
-  VerifyIdentityInput
+  VerifyIdentityInput,
+  VerifyPhoneUpdateInput,
+  VerifyUpdateResult
 } from "../methods/account"
 import {
   deleteUser,
   revokeSession,
   sendEmailUpdateCode,
   sendIdentityCode,
+  sendPhoneUpdateCode,
   signOut,
   updateUser,
   verifyEmailUpdate,
-  verifyIdentity
+  verifyIdentity,
+  verifyPhoneUpdate
 } from "../methods/account"
 import type { GetTokenOptions, RefreshToken } from "../methods/get-token"
 import { createGetToken } from "../methods/get-token"
@@ -228,7 +232,7 @@ export interface AuthClient {
    */
   sendEmailUpdateCode: (
     input: SendEmailUpdateCodeInput
-  ) => Promise<SendEmailUpdateCodeResult>
+  ) => Promise<SendUpdateCodeResult>
   /**
    * Verifies the code `sendEmailUpdateCode` sent and re-keys the account to
    * the new address. Codes sent to the old address stop working.
@@ -237,7 +241,15 @@ export interface AuthClient {
    */
   verifyEmailUpdate: (
     input: VerifyEmailUpdateInput
-  ) => Promise<VerifyEmailUpdateResult>
+  ) => Promise<VerifyUpdateResult>
+  /** `sendEmailUpdateCode` for a phone number, texted through `sms.sendCode`. */
+  sendPhoneUpdateCode: (
+    input: SendPhoneUpdateCodeInput
+  ) => Promise<SendUpdateCodeResult>
+  /** `verifyEmailUpdate` for a phone number. */
+  verifyPhoneUpdate: (
+    input: VerifyPhoneUpdateInput
+  ) => Promise<VerifyUpdateResult>
   /**
    * Signs out.
    *
@@ -291,6 +303,8 @@ export function createAuthClient(options: AuthClientOptions = {}): AuthClient {
     verifyIdentity: (input) => verifyIdentity(internals, input),
     sendEmailUpdateCode: (input) => sendEmailUpdateCode(internals, input),
     verifyEmailUpdate: (input) => verifyEmailUpdate(internals, input),
+    sendPhoneUpdateCode: (input) => sendPhoneUpdateCode(internals, input),
+    verifyPhoneUpdate: (input) => verifyPhoneUpdate(internals, input),
     signOut: (input) => signOut(internals, input),
     setLocale: (locale) => {
       internals.locale = locale

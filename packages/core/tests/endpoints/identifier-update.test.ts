@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
+import type { PhoneNumberChangedNotificationContext } from "../../src/core/auth-options"
+import type { CapturedCode } from "../helpers/create-test-internals"
 import { createTestServer } from "../helpers/create-test-server"
 import {
   readRefreshCookie,
@@ -265,5 +267,69 @@ describe("changing the email address", () => {
     const refused = await sendCode(context, session)
     expect(refused.status).toBe(409)
     expect(await codeOf(refused)).toBe("guestCannotReceiveCode")
+  })
+})
+
+describe("changing the phone number", () => {
+  it("runs the email flow for a number: normalized, coded, re-keyed, the old number told", async () => {
+    const texts: CapturedCode[] = []
+    const told: PhoneNumberChangedNotificationContext[] = []
+    const context = await createTestServer({
+      sms: {
+        sendCode: ({ phoneNumber, code, locale, purpose, headers }) => {
+          texts.push({
+            channel: "sms",
+            destination: phoneNumber,
+            code,
+            locale,
+            purpose,
+            headers
+          })
+        },
+        sendPhoneNumberChangedNotification: (notice) => {
+          told.push(notice)
+        }
+      }
+    })
+    const session = await signIn(context)
+    await verifyIdentity(context, session)
+    await insertUser(context.db, { phoneNumber: "+15550100199" })
+    const call = (path: string, body: Record<string, unknown>) =>
+      context.auth.handler(
+        request("POST", `/api/auth/user/phone-update/${path}`, {
+          cookies: refreshCookieFor(session.refreshToken),
+          token: session.token,
+          body
+        })
+      )
+
+    const taken = await call("send-code", { phoneNumber: "+1 (555) 010-0199" })
+    expect(taken.status).toBe(409)
+    expect(await codeOf(taken)).toBe("phoneNumberTaken")
+
+    const sent = await call("send-code", { phoneNumber: "+1 (555) 010-0100" })
+    expect(sent.status).toBe(200)
+    expect(readSetCookies(sent).get("auth-ts.attempt.phone")).toBeDefined()
+    expect(texts[0]?.destination).toBe("+15550100100")
+    expect(texts[0]?.purpose).toBe("phoneChange")
+
+    const wrong = await call("verify", {
+      phoneNumber: "+15550100100",
+      code: "WRONG1"
+    })
+    expect(wrong.status).toBe(401)
+
+    const done = await call("verify", {
+      phoneNumber: "+15550100100",
+      code: required(texts[0], "text").code
+    })
+    expect(done.status).toBe(200)
+    expect(context.db.users()[0]?.phoneNumber).toBe("+15550100100")
+    expect(context.db.users()[0]?.email).toBe(OLD)
+    // Nothing to tell: the account had no number before.
+    expect(told).toEqual([])
+    expect(
+      readSetCookies(done).get("auth-ts.attempt.phone")?.attributes
+    ).toContain("Max-Age=0")
   })
 })

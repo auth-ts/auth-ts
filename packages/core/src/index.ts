@@ -32,12 +32,14 @@ export type {
 export { authTables, defineAuthDatabase } from "./core/auth-database"
 export type {
   AuthOptions,
+  ChangedNotificationContext,
   CookieOptions,
   EmailChangedNotificationContext,
   EmailOptions,
   JwksOptions,
   JwtClaims,
   JwtOptions,
+  PhoneNumberChangedNotificationContext,
   ProviderCredentials,
   ProvidersOptions,
   RateLimitBucket,

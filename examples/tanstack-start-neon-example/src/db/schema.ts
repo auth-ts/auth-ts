@@ -116,7 +116,7 @@ export const verifications = pgTable.withRLS(
     index("verificationsUpdatedAtIndex").on(table.updatedAt),
     check(
       "verificationsPurposeCheck",
-      sql`"purpose" in ('signIn', 'identity', 'emailChange')`
+      sql`"purpose" in ('signIn', 'identity', 'emailChange', 'phoneChange')`
     )
   ]
 )

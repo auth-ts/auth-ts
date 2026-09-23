@@ -36,6 +36,7 @@ export const builtInErrorMessages: Record<AuthErrorCode, string> = {
     "Add an email address or phone number before continuing.",
   guestRequiresSignOut: "Sign out before continuing as a guest.",
   emailTaken: "That email address already belongs to an account.",
+  phoneNumberTaken: "That phone number already belongs to an account.",
   providerUnavailable:
     "The sign-in provider did not respond. Please try again.",
   providerReconnectRequired:

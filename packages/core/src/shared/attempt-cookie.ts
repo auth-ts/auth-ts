@@ -18,7 +18,8 @@ export interface AttemptInput {
 const ATTEMPT_COOKIE_NAMES: Record<VerificationPurpose, string> = {
   signIn: "auth-ts.attempt",
   identity: "auth-ts.attempt.identity",
-  emailChange: "auth-ts.attempt.email"
+  emailChange: "auth-ts.attempt.email",
+  phoneChange: "auth-ts.attempt.phone"
 }
 
 /**

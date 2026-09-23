@@ -44,6 +44,8 @@ export type AuthErrorCode =
   | "guestCannotReceiveCode"
   /** The address another account already signs in with. */
   | "emailTaken"
+  /** The number another account already signs in with. */
+  | "phoneNumberTaken"
   /**
    * A guest sign-in was attempted from a browser that is signed in. Guests
    * need a signed-out browser — under `multiUser` more sign-ins are
@@ -82,6 +84,7 @@ export const ERROR_STATUS: Record<AuthErrorCode, number> = {
   payloadTooLarge: 413,
   guestCannotReceiveCode: 409,
   emailTaken: 409,
+  phoneNumberTaken: 409,
   guestRequiresSignOut: 409,
   providerUnavailable: 502,
   providerReconnectRequired: 403,

@@ -138,9 +138,14 @@ export interface AuthSession {
  * What a live verification code authorizes. Checked on every verify, so a code
  * cannot cross purposes. An `identity` code, once verified, stays as the
  * marker that lets its session revoke devices or delete the account. An
- * `emailChange` code is filed under the new address and re-keys the account.
+ * `emailChange` or `phoneChange` code is filed under the new identifier and
+ * re-keys the account to it.
  */
-export type VerificationPurpose = "signIn" | "identity" | "emailChange"
+export type VerificationPurpose =
+  | "signIn"
+  | "identity"
+  | "emailChange"
+  | "phoneChange"
 
 /**
  * A verification code, stored as an scrypt string of the code.

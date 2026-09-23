@@ -14,8 +14,10 @@ import { getTokenDocs } from "../endpoints/token"
 import { deleteUserDocs, updateUserDocs } from "../endpoints/user"
 import {
   sendEmailUpdateCodeDocs,
-  verifyEmailUpdateDocs
-} from "../endpoints/user/email-update"
+  sendPhoneUpdateCodeDocs,
+  verifyEmailUpdateDocs,
+  verifyPhoneUpdateDocs
+} from "../endpoints/user/identifier-update"
 import {
   sendIdentityCodeDocs,
   verifyIdentityDocs
@@ -64,6 +66,8 @@ export const endpointDocs: {
   verifyIdentity: verifyIdentityDocs,
   sendEmailUpdateCode: sendEmailUpdateCodeDocs,
   verifyEmailUpdate: verifyEmailUpdateDocs,
+  sendPhoneUpdateCode: sendPhoneUpdateCodeDocs,
+  verifyPhoneUpdate: verifyPhoneUpdateDocs,
   revokeSession: revokeSessionDocs,
   listUsers: listUsersDocs,
   switchUser: switchUserDocs,
@@ -97,6 +101,8 @@ export const summaries: { [Name in keyof EndpointRegistry]: string } = {
   verifyIdentity: "Verify identity",
   sendEmailUpdateCode: "Send an email update code",
   verifyEmailUpdate: "Verify an email update",
+  sendPhoneUpdateCode: "Send a phone update code",
+  verifyPhoneUpdate: "Verify a phone update",
   revokeSession: "Revoke a session",
   listUsers: "List the signed in users",
   switchUser: "Switch to another signed in user",

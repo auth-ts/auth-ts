@@ -335,6 +335,27 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
     })
   })
 
+  it("routes the phone pair the same way", async () => {
+    server.on("POST", "/api/auth/user/phone-update/send-code", {
+      body: { sent: true, attempt: "attempt-3" }
+    })
+    server.on("POST", "/api/auth/user/phone-update/verify", {
+      body: { ...user, phoneNumber: "+15550100" }
+    })
+    const client = await signedIn()
+
+    expect(
+      await client.sendPhoneUpdateCode({ phoneNumber: "+15550100" })
+    ).toEqual({ status: "sent", attempt: "attempt-3" })
+    const changed = await client.verifyPhoneUpdate({
+      phoneNumber: "+15550100",
+      code: "ABCDEF"
+    })
+    expect(changed.status === "updated" && changed.user.phoneNumber).toBe(
+      "+15550100"
+    )
+  })
+
   it("still throws for a taken address", async () => {
     server.on("POST", "/api/auth/user/email-update/send-code", {
       status: 409,

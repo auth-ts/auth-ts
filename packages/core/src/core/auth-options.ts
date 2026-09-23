@@ -35,19 +35,31 @@ export interface SendCodeContext {
    */
   headers: Headers
   /** Why the code was sent, so a "confirm it's you" mail can differ from sign-in mail. */
-  purpose: "signIn" | "identity" | "emailChange"
+  purpose: "signIn" | "identity" | "emailChange" | "phoneChange"
 }
 
-/** Everything an email-changed notification is told. */
-export interface EmailChangedNotificationContext {
-  /** The address that was replaced. */
-  email: string
-  /** The user, carrying the new address. */
+/** What every changed-identifier notification is told. */
+export interface ChangedNotificationContext {
+  /** The user, carrying the new identifier. */
   user: AuthUser
   /** The locale core already resolved for this request. */
   locale: string
   /** The request's headers. */
   headers: Headers
+}
+
+/** Everything an email-changed notification is told. */
+export interface EmailChangedNotificationContext
+  extends ChangedNotificationContext {
+  /** The address that was replaced. */
+  email: string
+}
+
+/** Everything a phone-number-changed notification is told. */
+export interface PhoneNumberChangedNotificationContext
+  extends ChangedNotificationContext {
+  /** The number that was replaced. */
+  phoneNumber: string
 }
 
 /** Everything a signed-in notification is told about the sign-in. */
@@ -92,6 +104,14 @@ export interface EmailOptions {
 export interface SmsOptions {
   sendCode(
     context: SendCodeContext & { phoneNumber: string }
+  ): Promise<void> | void
+  /**
+   * Tells the old number that it no longer belongs to the account, once a
+   * change completes. Runs behind the response where `waitUntil` is
+   * configured; a failure is logged, since the change is already made.
+   */
+  sendPhoneNumberChangedNotification?(
+    context: PhoneNumberChangedNotificationContext
   ): Promise<void> | void
 }
 

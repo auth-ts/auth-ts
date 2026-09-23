@@ -14,7 +14,8 @@ import { readSetCookies } from "./request"
 const ATTEMPT_COOKIES = [
   "auth-ts.attempt",
   "auth-ts.attempt.identity",
-  "auth-ts.attempt.email"
+  "auth-ts.attempt.email",
+  "auth-ts.attempt.phone"
 ]
 
 /** A real server wired to in-memory storage, with sends and logs captured. */

@@ -171,7 +171,9 @@ if (result.status === "updated") {
 either call. Once the change lands, codes sent to the old address stop working
 and the old address is told, if `email.sendEmailChangedNotification` is
 configured. Sessions stay signed in. The reference application runs both steps
-in one dialog opened from the profile card.
+in one dialog opened from the profile card. `sendPhoneUpdateCode` and
+`verifyPhoneUpdate` are the same pair for a phone number, when `sms` is
+configured.
 
 ## What is still the library's
 

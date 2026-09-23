@@ -293,7 +293,9 @@ address or the user's sessions — the book has codes invalidated when the
 address changes — and tells the old address through
 `email.sendEmailChangedNotification`. Sessions stay signed in, as they do in
 his app; an address another account signs in with is refused as 409
-`emailTaken`, before the code and again after it.
+`emailTaken`, before the code and again after it. A phone number changes the
+same way through `/user/phone-update`, with the code texted and the old number
+told through `sms.sendPhoneNumberChangedNotification`.
 
 Signing out this device, or every device, needs nothing: a hijacker who does
 either signs themselves out too.
