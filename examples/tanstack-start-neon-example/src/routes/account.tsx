@@ -1,5 +1,4 @@
 import type { SignOutInput } from "@auth-ts/core/client"
-import { isAuthError } from "@auth-ts/core/client"
 import {
   ArrowRightStartOnRectangleIcon,
   ArrowsRightLeftIcon,
@@ -30,6 +29,7 @@ import { SignedOutCard } from "../components/signed-out-card"
 import { UpdateEmailDialog } from "../components/update-email-dialog"
 import type { VerifiedAction } from "../components/verify-identity-dialog"
 import { useVerifiedAction } from "../components/verify-identity-dialog"
+import { UNEXPECTED, useReportError } from "../hooks/use-report-error"
 import { useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 import { client } from "../lib/client"
@@ -49,10 +49,16 @@ function AccountPage() {
     user?.email ?? user?.phoneNumber ?? "your address"
   )
 
+  const report = useReportError()
+
   const signOut: SignOut = async (input) => {
-    await authClient.signOut(input)
-    await queryClient.resetQueries()
-    await navigate({ to: "/login" })
+    try {
+      await authClient.signOut(input)
+      await queryClient.resetQueries()
+      await navigate({ to: "/login" })
+    } catch (error) {
+      await report(error, setNotice)
+    }
   }
 
   if (isPending) return <PendingSpinner />
@@ -90,7 +96,7 @@ function AccountPage() {
       />
       <ProvidersCard setNotice={setNotice} />
       <SessionsCard setNotice={setNotice} runVerified={verified.run} />
-      <SwitchUserCard userId={user.id} />
+      <SwitchUserCard userId={user.id} setNotice={setNotice} />
       <SignOutButtons userId={user.id} signOut={signOut} />
       {user.email || user.phoneNumber ? (
         <DeleteCard runVerified={verified.run} />
@@ -123,7 +129,7 @@ function ProfileCard({
       setDraftName(null)
       setNotice({ text: "Saved.", tone: "success" })
     },
-    onError: () => setNotice({ text: "Could not save.", tone: "error" })
+    onError: () => setNotice({ text: UNEXPECTED, tone: "error" })
   })
 
   const nameUnchanged =
@@ -197,9 +203,11 @@ function ProvidersCard({ setNotice }: { setNotice: SetNotice }) {
     ["id"],
     null,
     {
-      onError: () => setNotice({ text: "Could not disconnect.", tone: "error" })
+      onError: () => setNotice({ text: UNEXPECTED, tone: "error" })
     }
   )
+
+  const report = useReportError()
 
   const linkGitHub = async () => {
     setNotice(null)
@@ -209,10 +217,7 @@ function ProvidersCard({ setNotice }: { setNotice: SetNotice }) {
         redirect: "/account"
       })
     } catch (error) {
-      setNotice({
-        text: isAuthError(error) ? error.message : "Could not link GitHub.",
-        tone: "error"
-      })
+      await report(error, setNotice)
     }
   }
 
@@ -270,8 +275,11 @@ function SessionsCard({
     client.from("sessions").select().order("createdAt", { ascending: false })
   )
   const revalidateSessions = useRevalidateTables([{ table: "sessions" }])
+  const report = useReportError()
+  const [revoking, setRevoking] = useState<string | null>(null)
 
   const revoke = async (id: string, device: string) => {
+    setRevoking(id)
     try {
       await runVerified(async () => {
         const result = await authClient.revokeSession({ id })
@@ -285,10 +293,9 @@ function SessionsCard({
         return result
       })
     } catch (error) {
-      setNotice({
-        text: isAuthError(error) ? error.message : "Could not revoke.",
-        tone: "error"
-      })
+      await report(error, setNotice)
+    } finally {
+      setRevoking(null)
     }
   }
 
@@ -317,9 +324,14 @@ function SessionsCard({
                 onClick={() =>
                   revoke(session.id, session.userAgent ?? "that device")
                 }
+                disabled={revoking !== null}
                 className="btn btn-ghost btn-sm"
               >
-                <XMarkIcon className="size-4" />
+                {revoking === session.id ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <XMarkIcon className="size-4" />
+                )}
                 Revoke
               </button>
             </li>
@@ -335,8 +347,28 @@ function SessionsCard({
   )
 }
 
-function SwitchUserCard({ userId }: { userId: string }) {
+function SwitchUserCard({
+  userId,
+  setNotice
+}: {
+  userId: string
+  setNotice: SetNotice
+}) {
   const queryClient = useQueryClient()
+  const report = useReportError()
+  const [switching, setSwitching] = useState<string | null>(null)
+
+  const switchTo = async (id: string) => {
+    setSwitching(id)
+    try {
+      await authClient.switchUser({ userId: id })
+      await queryClient.resetQueries()
+    } catch (error) {
+      await report(error, setNotice)
+    } finally {
+      setSwitching(null)
+    }
+  }
   const users = useReactQuery({
     queryKey: ["users"],
     queryFn: authClient.listUsers,
@@ -361,15 +393,15 @@ function SwitchUserCard({ userId }: { userId: string }) {
               ) : (
                 <button
                   type="button"
-                  onClick={async () => {
-                    await authClient.switchUser({
-                      userId: signedIn.id
-                    })
-                    await queryClient.resetQueries()
-                  }}
+                  onClick={() => void switchTo(signedIn.id)}
+                  disabled={switching !== null}
                   className="btn btn-outline btn-sm"
                 >
-                  <ArrowsRightLeftIcon className="size-4" />
+                  {switching === signedIn.id ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <ArrowsRightLeftIcon className="size-4" />
+                  )}
                   Switch
                 </button>
               )}
@@ -388,11 +420,22 @@ function SignOutButtons({
   userId: string
   signOut: SignOut
 }) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [confirmingAll, setConfirmingAll] = useState(false)
   const buttons: { label: string; input?: SignOutInput }[] = [
     { label: "Sign out" },
     { label: "Sign out this account", input: { userId } },
-    { label: "Sign out everywhere", input: { scope: "global" } }
+    { label: "Sign out of all devices", input: { scope: "global" } }
   ]
+
+  const run = async (label: string, input?: SignOutInput) => {
+    setBusy(label)
+    try {
+      await signOut(input)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -400,13 +443,34 @@ function SignOutButtons({
         <button
           key={label}
           type="button"
-          onClick={() => signOut(input)}
+          onClick={() =>
+            input?.scope === "global"
+              ? setConfirmingAll(true)
+              : void run(label, input)
+          }
+          disabled={busy !== null}
           className="btn btn-outline btn-sm"
         >
-          <ArrowRightStartOnRectangleIcon className="size-4" />
+          {busy === label ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : (
+            <ArrowRightStartOnRectangleIcon className="size-4" />
+          )}
           {label}
         </button>
       ))}
+      {confirmingAll ? (
+        <ConfirmDialog
+          title="Sign out of all devices"
+          body="Do you want to sign out of all devices?"
+          confirmLabel="Sign out"
+          onConfirm={async () => {
+            await run("Sign out of all devices", { scope: "global" })
+            setConfirmingAll(false)
+          }}
+          onCancel={() => setConfirmingAll(false)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -418,8 +482,9 @@ function DeleteCard({ runVerified }: { runVerified: RunVerified }) {
   const [deletionNotice, setDeletionNotice] = useState<Notice | null>(null)
   const [confirming, setConfirming] = useState(false)
 
+  const report = useReportError()
+
   const removeAccount = async () => {
-    setConfirming(false)
     setDeletionNotice(null)
     try {
       await runVerified(async () => {
@@ -431,12 +496,9 @@ function DeleteCard({ runVerified }: { runVerified: RunVerified }) {
         return result
       })
     } catch (error) {
-      setDeletionNotice({
-        text: isAuthError(error)
-          ? error.message
-          : "Could not delete the account.",
-        tone: "error"
-      })
+      await report(error, setDeletionNotice)
+    } finally {
+      setConfirming(false)
     }
   }
 

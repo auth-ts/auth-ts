@@ -2,6 +2,7 @@ import { isAuthError } from "@auth-ts/core/client"
 import { EnvelopeIcon } from "@heroicons/react/24/outline"
 import { useState } from "react"
 import { useCountdown } from "../hooks/use-countdown"
+import { useReportError } from "../hooks/use-report-error"
 import { authClient } from "../lib/auth-client"
 import type { Notice } from "./notice"
 import { NoticeAlert } from "./notice"
@@ -9,20 +10,7 @@ import type { VerifiedAction } from "./verify-identity-dialog"
 
 const RESEND_SECONDS = 30
 
-const MESSAGES: Record<string, string> = {
-  emailTaken: "This email address is already linked to an existing account.",
-  invalidCode: "Incorrect verification code.",
-  rateLimited: "Too many attempts. Please try again later."
-}
-
-function errorNotice(error: unknown, fallback: string): Notice {
-  return {
-    text: isAuthError(error)
-      ? (MESSAGES[error.code] ?? error.message)
-      : fallback,
-    tone: "error"
-  }
-}
+const TAKEN = "This email address is already linked to an existing account."
 
 /**
  * The author's two pages in one dialog: set the new address, then verify the
@@ -43,6 +31,16 @@ export function UpdateEmailDialog({
   const [notice, setNotice] = useState<Notice | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [cooldown, startCooldown] = useCountdown()
+  const report = useReportError()
+
+  const fail = async (error: unknown) => {
+    if (isAuthError(error) && error.retryAfter) startCooldown(error.retryAfter)
+    if (isAuthError(error) && error.code === "emailTaken") {
+      setNotice({ text: TAKEN, tone: "error" })
+      return
+    }
+    await report(error, setNotice)
+  }
 
   const send = async () => {
     setSubmitting(true)
@@ -57,10 +55,7 @@ export function UpdateEmailDialog({
         return result
       })
     } catch (error) {
-      if (isAuthError(error) && error.retryAfter) {
-        startCooldown(error.retryAfter)
-      }
-      setNotice(errorNotice(error, "Could not send the code."))
+      await fail(error)
     } finally {
       setSubmitting(false)
     }
@@ -81,10 +76,7 @@ export function UpdateEmailDialog({
         return result
       })
     } catch (error) {
-      if (isAuthError(error) && error.retryAfter) {
-        startCooldown(error.retryAfter)
-      }
-      setNotice(errorNotice(error, "Could not send the code."))
+      await fail(error)
     }
   }
 
@@ -98,7 +90,7 @@ export function UpdateEmailDialog({
         return result
       })
     } catch (error) {
-      setNotice(errorNotice(error, "Could not verify the code."))
+      await fail(error)
     } finally {
       setSubmitting(false)
     }
@@ -153,6 +145,9 @@ export function UpdateEmailDialog({
                 disabled={submitting || email.length === 0}
                 className="btn btn-primary btn-sm"
               >
+                {submitting ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : null}
                 Continue
               </button>
             </div>
@@ -208,6 +203,9 @@ export function UpdateEmailDialog({
                 disabled={submitting || code.length === 0}
                 className="btn btn-primary btn-sm"
               >
+                {submitting ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : null}
                 Update email address
               </button>
             </div>

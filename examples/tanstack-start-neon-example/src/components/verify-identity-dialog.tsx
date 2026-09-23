@@ -2,6 +2,7 @@ import { isAuthError } from "@auth-ts/core/client"
 import { ShieldCheckIcon } from "@heroicons/react/24/outline"
 import { useState } from "react"
 import { useCountdown } from "../hooks/use-countdown"
+import { useReportError } from "../hooks/use-report-error"
 import { authClient } from "../lib/auth-client"
 import type { Notice } from "./notice"
 import { NoticeAlert } from "./notice"
@@ -10,14 +11,6 @@ import { NoticeAlert } from "./notice"
 export type VerifiedAction = () => Promise<{ status: string }>
 
 const RESEND_SECONDS = 30
-const UNEXPECTED = "An unexpected error occurred. Please try again."
-
-function errorNotice(error: unknown, fallback: string): Notice {
-  return {
-    text: isAuthError(error) ? error.message : fallback,
-    tone: "error"
-  }
-}
 
 /**
  * Runs an action, and when the server asks for verification, confirms it's
@@ -30,6 +23,7 @@ export function useVerifiedAction(destination: string) {
     settle: (error?: unknown) => void
   } | null>(null)
   const [sendNotice, setSendNotice] = useState<Notice | null>(null)
+  const report = useReportError()
 
   // Settles once the retry after verifying does, so its error reaches the caller.
   const run = async (action: VerifiedAction) => {
@@ -46,7 +40,7 @@ export function useVerifiedAction(destination: string) {
     try {
       await authClient.sendIdentityCode()
     } catch (error) {
-      setSendNotice(errorNotice(error, UNEXPECTED))
+      await report(error, setSendNotice)
     }
     return settled
   }
@@ -90,6 +84,7 @@ function VerifyIdentityDialog({
   const [notice, setNotice] = useState<Notice | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [cooldown, startCooldown] = useCountdown()
+  const report = useReportError()
 
   const resend = async () => {
     setNotice(null)
@@ -101,7 +96,7 @@ function VerifyIdentityDialog({
       if (isAuthError(error) && error.retryAfter) {
         startCooldown(error.retryAfter)
       }
-      setNotice(errorNotice(error, "Could not send the code."))
+      await report(error, setNotice)
     }
   }
 
@@ -112,7 +107,7 @@ function VerifyIdentityDialog({
       await authClient.verifyIdentity({ code })
       await onVerified()
     } catch (error) {
-      setNotice(errorNotice(error, "Could not verify the code."))
+      await report(error, setNotice)
     } finally {
       setSubmitting(false)
     }
@@ -178,6 +173,9 @@ function VerifyIdentityDialog({
               disabled={submitting || code.length === 0}
               className="btn btn-primary btn-sm"
             >
+              {submitting ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : null}
               Confirm
             </button>
           </div>

@@ -7,11 +7,12 @@ import {
 } from "@heroicons/react/24/outline"
 import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { GitHubIcon } from "../components/github-icon"
 import type { Notice } from "../components/notice"
 import { NoticeAlert } from "../components/notice"
 import { useCountdown } from "../hooks/use-countdown"
+import { UNEXPECTED } from "../hooks/use-report-error"
 import { useUser } from "../hooks/use-user"
 import { authClient } from "../lib/auth-client"
 
@@ -29,7 +30,8 @@ const signInFailures: Record<string, string> = {
     "Verify your email address with that provider, then try again.",
   providerUnavailable: "The provider did not respond. Please try again.",
   providerConflict: "That account is already connected to a different user.",
-  invalidState: "That sign-in attempt expired. Please start again."
+  invalidState: "That sign-in attempt expired. Please start again.",
+  sessionExpired: "Your session has expired."
 }
 
 function LoginPage() {
@@ -46,8 +48,19 @@ function LoginPage() {
       : null
   )
   const [cooldown, startCooldown] = useCountdown()
+  const [pending, setPending] = useState<string | null>(null)
+
+  // Back from GitHub restores this page with the spinner still on.
+  useEffect(() => {
+    const reset = (event: PageTransitionEvent) => {
+      if (event.persisted) setPending(null)
+    }
+    window.addEventListener("pageshow", reset)
+    return () => window.removeEventListener("pageshow", reset)
+  }, [])
 
   const report = (error: unknown) => {
+    setPending(null)
     if (isAuthError(error) && error.retryAfter) {
       startCooldown(error.retryAfter)
       setNotice({ text: error.message, tone: "error" })
@@ -55,15 +68,17 @@ function LoginPage() {
     }
 
     setNotice({
-      text: isAuthError(error) ? error.message : "Something went wrong.",
+      text: isAuthError(error) ? error.message : UNEXPECTED,
       tone: "error"
     })
   }
 
   const requestCode = async () => {
     setNotice(null)
+    setPending("send")
     try {
       await authClient.sendSignInCode({ email })
+      setPending(null)
       setStage("code")
       setNotice({
         text: "Check the server console for your code.",
@@ -76,6 +91,7 @@ function LoginPage() {
 
   const submitCode = async () => {
     setNotice(null)
+    setPending("code")
     try {
       await authClient.signInWithCode({ email, code })
       await queryClient.invalidateQueries()
@@ -87,6 +103,7 @@ function LoginPage() {
 
   const continueWithGitHub = async () => {
     setNotice(null)
+    setPending("github")
     try {
       await authClient.signInWithProvider({
         provider: "github",
@@ -100,6 +117,7 @@ function LoginPage() {
 
   const continueAsGuest = async () => {
     setNotice(null)
+    setPending("guest")
     try {
       await authClient.signInAsGuest()
       await queryClient.invalidateQueries()
@@ -148,10 +166,12 @@ function LoginPage() {
               </fieldset>
               <button
                 type="submit"
-                disabled={cooldown > 0}
+                disabled={cooldown > 0 || pending !== null}
                 className="btn btn-primary w-full"
               >
-                {cooldown ? (
+                {pending === "send" ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : cooldown ? (
                   `Try again in ${cooldown}s`
                 ) : (
                   <>
@@ -190,9 +210,21 @@ function LoginPage() {
                 />
                 <p className="label">Sent to {email}</p>
               </fieldset>
-              <button type="submit" className="btn btn-primary w-full">
-                <ArrowRightEndOnRectangleIcon className="size-4" />
-                Sign in
+              <button
+                type="submit"
+                disabled={cooldown > 0 || pending !== null}
+                className="btn btn-primary w-full"
+              >
+                {pending === "code" ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : cooldown ? (
+                  `Try again in ${cooldown}s`
+                ) : (
+                  <>
+                    <ArrowRightEndOnRectangleIcon className="size-4" />
+                    Sign in
+                  </>
+                )}
               </button>
               <button
                 type="button"
@@ -213,9 +245,14 @@ function LoginPage() {
             <button
               type="button"
               onClick={() => void continueWithGitHub()}
+              disabled={pending !== null}
               className="btn btn-outline w-full"
             >
-              <GitHubIcon className="size-4" />
+              {pending === "github" ? (
+                <span className="loading loading-spinner loading-sm" />
+              ) : (
+                <GitHubIcon className="size-4" />
+              )}
               Continue with GitHub
             </button>
             {/* Guests need a signed-out browser. */}
@@ -223,9 +260,14 @@ function LoginPage() {
               <button
                 type="button"
                 onClick={() => void continueAsGuest()}
+                disabled={pending !== null}
                 className="btn btn-ghost w-full"
               >
-                <UserIcon className="size-4" />
+                {pending === "guest" ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  <UserIcon className="size-4" />
+                )}
                 Continue as guest
               </button>
             )}
