@@ -278,6 +278,45 @@ either signs themselves out too.
 Codes carry a purpose. A sign-in code cannot confirm an identity, and an
 identity code cannot sign anyone in.
 
+## In the browser
+
+The book's storage chapter says the choice between cookies and Web Storage
+matters less than what an XSS can reach, so here is what the client keeps and
+where:
+
+| what | where | readable by script? |
+| --- | --- | --- |
+| refresh token (the session) | `HttpOnly` cookie, `__Host-` prefixed in production | no |
+| access token | a variable in the client, in memory | yes, by the page's own code |
+| the signed-in user | the same variable | yes |
+| sign-in hint (`in`/`out`) | `auth-ts.hint` cookie | yes, by design |
+
+The access token is never written to `localStorage` or `sessionStorage`: in
+memory it dies with the page, whereas a persisted bearer token turns any script
+injection into a credential that keeps working after the tab is closed. What a
+script injected into your page *can* do is call the auth endpoints as the user,
+same as the book notes for `HttpOnly` cookies — the attribute stops export, not
+use. That is why the destructive actions sit behind a fresh identity check:
+revoking a device, deleting the account and, later, changing the address need a
+code from the inbox, which a script does not have.
+
+**A Content Security Policy is yours to set**, from wherever your framework
+sets headers, and it is the defence the book asks for against XSS. The author's
+app ships one on every page:
+
+```
+default-src 'none'; script-src <hash>; base-uri 'none'; img-src <your images>;
+connect-src 'self'; style-src <hash>; frame-ancestors 'none'; form-action 'none';
+```
+
+`connect-src 'self'` is enough for this library on a same-origin mount; a
+cross-origin auth server needs its origin listed there. Nothing here needs
+`unsafe-inline` or `unsafe-eval`.
+
+**No personal data is kept on the client** beyond the user object your page
+asked for, and the book's rule applies to whatever you add: neither cookies nor
+Web Storage encrypt anything, so nothing sensitive belongs in either.
+
 ## Cross-origin
 
 When the application and the auth server share an origin — the usual case, and
