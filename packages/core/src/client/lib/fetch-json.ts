@@ -59,7 +59,8 @@ export function createFetchJson(
       code: parsed?.code ?? "internalError",
       message:
         parsed?.message ?? `Request failed with status ${response.status}.`,
-      retryAfter: parsed?.retryAfter
+      retryAfter: parsed?.retryAfter,
+      requestId: parsed?.requestId
     }
   }
 
@@ -118,7 +119,8 @@ export function createFetchJson(
         failure.code,
         response.status,
         failure.message,
-        failure.retryAfter
+        failure.retryAfter,
+        failure.requestId
       )
     }
 

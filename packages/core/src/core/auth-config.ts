@@ -69,6 +69,7 @@ export interface AuthConfig {
   localization?: LocalizationOptions
   ipAddress: IpAddressConfig
   trustedOrigins: string[]
+  requestIdHeader?: string
   openapi: boolean
   logLevel: LogLevel
   logger?: Logger
@@ -425,6 +426,9 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
     ...(options.localization ? { localization: options.localization } : {}),
     ipAddress: requireIpAddress(options.ipAddress),
     trustedOrigins: requireOrigins(options.trustedOrigins),
+    ...(options.requestIdHeader
+      ? { requestIdHeader: options.requestIdHeader.toLowerCase() }
+      : {}),
     openapi: options.openapi ?? false,
     logLevel: options.logLevel ?? "warn",
     ...(options.logger ? { logger: options.logger } : {}),

@@ -110,6 +110,8 @@ export interface AuthErrorBody {
   message: string
   /** Seconds to wait, present on `rateLimited`. */
   retryAfter?: number
+  /** Present on `internalError`: quote it to find the log line. */
+  requestId?: string
 }
 
 /** Builds the JSON error response. `Retry-After` is mirrored into a real header. */
@@ -117,7 +119,7 @@ export function errorResponse(
   code: AuthErrorCode,
   status: number,
   message: string,
-  options: { retryAfter?: number; headers?: Headers } = {}
+  options: { retryAfter?: number; headers?: Headers; requestId?: string } = {}
 ) {
   const headers = new Headers(options.headers)
   headers.set("content-type", "application/json")
@@ -130,7 +132,8 @@ export function errorResponse(
     message,
     ...(options.retryAfter === undefined
       ? {}
-      : { retryAfter: options.retryAfter })
+      : { retryAfter: options.retryAfter }),
+    ...(options.requestId === undefined ? {} : { requestId: options.requestId })
   }
 
   return new Response(JSON.stringify(body), { status, headers })

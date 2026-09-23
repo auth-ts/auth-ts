@@ -149,9 +149,13 @@ function toErrorResponse(
   // It is logged with its message but answered with a generic body, because an
   // internal error message is exactly the kind of thing that leaks a query or a
   // connection string to whoever is poking at the endpoint.
+  const requestId =
+    (config.requestIdHeader && request.headers.get(config.requestIdHeader)) ||
+    crypto.randomUUID()
   internals.log.error("unhandled error in auth endpoint", {
     method: request.method,
     path: endpoint.path,
+    requestId,
     error: String(error)
   })
 
@@ -159,6 +163,6 @@ function toErrorResponse(
     "internalError",
     ERROR_STATUS.internalError,
     getErrorMessage("internalError", locale, config.localization),
-    { headers }
+    { headers, requestId }
   )
 }

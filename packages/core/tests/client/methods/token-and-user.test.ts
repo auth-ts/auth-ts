@@ -257,6 +257,22 @@ describe("getToken", () => {
       retryAfter: 42
     })
   })
+
+  it("surfaces requestId from an unexpected failure", async () => {
+    server.on("GET", "/api/auth/token", {
+      status: 500,
+      body: {
+        code: "internalError",
+        message: "Something went wrong.",
+        requestId: "req-7"
+      }
+    })
+
+    await expect(createAuthClient().getToken()).rejects.toMatchObject({
+      code: "internalError",
+      requestId: "req-7"
+    })
+  })
 })
 
 describe("the session hint", () => {

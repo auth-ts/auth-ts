@@ -6,8 +6,8 @@ export type LogLevel = "silent" | "error" | "warn" | "info" | "debug"
  *
  * It never receives request headers: the `Cookie` header *is* the refresh token,
  * so handing the carrier to a logger would put a live credential one destructure
- * away from every log aggregator. Correlation data (path, request id) is passed
- * explicitly in `data` instead.
+ * away from every log aggregator. An unhandled error's `data` carries its
+ * method, path and `requestId` instead.
  */
 export type Logger = (
   level: Exclude<LogLevel, "silent">,

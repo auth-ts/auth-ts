@@ -536,6 +536,13 @@ export interface AuthOptions<
    */
   trustedOrigins?: string[]
   /**
+   * The header your platform puts its request id in: `cf-ray` on Cloudflare,
+   * `x-vercel-id` on Vercel, `x-request-id` behind most proxies. An unexpected
+   * error returns it as `requestId` and logs it, so a report can be matched
+   * to its log line. Without it, or without the header, one is generated.
+   */
+  requestIdHeader?: string
+  /**
    * Serves `GET {basePath}/openapi.json` and a browsable `GET {basePath}/reference`.
    *
    * Off by default. The document names the providers you configured and the

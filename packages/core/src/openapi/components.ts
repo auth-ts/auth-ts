@@ -69,6 +69,10 @@ const authError: ObjectSchemaFor<AuthErrorBody> = {
     retryAfter: {
       type: "integer",
       description: "Seconds; on `rateLimited`."
+    },
+    requestId: {
+      type: "string",
+      description: "On `internalError`; matches the server's log line."
     }
   },
   required: ["name", "code", "message"]

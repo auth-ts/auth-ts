@@ -14,18 +14,22 @@ export class AuthError extends Error {
   readonly status: number
   /** Seconds to wait, present on `rateLimited`. Render a countdown. */
   readonly retryAfter?: number
+  /** Present on `internalError`. Show it so a report can be matched to the server log. */
+  readonly requestId?: string
 
   constructor(
     code: AuthErrorCode,
     status: number,
     message: string,
-    retryAfter?: number
+    retryAfter?: number,
+    requestId?: string
   ) {
     super(message)
     this.name = "AuthError"
     this.code = code
     this.status = status
     if (retryAfter !== undefined) this.retryAfter = retryAfter
+    if (requestId !== undefined) this.requestId = requestId
   }
 }
 

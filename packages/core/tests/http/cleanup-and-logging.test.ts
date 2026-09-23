@@ -141,8 +141,45 @@ describe("an unhandled throw", () => {
     expect(await response.json()).toEqual({
       name: "AuthError",
       code: "internalError",
-      message: "Etwas ist schiefgelaufen."
+      message: "Etwas ist schiefgelaufen.",
+      requestId: expect.any(String)
     })
+  })
+
+  it("answers and logs one request id, the platform's when configured", async () => {
+    for (const [options, headers, expected] of [
+      [{}, {}, undefined],
+      [
+        { requestIdHeader: "x-request-id" },
+        { "x-request-id": "req-42" },
+        "req-42"
+      ]
+    ] as const) {
+      const context = await createTestServer({ ...failing, ...options })
+      const response = await context.auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", {
+          body: { email: "ada@example.com" },
+          headers
+        })
+      )
+      const { requestId } = (await response.json()) as { requestId: string }
+      const logged = context.logCalls.find(
+        (call) => call.message === "unhandled error in auth endpoint"
+      )?.data?.requestId
+
+      expect(requestId).toBe(expected ?? logged)
+      expect(logged).toBe(requestId)
+    }
+  })
+
+  it("puts no request id on an expected refusal", async () => {
+    const { auth } = await createTestServer()
+    const response = await auth.handler(
+      request("POST", "/api/auth/sign-in/code", { body: { code: "ABCDEF" } })
+    )
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).not.toHaveProperty("requestId")
   })
 
   it("says nothing about what failed, whatever the thrown message held", async () => {
