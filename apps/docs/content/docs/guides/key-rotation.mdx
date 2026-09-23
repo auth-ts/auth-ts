@@ -20,7 +20,7 @@ An access token signed by the old key stops verifying once the verifier picks up
 the new key set — Neon and Supabase cache it briefly, and in-process
 `verifyToken` switches with the deploy. The client refreshes and gets a token
 under the new key, so the visible effect is one failed request at most, inside a
-window no longer than the access-token lifetime: ten minutes by default.
+window no longer than the access-token lifetime: an hour by default.
 
 The new key carries a new `kid` — its thumbprint — which is what makes a
 verifier holding a cached `jwks.json` fetch it again rather than check new

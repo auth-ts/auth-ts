@@ -240,7 +240,7 @@ function SessionsCard({
         const result = await authClient.revokeSession({ id })
         if (result.status === "revoked") {
           setNotice({
-            text: `Signed out ${device}. It stays signed in until its current token expires, up to ten minutes.`,
+            text: `Signed out ${device}. It stays signed in until its current token expires, up to an hour.`,
             tone: "success"
           })
           await revalidateSessions()
@@ -290,7 +290,7 @@ function SessionsCard({
         </ul>
         <p className="text-xs text-base-content/60">
           Revoking asks you to confirm it's you, once an hour. A revoked device
-          keeps working until its current access token expires — ten minutes by
+          keeps working until its current access token expires — an hour by
           default.
         </p>
       </div>

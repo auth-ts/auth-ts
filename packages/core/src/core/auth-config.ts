@@ -401,7 +401,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
     jwt: {
       privateKey,
       alg: options.jwt?.alg ?? "RS256",
-      ttl: requireLifetime(options.jwt?.ttl ?? "10m", "jwt.ttl"),
+      ttl: requireLifetime(options.jwt?.ttl ?? "1h", "jwt.ttl"),
       claims: requireClaims(options.jwt?.claims),
       ...(options.jwt?.audience ? { audience: options.jwt.audience } : {})
     },

@@ -128,7 +128,7 @@ export interface JwtOptions {
   privateKey?: string
   /** @default "RS256" */
   alg?: JwtAlgorithm
-  /** Access-token lifetime, which is also the revocation latency. @default "10m" */
+  /** Access-token lifetime, which is also the revocation latency. @default "1h" */
   ttl?: Duration
   /**
    * Merged into every token, under the caller's own claims.

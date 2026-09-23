@@ -142,7 +142,7 @@ request succeeds no matter what the origin list says. So this is not token
 protection, and it is not a substitute for the policy.
 
 What actually contains a leaked token is the rest of the design: it lives in
-memory rather than storage, it expires in ten minutes, and row-level security
+memory rather than storage, it expires within an hour, and row-level security
 still decides what it can read. A stolen token reads the rows of whoever it
 belongs to and nothing else.
 

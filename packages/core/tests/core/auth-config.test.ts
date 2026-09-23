@@ -485,7 +485,7 @@ describe("resolved defaults", () => {
 
     expect(config.basePath).toBe("/api/auth")
     expect(config.jwt.alg).toBe("RS256")
-    expect(config.jwt.ttl).toBe("10m")
+    expect(config.jwt.ttl).toBe("1h")
     expect(config.jwt.claims).toEqual({ role: "authenticated" })
     expect(config.session).toEqual({ ttl: "10d", sliding: true })
     expect(config.cookie.name).toBe("auth-ts.refresh")
