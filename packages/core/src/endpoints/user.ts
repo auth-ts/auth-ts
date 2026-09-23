@@ -182,21 +182,6 @@ export const deleteUser = defineEndpoint({
     const headers = input.headers ?? new Headers()
     const { caller, user } = await authenticateUser(internals, input)
 
-    const finishDeletion = async () => {
-      await deleteUserAndRows(internals, user)
-
-      const responseHeaders = new Headers()
-      for (const cookie of clearedRefreshCookies(internals, {
-        requestURL: input.requestURL,
-        headers,
-        userIds: [user.id]
-      })) {
-        responseHeaders.append("set-cookie", cookie)
-      }
-
-      return { data: undefined, status: 204, headers: responseHeaders }
-    }
-
     // A guest with no identifier cannot be challenged at all.
     if (!accountIdentifier(user)) {
       throw new AuthApiError("guestCannotReceiveCode")
@@ -206,6 +191,18 @@ export const deleteUser = defineEndpoint({
       caller.sessionId,
       readAttempt(input, "identity")
     )
-    return finishDeletion()
+
+    await deleteUserAndRows(internals, user)
+
+    const responseHeaders = new Headers()
+    for (const cookie of clearedRefreshCookies(internals, {
+      requestURL: input.requestURL,
+      headers,
+      userIds: [user.id]
+    })) {
+      responseHeaders.append("set-cookie", cookie)
+    }
+
+    return { data: undefined, status: 204, headers: responseHeaders }
   }
 })
