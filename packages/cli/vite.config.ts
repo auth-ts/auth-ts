@@ -3,7 +3,7 @@ import { resolve } from "node:path"
 import { defineConfig } from "vite"
 
 // A Node command, not a library: one entry, a shebang, and every dependency
-// left external — `jose` installs alongside it, and the `node:` built-ins are
+// left external — `jose` and `@auth-ts/core` install alongside it, and the `node:` built-ins are
 // the runtime's own. Nothing is polyfilled for a browser because nothing here
 // ever runs in one.
 export default defineConfig({
@@ -12,7 +12,7 @@ export default defineConfig({
     target: "node20",
     minify: false,
     rollupOptions: {
-      external: [/^node:/, "jose"],
+      external: [/^node:/, "jose", /^@auth-ts\/core/],
       output: { banner: "#!/usr/bin/env node" }
     }
   },

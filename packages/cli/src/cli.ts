@@ -1,7 +1,7 @@
 import { resolve } from "node:path"
 import { createInterface } from "node:readline/promises"
 import { parseArgs } from "node:util"
-import type { JwtAlgorithm } from "./keygen"
+import type { JwtAlgorithm } from "@auth-ts/core"
 import { keygen } from "./keygen"
 import { existingEnvNames, writeEnvFile, writeKeySet } from "./write"
 

@@ -1,13 +1,7 @@
+import type { JwtAlgorithm } from "@auth-ts/core"
+import { importSigningKey } from "@auth-ts/core"
 import type { JWK } from "jose"
-import {
-  calculateJwkThumbprint,
-  exportJWK,
-  exportPKCS8,
-  generateKeyPair
-} from "jose"
-
-/** The signing algorithms `@auth-ts/core` accepts. */
-export type JwtAlgorithm = "ES256" | "RS256"
+import { exportPKCS8, generateKeyPair } from "jose"
 
 /** What `keygen` needs to know. */
 export interface KeygenOptions {
@@ -29,20 +23,6 @@ export interface KeygenResult {
 }
 
 /**
- * The public JWK for this key, as `@auth-ts/core` identifies it.
- *
- * The public members only, then `alg`, `use`, and the RFC 7638 thumbprint as
- * `kid` — the same `kid` the server stamps on every token header, which is how
- * a verifier holding this file picks the key.
- */
-async function toPublicJwk(publicKey: CryptoKey, algorithm: JwtAlgorithm) {
-  const jwk = await exportJWK(publicKey)
-  const kid = await calculateJwkThumbprint(jwk)
-
-  return { ...jwk, alg: algorithm, use: "sig", kid }
-}
-
-/**
  * Generates a signing key and the public key set.
  *
  * Nothing is written here. What the command does with the two is its own
@@ -51,11 +31,11 @@ async function toPublicJwk(publicKey: CryptoKey, algorithm: JwtAlgorithm) {
 export async function keygen({
   algorithm
 }: KeygenOptions): Promise<KeygenResult> {
-  const { privateKey, publicKey } = await generateKeyPair(algorithm, {
-    extractable: true
-  })
+  const { privateKey } = await generateKeyPair(algorithm, { extractable: true })
   const privateKeyPem = await exportPKCS8(privateKey)
-  const jwks: Jwks = { keys: [await toPublicJwk(publicKey, algorithm)] }
+  // The server's own derivation, so the kid always matches
+  const { publicJwk } = await importSigningKey(privateKeyPem, algorithm)
+  const jwks: Jwks = { keys: [publicJwk] }
 
   return { privateKeyPem, jwks }
 }

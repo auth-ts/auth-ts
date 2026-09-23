@@ -91,7 +91,11 @@ export type {
   LocalizationOptions
 } from "./http/get-error-message"
 export type { DecodedToken } from "./jwt/decode-token"
-export type { JwtAlgorithm } from "./jwt/import-signing-key"
+export type {
+  JwtAlgorithm,
+  SigningKeyMaterial
+} from "./jwt/import-signing-key"
+export { importSigningKey } from "./jwt/import-signing-key"
 export type { SignTokenClaims } from "./jwt/sign-token"
 export type { TokenClaims, UnverifiedClaims } from "./jwt/verify-token"
 export type {

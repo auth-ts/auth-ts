@@ -80,10 +80,8 @@
         "auth-ts": "./dist/cli.js",
       },
       "dependencies": {
-        "jose": "6.2.9",
-      },
-      "devDependencies": {
         "@auth-ts/core": "workspace:*",
+        "jose": "6.2.9",
       },
     },
     "packages/core": {

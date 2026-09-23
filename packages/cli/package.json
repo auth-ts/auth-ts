@@ -21,10 +21,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@auth-ts/core": "workspace:*",
     "jose": "6.2.9"
-  },
-  "devDependencies": {
-    "@auth-ts/core": "workspace:*"
   },
   "repository": {
     "type": "git",
