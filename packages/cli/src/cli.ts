@@ -8,12 +8,12 @@ import { existingEnvNames, writeEnvFile, writeKeySet } from "./write"
 const USAGE = `Usage: bun x @auth-ts/cli <command>
 
 Commands:
-  keygen [--alg RS256|ES256] [--out DIR] [--env FILE] [--yes]
+  keygen [--alg ES256|RS256] [--out DIR] [--env FILE] [--yes]
 
 Prints a signing key and the public key set, then asks whether to keep them.
 Nothing is written unless you say so.
 
-  --alg   RS256 (default) or ES256
+  --alg   ES256 (default) or RS256
   --out   where jwks.json goes, default public
   --env   which env file the variable is appended to, default .env
   --yes   write both without asking. A variable the env file already sets is
@@ -80,7 +80,7 @@ function highlightJson(json: string, style: Style) {
   )
 }
 
-const ALGORITHMS: readonly JwtAlgorithm[] = ["RS256", "ES256"]
+const ALGORITHMS: readonly JwtAlgorithm[] = ["ES256", "RS256"]
 
 function isAlgorithm(value: string): value is JwtAlgorithm {
   return ALGORITHMS.some((candidate) => candidate === value)
@@ -115,7 +115,7 @@ function parseKeygenArgs(args: string[]): KeygenArgs {
     values = parseArgs({
       args,
       options: {
-        alg: { type: "string", default: "RS256" },
+        alg: { type: "string", default: "ES256" },
         out: { type: "string", default: "public" },
         env: { type: "string", default: ".env" },
         yes: { type: "boolean", short: "y", default: false }
@@ -129,7 +129,7 @@ function parseKeygenArgs(args: string[]): KeygenArgs {
   // JWA names them in capitals, but nobody types a header value from memory.
   const algorithm = values.alg.toUpperCase()
   if (!isAlgorithm(algorithm)) {
-    return fail(`Unknown algorithm "${values.alg}". Use RS256 or ES256.`)
+    return fail(`Unknown algorithm "${values.alg}". Use ES256 or RS256.`)
   }
 
   return {

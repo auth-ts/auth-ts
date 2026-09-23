@@ -17,7 +17,7 @@ JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 jwks.json
 {
   "keys": [
-    { "kty": "RSA", "alg": "RS256", "use": "sig", "kid": "...", ... }
+    { "kty": "EC", "crv": "P-256", "alg": "ES256", "use": "sig", "kid": "...", ... }
   ]
 }
 
@@ -81,7 +81,7 @@ where.
 
 | Flag | Default | |
 | --- | --- | --- |
-| `--alg RS256\|ES256` | `RS256` | The signing algorithm, in any case. Match `jwt.alg` on the server. |
+| `--alg ES256\|RS256` | `ES256` | The signing algorithm, in any case. Match `jwt.alg` on the server. |
 | `--out DIR` | `public` | Where `jwks.json` goes. Created if it is not there. |
 | `--env FILE` | `.env` | Which env file the key is appended to. |
 | `--yes`, `-y` | off | Write without asking. Still will not overwrite a variable that is already set. |

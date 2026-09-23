@@ -7,7 +7,7 @@ import {
 } from "jose"
 
 /** The signing algorithms `@auth-ts/core` accepts. */
-export type JwtAlgorithm = "RS256" | "ES256"
+export type JwtAlgorithm = "ES256" | "RS256"
 
 /** What `keygen` needs to know. */
 export interface KeygenOptions {

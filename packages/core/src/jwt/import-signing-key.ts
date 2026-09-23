@@ -4,12 +4,14 @@ import { calculateJwkThumbprint, exportJWK, importPKCS8 } from "jose"
 /**
  * The signing algorithm.
  *
- * Both are accepted by Neon and Supabase. RS256 is the default for the widest
- * verifier compatibility; ES256 produces smaller signatures and is one line to
- * switch to. Symmetric algorithms are structurally impossible here — a JWKS
- * endpoint cannot publish an HMAC secret without publishing the ability to forge.
+ * Both are accepted by Neon and Supabase. ES256 is the default, as Supabase
+ * recommends for new keys: P-256 signs faster than RSA at comparable security
+ * and its signatures are a third the size, on a token that rides every data
+ * request. RS256 is one line away for a verifier that only speaks RSA.
+ * Symmetric algorithms are structurally impossible here — a JWKS endpoint
+ * cannot publish an HMAC secret without publishing the ability to forge.
  */
-export type JwtAlgorithm = "RS256" | "ES256"
+export type JwtAlgorithm = "ES256" | "RS256"
 
 /** An imported signing key: what signs, and what gets published. */
 export interface SigningKeyMaterial {

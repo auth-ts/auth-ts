@@ -21,7 +21,7 @@ afterEach(async () => {
 })
 
 /** A server configured the way a consumer's would be, from the generated values. */
-function serverFor(privateKeyPem: string, alg: "RS256" | "ES256" = "RS256") {
+function serverFor(privateKeyPem: string, alg: "ES256" | "RS256" = "ES256") {
   return createAuth({
     database: createMemoryDatabase(),
     guest: true,

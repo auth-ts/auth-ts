@@ -233,7 +233,7 @@ describe("issueSession", () => {
     })
     const { verificationKeys } = await internals.keys()
     const claims = await verifyToken(
-      { keys: verificationKeys, algorithm: "RS256" },
+      { keys: verificationKeys, algorithm: "ES256" },
       issued.token
     )
 
@@ -263,7 +263,7 @@ describe("issueSession", () => {
     })
     const { verificationKeys } = await internals.keys()
     const claims = await verifyToken(
-      { keys: verificationKeys, algorithm: "RS256" },
+      { keys: verificationKeys, algorithm: "ES256" },
       issued.token
     )
 
@@ -312,7 +312,7 @@ describe("issueSession", () => {
     })
     const { verificationKeys } = await internals.keys()
     const claims = await verifyToken(
-      { keys: verificationKeys, algorithm: "RS256" },
+      { keys: verificationKeys, algorithm: "ES256" },
       issued.token
     )
 

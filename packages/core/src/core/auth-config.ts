@@ -396,7 +396,7 @@ export function resolveAuthConfig(options: AuthOptions): AuthConfig {
     providers,
     jwt: {
       privateKey,
-      alg: options.jwt?.alg ?? "RS256",
+      alg: options.jwt?.alg ?? "ES256",
       ttl: requireLifetime(options.jwt?.ttl ?? "1h", "jwt.ttl"),
       claims: requireClaims(options.jwt?.claims),
       ...(options.jwt?.audience ? { audience: options.jwt.audience } : {})

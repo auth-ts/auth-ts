@@ -126,7 +126,7 @@ export interface JwtOptions {
    * variable; construction throws if neither is set.
    */
   privateKey?: string
-  /** @default "RS256" */
+  /** ES256 unless a verifier of yours only speaks RSA. @default "ES256" */
   alg?: JwtAlgorithm
   /** Access-token lifetime, which is also the revocation latency. @default "1h" */
   ttl?: Duration

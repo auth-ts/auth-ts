@@ -36,9 +36,9 @@ let cachedKeys:
   | Promise<{ privateKeyPem: string; publicKeyPem: string }>
   | undefined
 
-/** Generating an RSA key is slow, so the suite shares one across tests. */
+/** One key for the whole suite: a P-256 pair is cheap, but a shared one is free. */
 function testKeys() {
-  cachedKeys ??= generateTestKeys("RS256")
+  cachedKeys ??= generateTestKeys("ES256")
   return cachedKeys
 }
 

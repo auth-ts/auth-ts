@@ -9,7 +9,7 @@ export interface TestKeyPair {
 
 /** Generates a real key pair so tests exercise the same import path as production. */
 export async function generateTestKeys(
-  algorithm: JwtAlgorithm = "RS256"
+  algorithm: JwtAlgorithm = "ES256"
 ): Promise<TestKeyPair> {
   const { privateKey, publicKey } = await generateKeyPair(algorithm, {
     extractable: true

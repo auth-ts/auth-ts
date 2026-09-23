@@ -3,7 +3,7 @@
 **Free forever JWT auth in TypeScript — four functions to write against any database.**
 No limits, no service, no company.
 
-For applications that issue **their own** RS256 or ES256 tokens, for PostgREST
+For applications that issue **their own** ES256 or RS256 tokens, for PostgREST
 and row-level-security backends — Neon's Data API, Supabase, self-hosted
 PostgREST — or anything that trusts a JWKS URL. Your database verifies the token
 and your policies decide what comes back, so authorization lives in Postgres

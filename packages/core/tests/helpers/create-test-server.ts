@@ -26,7 +26,7 @@ let cachedKeys:
   | undefined
 
 function testKeys() {
-  cachedKeys ??= generateTestKeys("RS256")
+  cachedKeys ??= generateTestKeys("ES256")
   return cachedKeys
 }
 

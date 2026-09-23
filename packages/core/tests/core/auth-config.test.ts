@@ -483,7 +483,7 @@ describe("resolved defaults", () => {
     const { config } = createAuth(baseOptions())
 
     expect(config.basePath).toBe("/api/auth")
-    expect(config.jwt.alg).toBe("RS256")
+    expect(config.jwt.alg).toBe("ES256")
     expect(config.jwt.ttl).toBe("1h")
     expect(config.jwt.claims).toEqual({ role: "authenticated" })
     expect(config.session).toEqual({ ttl: "10d", sliding: true })
