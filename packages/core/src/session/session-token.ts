@@ -83,8 +83,6 @@ export async function findSession(
   return authSession
 }
 
-const SLIDE_INTERVAL = "1h"
-
 /** User-agent and validated client IP for a session row, from the request headers. */
 export function sessionStamp(internals: AuthInternals, headers: Headers) {
   const userAgent = headers.get("user-agent")
@@ -114,14 +112,12 @@ export async function validateSessionToken(
     return null
   }
 
-  if (
-    Date.now() - authSession.updatedAt.getTime() <
-    parseDuration(SLIDE_INTERVAL)
-  ) {
+  const now = new Date()
+  if (now.getTime() - authSession.updatedAt.getTime() < 60 * 60 * 1000) {
     return authSession
   }
 
-  const written = { updatedAt: new Date(), ...sessionStamp(internals, headers) }
+  const written = { updatedAt: now, ...sessionStamp(internals, headers) }
   const write = internals.db.update({
     table: "sessions",
     // Never revives a session revoked meanwhile
