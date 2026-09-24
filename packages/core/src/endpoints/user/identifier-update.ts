@@ -337,11 +337,6 @@ const phone = updateEndpoints({
     })
 })
 
-/** Body accepted by `POST /user/email-update/send-code`. */
-export type SendEmailUpdateCodeInput = SendUpdateCodeInput<"email">
-/** Body accepted by `POST /user/phone-update/send-code`. */
-export type SendPhoneUpdateCodeInput = SendUpdateCodeInput<"phoneNumber">
-
 /** How `POST /user/email-update/send-code` appears in the OpenAPI document. */
 export const sendEmailUpdateCodeDocs = email.sendCodeDocs
 /** How `POST /user/email-update/verify` appears in the OpenAPI document. */

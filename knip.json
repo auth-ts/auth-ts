@@ -2,9 +2,5 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreWorkspaces": ["examples/**"],
   "ignore": ["apps/docs/content/snippets/**"],
-  "ignoreDependencies": ["@nx/vite", "shiki"],
-  "ignoreExportsUsedInFile": true,
-  "ignoreIssues": {
-    "packages/core/src/endpoints/user/identifier-update.ts": ["types"]
-  }
+  "ignoreExportsUsedInFile": true
 }
