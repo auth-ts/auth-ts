@@ -1,7 +1,7 @@
 {
   "name": "@auth-ts/core",
   "version": "0.1.0",
-  "description": "Free forever JWT auth in TypeScript.",
+  "description": "Sign-in, sessions and JWTs for any TypeScript app.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

@@ -1,7 +1,8 @@
 # @auth-ts/core
 
-The issuer. Zero framework dependencies, zero database dependencies — `jose` and
-nothing else — so it runs on Node 20+, Cloudflare Workers, Deno, and Bun alike.
+Sign-in, sessions and JWTs for any TypeScript app. No framework or database
+dependencies, only `jose`, so it runs on Node 20+, Cloudflare Workers, Deno and
+Bun.
 
 Browser token management is the same package's `/client` entry, which carries
 none of the issuer with it.
@@ -14,9 +15,7 @@ npm install @auth-ts/core
 import { createAuth } from "@auth-ts/core"
 
 export const auth = createAuth({
-  database: {
-    /* select, insert, update, delete — written against your own tables */
-  },
+  database: authDatabase, // four functions against your own tables
   email: { sendCode: async ({ email, code }) => {} }
 })
 ```

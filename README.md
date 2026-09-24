@@ -1,23 +1,26 @@
 # auth.ts
 
-**Free forever JWT auth in TypeScript — four functions to write against any database.**
-No limits, no service, no company.
+**Sign-in, sessions and JWTs for any TypeScript app. Bring your own database and
+framework.**
 
-For applications that issue **their own** ES256 or RS256 tokens, for PostgREST
-and row-level-security backends — Neon's Data API, Supabase, self-hosted
-PostgREST — or anything that trusts a JWKS URL. Your database verifies the token
-and your policies decide what comes back, so authorization lives in Postgres
-rather than in application code.
+Free forever. No limits, no service, no company. Built on
+[Lucia](https://lucia-auth.com) and [The Copenhagen Book](https://thecopenhagenbook.com).
 
-* `@auth-ts/core` — the issuer. Zero framework dependencies, zero database
-  dependencies, `jose` and nothing else. Runs on Node 20+, Cloudflare Workers,
-  Deno, and Bun.
-* `@auth-ts/core/client` — browser token management, from the same package. The
-  entry a browser imports carries none of the issuer.
-* `@auth-ts/cli` — `npx @auth-ts/cli keygen`: the signing key and the
-  `public/jwks.json` to deploy with your app.
+- Email and SMS codes, GitHub and Google, and guest sign-in
+- Sessions, sign-out, device lists and account switching
+- Short-lived ES256 or RS256 JWTs, verified in your own routes or by anything
+  that trusts a JWKS URL, like Neon, Supabase or PostgREST
+- Connected accounts with refreshed provider tokens
+- Rate limiting, CSRF protection and code guessing limits
+- No adapter packages: six tables and four functions you write
+- Runs on Node 20+, Cloudflare Workers, Deno and Bun
 
-Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous guests.
+## Packages
+
+| package | |
+| --- | --- |
+| [`@auth-ts/core`](packages/core) | The server, plus the browser client at `@auth-ts/core/client`. Depends only on `jose`. |
+| [`@auth-ts/cli`](packages/cli) | `npx @auth-ts/cli keygen` generates your signing key and `jwks.json`. |
 
 ## Quickstart
 
@@ -26,43 +29,42 @@ npm install @auth-ts/core
 npx @auth-ts/cli keygen
 ```
 
-`keygen` prints `JWT_PRIVATE_KEY` and the public key set, then asks whether to
-keep them — the key appended to `.env`, the key set written to
-`public/jwks.json`, which your framework serves at `/jwks.json`.
+`keygen` saves `JWT_PRIVATE_KEY` to `.env` and the public key set to
+`public/jwks.json`.
+
+Create the server. `authDatabase` is four functions against your own tables;
+the docs have [ready-to-copy versions](https://authts.dev/docs/database) for
+Drizzle and node-postgres.
 
 ```ts
 // lib/auth.ts
 import { createAuth } from "@auth-ts/core"
+import { authDatabase } from "./auth-database"
 
 export const auth = createAuth({
-  database: {
-    /* four functions — see the AuthDatabase reference */
-  },
+  database: authDatabase,
   email: {
     sendCode: async ({ email, code }) => {
-      await yourEmailProvider.send({ to: email, text: code })
+      await yourEmailProvider.send({ to: email, text: `Your code is ${code}` })
     }
   }
 })
-
-export type Auth = typeof auth
 ```
 
-Mount it once, at `<basePath>/*`:
+Mount it at `/api/auth`, here with TanStack Start:
 
 ```ts
+// src/routes/api/auth/$.ts
 export const Route = createFileRoute("/api/auth/$")({
   server: {
     handlers: {
-      GET: ({ request }) => auth.handler(request),
-      POST: ({ request }) => auth.handler(request),
-      DELETE: ({ request }) => auth.handler(request)
+      ANY: ({ request }) => auth.handler(request)
     }
   }
 })
 ```
 
-Then point your database at `https://your.app/jwks.json`, and in the browser:
+Sign in from the browser:
 
 ```ts
 import { createAuthClient } from "@auth-ts/core/client"
@@ -71,43 +73,37 @@ export const authClient = createAuthClient()
 
 await authClient.sendSignInCode({ email })
 await authClient.signInWithCode({ code })
-
-// Your PostgREST client asks for the token on every request.
-new NeonPostgrestClient({
-  dataApiUrl: DATA_API_URL,
-  options: { global: { fetch: fetchWithToken(authClient.getToken) } }
-})
 ```
 
-## Why no adapter packages
+Send the token to your API, and verify it there:
 
-Adapters are a promise to track someone else's schema conventions forever, and
-they always leak. Instead there are four functions — `select`, `insert`,
-`update`, `delete`, filtered by equality on columns the library names — plus an
-optional sweep. It is the same code an adapter would generate, except you can
-read it and it is already written against your own tables. That is the whole
-integration surface, and it is where the semver discipline goes.
+```ts
+// browser
+await fetch("/api/todos", {
+  headers: { authorization: `Bearer ${await authClient.getToken()}` }
+})
 
-## Design in one paragraph
+// server
+const claims = await auth.verifyToken(token) // null if invalid
+```
 
-The refresh token is the session: 32 random bytes, delivered only as an
-`HttpOnly`, `Secure`, `SameSite=Lax` cookie, stored by you as a SHA-256 hash. The
-access token is a short-lived JWT held in a JavaScript variable and never
-persisted, because a stored bearer token turns any XSS into an exfiltratable
-credential. `GET /token` is the only endpoint that reads the cookie, and the only
-one that touches a session; everything else authenticates from the JWT alone. A
-signed-out visitor never makes that exchange: a readable `auth-ts.hint` cookie,
-written and retired with the refresh cookie, holds `in` or `out` and nothing
-else, so the client can answer "nobody" without a request. Revocation latency is therefore the access-token lifetime — ten
-minutes by default — which is stated plainly rather than glossed over.
+The [full quickstart](https://authts.dev/docs/quickstart) covers the tables,
+other frameworks, and querying Neon with row-level security.
 
-## Repository
+## How it works
+
+The session is a refresh token in an `HttpOnly` cookie. The client trades it for
+a short-lived JWT, kept only in memory, which every request carries. Your API or
+database verifies the JWT against your public `jwks.json`, with no call back to
+auth.ts. See [How it works](https://authts.dev/docs/concepts).
+
+## Development
 
 ```text
-packages/core      @auth-ts/core
-packages/cli       @auth-ts/cli
-apps/docs          the documentation site
-examples/react/    TanStack Start + Neon reference application
+packages/core                  @auth-ts/core
+packages/cli                   @auth-ts/cli
+apps/docs                      authts.dev
+examples/react/tanstack-start-neon   TanStack Start + Neon example
 ```
 
 ```bash
@@ -115,17 +111,14 @@ pnpm install
 pnpm test
 ```
 
-## What is not here yet
+The repo uses pnpm and Nx. `pnpm test` runs every check: `test:lib`,
+`test:types`, `test:build`, `build`, sherif and knip. `pnpm run lint` runs Biome.
 
-[ROADMAP.md](ROADMAP.md) covers what is deliberately deferred, what is built but
-not yet proven against a live provider, and what this project declines to build
-at all — with the reasoning, so the decisions can be argued with rather than
-guessed at.
+## Links
 
-## Documentation
+- [Documentation](https://authts.dev)
+- [Roadmap](ROADMAP.md): what's deferred, and what's deliberately not built
 
-[authts.dev](https://authts.dev)
+## License
 
-## Licence
-
-Apache-2.0.
+Apache-2.0

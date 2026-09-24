@@ -13,6 +13,6 @@ so, and a variable the env file already sets is never overwritten without being
 asked about first.
 
 `--out` moves the key set, `--env` moves the variable, `--yes` skips the
-question, and `--alg ES256` picks the other algorithm.
+question, and `--alg RS256` switches from the default ES256.
 
 Full documentation: [authts.dev](https://authts.dev/docs/reference/cli)
