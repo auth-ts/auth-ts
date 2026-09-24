@@ -10,7 +10,7 @@ trustPolicyExclude:
 packages:
   - packages/*
   - apps/*
-  - examples/*
+  - examples/*/*
 
 allowBuilds:
   nx: true

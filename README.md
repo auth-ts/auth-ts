@@ -107,7 +107,7 @@ minutes by default — which is stated plainly rather than glossed over.
 packages/core      @auth-ts/core
 packages/cli       @auth-ts/cli
 apps/docs          the documentation site
-examples/          TanStack Start + Neon reference application
+examples/react/    TanStack Start + Neon reference application
 ```
 
 ```bash

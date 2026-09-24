@@ -264,11 +264,11 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
 
-  examples/tanstack-start-neon-example:
+  examples/react/tanstack-start-neon:
     dependencies:
       '@auth-ts/core':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../../packages/core
       '@heroicons/react':
         specifier: ^2.2.0
         version: 2.2.0(react@19.2.8)
@@ -308,7 +308,7 @@ importers:
     devDependencies:
       '@auth-ts/cli':
         specifier: workspace:*
-        version: link:../../packages/cli
+        version: link:../../../packages/cli
       '@cloudflare/vite-plugin':
         specifier: 1.53.1
         version: 1.53.1(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(wrangler@4.125.0)
