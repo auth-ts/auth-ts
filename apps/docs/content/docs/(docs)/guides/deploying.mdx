@@ -1,0 +1,78 @@
+---
+title: Deploying
+description: A checklist for going to production.
+---
+
+## Before you ship
+
+- [ ] `sendCode` uses a real email or SMS provider, not `console.log`.
+- [ ] `JWT_PRIVATE_KEY` is set, and `jwks.json` is deployed with it.
+- [ ] Your data API points at your production `jwks.json`.
+- [ ] The [auth tables are protected](/docs/data/row-level-security).
+- [ ] [`authDatabaseChecks`](/docs/guides/testing) pass against the production database.
+- [ ] OAuth apps have your production callback URLs.
+
+## Client IP address
+
+The IP is used for per-IP rate limits and stored on each session. Most hosts
+overwrite `x-forwarded-for` with a single address, which works with no
+configuration. Otherwise, set `ipAddress`:
+
+| host | setting |
+| --- | --- |
+| Cloudflare | `{ headers: ["cf-connecting-ip"] }` |
+| Akamai | `{ headers: ["true-client-ip"] }` |
+| nginx, Railway | `{ headers: ["x-real-ip"] }` |
+| Vercel, or proxies you can count | `{ trustedProxies: 1 }` |
+| Proxies you run | `{ trustedProxies: ["10.0.0.0/24"] }` |
+
+When a header lists several addresses and you've set nothing, none is trusted,
+because the first one could be anything the client sent. The per-address code
+guessing limit works either way.
+
+## Cloudflare Workers
+
+Pass `waitUntil`, so cleanup and notifications run after the response:
+
+```ts
+import { waitUntil } from "cloudflare:workers"
+
+createAuth({ waitUntil /* ... */ })
+```
+
+## Your origin
+
+auth.ts reads its origin from each request. Set `baseURL` to fix it, which also
+adds `iss` to tokens and serves the discovery document:
+
+```ts
+createAuth({ baseURL: "https://your.app" /* ... */ })
+```
+
+Behind a proxy that rewrites the host, either set `baseURL` or turn on
+`trustedProxyHeaders` to read `X-Forwarded-Host`. Only do the latter if every
+request passes through that proxy.
+
+## A separate app origin
+
+If your app and auth server are on different origins, list the app:
+
+```ts
+createAuth({ trustedOrigins: ["https://app.example.com"] /* ... */ })
+```
+
+auth.ts sends no CORS headers; set them where you already do. The response to
+the preflight must allow credentials and the `authorization` and
+`content-type` headers, and must echo the origin rather than `*`. Both must be
+on one registrable domain for the cookie to work, and `cookie.hintDomain`
+should name it.
+
+## Content Security Policy
+
+Set one on every page. auth.ts needs only `connect-src 'self'`, plus your auth
+origin if it's separate. Nothing needs `unsafe-inline` or `unsafe-eval`.
+
+## Logs
+
+Set `requestIdHeader` to your host's request id header, like `cf-ray` on
+Cloudflare, so an unexpected error's `requestId` matches a log line.

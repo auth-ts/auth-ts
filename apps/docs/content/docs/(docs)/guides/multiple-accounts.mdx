@@ -1,0 +1,44 @@
+---
+title: Multiple accounts
+description: Several users signed in to one browser, with switching.
+---
+
+With `multiUser`, signing in as a second user keeps the first signed in, and
+the user can switch between them without signing in again.
+
+```ts title="lib/auth.ts"
+export const auth = createAuth({
+  database: authDatabase,
+  multiUser: true
+  // ...
+})
+```
+
+## List and switch
+
+```ts
+const users = await authClient.listUsers()
+
+await authClient.switchUser({ userId: users[1].id })
+```
+
+`listUsers` returns every user signed in to this browser. Compare against the
+current token's `sub` to mark the active one. `switchUser` replaces the token,
+so refetch anything keyed by the user afterwards.
+
+## Adding an account
+
+Call any sign-in method while signed in. The new user becomes active and the
+others stay signed in. Signing in again as a user who's already here replaces
+only that user's session.
+
+Without `multiUser`, a new sign-in signs everyone else in this browser out.
+
+## Signing out
+
+```ts
+await authClient.signOut({ userId }) // one user
+await authClient.signOut() // everyone in this browser
+```
+
+Each user has their own refresh cookie, named `auth-ts.refresh.<userId>`.

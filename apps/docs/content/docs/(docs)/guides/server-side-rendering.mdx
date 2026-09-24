@@ -1,0 +1,43 @@
+---
+title: Server-side rendering
+description: Read the session in loaders and server components.
+---
+
+A page request carries the refresh cookie. `auth.getToken` turns it into a
+token and the user, or `null` when nobody is signed in:
+
+```ts
+const session = await auth.getToken({ headers: request.headers })
+
+if (!session) return { user: null }
+
+session.user // the user row
+session.token // a token for your data API
+```
+
+Call it once per request, then reuse the token. Every other server call on
+`auth` takes that token:
+
+```ts
+await auth.updateUser({ token: session.token, name })
+```
+
+To query your data API on the server, send the same token as a bearer. The
+database applies the same policies it does for the browser.
+
+## Requirements
+
+- The refresh cookie must reach your pages, so leave `cookie.path` at its
+  default of `/`.
+- Server-side calls go straight to the function. No HTTP request is made to
+  your own server.
+
+## Choosing the check
+
+| need | use |
+| --- | --- |
+| Render for a page request with cookies | `auth.getToken({ headers })` |
+| Protect an API route called with a bearer token | `auth.verifyToken(token)` |
+| Refuse a signed-out session immediately | `auth.verifySession({ token })` |
+
+See [Your own API](/docs/data/server-routes) for the last two.

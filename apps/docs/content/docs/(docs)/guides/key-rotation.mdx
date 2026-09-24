@@ -1,32 +1,25 @@
 ---
 title: Rotating keys
-description: Generate a new key and deploy it with its jwks.json.
+description: Replace your signing key without signing anyone out.
 ---
 
-A signing key and its `public/jwks.json` travel together, so rotating is the
-setup step again:
+A key and its `jwks.json` always ship together, so rotating is the setup step
+again:
 
 ```bash
-bun x @auth-ts/cli keygen
+npx @auth-ts/cli keygen
 ```
 
-Set the new `JWT_PRIVATE_KEY` in the environment, keep the new `public/jwks.json`
-it wrote, and deploy. From that deploy on, tokens are signed with the new key and
-`/jwks.json` names only it.
+Answer yes to replace `JWT_PRIVATE_KEY`, then deploy the new key and the new
+`public/jwks.json` together. On Supabase, also
+[import the new key](/docs/data/supabase).
 
-## Tokens already out there
+## What users notice
 
-An access token signed by the old key stops verifying once the verifier picks up
-the new key set — Neon and Supabase cache it briefly, and in-process
-`verifyToken` switches with the deploy. The client refreshes and gets a token
-under the new key, so the visible effect is one failed request at most, inside a
-window no longer than the access-token lifetime: an hour by default.
+Almost nothing. Sessions don't depend on the signing key, so nobody is signed
+out. Access tokens signed with the old key stop verifying once your data API
+picks up the new key set, and the client fetches a new token on the next 401.
+At most, one request fails and is retried, within the token lifetime.
 
-The new key carries a new `kid` — its thumbprint — which is what makes a
-verifier holding a cached `jwks.json` fetch it again rather than check new
-tokens against the key it knows by the old name.
-
-## Sessions survive
-
-Rotation affects access tokens only. Refresh tokens are random bytes checked
-against your own table, so nobody is signed out.
+The new key has a new `kid`, which tells verifiers holding a cached key set to
+fetch it again.

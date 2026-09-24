@@ -1,3 +1,18 @@
 {
-  "pages": ["mounting", "account-page", "key-rotation", "openapi"]
+  "pages": [
+    "mounting",
+    "reading-the-user",
+    "server-side-rendering",
+    "account-page",
+    "changing-email-or-phone",
+    "multiple-accounts",
+    "connected-accounts",
+    "claims-and-fields",
+    "emails",
+    "native-apps",
+    "deploying",
+    "key-rotation",
+    "testing",
+    "openapi"
+  ]
 }

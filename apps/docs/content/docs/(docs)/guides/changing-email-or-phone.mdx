@@ -1,0 +1,47 @@
+---
+title: Changing email or phone
+description: Move an account to a new email address or phone number.
+---
+
+Changing an email takes two codes: one proving it's really the user, then one
+sent to the new address. The account keeps its old address until the second
+code is verified.
+
+```ts
+const sent = await authClient.sendEmailUpdateCode({ email: newEmail })
+
+if (sent.status === "verificationRequired") {
+  await authClient.sendIdentityCode()
+  await authClient.verifyIdentity({ code: await askForCode() })
+  await authClient.sendEmailUpdateCode({ email: newEmail })
+}
+
+const result = await authClient.verifyEmailUpdate({ code: await askForCode() })
+if (result.status === "updated") {
+  result.user.email // the new address
+}
+```
+
+Your `sendCode` receives `purpose: "emailChange"` for the second code, so that
+email can say what it's for.
+
+After the change:
+
+- Codes sent to the old address stop working.
+- The old address is told, if you set `email.sendEmailChangedNotification`.
+- Every session stays signed in.
+
+## Phone numbers
+
+`sendPhoneUpdateCode` and `verifyPhoneUpdate` work the same way, through
+`sms.sendCode`, and `sms.sendPhoneNumberChangedNotification` tells the old
+number.
+
+## Errors
+
+| code | when |
+| --- | --- |
+| `emailTaken`, `phoneNumberTaken` | Another account already uses it. |
+| `invalidEmailAddress`, `invalidField` | The new address or number isn't valid. |
+| `guestCannotReceiveCode` | Guests have no address to confirm with. |
+| `invalidCode`, `incorrectCode` | The code expired or is wrong. |
