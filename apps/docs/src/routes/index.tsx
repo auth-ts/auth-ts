@@ -80,12 +80,12 @@ const FEATURES = [
   {
     icon: KeyRound,
     title: "Every common sign-in",
-    body: "Email and SMS codes, GitHub, Google, and guests who can upgrade later."
+    body: "Email and SMS codes, GitHub, Google, and guests who keep their data when they sign in."
   },
   {
     icon: MonitorSmartphone,
     title: "Sessions and devices",
-    body: "A session per device, and switching between accounts on one."
+    body: "A session per device, and switching between accounts in one browser."
   },
   {
     icon: ShieldCheck,
