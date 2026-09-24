@@ -122,7 +122,7 @@ function FullWidthHeader(props: ComponentProps<"header">) {
 
 function SidebarBanner({ children }: ComponentProps<"div">) {
   return (
-    <div className="flex flex-col gap-3 p-4 pb-2 lg:p-0 lg:pt-2">
+    <div className="flex flex-col gap-3 p-4 pb-2 lg:hidden">
       {children}
       <SectionTabs className="border-b px-2 lg:hidden" />
     </div>
@@ -142,7 +142,8 @@ function DocumentationPage() {
         children: <SectionTabs className="ms-6 self-stretch max-lg:hidden" />
       }}
       sidebar={{
-        banner: SidebarBanner
+        banner: SidebarBanner,
+        className: "lg:[&_[data-radix-scroll-area-viewport]]:pt-6"
       }}
       tabs={false}
       slots={{ header: FullWidthHeader }}
