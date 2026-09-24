@@ -82,8 +82,8 @@ const clientLoader = browserCollections.docs.createClientLoader({
     return (
       <DocsPage
         toc={toc}
-        tableOfContent={{ style: "clerk", container: { className: "pt-4" } }}
-        className="md:pt-4 xl:pt-4"
+        tableOfContent={{ style: "clerk", container: { className: "pt-6" } }}
+        className="md:pt-6 xl:pt-6"
       >
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
@@ -122,7 +122,7 @@ function FullWidthHeader(props: ComponentProps<"header">) {
 
 function SidebarBanner({ children }: ComponentProps<"div">) {
   return (
-    <div className="flex flex-col gap-3 p-4 pb-2 lg:hidden">
+    <div className="flex flex-col gap-3 p-4 pb-2 lg:p-0 lg:pt-2">
       {children}
       <SectionTabs className="border-b px-2 lg:hidden" />
     </div>
@@ -149,7 +149,7 @@ function DocumentationPage() {
       tree={data.pageTree}
     >
       {data.type === "openapi" ? (
-        <DocsPage full className="md:pt-4 xl:pt-4">
+        <DocsPage full className="md:pt-6 xl:pt-6">
           <DocsTitle>{data.title}</DocsTitle>
           <DocsDescription>{data.description}</DocsDescription>
           <DocsBody>
