@@ -1,11 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock"
 import { HomeLayout } from "fumadocs-ui/layouts/home"
-import { useCopyButton } from "fumadocs-ui/utils/use-copy-button"
 import {
   ArrowRight,
-  Check,
-  Copy,
   Database,
   Globe,
   KeyRound,
@@ -13,6 +10,7 @@ import {
   Scale,
   ShieldCheck
 } from "lucide-react"
+import { Fragment } from "react"
 import { GitHubIcon } from "~/components/github-icon"
 import { Logo } from "~/components/logo"
 import { SiteHeader } from "~/components/site-header"
@@ -20,7 +18,14 @@ import { REPO_URL } from "~/lib/layout.shared"
 
 export const Route = createFileRoute("/")({ component: LandingPage })
 
-const INSTALL = "npm install @auth-ts/core"
+const CLAIMS = ["No limits", "No service", "No company"]
+
+const SPECS = [
+  ["Runtime", "Node 20+, Workers, Deno, Bun"],
+  ["Algorithms", "ES256, RS256"],
+  ["Dependencies", "jose"],
+  ["License", "Apache-2.0"]
+]
 
 const STEPS = [
   {
@@ -139,67 +144,80 @@ function Hero() {
         <div className="hero-noise" />
       </div>
       <div
-        className={`${FRAME} flex flex-col items-center px-6 py-24 text-center md:py-36`}
+        className={`${FRAME} grid grid-cols-1 gap-x-12 gap-y-10 px-6 py-16 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end lg:py-28`}
       >
-        <h1 className="flex flex-col items-center gap-5">
-          <span className="flex items-center gap-3 font-mono text-6xl font-semibold tracking-tighter md:gap-4 md:text-8xl">
-            <Logo className="text-fd-primary size-16 md:size-24" />
-            auth.ts
-          </span>
-          <span className="text-2xl font-medium tracking-tight text-balance md:text-3xl">
-            <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:bottom-[-0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
-              Free forever
-            </span>{" "}
-            auth in TypeScript.
-          </span>
-        </h1>
-        <p className="text-fd-muted-foreground mt-6 max-w-xl text-lg text-pretty">
-          Sign-in, sessions and JWTs for any TypeScript app. Bring your own
-          database and framework.
-        </p>
-        <div className="mt-10 flex flex-wrap justify-center gap-3">
-          <Link
-            to="/docs/$"
-            params={{ _splat: "quickstart" }}
-            className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
-          >
-            Get started
-            <ArrowRight className="size-4" />
-          </Link>
-          <a
-            href={REPO_URL}
-            className="border-fd-border bg-fd-background/60 hover:bg-fd-accent inline-flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-medium backdrop-blur-sm transition-colors"
-          >
-            <GitHubIcon className="size-4" />
-            GitHub
-          </a>
+        <div className="min-w-0">
+          <h1 className="flex flex-col gap-4">
+            <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
+              <Logo className="text-fd-primary size-15 md:size-22" />
+              auth.ts
+            </span>
+            <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl">
+              <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:bottom-[-0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
+                Free forever
+              </span>{" "}
+              auth in TypeScript.
+            </span>
+          </h1>
+          <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty">
+            Sign-in, sessions and JWTs for any TypeScript app. Bring your own
+            database and framework.
+          </p>
+          <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-medium">
+            {CLAIMS.map((claim, index) => (
+              <Fragment key={claim}>
+                {index > 0 && (
+                  <span aria-hidden className="text-fd-primary">
+                    /
+                  </span>
+                )}
+                {claim}
+              </Fragment>
+            ))}
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link
+              to="/docs/$"
+              params={{ _splat: "quickstart" }}
+              className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
+            >
+              Get started
+              <ArrowRight className="size-4" />
+            </Link>
+            <a
+              href={REPO_URL}
+              className="hover:text-fd-primary inline-flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <GitHubIcon className="size-4" />
+              GitHub
+            </a>
+          </div>
+          <div className="mt-8 max-w-md">
+            <DynamicCodeBlock
+              lang="bash"
+              code={`npm install @auth-ts/core
+npx @auth-ts/cli keygen`}
+            />
+          </div>
         </div>
-        <InstallCommand />
+        <div>
+          <p className="text-fd-muted-foreground mb-3 font-mono text-xs tracking-wider uppercase">
+            Package
+          </p>
+          <dl className="text-sm md:grid md:grid-cols-2 md:gap-x-12 lg:block">
+            {SPECS.map(([term, value]) => (
+              <div
+                key={term}
+                className="border-fd-border flex items-baseline justify-between gap-6 border-b py-2.5 first:border-t md:nth-2:border-t lg:nth-2:border-t-0"
+              >
+                <dt className="text-fd-muted-foreground">{term}</dt>
+                <dd className="text-end font-mono">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </div>
     </section>
-  )
-}
-
-function InstallCommand() {
-  const [checked, onClick] = useCopyButton(() =>
-    navigator.clipboard.writeText(INSTALL)
-  )
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Copy install command"
-      className="border-fd-border bg-fd-background/60 hover:text-fd-accent-foreground mt-6 inline-flex items-center gap-3 rounded-lg border px-4 py-2 font-mono text-sm backdrop-blur-sm transition-colors"
-    >
-      <span className="text-fd-muted-foreground select-none">$</span>
-      {INSTALL}
-      {checked ? (
-        <Check className="text-fd-primary size-3.5" />
-      ) : (
-        <Copy className="text-fd-muted-foreground size-3.5" />
-      )}
-    </button>
   )
 }
 
