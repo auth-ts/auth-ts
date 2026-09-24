@@ -29,17 +29,17 @@
     ]
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.9",
-    "@types/node": "26.2.0",
-    "happy-dom": "20.11.6",
+    "@biomejs/biome": "2.5.14",
+    "@types/node": "26.6.2",
+    "happy-dom": "20.14.5",
     "knip": "6.38.0",
-    "lefthook": "^2.1.10",
-    "nx": "23.1.1",
+    "lefthook": "^2.1.14",
+    "nx": "23.2.1",
     "publint": "0.3.24",
     "sherif": "1.13.0",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
-    "vite": "8.2.2",
+    "vite": "8.3.0",
     "vitest": "4.1.11"
   }
 }

@@ -125,14 +125,11 @@ const typeTables: RemarkAutoTypeTableOptions = {
     basePath: "../../packages/core/src",
     typeSimplifier: {
       // Default shows "union" and "object" instead.
-      override: ({ type, location }) => {
-        const members = type
-          .getText(location)
-          .split(" | ")
-          .filter((member) => member !== "undefined")
-        const joined = members.join(" | ")
-        const text =
-          members.length === 1 ? joined.replace(/^\((.*)\)$/, "$1") : joined
+      override: ({ type, checker, location }) => {
+        const text = checker
+          .typeToString(type, location)
+          .replace(/ \| undefined$/, "")
+          .replace(/^\((\(.*\) => .*)\)$/, "$1")
 
         return text.length <= 60 ? text : undefined
       }

@@ -33,7 +33,7 @@
     "test:build": "publint --strict"
   },
   "dependencies": {
-    "jose": "6.2.9"
+    "jose": "6.2.12"
   },
   "devDependencies": {
     "typescript": "7.0.2"

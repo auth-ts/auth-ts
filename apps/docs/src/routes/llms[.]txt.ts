@@ -11,8 +11,8 @@ import { source } from "~/lib/source"
 export const Route = createFileRoute("/llms.txt")({
   server: {
     handlers: {
-      GET: () =>
-        new Response(llms(source).index(), {
+      GET: async () =>
+        new Response(await llms(source).index(), {
           headers: { "content-type": "text/plain; charset=utf-8" }
         })
     }

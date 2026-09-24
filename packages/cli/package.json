@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@auth-ts/core": "workspace:*",
-    "jose": "6.2.9"
+    "jose": "6.2.12"
   },
   "repository": {
     "type": "git",

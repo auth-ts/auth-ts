@@ -18,3 +18,7 @@ allowBuilds:
   esbuild: true
   workerd: true
   core-js-pure: false
+
+# Neon's client pins this exact version
+overrides:
+  '@supabase/postgrest-js': 2.79.0
