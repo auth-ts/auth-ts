@@ -245,13 +245,6 @@ is the fix; the check is evidence that you have one.
 
 ## Deferred features
 
-### Email and phone number changes
-
-Changing an identifier re-keys the account, because every sign-in resolves
-through it. That makes it a ceremony — a code verified at the **new** address,
-and a notification to the old one — not a field on `PATCH /user`, which is why
-that endpoint rejects `email` and `phoneNumber` today.
-
 ### Magic links
 
 Codes were chosen for v1 because they survive the common case where the link
