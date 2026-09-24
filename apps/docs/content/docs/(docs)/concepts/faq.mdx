@@ -15,19 +15,20 @@ unique constraints, and a `delete` that returns what it removed.
 A code works when the email opens in a different browser from the one that
 asked, which is common on phones. Links may come later.
 
-## Can I use it without PostgREST?
+## Do I need PostgREST or row-level security?
 
-Yes. Anything that trusts a JWKS works, and `verifyToken` protects your own API
-routes with no database involved. See [Your own API](/docs/data/server-routes).
+No. Most apps check the token in their own API routes with `verifyToken`. See
+[Your own API](/docs/data/server-routes). Row-level security is an option when
+the browser queries your database directly.
 
 ## Does it run on edge runtimes?
 
 Yes. It uses Web Crypto and `jose`, with no `node:` imports except `scrypt` for
 hashing codes, which Node, Bun, Deno and Cloudflare Workers all provide.
 
-## How is this different from session libraries?
+## Why JWTs and sessions?
 
-Session libraries give your server a session object, and your server code
-decides access. auth.ts gives your database a JWT, and your policies decide
-access. If your backend isn't Postgres with row-level security, a session
-library may suit you better.
+The session, in an `HttpOnly` cookie, is what keeps someone signed in and what
+you revoke. The JWT is what every request carries: your API checks it with
+`verifyToken` without a database lookup, and a database like Neon or Supabase
+can check it too. See [Sessions and revocation](/docs/concepts/sessions).

@@ -1,10 +1,11 @@
 ---
 title: Quickstart
-description: Email sign-in, a signed token, and a query your database authorizes.
+description: Email sign-in and a JWT you verify in your API or database.
 ---
 
-You need Postgres and an app with a server route that takes a `Request` and
-returns a `Response`.
+You need an app with a server route that takes a `Request` and returns a
+`Response`. The tables here are Postgres; for other databases, see
+[Database](/docs/database).
 
 <Steps>
 <Step>
@@ -122,10 +123,39 @@ const { user } = await authClient.signInWithCode({ code })
 </Step>
 <Step>
 
-### Query with the token
+### Use the token
 
-Point your database at `https://your.app/jwks.json`. On Neon, that is the Data
-API's JWKS URL; see [Neon](/docs/data/neon). Then give a table a policy:
+Every request to your API or database carries the JWT. Check it where you
+decide access.
+
+<Tabs items={["Your API", "Neon Data API"]}>
+<Tab value="Your API">
+
+Send the token from the browser:
+
+```ts
+const response = await fetch("/api/todos", {
+  headers: { authorization: `Bearer ${await authClient.getToken()}` }
+})
+```
+
+Verify it on the server. `verifyToken` checks the signature locally, with no
+database call:
+
+```ts title="src/routes/api/todos.ts"
+const token = request.headers.get("authorization")?.replace(/^Bearer /, "")
+const claims = token ? await auth.verifyToken(token) : null
+
+if (!claims) return new Response("Unauthorized", { status: 401 })
+
+// claims.sub is the user id
+```
+
+</Tab>
+<Tab value="Neon Data API">
+
+Set the Data API's JWKS URL to `https://your.app/jwks.json`, then give a table a
+policy:
 
 ```sql
 create table "todos" (
@@ -141,8 +171,7 @@ create policy "own todos" on "todos" for all to authenticated
   with check ((select auth.user_id()::uuid) = "userId");
 ```
 
-Your data client sends the token on every request, and gets back only the
-signed-in user's rows:
+The data client sends the token, and gets back only the user's rows:
 
 ```ts
 import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
@@ -155,13 +184,18 @@ const postgrest = new NeonPostgrestClient({
 const { data: todos } = await postgrest.from("todos").select()
 ```
 
+See [Neon](/docs/data/neon) for local development.
+
+</Tab>
+</Tabs>
+
 </Step>
 </Steps>
 
 ## Next
 
 <Cards>
-  <Card title="Row-level security" href="/docs/data/row-level-security" description="Policies, grants, and the tables you never expose." />
+  <Card title="Your own API" href="/docs/data/server-routes" description="Protect routes and actions with the token." />
   <Card title="GitHub and Google" href="/docs/sign-in/providers" description="Add OAuth sign-in." />
   <Card title="Reading the user" href="/docs/guides/reading-the-user" description="Keep the user and token in your query cache." />
   <Card title="Deploying" href="/docs/guides/deploying" description="Email delivery, proxies, and origins." />

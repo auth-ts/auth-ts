@@ -32,8 +32,8 @@ const FLOW = [
     body: "Checks codes and providers, then signs a short-lived JWT with your key."
   },
   {
-    title: "Your database",
-    body: "Verifies the JWT against your jwks.json. Row-level security decides what comes back."
+    title: "Your API or database",
+    body: "Verifies the JWT against your jwks.json, with verifyToken or any JWKS verifier."
   }
 ]
 
@@ -57,16 +57,23 @@ export const Route = createFileRoute("/api/auth/$")({
 })
 `
 
-const POLICY_SOURCE = `create policy "own todos" on "todos" for all to authenticated
-  using ((select auth.user_id()::uuid) = "userId")
-  with check ((select auth.user_id()::uuid) = "userId");
+const API_SOURCE = `import { auth } from "./auth"
+
+export async function requireUser(request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer /, "")
+  const claims = token ? await auth.verifyToken(token) : null
+
+  if (!claims) throw new Response("Unauthorized", { status: 401 })
+
+  return claims
+}
 `
 
 const FILES = [
   { name: "lib/auth.ts", lang: "ts", code: authSource },
   { name: "routes/api/auth/$.ts", lang: "ts", code: ROUTE_SOURCE },
   { name: "lib/auth-client.ts", lang: "ts", code: authClientSource },
-  { name: "policy.sql", lang: "sql", code: POLICY_SOURCE },
+  { name: "lib/require-user.ts", lang: "ts", code: API_SOURCE },
   { name: "lib/auth-database.ts", lang: "ts", code: authDatabaseSource }
 ]
 
@@ -76,8 +83,8 @@ const FEATURES = [
     body: "No adapters. Six tables you own, and select, insert, update and delete to reach them."
   },
   {
-    title: "Authorization in Postgres",
-    body: "Short-lived JWTs your database verifies. Your policies decide what each user sees."
+    title: "JWTs anything can verify",
+    body: "Check tokens in your own routes, or hand them to Neon, Supabase or PostgREST."
   },
   {
     title: "Every common sign-in",
@@ -137,8 +144,8 @@ function Hero() {
             </span>
           </h1>
           <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty">
-            Sign people in and issue short-lived JWTs that your database
-            verifies. Authorization lives in your row-level security policies.
+            Sign-in, sessions and JWTs for any TypeScript app. Bring your own
+            database and framework.
           </p>
           <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-medium">
             {CLAIMS.map((claim, index) => (
@@ -221,8 +228,8 @@ function HowItWorks() {
         </ol>
         <div className="mt-8 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-center">
           <p className="text-fd-muted-foreground text-pretty">
-            What your database reads. Policies use <code>sub</code> for the user
-            and <code>type</code> for their role.
+            What every verifier reads: <code>sub</code> is the user and{" "}
+            <code>type</code> their role.
           </p>
           <div className="min-w-0">
             <DynamicCodeBlock lang="json" code={TOKEN} />

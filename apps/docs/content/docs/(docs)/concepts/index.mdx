@@ -36,11 +36,12 @@ A token in `localStorage` turns any script injection into a credential the
 attacker keeps after the tab closes. In memory, it dies with the page, and the
 cookie that outlives it can't be read by script.
 
-## Where authorization happens
+## Where the token is checked
 
-In your database. The user object in the browser is only for display. If
-someone tampers with it, they see the wrong name and no one else's data, because
-row-level security reads the verified token, not the client.
+Wherever you decide access: in your API routes with `verifyToken`, or in your
+database with row-level security. The user object in the browser is only for
+display. If someone tampers with it, they see the wrong name and nothing else,
+because the server and database read the verified token, not the client.
 
 auth.ts is built on [Lucia](https://lucia-auth.com)'s session code and
 [The Copenhagen Book](https://thecopenhagenbook.com)'s guidance.
