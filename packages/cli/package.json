@@ -17,8 +17,9 @@
     "build": "vite build",
     "dev": "vite build --watch",
     "keygen": "tsx src/cli.ts keygen",
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "test:lib": "vitest run",
+    "test:types": "tsc -p tsconfig.json",
+    "test:build": "publint --strict"
   },
   "dependencies": {
     "@auth-ts/core": "workspace:*",

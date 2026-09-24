@@ -112,7 +112,7 @@ examples/          TanStack Start + Neon reference application
 
 ```bash
 pnpm install
-pnpm nx run-many -t typecheck test build
+pnpm test
 ```
 
 ## What is not here yet

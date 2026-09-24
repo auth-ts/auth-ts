@@ -28,8 +28,9 @@
   "scripts": {
     "build": "vite build && tsx scripts/check-bundles.ts",
     "dev": "vite build --watch",
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "test:lib": "vitest run",
+    "test:types": "tsc -p tsconfig.json",
+    "test:build": "publint --strict"
   },
   "dependencies": {
     "jose": "6.2.9"

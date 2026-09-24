@@ -47,5 +47,5 @@ jobs:
 
       - uses: nrwl/nx-set-shas@3e9ad7370203c1e93d109be57f3b72eb0eb511b1 # v4.4.0
 
-      - name: Typecheck, test, and build affected projects
-        run: pnpm nx affected -t typecheck test build
+      - name: Test and build affected projects
+        run: pnpm run test:pr

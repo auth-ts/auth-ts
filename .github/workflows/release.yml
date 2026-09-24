@@ -68,8 +68,8 @@ jobs:
 
       # Everything, not `affected`: a release is the one place the whole tree
       # must be green regardless of what changed since the last run.
-      - name: Typecheck and test
-        run: pnpm nx run-many -t typecheck test
+      - name: Test and build
+        run: pnpm run test:ci
 
   version:
     needs: verify
