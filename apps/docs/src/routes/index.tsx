@@ -127,7 +127,7 @@ function Hero() {
   return (
     <section className="border-fd-border relative isolate overflow-hidden border-b">
       <HeroBackdrop />
-      <div className="relative mx-auto grid max-w-5xl grid-cols-1 gap-x-12 gap-y-10 px-6 py-16 lg:py-28 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end">
+      <div className="relative mx-auto grid max-w-(--fd-layout-width) grid-cols-1 gap-x-12 gap-y-10 px-4 md:px-6 py-16 lg:py-28 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end">
         <div className="min-w-0">
           <h1 className="flex flex-col gap-4">
             <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
@@ -206,7 +206,7 @@ npx @auth-ts/cli keygen`}
 function HowItWorks() {
   return (
     <section className="border-fd-border border-b">
-      <div className="mx-auto max-w-5xl px-6 py-16">
+      <div className="mx-auto max-w-(--fd-layout-width) px-4 md:px-6 py-16">
         <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
         <ol className="mt-6 grid gap-3 md:grid-cols-3">
           {FLOW.map((step, index) => (
@@ -241,7 +241,7 @@ function HowItWorks() {
 function CodeTour() {
   return (
     <section className="border-fd-border border-b">
-      <div className="mx-auto max-w-5xl px-6 py-16">
+      <div className="mx-auto max-w-(--fd-layout-width) px-4 md:px-6 py-16">
         <h2 className="text-2xl font-semibold tracking-tight">
           The whole setup
         </h2>
@@ -266,7 +266,7 @@ function CodeTour() {
 function Features() {
   return (
     <section className="border-fd-border border-b">
-      <div className="mx-auto grid max-w-5xl gap-8 px-6 py-16 md:grid-cols-3">
+      <div className="mx-auto grid max-w-(--fd-layout-width) gap-8 px-4 md:px-6 py-16 md:grid-cols-3">
         {FEATURES.map((feature) => (
           <div key={feature.title}>
             <h2 className="text-lg font-semibold tracking-tight">
@@ -284,7 +284,7 @@ function Features() {
 
 function Footer() {
   return (
-    <footer className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-6 px-6 py-10 text-sm">
+    <footer className="mx-auto flex w-full max-w-(--fd-layout-width) flex-wrap items-center justify-between gap-6 px-4 md:px-6 py-10 text-sm">
       <nav className="flex flex-wrap gap-x-6 gap-y-2 font-medium">
         <Link to="/docs/$" params={{ _splat: "quickstart" }}>
           Quickstart
