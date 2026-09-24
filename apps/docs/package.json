@@ -24,6 +24,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "fumadocs-mdx": "15.4.3",
+    "fumadocs-twoslash": "4.0.1",
     "fumadocs-typescript": "5.4.1",
     "tailwindcss": "4.3.3",
     "zod": "4.6.5"

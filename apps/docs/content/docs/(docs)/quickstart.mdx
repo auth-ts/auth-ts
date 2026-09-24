@@ -56,7 +56,7 @@ driver.
 
 ### Create the server
 
-<include meta='title="lib/auth.ts"'>../../snippets/auth.ts</include>
+<include meta='twoslash title="lib/auth.ts"'>../../snippets/auth.ts</include>
 
 </Step>
 <Step>
@@ -111,9 +111,14 @@ export default app
 
 ### Sign in from the browser
 
-<include meta='title="lib/auth-client.ts"'>../../snippets/auth-client.ts</include>
+<include meta='twoslash title="lib/auth-client.ts"'>../../snippets/auth-client.ts</include>
 
-```ts
+```ts twoslash
+import { authClient } from "./lib/auth-client"
+
+declare const email: string
+declare const code: string
+// ---cut---
 await authClient.sendSignInCode({ email })
 
 // The code is in your server log.
@@ -133,7 +138,9 @@ decide access.
 
 Send the token from the browser:
 
-```ts
+```ts twoslash
+import { authClient } from "./lib/auth-client"
+// ---cut---
 const response = await fetch("/api/todos", {
   headers: { authorization: `Bearer ${await authClient.getToken()}` }
 })
@@ -142,13 +149,17 @@ const response = await fetch("/api/todos", {
 Verify it on the server. `verifyToken` checks the signature locally, with no
 database call:
 
-```ts title="src/routes/api/todos.ts"
-const token = request.headers.get("authorization")?.replace(/^Bearer /, "")
-const claims = token ? await auth.verifyToken(token) : null
+```ts twoslash title="src/routes/api/todos.ts"
+import { auth } from "./lib/auth"
+// ---cut---
+export async function GET(request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer /, "")
+  const claims = token ? await auth.verifyToken(token) : null
 
-if (!claims) return new Response("Unauthorized", { status: 401 })
+  if (!claims) return new Response("Unauthorized", { status: 401 })
 
-// claims.sub is the user id
+  return Response.json({ userId: claims.sub })
+}
 ```
 
 </Tab>

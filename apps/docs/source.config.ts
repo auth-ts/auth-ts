@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs"
+import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins"
 import { defineConfig, defineDocs } from "fumadocs-mdx/config"
+import { transformerTwoslash } from "fumadocs-twoslash"
 import type { RemarkAutoTypeTableOptions } from "fumadocs-typescript"
 import { createGenerator, remarkAutoTypeTable } from "fumadocs-typescript"
 
@@ -137,9 +139,36 @@ const typeTables: RemarkAutoTypeTableOptions = {
   }
 }
 
+const authDatabaseStub = `import type { AuthDatabase } from "@auth-ts/core"
+export declare const authDatabase: AuthDatabase`
+
+const twoslash = transformerTwoslash({
+  twoslashOptions: {
+    compilerOptions: {
+      target: "ES2022",
+      module: "ESNext",
+      moduleResolution: "Bundler",
+      strict: true
+    },
+    extraFiles: {
+      "auth-database.ts": authDatabaseStub,
+      "lib/auth-database.ts": authDatabaseStub,
+      "lib/auth.ts": readFileSync("content/snippets/auth.ts", "utf8"),
+      "lib/auth-client.ts": readFileSync(
+        "content/snippets/auth-client.ts",
+        "utf8"
+      )
+    }
+  }
+})
+
 export default defineConfig({
   mdxOptions: {
     remarkPlugins: [remarkTypeTableIds, [remarkAutoTypeTable, typeTables]],
-    rehypePlugins: [() => linkTypeNames]
+    rehypePlugins: [() => linkTypeNames],
+    rehypeCodeOptions: {
+      ...rehypeCodeDefaultOptions,
+      transformers: [...(rehypeCodeDefaultOptions.transformers ?? []), twoslash]
+    }
   }
 })

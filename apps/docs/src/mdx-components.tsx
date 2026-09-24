@@ -1,3 +1,4 @@
+import * as Twoslash from "fumadocs-twoslash/ui"
 import { Accordion, Accordions } from "fumadocs-ui/components/accordion"
 import { File, Files, Folder } from "fumadocs-ui/components/files"
 import { Step, Steps } from "fumadocs-ui/components/steps"
@@ -19,6 +20,7 @@ export type MDXComponents = Record<string, ComponentType<never>>
 export function getMDXComponents(components?: MDXComponents) {
   return {
     ...defaultComponents,
+    ...Twoslash,
     Accordion,
     Accordions,
     File,

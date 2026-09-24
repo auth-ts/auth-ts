@@ -6,7 +6,7 @@ import { fumadocsMdx } from "fumadocs-mdx/vite"
 import { defineConfig } from "vite"
 
 // Nothing links to these, so the crawler can't find them.
-const markdownPages = readdirSync("content/docs", {
+const markdownPages = readdirSync(new URL("content/docs", import.meta.url), {
   recursive: true,
   encoding: "utf8"
 })
