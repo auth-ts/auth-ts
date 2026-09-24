@@ -144,22 +144,22 @@ function Hero() {
         <div className="hero-noise" />
       </div>
       <div
-        className={`${FRAME} grid grid-cols-1 gap-x-12 gap-y-10 px-6 py-16 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end lg:py-28`}
+        className={`${FRAME} grid grid-cols-1 gap-x-16 gap-y-10 px-6 py-16 lg:grid-cols-2 lg:items-end lg:py-24 xl:gap-x-24`}
       >
         <div className="min-w-0">
           <h1 className="flex flex-col gap-4">
-            <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
-              <Logo className="text-fd-primary size-15 md:size-22" />
+            <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl 2xl:text-8xl">
+              <Logo className="text-fd-primary size-15 md:size-22 2xl:size-28" />
               auth.ts
             </span>
-            <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl">
+            <span className="max-w-xl text-2xl font-medium tracking-tight text-balance md:text-3xl 2xl:text-4xl">
               <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:bottom-[-0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
                 Free forever
               </span>{" "}
               auth in TypeScript.
             </span>
           </h1>
-          <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty">
+          <p className="text-fd-muted-foreground mt-6 max-w-xl text-pretty 2xl:text-lg">
             Sign-in, sessions and JWTs for any TypeScript app. Bring your own
             database and framework.
           </p>
@@ -192,7 +192,7 @@ function Hero() {
               GitHub
             </a>
           </div>
-          <div className="mt-8 max-w-md">
+          <div className="mt-8 max-w-md 2xl:max-w-xl">
             <DynamicCodeBlock
               lang="bash"
               code={`npm install @auth-ts/core
