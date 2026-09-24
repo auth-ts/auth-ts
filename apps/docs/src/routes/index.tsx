@@ -127,7 +127,7 @@ function Hero() {
   return (
     <section className="border-fd-border relative isolate overflow-hidden border-b">
       <HeroBackdrop />
-      <div className="relative mx-auto grid max-w-(--fd-layout-width) grid-cols-1 gap-x-12 gap-y-10 px-4 md:px-6 py-16 lg:py-28 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end">
+      <div className="relative mx-auto grid max-w-(--fd-layout-width) grid-cols-1 gap-x-16 gap-y-12 px-4 py-16 md:px-6 lg:py-24 xl:grid-cols-2 xl:items-center">
         <div className="min-w-0">
           <h1 className="flex flex-col gap-4">
             <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
@@ -182,22 +182,23 @@ npx @auth-ts/cli keygen`}
             />
           </div>
         </div>
-        <div>
-          <p className="text-fd-muted-foreground mb-3 font-mono text-xs tracking-wider uppercase">
-            Package
-          </p>
-          <dl className="text-sm md:grid md:grid-cols-2 md:gap-x-12 lg:block">
-            {SPECS.map(([term, value]) => (
-              <div
-                key={term}
-                className="border-fd-border flex items-baseline justify-between gap-6 border-b py-2.5 first:border-t md:nth-2:border-t lg:nth-2:border-t-0"
-              >
-                <dt className="text-fd-muted-foreground">{term}</dt>
-                <dd className="text-end font-mono">{value}</dd>
-              </div>
-            ))}
-          </dl>
+        <div className="min-w-0 max-md:hidden">
+          <DynamicCodeBlock
+            lang="ts"
+            code={authSource.trimEnd()}
+            codeblock={{ title: "lib/auth.ts" }}
+          />
         </div>
+        <dl className="border-fd-border grid grid-cols-2 gap-x-8 gap-y-6 border-t pt-8 xl:col-span-2 xl:grid-cols-4">
+          {SPECS.map(([term, value]) => (
+            <div key={term}>
+              <dt className="text-fd-muted-foreground font-mono text-xs tracking-wider uppercase">
+                {term}
+              </dt>
+              <dd className="mt-1.5 font-mono text-sm">{value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   )
@@ -208,30 +209,34 @@ function HowItWorks() {
     <section className="border-fd-border border-b">
       <div className="mx-auto max-w-(--fd-layout-width) px-4 md:px-6 py-16">
         <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
-        <ol className="mt-6 grid gap-3 md:grid-cols-3">
-          {FLOW.map((step, index) => (
-            <li
-              key={step.title}
-              className="border-fd-border bg-fd-card rounded-xl border p-4"
-            >
-              <p className="text-fd-primary font-mono text-xs">
-                Step {index + 1}
-              </p>
-              <p className="mt-1.5 font-medium">{step.title}</p>
-              <p className="text-fd-muted-foreground mt-1.5 text-sm text-pretty">
-                {step.body}
-              </p>
-            </li>
-          ))}
-        </ol>
-        <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-center">
-          <p className="text-fd-muted-foreground text-pretty">
-            What every verifier reads: <code>sub</code> is the user and{" "}
-            <code>type</code> their role.
-          </p>
-          <div className="min-w-0">
-            <DynamicCodeBlock lang="json" code={TOKEN} />
-          </div>
+        <div className="mt-6 grid gap-3 2xl:grid-cols-[minmax(0,3fr)_minmax(0,1.5fr)]">
+          <ol className="grid gap-3 md:grid-cols-3">
+            {FLOW.map((step, index) => (
+              <li
+                key={step.title}
+                className="border-fd-border bg-fd-card rounded-xl border p-4"
+              >
+                <p className="text-fd-primary font-mono text-xs">
+                  Step {index + 1}
+                </p>
+                <p className="mt-1.5 font-medium">{step.title}</p>
+                <p className="text-fd-muted-foreground mt-1.5 text-sm text-pretty">
+                  {step.body}
+                </p>
+              </li>
+            ))}
+          </ol>
+          <figure className="min-w-0 max-2xl:mt-5 lg:max-2xl:grid lg:max-2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:max-2xl:items-center lg:max-2xl:gap-6">
+            <DynamicCodeBlock
+              lang="json"
+              code={TOKEN}
+              codeblock={{ title: "Access token", className: "my-0" }}
+            />
+            <figcaption className="text-fd-muted-foreground mt-3 text-sm text-pretty lg:max-2xl:order-first lg:max-2xl:mt-0 lg:max-2xl:text-base">
+              What every verifier reads: <code>sub</code> is the user and{" "}
+              <code>type</code> their role.
+            </figcaption>
+          </figure>
         </div>
       </div>
     </section>
@@ -254,7 +259,7 @@ function CodeTour() {
         >
           {FILES.map((file) => (
             <Tab key={file.name} value={file.name}>
-              <DynamicCodeBlock lang={file.lang} code={file.code} />
+              <DynamicCodeBlock lang={file.lang} code={file.code.trimEnd()} />
             </Tab>
           ))}
         </Tabs>
