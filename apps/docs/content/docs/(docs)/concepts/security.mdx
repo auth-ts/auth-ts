@@ -1,0 +1,90 @@
+---
+title: Security model
+description: What each defense stops, and the setting behind it.
+---
+
+Every defense below has a test. Most follow
+[The Copenhagen Book](https://thecopenhagenbook.com).
+
+| threat | defense | your part |
+| --- | --- | --- |
+| Guessing a code | Codes bound to one browser, five guesses then one a minute, scrypt-hashed | none |
+| Flooding an inbox | Five codes per address, then one every 30 minutes | none |
+| A leaked database | Session secrets and codes stored only as hashes | none |
+| Stealing the token with XSS | Access token in memory only, refresh token `HttpOnly` | a CSP |
+| Cross-site requests | `Sec-Fetch-Site` checked on every write, JSON bodies only, bearer tokens | `trustedOrigins` for other origins |
+| Planting a cookie from a subdomain | `__Host-` cookies with no `Domain` | none |
+| OAuth code injection | State cookie, PKCE on every exchange, a nonce for Google | none |
+| Taking over an account with an unverified email | Only verified provider emails are accepted | none |
+| Open redirects | Only same-site paths are followed | none |
+| A hijacked session locking the owner out | Signing out other devices and deleting the account need a fresh code | none |
+| Users promoting themselves | `type` never changes through an endpoint | the [column grant](/docs/data/row-level-security) |
+| Reading auth tables through your data API | Codes, rate limits and provider tokens in tables with no policy | the [policies](/docs/data/row-level-security) |
+| A spoofed client IP | Forwarded headers trusted only as configured | `ipAddress` |
+
+## Details
+
+<Accordions>
+<Accordion title="Verification codes">
+
+Codes are six symbols from 32 by default, drawn from a secure random source
+without modulo bias. They're stored under scrypt (16 MiB), so a leaked table
+takes far longer to crack than a code lives. Codes last an hour.
+
+Each code is bound to the browser that asked for it, through an attempt cookie.
+Someone requesting a code for your address gets their own code; they can't
+replace or use yours. A code whose email fails to send is deleted.
+
+Codes carry a purpose, so a sign-in code can't confirm an identity. Email
+addresses are validated, never rewritten: capitals are rejected rather than
+lowercased.
+
+</Accordion>
+<Accordion title="Cross-site request forgery">
+
+Every request except `GET` and `HEAD` must carry `Sec-Fetch-Site: same-origin`,
+which browsers set and pages can't forge. Other origins pass only when listed in
+`trustedOrigins`. Bodies must be `application/json` and under 16 KiB.
+
+Only `GET /token` accepts the cookie alone, and a cross-site page can't read its
+response. Everything else needs the bearer token, so a request carrying only
+the cookie can't act for anyone.
+
+</Accordion>
+<Accordion title="Cookies">
+
+The refresh cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, with no `Domain`
+and a `__Host-` prefix in production. The prefix is dropped only on plain-HTTP
+`localhost`, or when `cookie.path` is narrowed. The session id alone proves
+nothing, so it can appear in device lists and logs.
+
+</Accordion>
+<Accordion title="OAuth">
+
+The state cookie ties the callback to the browser that started the flow and
+expires after ten minutes. PKCE means an intercepted code is useless, and
+Google's ID token is verified against Google's keys.
+
+Only verified emails count, because an unverified one would let anyone claim an
+existing account. Connecting a provider must finish in the session that started
+it, and an identity linked to one user is never moved to another.
+
+</Accordion>
+<Accordion title="Sensitive actions">
+
+Signing out another device, changing email or phone, and deleting the account
+need a code from `sendIdentityCode`. The confirmation belongs to that session
+in that browser and lasts an hour. There's no "signed in recently" shortcut,
+because a hijacked session is always recent.
+
+</Accordion>
+<Accordion title="In the browser">
+
+Set a Content Security Policy on every page. auth.ts needs only
+`connect-src 'self'`, plus your auth origin if it's separate, and never
+`unsafe-inline` or `unsafe-eval`. A script injected into your page can call the
+auth endpoints as the user, but it can't export the session or complete a
+sensitive action without the emailed code.
+
+</Accordion>
+</Accordions>

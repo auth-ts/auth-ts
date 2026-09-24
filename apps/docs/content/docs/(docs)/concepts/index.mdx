@@ -1,0 +1,46 @@
+---
+title: How it works
+description: Two tokens, one cookie, and where authorization happens.
+---
+
+## Two tokens
+
+**The refresh token is the session.** It lives only in an `HttpOnly`, `Secure`,
+`SameSite=Lax` cookie that scripts can't read. It's the session's row id and 32
+random bytes, joined as `id.secret`. Your database stores only a SHA-256 of the
+secret, so a leaked table can't be replayed.
+
+**The access token is a JWT** your database verifies. The client keeps it in a
+variable for at most an hour and never writes it to storage.
+
+## The flow
+
+1. Signing in sets the refresh cookie and returns the first access token.
+2. When the access token nears expiry, the client trades the cookie for a new
+   one at `GET /token`. That's the only request that reads the cookie.
+3. Every other request, to auth.ts or your data API, carries the access token
+   as a bearer.
+
+Because only `GET /token` reads the cookie, a forged cross-site request
+carrying just the cookie can't do anything.
+
+## The hint cookie
+
+Beside the refresh cookie, auth.ts sets `auth-ts.hint` to `in` or `out`, which
+scripts can read. A signed-out visitor makes no request at all: the client sees
+`out` and answers `null` without asking the server. It carries no credential.
+
+## Why memory, not storage
+
+A token in `localStorage` turns any script injection into a credential the
+attacker keeps after the tab closes. In memory, it dies with the page, and the
+cookie that outlives it can't be read by script.
+
+## Where authorization happens
+
+In your database. The user object in the browser is only for display. If
+someone tampers with it, they see the wrong name and no one else's data, because
+row-level security reads the verified token, not the client.
+
+auth.ts is built on [Lucia](https://lucia-auth.com)'s session code and
+[The Copenhagen Book](https://thecopenhagenbook.com)'s guidance.

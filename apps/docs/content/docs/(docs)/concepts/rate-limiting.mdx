@@ -1,0 +1,53 @@
+---
+title: Rate limiting
+description: The built-in limits, and how long guessing a code takes.
+---
+
+auth.ts limits sign-in abuse: sending codes and guessing them. It isn't a
+general API rate limiter; put that in front of your app.
+
+| bucket | keyed on | default |
+| --- | --- | --- |
+| `guesses` | the address or user | 5, then 1 a minute |
+| `sends` | the address | 5, then 1 every 30 minutes |
+| `identitySends` | the user | 5, then 1 a minute |
+| `guestsPerIP` | the client IP | 30, then 1 every 2 minutes |
+
+Each is a token bucket: it starts full, each request takes one token, and
+tokens come back at the refill rate. A refused request answers `rateLimited`
+with `retryAfter` in seconds.
+
+## Guessing a code
+
+A code only works in the browser that requested it, so the only budget an
+attacker can spend against an address is `guesses`. At the default rate,
+nonstop guessing reaches a 50% chance after:
+
+| code | possible values | time |
+| --- | --- | --- |
+| 6 letters and digits | 1.1 billion | about 1,000 years |
+| 8 digits | 100 million | about 95 years |
+| 6 digits | 1 million | about 1 year |
+
+Codes expire after an hour, so the attacker must keep requesting new ones, and
+each one emails the target. The attack is never quiet. While under attack, the real user may wait a minute to guess; their
+own code is never affected.
+
+## Storage
+
+Each bucket is one row in `rateLimits`. Taking a token reads the row, then
+updates it only if it's unchanged, so two requests can't both take the last
+token. Your database needs no atomic increment. Full buckets are deleted
+automatically.
+
+## Using your own limiter
+
+If your edge already limits `/sign-in/send-code` and `/sign-in/guest`, turn
+the built-in limits off:
+
+```ts
+createAuth({ rateLimit: false /* ... */ })
+```
+
+`guesses` stays on regardless, because nothing in front of auth.ts knows which
+address a guess is for.

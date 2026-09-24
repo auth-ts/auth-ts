@@ -1,0 +1,33 @@
+---
+title: FAQ
+description: Questions the other pages don't answer.
+---
+
+## Why no database adapters?
+
+Adapters have to track someone else's schema conventions, and they break
+whenever your table differs. Four small functions are about the same amount of
+code, and you can read and change them. auth.ts asks for six tables, a few
+unique constraints, and a `delete` that returns what it removed.
+
+## Why a code, not a magic link?
+
+A code works when the email opens in a different browser from the one that
+asked, which is common on phones. Links may come later.
+
+## Can I use it without PostgREST?
+
+Yes. Anything that trusts a JWKS works, and `verifyToken` protects your own API
+routes with no database involved. See [Your own API](/docs/data/server-routes).
+
+## Does it run on edge runtimes?
+
+Yes. It uses Web Crypto and `jose`, with no `node:` imports except `scrypt` for
+hashing codes, which Node, Bun, Deno and Cloudflare Workers all provide.
+
+## How is this different from session libraries?
+
+Session libraries give your server a session object, and your server code
+decides access. auth.ts gives your database a JWT, and your policies decide
+access. If your backend isn't Postgres with row-level security, a session
+library may suit you better.

@@ -1,0 +1,49 @@
+---
+title: Sessions and revocation
+description: How long sessions last, and how fast signing out takes effect.
+---
+
+## Lifetime
+
+A session lasts `session.ttl`, ten days by default, past its last use. Use
+extends it, but the row is written at most once an hour.
+
+For a fixed limit regardless of activity, turn sliding off:
+
+```ts
+createAuth({ session: { ttl: "12h", sliding: false } /* ... */ })
+```
+
+## Revocation takes up to an hour
+
+Your database checks the token's signature and expiry. It doesn't ask auth.ts
+whether the session still exists. So after a session is signed out, its current
+access token keeps working until it expires: an hour by default.
+
+Say so next to any "sign out everywhere" button. To shorten the window, lower
+`jwt.ttl`, which trades more refreshes for faster revocation.
+
+For actions that can't accept the delay, use `verifySession` on the server. It
+reads the session row and returns `null` once it's gone. See
+[Your own API](/docs/data/server-routes).
+
+Provider tokens are the exception: `getProviderToken` always checks the session,
+because some provider tokens never expire.
+
+## Why the refresh token isn't rotated
+
+Rotation limits the damage of a stolen refresh token. This one is `HttpOnly`
+and never leaves its origin, so stealing it takes a compromise that would defeat
+rotation too. What rotation reliably causes is a race between tabs, where one
+tab uses a token another already spent.
+
+That only holds while the token stays in an `HttpOnly` cookie, or the keychain
+in a [native app](/docs/guides/native-apps). Storing it anywhere a script can
+read would need rotation, so that isn't supported.
+
+## Signing out
+
+`signOut()` ends this browser's session. `signOut({ scope: "global" })` ends
+every session of the user. There's no "every device but this one": a stolen
+session would use it to lock the owner out. Signing out one other device needs
+a [confirmed identity](/docs/guides/account-page#confirming-its-you).
