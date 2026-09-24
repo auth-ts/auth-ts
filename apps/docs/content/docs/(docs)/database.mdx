@@ -1,0 +1,69 @@
+---
+title: Database
+description: The six tables and the four functions that connect them.
+---
+
+auth.ts has no database adapters. You create six tables and write four
+functions (`select`, `insert`, `update` and `delete`) that run its queries
+against them. Every query is an equality match on named columns, so the four
+functions are short in any driver.
+
+## The tables
+
+<include meta='tab="SQL" title="schema.sql"'>../../snippets/schema.sql</include>
+
+<include meta='tab="Drizzle" title="lib/schema.ts"'>../../snippets/schema.ts</include>
+
+| table | unique | indexed | cleaned up by |
+| --- | --- | --- | --- |
+| `users` | `email`, `phoneNumber` | | never; it's yours |
+| `sessions` | | `userId`, `updatedAt` | `updatedAt` |
+| `verifications` | | `(identifier, purpose, attemptHash)`, `attemptHash`, `updatedAt` | `updatedAt` |
+| `rateLimits` | `key` | `updatedAt` | `updatedAt` |
+| `identities` | `(provider, providerUserId)` | `userId` | |
+| `identitySecrets` | `identityId` | | cascades from `identities` |
+
+<Callout type="warn">
+The unique constraints are required. auth.ts reads before it writes, so two
+first sign-ins for one email both find nothing and both insert. The constraint
+is what makes one of them fail instead of creating two accounts.
+</Callout>
+
+Your app may read `users`, `sessions` and `identities`. Never grant
+`verifications`, `rateLimits` or `identitySecrets`. See
+[Row-level security](/docs/data/row-level-security).
+
+Ids can be any string. The defaults above fill them; set
+[`generateId`](/docs/reference/create-auth) to mint your own. Expired rows are
+deleted automatically on the requests that create new ones.
+
+## The four functions
+
+<include meta='tab="Drizzle" title="lib/auth-database.ts"'>../../snippets/auth-database-drizzle.ts</include>
+
+<include meta='tab="node-postgres" title="lib/auth-database.ts"'>../../snippets/auth-database-pg.ts</include>
+
+`defineAuthDatabase` types the functions so they need no casts. The rules they
+follow are on the [AuthDatabase reference](/docs/reference/auth-database).
+
+### Timestamps as strings
+
+If your driver returns timestamps as ISO strings, as Drizzle's
+`mode: "string"` and PostgREST do, say so once and the helper converts them:
+
+```ts
+export const authDatabase = defineAuthDatabase({
+  timestamps: "string"
+  // select, insert, update, delete
+})
+```
+
+### Different column names
+
+The table and column names above are fixed. If yours differ, map them inside
+the four functions.
+
+## Test it
+
+Run the built-in checks against your real database before you deploy. See
+[Testing your database](/docs/guides/testing).

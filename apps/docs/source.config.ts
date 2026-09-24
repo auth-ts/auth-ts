@@ -59,12 +59,16 @@ interface HastNode {
   children?: HastNode[]
 }
 
+// Headings and links already render an <a>.
+const UNLINKABLE = new Set(["a", "h1", "h2", "h3", "h4", "h5", "h6"])
+
 /** Wraps every token naming a documented type in a link. */
 function linkTypeNames(node: HastNode) {
   for (const child of node.children ?? []) {
+    if (child.tagName && UNLINKABLE.has(child.tagName)) continue
+
     const [text] = child.children ?? []
     const href =
-      child.tagName !== "a" &&
       child.children?.length === 1 &&
       text?.type === "text" &&
       typeLinks.get(String(text.value).trim())

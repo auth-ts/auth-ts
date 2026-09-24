@@ -6,6 +6,8 @@
   "pages": [
     "---Get started---",
     "index",
+    "quickstart",
+    "database",
     "---Guides---",
     "...guides",
     "---Concepts---",
