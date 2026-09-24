@@ -16,7 +16,7 @@ export function Header() {
             className="btn btn-ghost gap-1.5 px-2 text-lg font-semibold"
           >
             <Logo className="size-6 text-primary" />
-            Auth.ts
+            auth.ts
           </Link>
         </div>
 

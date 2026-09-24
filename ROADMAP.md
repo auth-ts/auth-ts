@@ -117,7 +117,7 @@ long-lived npm token once the first release is out.
 - [ ] **Swap the console email transport for a real provider.** It currently logs
       codes to the server console, which is fine locally and a security hole in
       public — anyone who can read your logs can sign in as anyone. The sender is
-      one function in `src/auth-server.ts`; a Resend call is about four lines.
+      one function in `src/lib/auth.ts`; a Resend call is about four lines.
 
 ### Nx Cloud
 

@@ -1,7 +1,7 @@
 import type { SVGProps } from "react"
 
 /**
- * The Auth.ts mark. It paints with `currentColor`, so it takes whatever text
+ * The auth.ts mark. It paints with `currentColor`, so it takes whatever text
  * colour surrounds it and needs no light/dark variants.
  *
  * The viewBox is cropped to the artwork rather than left at the exported

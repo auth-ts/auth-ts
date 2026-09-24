@@ -21,7 +21,7 @@ export function baseOptions(): BaseLayoutProps {
       title: (
         <span className="inline-flex items-center gap-1.5">
           <Logo className="text-fd-primary size-6" />
-          Auth.ts
+          auth.ts
         </span>
       )
     },

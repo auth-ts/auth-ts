@@ -17,14 +17,14 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Auth.ts | Free forever auth" },
+      { title: "auth.ts | Free forever auth" },
       {
         name: "description",
         content:
           "Free forever JWT auth in TypeScript — four functions to write against any database."
       },
       // The home-screen label, which has room for far less than the title.
-      { name: "apple-mobile-web-app-title", content: "Auth.ts" }
+      { name: "apple-mobile-web-app-title", content: "auth.ts" }
     ],
     links: [{ rel: "stylesheet", href: styles }]
   }),

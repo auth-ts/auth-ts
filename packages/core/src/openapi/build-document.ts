@@ -242,7 +242,7 @@ export function buildOpenAPIDocument(config?: AuthConfig): OpenAPIDocument {
   return {
     openapi: "3.1.1",
     info: {
-      title: "Auth.ts",
+      title: "auth.ts",
       version: "0.1.0",
       description:
         "Sign-in responses set an HttpOnly refresh cookie that `GET /token` reads; it never appears in a body. `GET /callback/{provider}` answers a top-level navigation with a redirect, so it is not something to fetch."

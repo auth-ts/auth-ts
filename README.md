@@ -1,4 +1,4 @@
-# Auth.ts
+# auth.ts
 
 **Free forever JWT auth in TypeScript — four functions to write against any database.**
 No limits, no service, no company.
@@ -31,7 +31,7 @@ keep them — the key appended to `.env`, the key set written to
 `public/jwks.json`, which your framework serves at `/jwks.json`.
 
 ```ts
-// auth-server.ts
+// lib/auth.ts
 import { createAuth } from "@auth-ts/core"
 
 export const auth = createAuth({

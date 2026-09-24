@@ -1,6 +1,6 @@
 {
-  "name": "Auth.ts Demo",
-  "short_name": "Auth.ts",
+  "name": "auth.ts Demo",
+  "short_name": "auth.ts",
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#6366f1",

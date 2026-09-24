@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="84 78 1086 1086">
-  <title>Auth.ts</title>
+  <title>auth.ts</title>
   <style>
     path { fill: #6366f1; }
     @media (prefers-color-scheme: dark) {
