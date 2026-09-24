@@ -143,6 +143,7 @@ function DocumentationPage() {
       }}
       sidebar={{
         banner: SidebarBanner,
+        collapsible: false,
         className: "lg:[&_[data-radix-scroll-area-viewport]]:pt-6"
       }}
       tabs={false}
