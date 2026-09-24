@@ -1,0 +1,55 @@
+---
+title: Server API
+description: What createAuth returns.
+---
+
+```ts
+import { auth } from "./lib/auth"
+
+const session = await auth.getToken({ headers: request.headers })
+const claims = await auth.verifyToken(token)
+```
+
+<auto-type-table path="core/create-auth.ts" type="Omit<Auth, keyof AuthCallables>" />
+
+## Endpoints
+
+Every endpoint is also a function on `auth` with the same name as the client
+method. Authenticated ones take `{ token }` or `{ headers }` carrying
+`Authorization: Bearer`.
+
+| function | route | needs |
+| --- | --- | --- |
+| `getToken` | `GET /token` | |
+| `sendSignInCode` | `POST /sign-in/send-code` | `email` or `sms` |
+| `signInWithCode` | `POST /sign-in/code` | |
+| `signInAsGuest` | `POST /sign-in/guest` | `guest` |
+| `signInWithProvider` | `POST /sign-in/provider/:provider` | `providers` |
+| `callbackProvider` | `GET /callback/:provider` | `providers` |
+| `connectProvider` | `POST /identities/connect/:provider` | `providers` |
+| `getProviderToken` | `GET /identities/:id/token` | |
+| `signOut` | `POST /sign-out` | |
+| `updateUser` | `POST /user` | |
+| `deleteUser` | `DELETE /user` | |
+| `sendIdentityCode` | `POST /user/verify/send-code` | |
+| `verifyIdentity` | `POST /user/verify` | |
+| `sendEmailUpdateCode` | `POST /user/email-update/send-code` |  |
+| `verifyEmailUpdate` | `POST /user/email-update/verify` |  |
+| `sendPhoneUpdateCode` | `POST /user/phone-update/send-code` |  |
+| `verifyPhoneUpdate` | `POST /user/phone-update/verify` |  |
+| `revokeSession` | `DELETE /sessions/:id` | |
+| `listUsers` | `GET /users` | `multiUser` |
+| `switchUser` | `POST /users/switch` | `multiUser` |
+| `getJwks` | `GET /jwks` | `jwks.json` |
+| `getDiscovery` | `GET /.well-known/openid-configuration` | `baseURL` |
+| `getOpenAPIDocument` | `GET /openapi.json` | `openapi` |
+| `getReference` | `GET /reference` | `openapi` |
+
+Routes are relative to `basePath`. Each one's request and response are in the
+[HTTP API](/docs/open-api/session/get/token) tab. An endpoint whose option isn't
+set answers `notFound`.
+
+## Errors
+
+Endpoint functions throw `AuthApiError`, with the same `code` the HTTP response
+carries. See [Errors](/docs/reference/errors).

@@ -70,60 +70,26 @@ export type AuthHandlers = { [Name in keyof EndpointRegistry]: AuthHandler }
 /** The configured server. `S` is the declared additional fields; see {@link AuthOptions}. */
 export interface Auth<S extends AdditionalFieldsSchema = AdditionalFieldsSchema>
   extends AuthCallables<S> {
-  /**
-   * The configuration this server runs on — the options after defaults and
-   * validation. Read it back in tests, or to learn a default without guessing.
-   */
+  /** The options after defaults and validation. */
   config: AuthConfig
-  /**
-   * The catch-all handler. Mount once at `<basePath>/*` and it dispatches
-   * everything.
-   */
+  /** The catch-all handler to mount at `<basePath>/*`. */
   handler: AuthHandler
-  /** Individual handlers, for mounting routes explicitly instead. */
+  /** One handler per endpoint, for mounting routes yourself. */
   handlers: AuthHandlers
-  /** Verifies a token locally — no database, no network. */
+  /** Verifies a token locally, with no database or network call. */
   verifyToken: (token: string) => Promise<TokenClaims | null>
   /**
-   * Verifies a token and confirms the session it names is still live.
-   *
-   * The database-backed twin of {@link Auth.verifyToken}, for the actions
-   * where a revocation latency of `jwt.ttl` is too long to accept — a transfer,
-   * a permission change, anything a stolen token must not still reach minutes
-   * after the person signed out everywhere.
-   *
-   * Two reads and no write: the token names its session, and a session revoked
-   * or expired answers `null` where `verifyToken` would still answer claims.
-   * Reach for it per action rather than per request — checking everywhere is
-   * the design this library is built to avoid.
-   *
-   * The token may be passed directly or arrive as `Authorization: Bearer` on
-   * `headers`, as everywhere else. A refresh cookie on those headers is *not*
-   * a second way in: this answers for the token it was given, and resolving
-   * the cookie instead would answer about a different session and slide it.
-   * A caller holding the cookie has `getToken`, which reads the session anyway.
+   * Verifies a token and checks its session still exists. Two database reads.
+   * @remarks `({ headers?, token? }) => Promise<{ session, user } | null>`
    */
   verifySession: (
     input: CallerInput
   ) => Promise<WithUserFields<ResolvedSession, S> | null>
-  /** Signs an arbitrary payload. The private key with a function signature. */
+  /** Signs any claims with your key. Never expose it through a route. */
   signToken: (claims?: SignTokenClaims) => Promise<string>
-  /** Decodes without verifying. Never authorize with this. */
+  /** Reads a token's claims without verifying it. Never authorize with it. */
   decodeToken: typeof decodeToken
-  /**
-   * The decrypted refresh token for one connected account, or `null`.
-   *
-   * Deliberately not an endpoint: this is the durable half of a provider grant,
-   * and no HTTP route serves it at any status. It exists for work that manages
-   * its own refresh cycle — a background job that syncs a mailbox for weeks
-   * without a request to hang off. Everything interactive wants
-   * `getProviderToken` instead, which refreshes and hands back the short-lived
-   * half.
-   *
-   * Takes the identity's own id, unscoped by user, because a worker has no
-   * session to be scoped by. Whatever calls it is inside your server and is
-   * trusted accordingly.
-   */
+  /** One connected account's provider refresh token, for background jobs. */
   getProviderRefreshToken: (identityId: string) => Promise<string | null>
 }
 

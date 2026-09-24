@@ -55,212 +55,65 @@ import {
 import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
 
-/**
- * The client.
- *
- * Two planes, one exchange: the refresh cookie buys an access token at
- * `/token`, and that token authenticates everything else — this client's own
- * methods and the data plane alike, so the same credential a PostgREST query
- * carries is the one a profile update carries. An application that never calls
- * `getToken` itself still gets all of this, because every method calls it. In a
- * browser the cookie is the browser's; anywhere else, `cookieStorage` is where
- * the client keeps it.
- */
+/** The browser client returned by `createAuthClient`. */
 export interface AuthClient {
-  /**
-   * A valid access token, refreshed when needed, or `null` when signed out.
-   *
-   * Hand it to your data plane's fetch wrapper, which asks for it per request.
-   * Read it directly when the token itself is what you need, or to ask "is
-   * anyone signed in" without a `try`.
-   *
-   * Only a token too close to expiry to be worth handing out makes a caller
-   * wait. Approaching that point the cached token is returned immediately and
-   * the refresh runs behind it, and concurrent callers share a single request —
-   * a page that mounts ten components makes one round trip.
-   *
-   * Nobody signed in is an answer, not a failure, so it resolves `null` rather
-   * than throwing. Every other failure — the server erroring, a proxy answering
-   * for it, the network dropping — throws and clears nothing: none of those is
-   * a verdict on the session.
-   *
-   * A browser that has never signed in, or has signed out, answers `null`
-   * without a request — so calling this on every render costs nothing until
-   * there is something to refresh.
-   */
+  /** A valid access token, refreshed when needed, or `null` when signed out. */
   getToken: (options?: GetTokenOptions) => Promise<string | null>
-  /**
-   * Exchanges the refresh cookie for a token now, and answers with the user it
-   * was minted for — or `null` when nobody is signed in.
-   *
-   * The cheapest way to learn who is here: `GET /token` reads that row to mint,
-   * so the user arrives with the token and a cold boot costs one request. It
-   * always asks, ignoring whatever is in memory, which is what makes it a
-   * reload rather than a read.
-   *
-   * It is not how you keep a name on screen up to date. That row is yours —
-   * query `users` through your data plane, where a rename in another tab
-   * arrives without a token being reminted.
-   */
+  /** Fetches a new token and its user now, or `null` when signed out. */
   refresh: RefreshToken["refresh"]
   /**
-   * Requests a sign-in code.
-   *
-   * Always succeeds for a well-formed address, whether or not an account
-   * exists — the server has nothing to reveal, since the account is created at
-   * verification.
-   *
-   * The code can only be verified by this client: browsers and `cookieStorage`
-   * clients carry the attempt cookie; anywhere else, pass the returned
-   * `attempt` to `signInWithCode`.
-   *
-   * @throws {AuthError} `rateLimited`, carrying `retryAfter`. Render the
-   * countdown rather than only disabling the button.
+   * Sends a sign-in code to an email or phone number.
+   * @throws {AuthError} `rateLimited`, with `retryAfter` in seconds.
    */
   sendSignInCode: (input: SendSignInCodeInput) => Promise<SendCodeResult>
-  /**
-   * Verifies a code and starts a session.
-   *
-   * The token comes back with the user and is stored on the way through, so the
-   * sign-in and the first render cost one round trip between them rather than a
-   * sign-in followed by a refresh.
-   */
+  /** Verifies a code and signs in, creating the account if new. */
   signInWithCode: (input: SignInWithCodeInput) => Promise<SignInResult>
-  /**
-   * Signs in anonymously.
-   *
-   * Available only when the server sets `guest: true`. The resulting user is
-   * real in every way that matters — they own rows, they have a session — which
-   * is what lets them keep everything when they later add an email or connect a
-   * provider.
-   */
+  /** Signs in as a guest. Needs `guest: true` on the server. */
   signInAsGuest: (input?: SignInAsGuestInput) => Promise<SignInResult>
-  /**
-   * Starts an OAuth sign-in, sending the browser to the provider.
-   *
-   * Resolves only if something goes wrong before the navigation — otherwise the
-   * page is on its way out. When the user comes back the session cookie is
-   * already set, so the application boots, calls `getToken`, and finds them
-   * signed in: the callback hands the SPA no token, and the cookie is what buys
-   * the first one.
-   *
-   * Signing in while already signed in never links accounts. Use
-   * `connectProvider` for that.
-   */
+  /** Sends the browser to a provider to sign in. Never links accounts. */
   signInWithProvider: (input: OAuthNavigationInput) => Promise<void>
-  /** Starts linking a provider to the currently signed-in user. */
+  /** Sends the browser to a provider to link it to the signed-in user. */
   connectProvider: (input: OAuthNavigationInput) => Promise<void>
   /**
-   * Gets a live access token for one connected account, so this browser can
-   * call that provider's API directly.
-   *
-   * The server refreshes it first when the stored one is spent, so what comes
-   * back is usable now. Hold it in a variable for the call you are about to
-   * make and ask again next time — it expires, and persisting it would put a
-   * credential for somebody else's service in storage this library does not
-   * control. The refresh token behind it never leaves the server.
-   *
-   * @throws {AuthError} `providerReconnectRequired` when the grant is gone —
-   * revoked at the provider, expired, or never durable. Send them through
-   * `connectProvider` again.
+   * A live access token for one connected account's API.
+   * @throws {AuthError} `providerReconnectRequired` when the grant is gone.
    */
   getProviderToken: (
     input: GetProviderTokenInput
   ) => Promise<ProviderTokenResult>
-  /** Lists every user signed in to this browser. Requires `multiUser` server-side. */
+  /** Every user signed in to this browser. Needs `multiUser`. */
   listUsers: () => Promise<AuthUser[]>
-  /**
-   * Switches to another user already signed in to this browser.
-   *
-   * The token and user caches are replaced together, so subscribers fire once
-   * and the whole interface flips at the same moment rather than briefly
-   * showing one user's name above another's data.
-   */
+  /** Switches to another user signed in to this browser. Needs `multiUser`. */
   switchUser: (input: SwitchUserInput) => Promise<AuthUser>
-  /** Updates the signed-in user and returns the row as stored. */
+  /** Updates `name`, `image` or additional fields, and returns the user. */
   updateUser: (input: UpdateUserInput) => Promise<AuthUser>
-  /**
-   * Deletes the account, once identity has been verified.
-   *
-   * Without a verification in the last hour the result is
-   * `"verificationRequired"`: call `sendIdentityCode()`, collect the code,
-   * call `verifyIdentity({ code })`, and retry. The challenge is reported as a
-   * value rather than an error because it is an expected branch of a working
-   * flow, not a failure.
-   *
-   * @throws {AuthError} `guestCannotReceiveCode` for a guest with no way to
-   * verify.
-   */
+  /** Deletes the account. Returns `verificationRequired` until identity is confirmed. */
   deleteUser: (input?: DeleteUserInput) => Promise<DeleteUserResult>
-  /**
-   * Signs one other device out, once identity has been verified.
-   *
-   * The same challenge as `deleteUser`, and the same hour: one verification
-   * covers every revoke and a deletion after it. To sign this device out,
-   * use `signOut` — only that clears the cookie.
-   *
-   * @throws {AuthError} `notFound` for a session that is not this user's.
-   */
+  /** Signs out another device. Returns `verificationRequired` until identity is confirmed. */
   revokeSession: (input: RevokeSessionInput) => Promise<RevokeSessionResult>
-  /**
-   * Sends the code that confirms it is really this user.
-   *
-   * Goes to whichever address is already on the account — there is nothing to
-   * choose, so there is nothing to pass.
-   *
-   * @throws {AuthError} `rateLimited`, or `guestCannotReceiveCode` for a guest
-   * with no email or phone number on file.
-   */
+  /** Sends a code to the account's own email or phone to confirm identity. */
   sendIdentityCode: () => Promise<SendCodeResult>
-  /**
-   * Verifies the code `sendIdentityCode` sent. For the next hour, this session
-   * in this browser can revoke devices and delete the account.
-   *
-   * @throws {AuthError} `incorrectCode` for a wrong code, `invalidCode` for an expired one, or
-   * `rateLimited`.
-   */
+  /** Verifies that code. Sensitive actions then work for an hour. */
   verifyIdentity: (input: VerifyIdentityInput) => Promise<void>
-  /**
-   * Sends a code to a new email address, once identity has been verified.
-   *
-   * The same challenge as `deleteUser`. The account keeps its address until
-   * `verifyEmailUpdate` succeeds.
-   *
-   * @throws {AuthError} `invalidEmailAddress`, `emailTaken`, `rateLimited`,
-   * or `guestCannotReceiveCode`.
-   */
+  /** Sends a code to a new email address. Needs confirmed identity. */
   sendEmailUpdateCode: (
     input: SendEmailUpdateCodeInput
   ) => Promise<SendUpdateCodeResult>
-  /**
-   * Verifies the code `sendEmailUpdateCode` sent and re-keys the account to
-   * the new address. Codes sent to the old address stop working.
-   *
-   * @throws {AuthError} `incorrectCode`, `invalidCode`, `emailTaken`, or `rateLimited`.
-   */
+  /** Verifies that code and changes the account's email. */
   verifyEmailUpdate: (input: VerifyUpdateInput) => Promise<VerifyUpdateResult>
-  /** `sendEmailUpdateCode` for a phone number, texted through `sms.sendCode`. */
+  /** Sends a code to a new phone number. Needs confirmed identity. */
   sendPhoneUpdateCode: (
     input: SendPhoneUpdateCodeInput
   ) => Promise<SendUpdateCodeResult>
-  /** `verifyEmailUpdate` for a phone number. */
+  /** Verifies that code and changes the account's phone number. */
   verifyPhoneUpdate: (input: VerifyUpdateInput) => Promise<VerifyUpdateResult>
-  /**
-   * Signs out.
-   *
-   * A session that is already gone resolves rather than throwing: the caller
-   * asked to end up signed out, and they are.
-   */
+  /** Signs out this browser, one user or all, locally or everywhere. */
   signOut: (input?: SignOutInput) => Promise<void>
-  /** Changes the locale sent on subsequent requests. */
+  /** Sets the locale sent as `Accept-Language`. */
   setLocale: (locale: string | undefined) => void
-  /** Drops the in-memory token only — the 401-retry helper. Leaves the session alone. */
+  /** Drops the in-memory token, for retrying a 401. The session stays. */
   clearToken: () => void
-  /**
-   * Reads a token's claims **without verifying it** — `sid` for which session
-   * row is this device, `sub`, `exp`. The server's `decodeToken`, same rule:
-   * never authorize with it.
-   */
+  /** Reads a token's claims without verifying it. Never authorize with it. */
   decodeToken: typeof decodeToken
 }
 

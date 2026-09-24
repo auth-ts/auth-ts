@@ -29,14 +29,12 @@ export type SignOutScope = "local" | "global"
 
 /** Input for signing out. */
 export interface SignOutInput {
-  scope?: SignOutScope
   /**
-   * Which of this browser's accounts to sign out, under `multiUser`.
-   *
-   * Omit it and every account signed in here goes. Name one and only that
-   * account goes, whether it is the active one or a parked one; the rest stay
-   * signed in.
+   * `local` ends this browser's session; `global` ends every session of the user.
+   * @default "local"
    */
+  scope?: SignOutScope
+  /** One user to sign out, under `multiUser`. Omit it to sign out everyone here. */
   userId?: string
 }
 

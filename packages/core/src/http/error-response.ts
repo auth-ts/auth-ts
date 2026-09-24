@@ -1,98 +1,59 @@
-/**
- * Every failure this library can report, as a stable string.
- *
- * These values are the contract: clients switch on `code`, never on `message`.
- * Messages are localized and may be reworded at any time; codes are English
- * forever and are only ever added to.
- */
-export type AuthErrorCode =
+/** The HTTP status for each error code. */
+export const ERROR_STATUS = {
   /** A rate-limit bucket ran out of tokens. */
-  | "rateLimited"
-  /** Expired, already used, for another purpose, or requested by another client. */
-  | "invalidCode"
-  /** The code is live and this client's, but not the one that was sent. */
-  | "incorrectCode"
-  /** The action needs identity confirmed first: `/user/verify/send-code`, `/user/verify`, then retry. */
-  | "verificationRequired"
-  /** No session, or a session that no longer resolves. */
-  | "unauthenticated"
-  /** That provider identity is already linked to a different user. */
-  | "providerConflict"
-  /** The provider reported a failure, or sent no code back — usually a cancelled consent. */
-  | "providerDenied"
-  /** The provider refused the exchange, or its response did not verify. */
-  | "providerRejected"
-  /** The provider has no verified email address for the account, so it cannot identify one. */
-  | "providerEmailUnverified"
-  /** The state cookie was missing, forged, expired, or for a different flow. */
-  | "invalidState"
-  /** A code was requested for a channel this server has no sender for. */
-  | "channelNotConfigured"
-  /** A request field was unknown, reserved, or the wrong primitive type. */
-  | "invalidField"
-  /** An email address that fails the book's rules: lowercase, one `@`, a dotted domain, at most 100 characters. */
-  | "invalidEmailAddress"
-  /** No such route, provider, session, or account. */
-  | "notFound"
-  /** The HTTP method is not allowed for this path. */
-  | "methodNotAllowed"
-  /** A state-changing request was not `Sec-Fetch-Site: same-origin`, nor from an allowlisted origin. */
-  | "forbiddenOrigin"
-  /** A request body was sent with a content type other than `application/json`. */
-  | "unsupportedMediaType"
-  /** A request body over 16 KiB. */
-  | "payloadTooLarge"
-  /** A guest has no email or phone number, so no code can be sent to them. */
-  | "guestCannotReceiveCode"
-  /** The address another account already signs in with. */
-  | "emailTaken"
-  /** The number another account already signs in with. */
-  | "phoneNumberTaken"
-  /**
-   * A guest sign-in was attempted from a browser that is signed in. Guests
-   * need a signed-out browser — under `multiUser` more sign-ins are
-   * welcome, so the refusal is about the guest, not about being signed in.
-   */
-  | "guestRequiresSignOut"
-  /** The OAuth provider timed out or failed while the code was being exchanged. */
-  | "providerUnavailable"
-  /**
-   * The stored grant for a linked provider cannot produce an access token any
-   * more — never issued, expired, or revoked at the provider. Only reconnecting
-   * fixes it, so it is not `unauthenticated`: the session here is perfectly fine.
-   */
-  | "providerReconnectRequired"
-  /** Something threw that this library did not anticipate. */
-  | "internalError"
-
-/** The status each code answers with. Complete by construction, like the messages. */
-export const ERROR_STATUS: Record<AuthErrorCode, number> = {
   rateLimited: 429,
+  /** Expired, already used, for another purpose, or requested by another client. */
   invalidCode: 401,
+  /** The code is live and this client's, but not the one that was sent. */
   incorrectCode: 401,
+  /** Confirm identity with `sendIdentityCode` and `verifyIdentity`, then retry. */
   verificationRequired: 403,
+  /** No session, or a session that no longer resolves. */
   unauthenticated: 401,
+  /** That provider identity is already linked to a different user. */
   providerConflict: 409,
+  /** The user cancelled at the provider, or it sent no code back. */
   providerDenied: 401,
+  /** The provider refused the exchange, or its response did not verify. */
   providerRejected: 401,
+  /** The provider has no verified email for this account. */
   providerEmailUnverified: 403,
+  /** The state cookie was missing, forged, expired, or for a different flow. */
   invalidState: 401,
+  /** A code was requested for a channel this server has no sender for. */
   channelNotConfigured: 400,
+  /** A request field was unknown, reserved, or the wrong primitive type. */
   invalidField: 400,
+  /** Not lowercase, not one `@` and a dotted domain, or over 100 characters. */
   invalidEmailAddress: 400,
+  /** No such route, provider, session, or account. */
   notFound: 404,
+  /** The HTTP method is not allowed for this path. */
   methodNotAllowed: 405,
+  /** A state-changing request from another origin not in `trustedOrigins`. */
   forbiddenOrigin: 403,
+  /** A request body that isn't `application/json`. */
   unsupportedMediaType: 415,
+  /** A request body over 16 KiB. */
   payloadTooLarge: 413,
+  /** A guest has no email or phone number, so no code can be sent to them. */
   guestCannotReceiveCode: 409,
+  /** The address another account already signs in with. */
   emailTaken: 409,
+  /** The number another account already signs in with. */
   phoneNumberTaken: 409,
+  /** Guest sign-in from a browser where someone is signed in. */
   guestRequiresSignOut: 409,
+  /** The OAuth provider timed out or failed while the code was being exchanged. */
   providerUnavailable: 502,
+  /** The provider grant is gone. Send the user through `connectProvider` again. */
   providerReconnectRequired: 403,
+  /** An unexpected server error. The response carries a `requestId`. */
   internalError: 500
-}
+} as const
+
+/** Every failure auth.ts reports. Switch on it, never on the message. */
+export type AuthErrorCode = keyof typeof ERROR_STATUS
 
 /**
  * The single shape of every non-2xx JSON body.

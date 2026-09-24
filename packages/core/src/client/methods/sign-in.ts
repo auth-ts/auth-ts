@@ -9,11 +9,9 @@ export type SendSignInCodeInput =
 
 /** The code, and any declared sign-up fields. */
 export interface SignInWithCodeInput {
+  /** The code the user entered. */
   code: string
-  /**
-   * The attempt token `sendSignInCode` returned. Browsers and `cookieStorage`
-   * clients carry it as a cookie; pass it only where neither applies.
-   */
+  /** The `attempt` from `sendSignInCode`. Only needed where there are no cookies. */
   attempt?: string
   /** Applied only if this verification creates the account. */
   additionalFields?: Record<string, string | number | boolean>
@@ -21,11 +19,13 @@ export interface SignInWithCodeInput {
 
 /** What a send returns: the attempt token the code is bound to. */
 export interface SendCodeResult {
+  /** Identifies this request's code. Sent as a cookie too. */
   attempt: string
 }
 
 /** What a completed sign-in returns. */
 export interface SignInResult {
+  /** The signed-in user. */
   user: AuthUser
   /** The access token for the new session, already stored by the client. */
   token: string
