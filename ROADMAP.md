@@ -102,8 +102,9 @@ long-lived npm token once the first release is out.
 
 ### Deploy the docs
 
-- [ ] Create the **Cloudflare Pages** project. Build `pnpm run build`, output
-      `dist/client`, root `apps/docs`.
+- [ ] Create the **Cloudflare Pages** project. Build `pnpm nx run docs:build`,
+      output `dist/client`, root `apps/docs`. Nx builds `@auth-ts/core` first,
+      which the docs' Twoslash blocks compile against.
 - [ ] Point `authts.dev` at it.
 - [ ] **Configure the `authts.com → authts.dev` redirect in Cloudflare itself**,
       as a Redirect Rule (Rules → Redirect Rules) on the `authts.com` zone,
@@ -163,7 +164,7 @@ exist and are yours before the first release.
 ### Deploying the docs
 
 `wrangler.jsonc` is written; no Cloudflare Pages project exists. Build command
-`pnpm run build`, output directory `dist/client`.
+`pnpm nx run docs:build`, output directory `dist/client`.
 
 The `authts.com → authts.dev` redirect is **not** configured anywhere. It has to
 be a Cloudflare Redirect Rule on the `authts.com` zone — Pages `_redirects` does
