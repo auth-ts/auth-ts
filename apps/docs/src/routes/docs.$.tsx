@@ -109,13 +109,13 @@ function MDXContent(page: PageSource) {
   return clientLoader.useContent(page.path, page)
 }
 
-// Full width, so its border spans the window.
+// Full width; contained so gutters don't squeeze the page.
 function FullWidthHeader(props: ComponentProps<"header">) {
   return (
     <Header
       {...props}
       style={{ gridColumn: "1 / -1" }}
-      className="border-b *:data-header-body:mx-auto *:data-header-body:w-full *:data-header-body:max-w-[var(--fd-layout-width,97rem)] *:data-header-body:border-b-0"
+      className="border-b [contain:inline-size] *:data-header-body:mx-auto *:data-header-body:w-full *:data-header-body:max-w-[var(--fd-layout-width,97rem)] *:data-header-body:border-b-0"
     />
   )
 }
