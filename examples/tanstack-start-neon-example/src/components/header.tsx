@@ -13,7 +13,7 @@ export function Header() {
         <div className="navbar-start">
           <Link
             to="/"
-            className="btn btn-ghost gap-1.5 px-2 text-lg font-semibold"
+            className="btn btn-ghost gap-1.5 px-2 font-mono text-lg font-semibold"
           >
             <Logo className="size-6 text-primary" />
             auth.ts

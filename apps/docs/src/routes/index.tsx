@@ -123,7 +123,7 @@ function Hero() {
            * it stays inside the h1 rather than becoming a second element.
            */}
           <h1 className="flex flex-col gap-4">
-            <span className="flex items-center gap-2 text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
+            <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
               <Logo className="text-fd-primary size-15 md:size-22" />
               auth.ts
             </span>
