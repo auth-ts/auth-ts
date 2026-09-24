@@ -1,97 +1,111 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock"
-import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import { HomeLayout } from "fumadocs-ui/layouts/home"
-import { ArrowRight } from "lucide-react"
-import { Fragment } from "react"
+import { useCopyButton } from "fumadocs-ui/utils/use-copy-button"
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  Database,
+  Globe,
+  KeyRound,
+  MonitorSmartphone,
+  Scale,
+  ShieldCheck
+} from "lucide-react"
 import { GitHubIcon } from "~/components/github-icon"
 import { Logo } from "~/components/logo"
 import { SiteHeader } from "~/components/site-header"
 import { REPO_URL } from "~/lib/layout.shared"
-import authSource from "../../content/snippets/auth.ts?raw"
-import authClientSource from "../../content/snippets/auth-client.ts?raw"
-import authDatabaseSource from "../../content/snippets/auth-database-drizzle.ts?raw"
 
 export const Route = createFileRoute("/")({ component: LandingPage })
 
-const CLAIMS = ["No limits", "No service", "No company"]
+const INSTALL = "npm install @auth-ts/core"
 
-const SPECS = [
-  ["Runtime", "Node 20+, Workers, Deno, Bun"],
-  ["Algorithms", "ES256, RS256"],
-  ["Dependencies", "jose"],
-  ["License", "Apache-2.0"]
-]
-
-const FLOW = [
+const STEPS = [
   {
-    title: "The browser",
-    body: "Signs in at /api/auth. Keeps an HttpOnly refresh cookie, and the access token in memory."
+    title: "Configure",
+    body: "One file on your server.",
+    file: "lib/auth.ts",
+    code: `import { createAuth } from "@auth-ts/core"
+import { authDatabase } from "./auth-database"
+
+export const auth = createAuth({
+  database: authDatabase,
+  email: { sendCode: sendEmail }
+})`
   },
   {
-    title: "Your server",
-    body: "Checks codes and providers, then signs a short-lived JWT with your key."
+    title: "Mount",
+    body: "One catch-all route, in any framework.",
+    file: "app/api/auth/[...all]/route.ts",
+    code: `import { auth } from "@/lib/auth"
+
+export const GET = auth.handler
+export const POST = auth.handler
+export const DELETE = auth.handler`
   },
   {
-    title: "Your API or database",
-    body: "Verifies the JWT against your jwks.json, with verifyToken or any JWKS verifier."
+    title: "Sign in",
+    body: "From the browser, with no UI to adopt.",
+    file: "components/sign-in.tsx",
+    code: `await authClient.sendSignInCode({ email })
+await authClient.signInWithCode({ code })
+
+const token = await authClient.getToken()`
   }
 ]
 
 const TOKEN = `{
   "sub": "0199a3c4-7e1b-7c3a-9f2e-4b8d1e6a2c10",
   "role": "authenticated",
-  "type": "user",
-  "amr": ["otp"],
-  "exp": 1771203600
+  "type": "user",    // "guest", "user" or "admin"
+  "amr": ["otp"],    // how they signed in
+  "exp": 1771203600  // one hour, by default
 }`
 
-const ROUTE_SOURCE = `import { createFileRoute } from "@tanstack/react-router"
-import { auth } from "~/lib/auth"
-
-export const Route = createFileRoute("/api/auth/$")({
-  server: {
-    handlers: {
-      ANY: ({ request }) => auth.handler(request)
-    }
-  }
-})
-`
-
-const API_SOURCE = `import { auth } from "./auth"
-
-export async function requireUser(request: Request) {
-  const token = request.headers.get("authorization")?.replace(/^Bearer /, "")
-  const claims = token ? await auth.verifyToken(token) : null
-
-  if (!claims) throw new Response("Unauthorized", { status: 401 })
-
-  return claims
-}
-`
-
-const FILES = [
-  { name: "lib/auth.ts", lang: "ts", code: authSource },
-  { name: "routes/api/auth/$.ts", lang: "ts", code: ROUTE_SOURCE },
-  { name: "lib/auth-client.ts", lang: "ts", code: authClientSource },
-  { name: "lib/require-user.ts", lang: "ts", code: API_SOURCE },
-  { name: "lib/auth-database.ts", lang: "ts", code: authDatabaseSource }
+const VERIFIERS = [
+  ["Your own routes", "data/server-routes"],
+  ["Neon", "data/neon"],
+  ["Supabase", "data/supabase"],
+  ["Any JWKS library", "data/jwks"]
 ]
 
 const FEATURES = [
   {
-    title: "Your tables, four functions",
-    body: "No adapters. Six tables you own, and select, insert, update and delete to reach them."
+    icon: Database,
+    title: "Your tables",
+    body: "Six tables in your own database, reached through four functions. No adapters."
   },
   {
-    title: "JWTs anything can verify",
-    body: "Check tokens in your own routes, or hand them to Neon, Supabase or PostgREST."
-  },
-  {
+    icon: KeyRound,
     title: "Every common sign-in",
-    body: "Email and SMS codes, GitHub, Google and guests, with devices and account switching."
+    body: "Email and SMS codes, GitHub, Google, and guests who can upgrade later."
+  },
+  {
+    icon: MonitorSmartphone,
+    title: "Sessions and devices",
+    body: "A session per device, and switching between accounts on one."
+  },
+  {
+    icon: ShieldCheck,
+    title: "Standard keys",
+    body: "ES256 or RS256, published at /jwks.json for anything to check."
+  },
+  {
+    icon: Globe,
+    title: "Runs anywhere",
+    body: "Node 20+, Workers, Deno and Bun. One dependency: jose."
+  },
+  {
+    icon: Scale,
+    title: "Free forever",
+    body: "Apache-2.0. No hosted service, no per-user pricing."
   }
 ]
+
+const FRAME =
+  "border-fd-border mx-auto w-full max-w-(--fd-layout-width) md:border-x"
 
 function LandingPage() {
   return (
@@ -100,169 +114,172 @@ function LandingPage() {
       className="[--fd-layout-width:97rem]"
     >
       <Hero />
-      <HowItWorks />
-      <CodeTour />
-      <Features />
-      <Footer />
+      <div className={FRAME}>
+        <Steps />
+        <Token />
+        <Features />
+        <Closing />
+        <Footer />
+      </div>
     </HomeLayout>
-  )
-}
-
-function HeroBackdrop() {
-  return (
-    <div
-      aria-hidden
-      className="hero-backdrop pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-    >
-      <div className="hero-stars hero-stars-far" />
-      <div className="hero-stars hero-stars-near" />
-      <div className="hero-glow hero-glow-near" />
-      <div className="hero-glow hero-glow-far" />
-      <div className="hero-noise" />
-    </div>
   )
 }
 
 function Hero() {
   return (
-    <section className="border-fd-border relative isolate overflow-hidden border-b">
-      <HeroBackdrop />
-      <div className="relative mx-auto grid max-w-(--fd-layout-width) grid-cols-1 gap-x-16 gap-y-12 px-4 py-16 md:px-6 lg:py-24 xl:grid-cols-2 xl:items-center">
-        <div className="min-w-0">
-          <h1 className="flex flex-col gap-4">
-            <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
-              <Logo className="text-fd-primary size-15 md:size-22" />
-              auth.ts
-            </span>
-            <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl">
-              <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:bottom-[-0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
-                Free forever
-              </span>{" "}
-              auth in TypeScript.
-            </span>
-          </h1>
-          <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty">
-            Sign-in, sessions and JWTs for any TypeScript app. Bring your own
-            database and framework.
-          </p>
-          <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-medium">
-            {CLAIMS.map((claim, index) => (
-              <Fragment key={claim}>
-                {index > 0 && (
-                  <span aria-hidden className="text-fd-primary">
-                    /
-                  </span>
-                )}
-                {claim}
-              </Fragment>
-            ))}
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Link
-              to="/docs/$"
-              params={{ _splat: "quickstart" }}
-              className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
-            >
-              Get started
-              <ArrowRight className="size-4" />
-            </Link>
-            <a
-              href={REPO_URL}
-              className="hover:text-fd-primary inline-flex items-center gap-2 text-sm font-medium transition-colors"
-            >
-              <GitHubIcon className="size-4" />
-              GitHub
-            </a>
-          </div>
-          <div className="mt-8 max-w-md">
-            <DynamicCodeBlock
-              lang="bash"
-              code={`npm install @auth-ts/core
-npx @auth-ts/cli keygen`}
-            />
-          </div>
-        </div>
-        <div className="min-w-0 max-md:hidden">
-          <DynamicCodeBlock
-            lang="ts"
-            code={authSource.trimEnd()}
-            codeblock={{ title: "lib/auth.ts" }}
-          />
-        </div>
-        <dl className="border-fd-border grid grid-cols-2 gap-x-8 gap-y-6 border-t pt-8 xl:col-span-2 xl:grid-cols-4">
-          {SPECS.map(([term, value]) => (
-            <div key={term}>
-              <dt className="text-fd-muted-foreground font-mono text-xs tracking-wider uppercase">
-                {term}
-              </dt>
-              <dd className="mt-1.5 font-mono text-sm">{value}</dd>
-            </div>
-          ))}
-        </dl>
+    <section className="relative isolate overflow-hidden">
+      <div
+        aria-hidden
+        className="hero-backdrop pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        <div className="hero-stars hero-stars-far" />
+        <div className="hero-stars hero-stars-near" />
+        <div className="hero-glow hero-glow-near" />
+        <div className="hero-glow hero-glow-far" />
+        <div className="hero-noise" />
       </div>
-    </section>
-  )
-}
-
-function HowItWorks() {
-  return (
-    <section className="border-fd-border border-b">
-      <div className="mx-auto max-w-(--fd-layout-width) px-4 md:px-6 py-16">
-        <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
-        <div className="mt-6 grid gap-3 2xl:grid-cols-[minmax(0,3fr)_minmax(0,1.5fr)]">
-          <ol className="grid gap-3 md:grid-cols-3">
-            {FLOW.map((step, index) => (
-              <li
-                key={step.title}
-                className="border-fd-border bg-fd-card rounded-xl border p-4"
-              >
-                <p className="text-fd-primary font-mono text-xs">
-                  Step {index + 1}
-                </p>
-                <p className="mt-1.5 font-medium">{step.title}</p>
-                <p className="text-fd-muted-foreground mt-1.5 text-sm text-pretty">
-                  {step.body}
-                </p>
-              </li>
-            ))}
-          </ol>
-          <figure className="min-w-0 max-2xl:mt-5 lg:max-2xl:grid lg:max-2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:max-2xl:items-center lg:max-2xl:gap-6">
-            <DynamicCodeBlock
-              lang="json"
-              code={TOKEN}
-              codeblock={{ title: "Access token", className: "my-0" }}
-            />
-            <figcaption className="text-fd-muted-foreground mt-3 text-sm text-pretty lg:max-2xl:order-first lg:max-2xl:mt-0 lg:max-2xl:text-base">
-              What every verifier reads: <code>sub</code> is the user and{" "}
-              <code>type</code> their role.
-            </figcaption>
-          </figure>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function CodeTour() {
-  return (
-    <section className="border-fd-border border-b">
-      <div className="mx-auto max-w-(--fd-layout-width) px-4 md:px-6 py-16">
-        <h2 className="text-2xl font-semibold tracking-tight">
-          The whole setup
-        </h2>
-        <p className="text-fd-muted-foreground mt-2 max-w-xl text-pretty">
-          Five files, the same ones the quickstart walks through.
+      <div
+        className={`${FRAME} flex flex-col items-center px-6 py-24 text-center md:py-36`}
+      >
+        <h1 className="flex flex-col items-center gap-5">
+          <span className="flex items-center gap-3 font-mono text-6xl font-semibold tracking-tighter md:gap-4 md:text-8xl">
+            <Logo className="text-fd-primary size-16 md:size-24" />
+            auth.ts
+          </span>
+          <span className="text-2xl font-medium tracking-tight text-balance md:text-3xl">
+            <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:bottom-[-0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
+              Free forever
+            </span>{" "}
+            auth in TypeScript.
+          </span>
+        </h1>
+        <p className="text-fd-muted-foreground mt-6 max-w-xl text-lg text-pretty">
+          Sign-in, sessions and JWTs for any TypeScript app. Bring your own
+          database and framework.
         </p>
-        <Tabs
-          items={FILES.map((file) => file.name)}
-          className="mt-6 [&_pre]:max-h-[28rem]"
-        >
-          {FILES.map((file) => (
-            <Tab key={file.name} value={file.name}>
-              <DynamicCodeBlock lang={file.lang} code={file.code.trimEnd()} />
-            </Tab>
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
+          <Link
+            to="/docs/$"
+            params={{ _splat: "quickstart" }}
+            className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
+          >
+            Get started
+            <ArrowRight className="size-4" />
+          </Link>
+          <a
+            href={REPO_URL}
+            className="border-fd-border bg-fd-background/60 hover:bg-fd-accent inline-flex items-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-medium backdrop-blur-sm transition-colors"
+          >
+            <GitHubIcon className="size-4" />
+            GitHub
+          </a>
+        </div>
+        <InstallCommand />
+      </div>
+    </section>
+  )
+}
+
+function InstallCommand() {
+  const [checked, onClick] = useCopyButton(() =>
+    navigator.clipboard.writeText(INSTALL)
+  )
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Copy install command"
+      className="border-fd-border bg-fd-background/60 hover:text-fd-accent-foreground mt-6 inline-flex items-center gap-3 rounded-lg border px-4 py-2 font-mono text-sm backdrop-blur-sm transition-colors"
+    >
+      <span className="text-fd-muted-foreground select-none">$</span>
+      {INSTALL}
+      {checked ? (
+        <Check className="text-fd-primary size-3.5" />
+      ) : (
+        <Copy className="text-fd-muted-foreground size-3.5" />
+      )}
+    </button>
+  )
+}
+
+function SectionHeading({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="px-6 pt-16 pb-10 md:px-6">
+      <h2 className="text-3xl font-semibold tracking-tight text-balance">
+        {title}
+      </h2>
+      <p className="text-fd-muted-foreground mt-3 max-w-xl text-pretty">
+        {body}
+      </p>
+    </div>
+  )
+}
+
+function Steps() {
+  return (
+    <section className="border-fd-border border-t">
+      <SectionHeading
+        title="Three steps to a signed-in user"
+        body="The quickstart walks through each one, with the database tables."
+      />
+      <ol className="border-fd-border divide-fd-border grid divide-y border-t xl:grid-cols-3 xl:divide-x xl:divide-y-0">
+        {STEPS.map((step, index) => (
+          <li
+            key={step.title}
+            className="flex min-w-0 flex-col gap-1 p-6 md:max-xl:grid md:max-xl:grid-cols-[13rem_minmax(0,1fr)] md:max-xl:grid-rows-[auto_auto_1fr] md:max-xl:gap-x-8"
+          >
+            <p className="text-fd-primary font-mono text-xs">0{index + 1}</p>
+            <h3 className="font-medium">{step.title}</h3>
+            <p className="text-fd-muted-foreground mb-3 text-sm">{step.body}</p>
+            <DynamicCodeBlock
+              lang={step.file.endsWith("x") ? "tsx" : "ts"}
+              code={step.code}
+              codeblock={{
+                title: step.file,
+                className:
+                  "my-0 flex-1 [&_pre]:text-xs md:max-xl:col-start-2 md:max-xl:row-span-3 md:max-xl:row-start-1"
+              }}
+            />
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+function Token() {
+  return (
+    <section className="border-fd-border divide-fd-border grid divide-y border-t lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+      <div className="px-6 py-16 md:px-6">
+        <h2 className="text-3xl font-semibold tracking-tight text-balance">
+          A JWT anything can verify
+        </h2>
+        <p className="text-fd-muted-foreground mt-3 max-w-lg text-pretty">
+          Your server signs a short-lived token with your own key. Anything that
+          reads a JWKS can check it, with no call back to auth.
+        </p>
+        <ul className="mt-8 flex flex-col">
+          {VERIFIERS.map(([text, splat]) => (
+            <li key={text} className="border-fd-border border-b first:border-t">
+              <Link
+                to="/docs/$"
+                params={{ _splat: splat }}
+                className="group hover:text-fd-primary flex items-center justify-between py-3 text-sm font-medium transition-colors"
+              >
+                {text}
+                <ArrowRight className="text-fd-muted-foreground group-hover:text-fd-primary size-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </li>
           ))}
-        </Tabs>
+        </ul>
+      </div>
+      <div className="flex min-w-0 items-center px-6 py-16 md:px-6">
+        <DynamicCodeBlock
+          lang="jsonc"
+          code={TOKEN}
+          codeblock={{ title: "Access token", className: "my-0 w-full" }}
+        />
       </div>
     </section>
   )
@@ -270,26 +287,50 @@ function CodeTour() {
 
 function Features() {
   return (
-    <section className="border-fd-border border-b">
-      <div className="mx-auto grid max-w-(--fd-layout-width) gap-8 px-4 md:px-6 py-16 md:grid-cols-3">
-        {FEATURES.map((feature) => (
-          <div key={feature.title}>
-            <h2 className="text-lg font-semibold tracking-tight">
-              {feature.title}
-            </h2>
-            <p className="text-fd-muted-foreground mt-2 text-pretty">
-              {feature.body}
+    <section className="border-fd-border border-t">
+      <SectionHeading
+        title="Everything a sign-in needs"
+        body="And nothing you have to host, pay for or migrate away from."
+      />
+      <ul className="border-fd-border bg-fd-border grid gap-px border-t sm:grid-cols-2 lg:grid-cols-3">
+        {FEATURES.map(({ icon: Icon, title, body }) => (
+          <li key={title} className="bg-fd-background p-6 md:px-6">
+            <Icon className="text-fd-primary size-5" />
+            <h3 className="mt-4 font-medium">{title}</h3>
+            <p className="text-fd-muted-foreground mt-1.5 text-sm text-pretty">
+              {body}
             </p>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
+    </section>
+  )
+}
+
+function Closing() {
+  return (
+    <section className="border-fd-border flex flex-col items-center border-t px-6 py-20 text-center">
+      <h2 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
+        Add sign-in to your app
+      </h2>
+      <p className="text-fd-muted-foreground mt-3 max-w-md text-pretty">
+        From an empty folder to a signed-in user, one step at a time.
+      </p>
+      <Link
+        to="/docs/$"
+        params={{ _splat: "quickstart" }}
+        className="bg-fd-primary text-fd-primary-foreground hover:bg-fd-primary/90 mt-8 inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
+      >
+        Read the quickstart
+        <ArrowRight className="size-4" />
+      </Link>
     </section>
   )
 }
 
 function Footer() {
   return (
-    <footer className="mx-auto flex w-full max-w-(--fd-layout-width) flex-wrap items-center justify-between gap-6 px-4 md:px-6 py-10 text-sm">
+    <footer className="border-fd-border flex flex-wrap items-center justify-between gap-6 border-t px-6 py-8 text-sm md:px-6">
       <nav className="flex flex-wrap gap-x-6 gap-y-2 font-medium">
         <Link to="/docs/$" params={{ _splat: "quickstart" }}>
           Quickstart
