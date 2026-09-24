@@ -2,11 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock"
 import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import { HomeLayout } from "fumadocs-ui/layouts/home"
+import {
+  FullSearchTrigger,
+  SearchTrigger
+} from "fumadocs-ui/layouts/shared/slots/search-trigger"
+import { ThemeSwitch } from "fumadocs-ui/layouts/shared/slots/theme-switch"
 import { ArrowRight } from "lucide-react"
 import { Fragment } from "react"
 import { GitHubIcon } from "~/components/github-icon"
 import { Logo } from "~/components/logo"
-import { baseOptions, REPO_URL } from "~/lib/layout.shared"
+import { tabClassName } from "~/components/section-tabs"
+import { baseOptions, navTitle, REPO_URL } from "~/lib/layout.shared"
 import authSource from "../../content/snippets/auth.ts?raw"
 import authClientSource from "../../content/snippets/auth-client.ts?raw"
 import authDatabaseSource from "../../content/snippets/auth-database-drizzle.ts?raw"
@@ -96,16 +102,8 @@ function LandingPage() {
   return (
     <HomeLayout
       {...baseOptions()}
-      links={[
-        { text: "Docs", url: "/docs" },
-        { text: "Reference", url: "/docs/reference/create-auth" },
-        {
-          text: "HTTP API",
-          url: "/docs/open-api/sign-in/post/sign-in/send-code"
-        }
-      ]}
-      // Match the docs header's width and padding.
-      className="[--fd-layout-width:97rem] md:[&_#nd-nav_nav]:px-6"
+      nav={{ component: <HomeHeader /> }}
+      className="[--fd-layout-width:97rem]"
     >
       <Hero />
       <HowItWorks />
@@ -113,6 +111,56 @@ function LandingPage() {
       <Features />
       <Footer />
     </HomeLayout>
+  )
+}
+
+const LINKS = [
+  ["Docs", ""],
+  ["Reference", "reference/create-auth"],
+  ["HTTP API", "open-api/sign-in/post/sign-in/send-code"]
+]
+
+// Same layout as the docs header.
+function HomeHeader() {
+  return (
+    <header className="bg-fd-background/80 sticky top-0 z-40 border-b backdrop-blur-sm">
+      <div className="mx-auto flex h-14 max-w-(--fd-layout-width) gap-2 px-4 md:px-6">
+        <div className="flex flex-1 items-center">
+          <Link to="/" className="inline-flex items-center">
+            {navTitle}
+          </Link>
+          <nav className="ms-6 flex gap-6 self-stretch max-sm:hidden">
+            {LINKS.map(([text, splat]) => (
+              <Link
+                key={text}
+                to="/docs/$"
+                params={{ _splat: splat }}
+                className={tabClassName}
+              >
+                {text}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <FullSearchTrigger
+          hideIfDisabled
+          className="my-auto w-full max-w-sm rounded-xl ps-2.5 max-md:hidden"
+        />
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <SearchTrigger hideIfDisabled className="p-2 md:hidden" />
+          <a
+            href={REPO_URL}
+            rel="noreferrer noopener"
+            target="_blank"
+            aria-label="GitHub"
+            className="text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-accent-foreground inline-flex items-center justify-center rounded-md p-1.5 transition-colors"
+          >
+            <GitHubIcon className="size-4.5" />
+          </a>
+          <ThemeSwitch mode="light-dark-system" />
+        </div>
+      </div>
+    </header>
   )
 }
 

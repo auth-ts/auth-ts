@@ -4,6 +4,14 @@ import { Logo } from "~/components/logo"
 /** The GitHub repository, used by the nav link and the landing page. */
 export const REPO_URL = "https://github.com/auth-ts/auth-ts"
 
+// One child, so layout gap-2.5 does nothing.
+export const navTitle = (
+  <span className="inline-flex items-center gap-1.5 font-mono font-semibold">
+    <Logo className="text-fd-primary size-6" />
+    auth.ts
+  </span>
+)
+
 /**
  * The navbar shared by the landing page and the docs.
  *
@@ -14,17 +22,7 @@ export const REPO_URL = "https://github.com/auth-ts/auth-ts"
  */
 export function baseOptions(): BaseLayoutProps {
   return {
-    nav: {
-      // Wrapped rather than a fragment: every layout hardcodes `gap-2.5` on
-      // the title slot, which is too airy for a mark this size. One child
-      // leaves that gap nothing to act on, so the spacing below is what shows.
-      title: (
-        <span className="inline-flex items-center gap-1.5 font-mono font-semibold">
-          <Logo className="text-fd-primary size-6" />
-          auth.ts
-        </span>
-      )
-    },
+    nav: { title: navTitle },
     githubUrl: REPO_URL,
     // Three-way, not the default two-way toggle: without "system" in the
     // switch, the first click strands the reader on an explicit light or dark
