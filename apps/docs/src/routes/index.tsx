@@ -2,17 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { DynamicCodeBlock } from "fumadocs-ui/components/dynamic-codeblock"
 import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import { HomeLayout } from "fumadocs-ui/layouts/home"
-import {
-  FullSearchTrigger,
-  SearchTrigger
-} from "fumadocs-ui/layouts/shared/slots/search-trigger"
-import { ThemeSwitch } from "fumadocs-ui/layouts/shared/slots/theme-switch"
 import { ArrowRight } from "lucide-react"
 import { Fragment } from "react"
 import { GitHubIcon } from "~/components/github-icon"
 import { Logo } from "~/components/logo"
-import { tabClassName } from "~/components/section-tabs"
-import { baseOptions, navTitle, REPO_URL } from "~/lib/layout.shared"
+import { SiteHeader } from "~/components/site-header"
+import { REPO_URL } from "~/lib/layout.shared"
 import authSource from "../../content/snippets/auth.ts?raw"
 import authClientSource from "../../content/snippets/auth-client.ts?raw"
 import authDatabaseSource from "../../content/snippets/auth-database-drizzle.ts?raw"
@@ -101,8 +96,7 @@ const FEATURES = [
 function LandingPage() {
   return (
     <HomeLayout
-      {...baseOptions()}
-      nav={{ component: <HomeHeader /> }}
+      nav={{ component: <SiteHeader /> }}
       className="[--fd-layout-width:97rem]"
     >
       <Hero />
@@ -111,56 +105,6 @@ function LandingPage() {
       <Features />
       <Footer />
     </HomeLayout>
-  )
-}
-
-const LINKS = [
-  ["Docs", ""],
-  ["Reference", "reference/create-auth"],
-  ["HTTP API", "open-api/sign-in/post/sign-in/send-code"]
-]
-
-// Same layout as the docs header.
-function HomeHeader() {
-  return (
-    <header className="bg-fd-background/80 sticky top-0 z-40 border-b backdrop-blur-sm">
-      <div className="mx-auto flex h-14 max-w-(--fd-layout-width) gap-2 px-4 md:px-6">
-        <div className="flex flex-1 items-center">
-          <Link to="/" className="inline-flex items-center">
-            {navTitle}
-          </Link>
-          <nav className="ms-6 flex gap-6 self-stretch max-sm:hidden">
-            {LINKS.map(([text, splat]) => (
-              <Link
-                key={text}
-                to="/docs/$"
-                params={{ _splat: splat }}
-                className={tabClassName}
-              >
-                {text}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <FullSearchTrigger
-          hideIfDisabled
-          className="my-auto w-full max-w-sm rounded-xl ps-2.5 max-md:hidden"
-        />
-        <div className="flex flex-1 items-center justify-end gap-2">
-          <SearchTrigger hideIfDisabled className="p-2 md:hidden" />
-          <a
-            href={REPO_URL}
-            rel="noreferrer noopener"
-            target="_blank"
-            aria-label="GitHub"
-            className="text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-accent-foreground inline-flex items-center justify-center rounded-md p-1.5 transition-colors"
-          >
-            <GitHubIcon className="size-4.5" />
-          </a>
-          <ThemeSwitch mode="light-dark-system" />
-        </div>
-      </div>
-    </header>
   )
 }
 
@@ -183,7 +127,7 @@ function Hero() {
   return (
     <section className="border-fd-border relative isolate overflow-hidden border-b">
       <HeroBackdrop />
-      <div className="relative mx-auto grid max-w-5xl grid-cols-1 gap-x-12 gap-y-10 px-6 py-20 md:py-28 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end">
+      <div className="relative mx-auto grid max-w-5xl grid-cols-1 gap-x-12 gap-y-10 px-6 py-16 lg:py-28 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end">
         <div className="min-w-0">
           <h1 className="flex flex-col gap-4">
             <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl">
@@ -242,11 +186,11 @@ npx @auth-ts/cli keygen`}
           <p className="text-fd-muted-foreground mb-3 font-mono text-xs tracking-wider uppercase">
             Package
           </p>
-          <dl className="text-sm">
+          <dl className="text-sm md:grid md:grid-cols-2 md:gap-x-12 lg:block">
             {SPECS.map(([term, value]) => (
               <div
                 key={term}
-                className="border-fd-border flex items-baseline justify-between gap-6 border-b py-2.5 first:border-t"
+                className="border-fd-border flex items-baseline justify-between gap-6 border-b py-2.5 first:border-t md:nth-2:border-t lg:nth-2:border-t-0"
               >
                 <dt className="text-fd-muted-foreground">{term}</dt>
                 <dd className="text-end font-mono">{value}</dd>
@@ -280,7 +224,7 @@ function HowItWorks() {
             </li>
           ))}
         </ol>
-        <div className="mt-8 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-center">
+        <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-center">
           <p className="text-fd-muted-foreground text-pretty">
             What every verifier reads: <code>sub</code> is the user and{" "}
             <code>type</code> their role.

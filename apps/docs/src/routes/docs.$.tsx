@@ -16,7 +16,8 @@ import { Header } from "fumadocs-ui/layouts/notebook/slots/header"
 import type { ComponentProps } from "react"
 import { OpenAPIPage } from "~/components/api-page"
 import { SectionTabs } from "~/components/section-tabs"
-import { baseOptions, REPO_URL } from "~/lib/layout.shared"
+import { HeaderActions } from "~/components/site-header"
+import { navTitle, REPO_URL } from "~/lib/layout.shared"
 import { source } from "~/lib/source"
 import { getMDXComponents } from "~/mdx-components"
 import browserCollections from "../../.source/browser"
@@ -115,39 +116,37 @@ function FullWidthHeader(props: ComponentProps<"header">) {
     <Header
       {...props}
       style={{ gridColumn: "1 / -1" }}
-      className="border-b [contain:inline-size] *:data-header-body:mx-auto *:data-header-body:w-full *:data-header-body:max-w-[var(--fd-layout-width,97rem)] *:data-header-body:border-b-0"
+      className="border-b [contain:inline-size] md:[&>[data-header-body]>div]:flex-none md:[&>[data-header-body]>div:first-child]:pe-4 md:[&>[data-header-body]>div:last-child]:ps-4 [&>[data-header-body]>button]:mx-auto *:data-header-body:mx-auto *:data-header-body:w-full *:data-header-body:max-w-[var(--fd-layout-width,97rem)] *:data-header-body:border-b-0"
     />
   )
 }
 
 function SidebarBanner({ children }: ComponentProps<"div">) {
   return (
-    <div className="flex flex-col gap-3 p-4 pb-2 lg:hidden">
+    <div className="flex flex-col gap-3 p-4 pb-2 md:hidden">
       {children}
-      <SectionTabs className="border-b px-2 lg:hidden" />
+      <SectionTabs className="border-b px-2" />
     </div>
   )
 }
 
 function DocumentationPage() {
   const data = useFumadocsLoader(Route.useLoaderData())
-  const options = baseOptions()
 
   return (
     <NotebookLayout
-      {...options}
       nav={{
-        ...options.nav,
+        title: navTitle,
         mode: "top",
-        children: <SectionTabs className="ms-6 self-stretch max-lg:hidden" />
+        children: <SectionTabs className="ms-6 self-stretch max-md:hidden" />
       }}
       sidebar={{
         banner: SidebarBanner,
         collapsible: false,
-        className: "lg:[&_[data-radix-scroll-area-viewport]]:pt-6"
+        className: "md:[&_[data-radix-scroll-area-viewport]]:pt-6"
       }}
       tabs={false}
-      slots={{ header: FullWidthHeader }}
+      slots={{ header: FullWidthHeader, themeSwitch: HeaderActions }}
       tree={data.pageTree}
     >
       {data.type === "openapi" ? (
