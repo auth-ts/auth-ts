@@ -257,6 +257,10 @@ The shape is the web `Storage` interface, so a store that already has
 `getItem`/`setItem`/`removeItem` passes straight through. Use one the platform
 protects — the keychain or keystore — because what lands in it is the session.
 
+### CookieStorage
+
+<auto-type-table path="client/lib/cookie-jar.ts" name="CookieStorage" />
+
 Everything else is unchanged: `getToken()` still serves the JWT from memory for
 your data client, and the app never touches the cookie. `signInWithProvider` and
 `connectProvider` fetch the provider's authorize URL and then assign `location`, so a

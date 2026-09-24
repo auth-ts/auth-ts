@@ -22,10 +22,17 @@ export const docs = defineDocs({
   docs: { postprocess: { includeProcessedMarkdown: true } }
 })
 
+const typeLinks: Record<string, string> = {
+  CookieStorage: "/docs/reference/client#cookiestorage"
+}
+
 const typeTables: RemarkAutoTypeTableOptions = {
   generator,
   options: {
     basePath: "../../packages/core/src",
+    transform: (entry) => {
+      entry.typeHref = typeLinks[entry.simplifiedType]
+    },
     typeSimplifier: {
       // Default shows "union" and "object" instead.
       override: ({ type, location }) => {
@@ -37,7 +44,7 @@ const typeTables: RemarkAutoTypeTableOptions = {
         const text =
           members.length === 1 ? joined.replace(/^\((.*)\)$/, "$1") : joined
 
-        return text.length <= 40 ? text : undefined
+        return text.length <= 60 ? text : undefined
       }
     }
   }
