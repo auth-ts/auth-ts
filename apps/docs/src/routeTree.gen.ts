@@ -16,6 +16,7 @@ import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as OpenapiDotjsonRouteImport } from './routes/openapi[.]json'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
+import { Route as LlmsDotmdxSplatRouteImport } from './routes/llms[.]mdx.$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,11 @@ const DocsSplatRoute = DocsSplatRouteImport.update({
   path: '/docs/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LlmsDotmdxSplatRoute = LlmsDotmdxSplatRouteImport.update({
+  id: '/llms.mdx/$',
+  path: '/llms.mdx/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/openapi.json': typeof OpenapiDotjsonRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
+  '/llms.mdx/$': typeof LlmsDotmdxSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/openapi.json': typeof OpenapiDotjsonRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
+  '/llms.mdx/$': typeof LlmsDotmdxSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/openapi.json': typeof OpenapiDotjsonRoute
   '/api/search': typeof ApiSearchRoute
   '/docs/$': typeof DocsSplatRoute
+  '/llms.mdx/$': typeof LlmsDotmdxSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/openapi.json'
     | '/api/search'
     | '/docs/$'
+    | '/llms.mdx/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/openapi.json'
     | '/api/search'
     | '/docs/$'
+    | '/llms.mdx/$'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/openapi.json'
     | '/api/search'
     | '/docs/$'
+    | '/llms.mdx/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   OpenapiDotjsonRoute: typeof OpenapiDotjsonRoute
   ApiSearchRoute: typeof ApiSearchRoute
   DocsSplatRoute: typeof DocsSplatRoute
+  LlmsDotmdxSplatRoute: typeof LlmsDotmdxSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/llms.mdx/$': {
+      id: '/llms.mdx/$'
+      path: '/llms.mdx/$'
+      fullPath: '/llms.mdx/$'
+      preLoaderRoute: typeof LlmsDotmdxSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   OpenapiDotjsonRoute: OpenapiDotjsonRoute,
   ApiSearchRoute: ApiSearchRoute,
   DocsSplatRoute: DocsSplatRoute,
+  LlmsDotmdxSplatRoute: LlmsDotmdxSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

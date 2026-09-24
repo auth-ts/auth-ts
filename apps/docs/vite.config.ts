@@ -1,8 +1,29 @@
+import { readdirSync } from "node:fs"
 import tailwindcss from "@tailwindcss/vite"
 import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import react from "@vitejs/plugin-react"
 import { fumadocsMdx } from "fumadocs-mdx/vite"
 import { defineConfig } from "vite"
+
+// Nothing links to these, so the crawler can't find them.
+const markdownPages = readdirSync("content/docs", {
+  recursive: true,
+  encoding: "utf8"
+})
+  .filter((file) => file.endsWith(".mdx"))
+  .map((file) => {
+    const slug = file
+      .replace(/\.mdx$/, "")
+      .split("/")
+      .filter((segment) => !segment.startsWith("(") && segment !== "index")
+      .join("/")
+    const path = `/llms.mdx/docs${slug ? `/${slug}` : ""}.md`
+
+    return {
+      path,
+      prerender: { enabled: true, outputPath: path, crawlLinks: false }
+    }
+  })
 
 export default defineConfig({
   // The type-table generator drives the TypeScript compiler, which ships as
@@ -26,6 +47,7 @@ export default defineConfig({
       prerender: { enabled: true },
       pages: [
         { path: "/" },
+        ...markdownPages,
         {
           // The search index, written once at build time. It is JSON rather
           // than a page, so it needs an explicit filename and must not be

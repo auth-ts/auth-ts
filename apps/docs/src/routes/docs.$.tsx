@@ -8,10 +8,12 @@ import {
   DocsBody,
   DocsDescription,
   DocsPage,
-  DocsTitle
+  DocsTitle,
+  MarkdownCopyButton,
+  ViewOptionsPopover
 } from "fumadocs-ui/layouts/notebook/page"
 import { OpenAPIPage } from "~/components/api-page"
-import { baseOptions } from "~/lib/layout.shared"
+import { baseOptions, REPO_URL } from "~/lib/layout.shared"
 import { source } from "~/lib/source"
 import { getMDXComponents } from "~/mdx-components"
 import browserCollections from "../../.source/browser"
@@ -62,15 +64,29 @@ const loadPage = createServerFn({ method: "GET" })
 
     // Title and description travel with the path so the document head can be
     // rendered before the MDX chunk has loaded.
-    return { ...shared, type: "docs" as const, path: page.path }
+    return { ...shared, type: "docs" as const, path: page.path, url: page.url }
   })
 
+interface PageSource {
+  path: string
+  url: string
+}
+
 const clientLoader = browserCollections.docs.createClientLoader({
-  component({ frontmatter, toc, default: MDX }) {
+  component({ frontmatter, toc, default: MDX }, { path, url }: PageSource) {
+    const markdownUrl = `/llms.mdx${url}.md`
+
     return (
       <DocsPage toc={toc} tableOfContent={{ style: "clerk" }}>
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
+        <div className="border-fd-border -mt-2 flex items-center gap-2 border-b pb-6">
+          <MarkdownCopyButton markdownUrl={markdownUrl} />
+          <ViewOptionsPopover
+            markdownUrl={markdownUrl}
+            githubUrl={`${REPO_URL}/blob/main/apps/docs/content/docs/${path}`}
+          />
+        </div>
         <DocsBody>
           <MDX components={getMDXComponents()} />
         </DocsBody>
@@ -82,8 +98,8 @@ const clientLoader = browserCollections.docs.createClientLoader({
 // Two components rather than a branch inside one: `useContent` is a hook, and a
 // reader moving between an API page and a prose page would otherwise change how
 // many hooks render.
-function MDXContent({ path }: { path: string }) {
-  return clientLoader.useContent(path)
+function MDXContent(page: PageSource) {
+  return clientLoader.useContent(page.path, page)
 }
 
 function DocumentationPage() {
@@ -106,7 +122,7 @@ function DocumentationPage() {
           </DocsBody>
         </DocsPage>
       ) : (
-        <MDXContent path={data.path} />
+        <MDXContent path={data.path} url={data.url} />
       )}
     </NotebookLayout>
   )
