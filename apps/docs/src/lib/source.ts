@@ -1,15 +1,12 @@
-import type { Folder, Item, Node } from "fumadocs-core/page-tree"
+import type { Folder, Node } from "fumadocs-core/page-tree"
 import { loader } from "fumadocs-core/source"
 import { icons } from "lucide-react"
 import { createElement } from "react"
-import { OpenAPIIcon } from "~/components/openapi-icon"
 import { docs } from "../../.source/server"
 import { openapi, routeSegments, tagOrder, tagSlug } from "./openapi"
 
-const BASE_DIR = "open-api"
+const BASE_DIR = "reference/http-api"
 
-/** Operation page paths, in the document's order. */
-const operationPaths: string[] = []
 const TAG_BY_SLUG = new Map(tagOrder.map((tag) => [tagSlug(tag), tag]))
 
 function rankOf(node: Node) {
@@ -26,7 +23,7 @@ function leaves(node: Node): Node[] {
 }
 
 /**
- * Titles the OpenAPI root and its tag folders, and orders both by tag.
+ * Titles the OpenAPI folder and its tag folders, and orders both by tag.
  *
  * The URL nests one level per path segment below the tag, method included, so
  * it reads the way the rendered reference's own anchors do. Those levels are
@@ -39,27 +36,12 @@ function openAPIFolder(node: Folder, folderPath: string) {
       (left, right) => rankOf(left) - rankOf(right)
     )
 
-    return {
-      ...node,
-      name: "HTTP API",
-      description: "Every endpoint, as OpenAPI",
-      root: true,
-      icon: createElement(OpenAPIIcon, { className: "size-4" }),
-      // Layout tabs link to a root's index.
-      index: children
-        .flatMap(leaves)
-        .find(
-          (leaf): leaf is Item =>
-            leaf.type === "page" && leaf.url.endsWith(`/${operationPaths[0]}`)
-        ),
-      children
-    }
+    return { ...node, name: "HTTP API", children }
   }
 
-  const segments = folderPath.split("/")
-  if (segments.length !== 2 || segments[0] !== BASE_DIR) return node
+  if (!folderPath.startsWith(`${BASE_DIR}/`)) return node
 
-  const tag = TAG_BY_SLUG.get(segments[1] ?? "")
+  const tag = TAG_BY_SLUG.get(folderPath.slice(BASE_DIR.length + 1))
   if (!tag) return node
 
   return { ...node, name: tag, children: node.children.flatMap(leaves) }
@@ -91,7 +73,6 @@ export const source = loader({
             ...routeSegments(operation.path)
           ]
 
-          operationPaths.push(segments.join("/"))
           builder.create({
             type: "operation",
             schemaId: builder.id,

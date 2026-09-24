@@ -1,3 +1,4 @@
 /docs/security /docs/concepts/security 301
 /docs/faq /docs/concepts/faq 301
 /docs/guides/neon /docs/data/neon 301
+/docs/open-api/* /docs/reference/http-api/:splat 301
