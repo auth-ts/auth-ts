@@ -4,12 +4,16 @@ import { defineConfig } from "vite"
 const declarations = () => ({
   name: "declarations",
   closeBundle() {
-    execFileSync("bun", ["x", "tsc", "-p", "tsconfig.build.json"], {
+    execFileSync("pnpm", ["exec", "tsc", "-p", "tsconfig.build.json"], {
       stdio: "inherit"
     })
-    execFileSync("bun", ["../../tools/build/dts-extensions.ts", "dist"], {
-      stdio: "inherit"
-    })
+    execFileSync(
+      "pnpm",
+      ["exec", "tsx", "../../tools/build/dts-extensions.ts", "dist"],
+      {
+        stdio: "inherit"
+      }
+    )
   }
 })
 

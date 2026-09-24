@@ -7,7 +7,7 @@ Browser token management is the same package's `/client` entry, which carries
 none of the issuer with it.
 
 ```bash
-bun add @auth-ts/core
+npm install @auth-ts/core
 ```
 
 ```ts

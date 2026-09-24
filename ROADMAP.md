@@ -54,7 +54,7 @@ GitHub is in real use. Google is the part with no real-world evidence behind it.
       so editing the gist will not change what Neon fetches:
       `https://gist.githubusercontent.com/daveycodez/93e780d7a7745317f3a65e7ceca93111/raw/auth-ts-jwks.json`
 - [ ] Upload `public/jwks.json` to the gist again whenever you run
-      `bun x @auth-ts/cli keygen` — it is a copy of the file, not a mirror.
+      `npx @auth-ts/cli keygen` — it is a copy of the file, not a mirror.
 - [ ] **Deployed, skip the gist entirely** and point Neon at
       `https://<your domain>/jwks.json`, the same file served by the app.
 - [ ] Treat the current key as a **development key**. Generate a separate one for
@@ -102,7 +102,7 @@ long-lived npm token once the first release is out.
 
 ### Deploy the docs
 
-- [ ] Create the **Cloudflare Pages** project. Build `bun run build`, output
+- [ ] Create the **Cloudflare Pages** project. Build `pnpm run build`, output
       `dist/client`, root `apps/docs`.
 - [ ] Point `authts.dev` at it.
 - [ ] **Configure the `authts.com → authts.dev` redirect in Cloudflare itself**,
@@ -163,7 +163,7 @@ exist and are yours before the first release.
 ### Deploying the docs
 
 `wrangler.jsonc` is written; no Cloudflare Pages project exists. Build command
-`bun run build`, output directory `dist/client`.
+`pnpm run build`, output directory `dist/client`.
 
 The `authts.com → authts.dev` redirect is **not** configured anywhere. It has to
 be a Cloudflare Redirect Rule on the `authts.com` zone — Pages `_redirects` does

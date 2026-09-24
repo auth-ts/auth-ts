@@ -10,9 +10,9 @@
 
 # Package manager
 
-**bun.** Never `npm`, `yarn`, or `pnpm` — the Nx guidance below uses `pnpm nx`
-only as an example of prefixing with the workspace's package manager. Here that
-is `bun nx`.
+**pnpm.** Never `npm`, `yarn`, or `bun` for work in this repo. Prefix Nx with
+`pnpm nx`. User-facing docs show `npm install` and `npx`, since that is what
+readers run in their own apps.
 
 # Comments
 

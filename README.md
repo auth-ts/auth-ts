@@ -14,7 +14,7 @@ rather than in application code.
   Deno, and Bun.
 * `@auth-ts/core/client` — browser token management, from the same package. The
   entry a browser imports carries none of the issuer.
-* `@auth-ts/cli` — `bun x @auth-ts/cli keygen`: the signing key and the
+* `@auth-ts/cli` — `npx @auth-ts/cli keygen`: the signing key and the
   `public/jwks.json` to deploy with your app.
 
 Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous guests.
@@ -22,8 +22,8 @@ Sign-in methods: email or SMS verification codes, GitHub, Google, and anonymous 
 ## Quickstart
 
 ```bash
-bun add @auth-ts/core
-bun x @auth-ts/cli keygen
+npm install @auth-ts/core
+npx @auth-ts/cli keygen
 ```
 
 `keygen` prints `JWT_PRIVATE_KEY` and the public key set, then asks whether to
@@ -111,8 +111,8 @@ examples/          TanStack Start + Neon reference application
 ```
 
 ```bash
-bun install
-bun x nx run-many -t typecheck test build
+pnpm install
+pnpm nx run-many -t typecheck test build
 ```
 
 ## What is not here yet

@@ -6,13 +6,13 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "bun run build && wrangler deploy",
-    "db:push": "drizzle-kit push && bun src/db/apply-sql.ts",
+    "deploy": "pnpm run build && wrangler deploy",
+    "db:push": "drizzle-kit push && node --env-file-if-exists=.env src/db/apply-sql.ts",
     "generate-types": "npx @neondatabase/neon-js gen-types --db-url \"$DATABASE_URL\" --output src/types/database.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "cf-typegen": "wrangler types",
-    "keygen": "bun x auth-ts keygen"
+    "keygen": "auth-ts keygen"
   },
   "dependencies": {
     "@auth-ts/core": "workspace:*",

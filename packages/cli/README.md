@@ -3,7 +3,7 @@
 The command line for [`@auth-ts/core`](https://www.npmjs.com/package/@auth-ts/core).
 
 ```bash
-bun x @auth-ts/cli keygen
+npx @auth-ts/cli keygen
 ```
 
 `keygen` generates a signing key and the public key set that verifies tokens

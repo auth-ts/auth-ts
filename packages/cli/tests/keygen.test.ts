@@ -103,9 +103,10 @@ describe("keygen", () => {
 
 describe("auth-ts keygen", () => {
   const entry = resolve(import.meta.dirname, "../src/cli.ts")
+  const tsconfig = resolve(import.meta.dirname, "../tsconfig.json")
 
   function run(args: string[]) {
-    return execFileSync("bun", [entry, ...args], {
+    return execFileSync("tsx", ["--tsconfig", tsconfig, entry, ...args], {
       cwd: directory,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"]
@@ -207,6 +208,6 @@ describe("auth-ts keygen", () => {
   })
 
   it("prints usage with no command", () => {
-    expect(run([])).toMatch(/^Usage: bun x @auth-ts\/cli <command>/)
+    expect(run([])).toMatch(/^Usage: npx @auth-ts\/cli <command>/)
   })
 })

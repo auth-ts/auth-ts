@@ -5,7 +5,7 @@ import type { JwtAlgorithm } from "@auth-ts/core"
 import { keygen } from "./keygen"
 import { existingEnvNames, writeEnvFile, writeKeySet } from "./write"
 
-const USAGE = `Usage: bun x @auth-ts/cli <command>
+const USAGE = `Usage: npx @auth-ts/cli <command>
 
 Commands:
   keygen [--alg ES256|RS256] [--out DIR] [--env FILE] [--yes]
