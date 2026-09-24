@@ -80,7 +80,11 @@ const clientLoader = browserCollections.docs.createClientLoader({
     const markdownUrl = `/llms.mdx${url}.md`
 
     return (
-      <DocsPage toc={toc} tableOfContent={{ style: "clerk" }}>
+      <DocsPage
+        toc={toc}
+        tableOfContent={{ style: "clerk", container: { className: "pt-8" } }}
+        className="md:pt-8 xl:pt-8"
+      >
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <div className="border-fd-border -mt-2 flex items-center gap-2 border-b pb-6">
@@ -116,6 +120,15 @@ function FullWidthHeader(props: ComponentProps<"header">) {
   )
 }
 
+function SidebarBanner({ children }: ComponentProps<"div">) {
+  return (
+    <div className="flex flex-col gap-3 p-4 pb-2 lg:p-0 lg:pt-4">
+      {children}
+      <SectionTabs className="border-b px-2 lg:hidden" />
+    </div>
+  )
+}
+
 function DocumentationPage() {
   const data = useFumadocsLoader(Route.useLoaderData())
   const options = baseOptions()
@@ -129,14 +142,14 @@ function DocumentationPage() {
         children: <SectionTabs className="ms-6 self-stretch max-lg:hidden" />
       }}
       sidebar={{
-        banner: <SectionTabs className="border-b px-2 lg:hidden" />
+        banner: SidebarBanner
       }}
       tabs={false}
       slots={{ header: FullWidthHeader }}
       tree={data.pageTree}
     >
       {data.type === "openapi" ? (
-        <DocsPage full>
+        <DocsPage full className="md:pt-8 xl:pt-8">
           <DocsTitle>{data.title}</DocsTitle>
           <DocsDescription>{data.description}</DocsDescription>
           <DocsBody>
