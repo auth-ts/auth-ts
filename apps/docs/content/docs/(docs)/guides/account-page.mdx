@@ -30,7 +30,7 @@ verifications, rateLimits, and identitySecrets are never granted.
 Nothing in the first three is a credential. `sessions.secretHash` is a SHA-256
 of the thirty-two random bytes in the token, so knowing it does not let anyone
 present the token it came from. The provider tokens live in `identitySecrets`, which has no policy at
-all. See [the Neon guide](/docs/guides/neon) for the SQL.
+all. See [Row-level security](/docs/data/row-level-security) for the SQL.
 
 The consequence worth knowing: `select()` with no column list is safe on all
 three. There is nothing on those rows to remember to leave out.

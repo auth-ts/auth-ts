@@ -1,0 +1,59 @@
+---
+title: SMS code
+description: Sign in with a one-time code sent by text message.
+---
+
+SMS works like [email codes](/docs/sign-in/email), with a phone number in place
+of the address.
+
+## Full example
+
+```ts title="sign-in.ts"
+import { authClient } from "./lib/auth-client"
+
+export async function sendCode(phoneNumber: string) {
+  await authClient.sendSignInCode({ phoneNumber })
+}
+
+export async function verifyCode(code: string) {
+  const { user } = await authClient.signInWithCode({ code })
+  return user
+}
+```
+
+## Enable it
+
+```ts title="lib/auth.ts"
+export const auth = createAuth({
+  database: authDatabase,
+  sms: {
+    sendCode: async ({ phoneNumber, code }) => {
+      await yourSmsProvider.send({ to: phoneNumber, body: `Your code is ${code}` })
+    }
+  },
+  verificationCode: { alphabet: "numeric" }
+})
+```
+
+Numeric codes let phones offer to autofill them. You can enable `email` and
+`sms` together; each send picks one.
+
+## Phone numbers
+
+Numbers must start with `+` and a country code, in E.164 form. Spaces, dashes,
+dots and parentheses are removed first, so `+1 (555) 010-0199` works. A number
+without `+` is rejected with `invalidField`.
+
+## Errors
+
+| code | when |
+| --- | --- |
+| `invalidField` | The number isn't E.164, or both `email` and `phoneNumber` were sent. |
+| `channelNotConfigured` | `sms` isn't set on the server. |
+| `rateLimited` | Too many codes or guesses. `error.retryAfter` is in seconds. |
+| `invalidCode` | The code expired, was already used, or was sent to another browser. |
+| `incorrectCode` | The code is live but wrong. |
+
+## Options
+
+<auto-type-table path="core/auth-options.ts" name="SmsOptions" />

@@ -1,0 +1,58 @@
+---
+title: Your own API
+description: Protect server routes with the same token.
+---
+
+Your API routes can trust the same access token your database does. Send it
+from the browser as a bearer token and verify it on the server.
+
+## Send the token
+
+```ts
+const response = await fetch("/api/todos", {
+  headers: { authorization: `Bearer ${await authClient.getToken()}` }
+})
+```
+
+## Verify it
+
+`verifyToken` checks the signature and expiry against your key. It makes no
+database or network call, and returns `null` for anything invalid.
+
+```ts title="lib/require-user.ts"
+import { auth } from "./auth"
+
+export async function requireUser(request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer /, "")
+  const claims = token ? await auth.verifyToken(token) : null
+
+  if (!claims) throw new Response("Unauthorized", { status: 401 })
+
+  return claims
+}
+```
+
+`claims.sub` is the user id, and `claims.sid` the session.
+
+## Actions that can't wait
+
+A signed-out session keeps working until its token expires, an hour by
+default. For actions where that's too long, such as payments or permission
+changes, use `verifySession`. It also checks that the session still exists:
+
+```ts
+const resolved = await auth.verifySession({ headers: request.headers })
+if (!resolved) throw new Response("Unauthorized", { status: 401 })
+
+resolved.user // the user row
+resolved.session // the session row
+```
+
+It costs two database reads, so use it only where it matters. See
+[Sessions and revocation](/docs/concepts/sessions).
+
+## In loaders and server components
+
+Page requests carry the refresh cookie, not a bearer token. Use `getToken` to
+turn the cookie into a token and user; see
+[Server-side rendering](/docs/guides/server-side-rendering).

@@ -1,0 +1,3 @@
+{
+  "pages": ["row-level-security", "neon", "supabase", "jwks", "server-routes"]
+}

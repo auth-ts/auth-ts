@@ -1,0 +1,46 @@
+---
+title: Other verifiers
+description: Self-hosted PostgREST, API gateways, and anything that reads a JWKS.
+---
+
+Anything that verifies JWTs against a JWKS can accept auth.ts tokens. Give it
+your key set and tell it which claims to read.
+
+| what | value |
+| --- | --- |
+| JWKS | `https://your.app/jwks.json`, or the file itself |
+| algorithm | ES256, or RS256 if you chose it at `keygen` |
+| key id | the `kid` header, matching the key set |
+| subject | `sub`, the user id |
+| role | `role`, `authenticated` by default |
+| issuer | `iss`, only when `baseURL` is set |
+| audience | `aud`, only when `jwt.audience` is set |
+| lifetime | `exp`, one hour after `iat` by default |
+
+## Self-hosted PostgREST
+
+PostgREST takes the key set itself as its JWT secret:
+
+```ini title="postgrest.conf"
+jwt-secret = "@/path/to/jwks.json"
+jwt-role-claim-key = ".role"
+```
+
+Replace the file whenever you rotate keys. Policies read the claims with
+`current_setting('request.jwt.claims', true)::json`.
+
+## Discovery
+
+Verifiers that want an issuer URL need `baseURL`:
+
+```ts
+createAuth({ baseURL: "https://your.app" /* ... */ })
+```
+
+Tokens then carry `iss: "https://your.app/api/auth"`, and the discovery
+document is served at `/api/auth/.well-known/openid-configuration`.
+
+## Custom claims
+
+Some verifiers expect claims in their own shape. Add them with `jwt.claims`;
+see [Custom claims](/docs/guides/claims-and-fields).

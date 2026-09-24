@@ -1,0 +1,74 @@
+---
+title: Guests
+description: Let people use your app before they sign up.
+---
+
+A guest is a real user with an id and a session, but no email or phone number.
+When they sign in later, they keep the same id, so everything they created is
+still theirs.
+
+## Full example
+
+```ts
+// First visit: no account yet.
+await authClient.signInAsGuest()
+
+// Later, while still signed in as the guest:
+await authClient.sendSignInCode({ email })
+const { user } = await authClient.signInWithCode({ code })
+```
+
+## Enable it
+
+```ts title="lib/auth.ts"
+export const auth = createAuth({
+  database: authDatabase,
+  guest: true
+  // ...
+})
+```
+
+Guest sign-ins are limited to 30 per IP, then one every two minutes
+(`rateLimit.guestsPerIP`).
+
+## Upgrading a guest
+
+When a guest signs in with a code or a provider, one of two things happens:
+
+- **The email is new.** The guest row becomes a normal user with the same id.
+  Nothing else changes.
+- **The email already has an account.** They're signed in to that account
+  instead. The guest row gets `primaryUserId` set to that account's id, and the
+  guest's session ends.
+
+In the second case, moving the guest's data is up to you. For example:
+
+```sql
+update "todos" set "userId" = u."primaryUserId"
+  from "users" u
+ where "todos"."userId" = u."id"
+   and u."type" = 'guest'
+   and u."primaryUserId" is not null;
+```
+
+Guests can't change an email they don't have, or confirm their identity, so
+[account actions](/docs/guides/account-page) that need a code return
+`guestCannotReceiveCode`.
+
+## Rules
+
+- `signInAsGuest` returns `guestRequiresSignOut` (409) if anyone is already
+  signed in on this browser.
+- A guest's session is their only way back. Once it expires, the row is
+  unreachable.
+
+## Cleaning up
+
+auth.ts never deletes users. Remove abandoned guests on your own schedule:
+
+```sql
+delete from "users" u
+ where u."type" = 'guest'
+   and u."primaryUserId" is null
+   and not exists (select 1 from "sessions" s where s."userId" = u."id");
+```
