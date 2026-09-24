@@ -1,4 +1,4 @@
-import type { Folder, Node } from "fumadocs-core/page-tree"
+import type { Folder, Item, Node } from "fumadocs-core/page-tree"
 import { loader } from "fumadocs-core/source"
 import { icons } from "lucide-react"
 import { createElement } from "react"
@@ -7,6 +7,9 @@ import { docs } from "../../.source/server"
 import { openapi, routeSegments, tagOrder, tagSlug } from "./openapi"
 
 const BASE_DIR = "open-api"
+
+/** Operation page paths, in the document's order. */
+const operationPaths: string[] = []
 const TAG_BY_SLUG = new Map(tagOrder.map((tag) => [tagSlug(tag), tag]))
 
 function rankOf(node: Node) {
@@ -43,7 +46,12 @@ function openAPIFolder(node: Folder, folderPath: string) {
       root: true,
       icon: createElement(OpenAPIIcon, { className: "size-4" }),
       // Layout tabs link to a root's index.
-      index: children.flatMap(leaves).find((leaf) => leaf.type === "page"),
+      index: children
+        .flatMap(leaves)
+        .find(
+          (leaf): leaf is Item =>
+            leaf.type === "page" && leaf.url.endsWith(`/${operationPaths[0]}`)
+        ),
       children
     }
   }
@@ -83,6 +91,7 @@ export const source = loader({
             ...routeSegments(operation.path)
           ]
 
+          operationPaths.push(segments.join("/"))
           builder.create({
             type: "operation",
             schemaId: builder.id,

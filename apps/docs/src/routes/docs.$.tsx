@@ -12,7 +12,10 @@ import {
   MarkdownCopyButton,
   ViewOptionsPopover
 } from "fumadocs-ui/layouts/notebook/page"
+import { Header } from "fumadocs-ui/layouts/notebook/slots/header"
+import type { ComponentProps } from "react"
 import { OpenAPIPage } from "~/components/api-page"
+import { SectionTabs } from "~/components/section-tabs"
 import { baseOptions, REPO_URL } from "~/lib/layout.shared"
 import { source } from "~/lib/source"
 import { getMDXComponents } from "~/mdx-components"
@@ -102,6 +105,17 @@ function MDXContent(page: PageSource) {
   return clientLoader.useContent(page.path, page)
 }
 
+// Full width, so its border spans the window.
+function FullWidthHeader(props: ComponentProps<"header">) {
+  return (
+    <Header
+      {...props}
+      style={{ gridColumn: "1 / -1" }}
+      className="border-b *:data-header-body:mx-auto *:data-header-body:w-full *:data-header-body:max-w-[var(--fd-layout-width,97rem)] *:data-header-body:border-b-0"
+    />
+  )
+}
+
 function DocumentationPage() {
   const data = useFumadocsLoader(Route.useLoaderData())
   const options = baseOptions()
@@ -109,8 +123,16 @@ function DocumentationPage() {
   return (
     <NotebookLayout
       {...options}
-      nav={{ ...options.nav, mode: "top" }}
-      tabMode="navbar"
+      nav={{
+        ...options.nav,
+        mode: "top",
+        children: <SectionTabs className="ms-6 self-stretch max-lg:hidden" />
+      }}
+      sidebar={{
+        banner: <SectionTabs className="border-b px-2 lg:hidden" />
+      }}
+      tabs={false}
+      slots={{ header: FullWidthHeader }}
       tree={data.pageTree}
     >
       {data.type === "openapi" ? (

@@ -97,9 +97,15 @@ function LandingPage() {
     <HomeLayout
       {...baseOptions()}
       links={[
-        { text: "Docs", url: "/docs", active: "nested-url" },
-        { text: "Reference", url: "/docs/reference/create-auth" }
+        { text: "Docs", url: "/docs" },
+        { text: "Reference", url: "/docs/reference/create-auth" },
+        {
+          text: "HTTP API",
+          url: "/docs/open-api/sign-in/post/sign-in/send-code"
+        }
       ]}
+      // Match the docs header's width and padding.
+      className="[--fd-layout-width:97rem] md:[&_#nd-nav_nav]:px-6"
     >
       <Hero />
       <HowItWorks />
