@@ -50,204 +50,131 @@ export type AdditionalFieldsInput<S extends AdditionalFieldsSchema> =
     ? { [field: string]: unknown }
     : { [K in keyof S]?: AdditionalFieldValue<S[K]> }
 
-/** The user fields core owns. Your declared fields sit beside these on {@link AuthUser}. */
+/** The user columns core owns. Your `additionalFields` sit beside them. */
 export interface CoreUserFields {
+  /** Primary key. */
   id: string
-  /** Null for guests; unique when present. */
+  /** Unique when present. Null for guests. */
   email?: string | null
-  /** Null for guests; unique when present. E.164. */
+  /** E.164. Unique when present. Null for guests. */
   phoneNumber?: string | null
+  /** Display name. */
   name?: string | null
-  /**
-   * Whatever your application stores to render a person: an `https` URL, a
-   * `data:` URI, a key into your own object storage. Named for the value rather
-   * than a format, because the library never reads it — a provider writes one
-   * on first sign-in and the account screen writes it after that.
-   */
+  /** An avatar URL, data URI or storage key. Core never reads it. */
   image?: string | null
+  /** `guest`, `user` or `admin`. Core writes only the first two. */
   type: UserType
-  /**
-   * Set on a **guest** row when its sign-in resolved to an existing account —
-   * a pointer saying "this guest's data belongs to that user now".
-   *
-   * Core writes it and never reads it again: migrating the guest's rows is your
-   * decision, on your schedule. It is deliberately never a JWT claim, because it
-   * describes a data migration rather than who is signed in.
-   */
+  /** On a guest who signed in to an existing account, that account's id. */
   primaryUserId?: string | null
   /** Written by core on insert. */
   createdAt: Date
-  /** Written by core on insert and on every update it makes. */
+  /** Written by core on every write. */
   updatedAt: Date
 }
 
-/**
- * A user row, as core reads it.
- *
- * Your declared `additionalFields` are part of this type, flat, beside the
- * fields core owns — typed from the schema you gave `createAuth`, so
- * `{ plan: "string" }` makes `user.plan` a `string | null | undefined`:
- * optional and nullable, because nothing guarantees a row has set it. Where no
- * schema is in scope — the client, or an implementation written against the
- * bare contract — the row is an open map rather than a closed one, which is
- * what a `select *` actually returns.
- *
- * This is also the `user` returned to the browser on sign-in and refresh, so
- * nothing sensitive belongs on it.
- */
+/** A user row: the core columns plus your `additionalFields`. Returned to the browser. */
 export type AuthUser<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = CoreUserFields & AdditionalFields<S>
 
-/**
- * A session row. The token is `id.secret`; core stores `sha256` of the secret,
- * never the secret. It lives `session.ttl` past `updatedAt`, or past
- * `createdAt` with `sliding: false` — the lifetime is policy, not a column.
- */
+/** A session row. The token is `id.secret`; only `sha256` of the secret is stored. */
 export interface AuthSession {
+  /** Primary key, and the token's `sid` claim. */
   id: string
+  /** The user signed in. */
   userId: string
+  /** SHA-256 of the token's secret, as hex. */
   secretHash: string
-  /**
-   * When this session was created. Core writes it on insert and never updates
-   * it; `updatedAt` is when the session was last used, to the hour.
-   */
+  /** When the session was created. Never updated. */
   createdAt: Date
+  /** The browser that signed in. */
   userAgent?: string | null
+  /** The client IP at sign-in. */
   ipAddress?: string | null
-  /**
-   * How this session was authenticated, as RFC 8176 method references.
-   *
-   * The registry's vocabulary wherever it has a value: `otp` for an emailed
-   * code, `sms` for one sent to a phone. Federated sign-in and guests have no
-   * registered value, so they take `fed` and `anonymous`, which is what the
-   * large providers settled on for the same two cases.
-   *
-   * An array because a session accumulates — a second factor adds to what
-   * proved identity the first time rather than replacing it. Return it from
-   * `jwt.claims` and it is the `amr` claim as OpenID Connect defines it: a flat
-   * array of strings, which a row-level security policy tests with one
-   * operator where an array of objects would need a path query.
-   */
+  /** How the session was authenticated: `otp`, `sms`, `fed` or `anonymous`. */
   amr?: string[] | null
-  /** Written by core on insert and on every update it makes. */
+  /** When the session was last used, to the hour. */
   updatedAt: Date
 }
 
-/**
- * What a live verification code authorizes. Checked on every verify, so a code
- * cannot cross purposes. An `identity` code, once verified, stays as the
- * marker that lets its session revoke devices or delete the account. An
- * `emailChange` or `phoneChange` code is filed under the new identifier and
- * re-keys the account to it.
- */
+/** What a verification code is for. Checked on every verify. */
 export type VerificationPurpose =
   | "signIn"
   | "identity"
   | "emailChange"
   | "phoneChange"
 
-/**
- * A verification code, stored as an scrypt string of the code.
- *
- * Several rows may be live for one identifier at once — one per client that
- * asked. Each is bound to the attempt token its requester holds, so a verify
- * reads exactly one row: the identifier's, for this purpose, for this attempt.
- * A send never touches another client's code.
- */
+/** A verification code, bound to the client that requested it. */
 export interface AuthVerification {
+  /** Primary key. */
   id: string
-  /** Normalized email or E.164 phone number. */
+  /** Email address or E.164 phone number. */
   identifier: string
-  /** A PHC-style scrypt string: `$scrypt$ln=14,r=8,p=1$<salt>$<key>`. */
+  /** The code under scrypt: `$scrypt$ln=14,r=8,p=1$<salt>$<key>`. */
   codeHash: string
-  /** SHA-256 of the attempt token handed to the client that requested the code. */
+  /** SHA-256 of the requesting client's attempt token. */
   attemptHash: string
+  /** What the code is for. */
   purpose: VerificationPurpose
   /** Written by core on insert. */
   createdAt: Date
-  /** Written by core on insert and on every update it makes. */
+  /** Written by core on every write. */
   updatedAt: Date
 }
 
-/**
- * One rate-limit bucket — the author's `bucketNodeStruct` as a row.
- *
- * `tokenCount` tokens remain, and one comes back every refill interval
- * counted from `lastRefilledAt`. Consuming is a read and an update that names
- * both values it read, so no atomic increment is asked of the store; a bucket
- * that has refilled is the same as no row, which is what the sweep deletes.
- */
+/** One rate-limit token bucket. */
 export interface AuthRateLimit {
+  /** Primary key. */
   id: string
-  /** What the bucket is for and whose: `guess:<address>`, `send:<address>`, `guest:ip:<address>`. */
+  /** The bucket, e.g. `guess:<address>` or `guest:ip:<address>`. */
   key: string
+  /** Tokens left. */
   tokenCount: number
+  /** When the last token was refilled. */
   lastRefilledAt: Date
   /** Written by core on insert. */
   createdAt: Date
-  /** Written by core on insert and on every update it makes. */
+  /** Written by core on every write. */
   updatedAt: Date
 }
 
-/** A provider identity linked to a user. */
+/** A GitHub or Google account linked to a user. */
 export interface AuthIdentity {
+  /** Primary key. */
   id: string
+  /** The user it belongs to. */
   userId: string
+  /** `github` or `google`. */
   provider: string
-  /** The provider's stable id — GitHub's numeric id, Google's `sub`. */
+  /** The provider's stable id: GitHub's numeric id, Google's `sub`. */
   providerUserId: string
-  /** Whatever the provider gives that a person recognises. Display only. */
+  /** A display name for the account. */
   label?: string | null
-  /** The scopes actually granted, space-delimited as the provider returned them. */
+  /** The scopes granted, space-separated. */
   scope?: string | null
   /** Written by core on insert. */
   createdAt: Date
-  /** Written by core on insert and on every update it makes. */
+  /** Written by core on every write. */
   updatedAt: Date
 }
 
-/**
- * The provider tokens for one identity, as the provider issued them.
- *
- * A table of its own rather than columns on `identities`, so that protecting
- * them is a table nobody writes a policy for rather than a column grant every
- * consumer has to remember to revoke. `identities` is then safe to read whole,
- * and the failure mode of forgetting something is nothing rather than a
- * credential on a screen. They cannot be hashed — a provider has to be handed
- * the token back — so the table being unreadable is the protection.
- *
- * **This table must cascade from `identities`.** Disconnecting a provider
- * deletes the identity, and an orphaned row here is a stored credential nothing
- * points at. `authDatabaseChecks` proves the cascade against your own database.
- */
+/** An identity's provider tokens. Never grant this table; it must cascade from `identities`. */
 export interface AuthIdentitySecret {
+  /** Primary key. */
   id: string
-  /** The identity these belong to. Deleting it must delete this row. */
+  /** The identity these belong to. */
   identityId: string
-  /**
-   * The provider's access token. Short-lived — read it through
-   * `getProviderToken`, which refreshes it rather than handing back a spent one.
-   */
+  /** The provider's access token. Read it with `getProviderToken`. */
   accessToken?: string | null
-  /** When {@link accessToken} expires, as the provider reported it. */
+  /** When `accessToken` expires. */
   accessTokenExpiresAt?: Date | null
-  /**
-   * The provider's refresh token. The durable half of the grant: this is what
-   * keeps calling a provider's API working for months without the user signing
-   * in again, and the one column whose leak matters most.
-   */
+  /** The provider's refresh token. */
   refreshToken?: string | null
-  /**
-   * When {@link refreshToken} expires. Null where the provider reports none.
-   *
-   * It sits beside the token rather than on `identities` because it describes
-   * the credential: a dead grant is one row to clear, not two.
-   */
+  /** When `refreshToken` expires, if the provider says. */
   refreshTokenExpiresAt?: Date | null
   /** Written by core on insert. */
   createdAt: Date
-  /** Written by core on insert and on every update it makes. */
+  /** Written by core on every write. */
   updatedAt: Date
 }
 
@@ -447,61 +374,13 @@ export type AuthDeleteInput<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > = { [K in AuthTable]: { table: K; where: AuthWhere<M, S, K> } }[AuthTable]
 
-/**
- * The integration surface: four table functions and an optional sweep.
- *
- * This interface *is* the product. There are no adapter packages — you write
- * these functions against your own tables, and in exchange the library never
- * owns your schema, your migrations, or your data.
- *
- * Core names the tables and the columns it reads; a schema that differs maps
- * them inside these functions. What core needs of the store is small and
- * stated:
- *
- * | table | unique | indexed | swept |
- * | --- | --- | --- | --- |
- * | `users` | `email`, `phoneNumber` | | |
- * | `sessions` | | `userId`, `updatedAt` | `updatedAt` |
- * | `verifications` | | `attemptHash`, `(identifier, purpose, attemptHash)`, `updatedAt` | `updatedAt` |
- * | `rateLimits` | `key` | `updatedAt` | `updatedAt` |
- * | `identities` | `(provider, providerUserId)` | `userId` | |
- *
- * **The uniqueness column is not hygiene, it is the design.** Core composes a
- * read and a write rather than asking your store for an upsert, so two first
- * sign-ins for one email both find nothing and both insert. The constraint is
- * what turns that race into a failed request instead of two accounts for one
- * person. The same holds for `(provider, providerUserId)`, and for
- * `rateLimits.key`, which settles two first requests on one bucket.
- *
- * The one concurrency property core requires is that {@link AuthDatabase.delete} is
- * atomic and returns what it removed: that is what makes a verification code usable
- * exactly once, since two verifiers can both read the row but only one deletes
- * it.
- *
- * These functions are pure with respect to the request: none of them receive
- * headers. Header-dependent session resolution is a spoofable auth bypass, and
- * non-HTTP callers (tests, migrations, the in-memory fixture) drive this
- * contract directly. For multi-tenancy, close over the tenant when constructing
- * the server instead.
- *
- * `S` is your declared `additionalFields`. Type an implementation as
- * `AuthDatabase<typeof additionalFields>` and every `users` row and write carries them
- * typed; the bare `AuthDatabase` sees them as an open map of primitives, and any
- * server accepts it.
- */
+/** The four functions that read and write your tables. */
 export interface AuthDatabase<
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema
 > {
   /**
    * Reads rows matching `where`, ordered and capped.
-   *
-   * Nothing here is optional, so there is no `undefined` to branch on and one
-   * code path per store. Core fills every value at the call site, and an
-   * unbounded read is a type error: every list core makes has a ceiling.
-   *
-   * There is no `offset`, because core never pages that way. Where it walks a
-   * set larger than one page — signing out other devices — it deletes what it
-   * read and re-reads from the start, so the next page is whatever is left.
+   * @remarks `({ table, where, limit, orderBy }) => Promise<Row[]>`
    */
   select<T extends AuthTable>(input: {
     table: T
@@ -511,17 +390,8 @@ export interface AuthDatabase<
   }): Promise<AuthRow<"date", S, T>[]>
 
   /**
-   * Inserts one row and returns it as stored.
-   *
-   * `undefined` is in the type because not every store hands the row back the
-   * same way — `RETURNING` gives a set to pick from, a document store gives the
-   * document. Core needs the row and fails the request without it, so return
-   * what the store gave rather than inventing a row or phrasing that failure.
-   *
-   * What comes back is how core learns anything the store decided: the `id`
-   * when `generateId` is not configured, and any column default. A unique
-   * violation must throw rather than merge — core reads before it inserts, and
-   * the constraint is deliberately the arbiter of the race between the two.
+   * Inserts one row and returns it as stored. A unique violation must throw.
+   * @remarks `({ table, values }) => Promise<Row | undefined>`
    */
   insert<T extends AuthTable>(input: {
     table: T
@@ -529,17 +399,8 @@ export interface AuthDatabase<
   }): Promise<AuthRow<"date", S, T> | undefined>
 
   /**
-   * Applies `fields` to every row matching `where`.
-   *
-   * `fields` always carries at least one defined value — core composes the set
-   * itself and skips the call entirely when a request changes nothing, so no
-   * implementation needs a guard against the empty `SET` that most query
-   * builders reject.
-   *
-   * Returns the rows it wrote, as {@link AuthDatabase.delete} does. That is what lets
-   * one statement both find and touch a row: core asks for a session used
-   * within its lifetime, and learns from what comes back whether there was
-   * one — rather than reading to find out if it may write, then writing.
+   * Updates every row matching `where` and returns them.
+   * @remarks `({ table, where, values }) => Promise<Row[]>`
    */
   update<T extends AuthTable>(input: {
     table: T
@@ -548,12 +409,8 @@ export interface AuthDatabase<
   }): Promise<AuthRow<"date", S, T>[]>
 
   /**
-   * Deletes every row matching `where` and returns what it removed.
-   *
-   * `DELETE … RETURNING *`, `findOneAndDelete`, `OUTPUT deleted.*`. One round
-   * trip, and the returned rows are proof: they are how core answers 404 rather
-   * than 204, and how a single-use verification code picks a winner between two
-   * verifiers who both read it.
+   * Deletes every row matching `where` and returns them. Must be atomic.
+   * @remarks `({ table, where }) => Promise<Row[]>`
    */
   delete<T extends AuthTable>(input: {
     table: T
@@ -580,35 +437,7 @@ export interface AuthDatabase<
   __schema?(schema: S): void
 }
 
-/**
- * Types an implementation of this contract, so that yours needs no casts.
- *
- * Core's own calls are precise because {@link AuthDatabase} is generic, but a generic
- * signature cannot be *proven* by a union-typed implementation, only asserted —
- * the same reason an overload has an implementation signature. This helper
- * holds that assertion, once, so your code has no casts in it:
- *
- * ```ts
- * export const authDatabase = defineAuthDatabase({
- *   async select({ table, where, limit }) {
- *     switch (table) {
- *       // `where` narrows with `table`: Partial<AuthUser> here,
- *       case "users": return run(`… where email = $1`, [where.email])
- *       case "rateLimits": return run(`… where key = $1 limit $2`, [where.key, limit])
- *       …
- *     }
- *   },
- *   …
- * })
- * ```
- *
- * A table map needs no switch, but it does want this helper for the same
- * reason — see the reference.
- *
- * `timestamps: "string"` types the implementation in ISO 8601 strings instead
- * of `Date`s and converts both ways here, so a store that holds timestamps as
- * text needs no parsing of its own. See {@link AuthTimestampMode}.
- */
+/** Types your `AuthDatabase` so it needs no casts. `timestamps: "string"` converts ISO strings. */
 export function defineAuthDatabase<
   M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema

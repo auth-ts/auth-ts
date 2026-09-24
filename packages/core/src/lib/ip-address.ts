@@ -1,67 +1,22 @@
 /** How the client's IP address is derived from proxy headers. */
 export interface IpAddressOptions {
   /**
-   * Headers the address is read from, in order — the first that yields a
-   * trustworthy address wins.
-   *
-   * `x-forwarded-for` covers most reverse proxies and is the default. A
-   * single-value header the platform guarantees it controls is stronger —
-   * `cf-connecting-ip` on Cloudflare, `true-client-ip` on Akamai, `x-real-ip`
-   * on Railway and behind nginx — because a client cannot append to it past
-   * the edge, so prefer one when your platform sets it.
-   *
-   * An entry may carry a port — `203.0.113.7:54321`, `[2001:db8::1]:443` — as
-   * Azure's front door and IIS ARR write it. The port is dropped, and the bare
-   * address is what is validated, keyed, and stored.
-   *
+   * Headers to read, in order. Prefer one your platform controls, e.g. `cf-connecting-ip`.
    * @default ["x-forwarded-for"]
    */
   headers?: string[]
   /**
-   * The proxies you run between the public internet and this app, as a hop
-   * count or as their addresses.
-   *
-   * The forwarded header is written by whoever talks to your outermost proxy
-   * and proxies *append*, so the leftmost entry is whatever the client typed.
-   * Declaring your topology is what makes the rest of the chain meaningful:
-   *
-   * - **A count** (`1`, or `true` for 1) reads the entry that many hops from
-   *   the right. Use this on Cloudflare, Vercel, and other platforms whose
-   *   proxy addresses you cannot enumerate.
-   * - **A list** of addresses or CIDR ranges (`["10.0.0.0/24"]`) walks the
-   *   chain right to left, skips hops you listed, and takes the first entry
-   *   that is not one of yours. Use this when you run the proxies yourself.
-   *
-   * Left unset, only a header carrying a *single* entry is trusted — a chain is
-   * ambiguous without knowing your topology, so none of it is used. That is the
-   * zero-config case, and it is correct on any platform whose proxy overwrites
-   * the header rather than appending to it.
-   *
-   * Neither form can verify who actually connected, only interpret what the
-   * header says. Keep the app reachable only through those proxies.
-   *
+   * Your proxies, as a hop count or their addresses and CIDR ranges. Unset trusts only single-entry headers.
    * @default 0
    */
   trustedProxies?: string[] | number | boolean
   /**
-   * The prefix length IPv6 addresses are grouped by when keying rate limits.
-   *
-   * A residential IPv6 client is handed a whole prefix — a `/64` by
-   * [RFC 6177](https://datatracker.ietf.org/doc/html/rfc6177), often more — so
-   * counting per address lets one client rotate through 2^64 of them without
-   * ever filling a bucket. Limits key on the prefix instead; the address stored
-   * on the session is untouched. IPv4 is always counted per address.
-   *
+   * IPv6 prefix length rate limits key on.
    * @default 64
    */
   ipv6Subnet?: number
   /**
-   * Derive no address at all.
-   *
-   * Nothing is read from any header, `session.ipAddress` stays null, and every
-   * per-IP limit is inert — the per-identifier guess limit, which is what
-   * protects an account, is unaffected.
-   *
+   * Reads no address: `ipAddress` stays null and per-IP limits are off.
    * @default false
    */
   disableTracking?: boolean

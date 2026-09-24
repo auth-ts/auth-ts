@@ -16,14 +16,7 @@ export interface RefreshToken {
 
 /** Per-call options for {@link RefreshToken.getToken}. */
 export interface GetTokenOptions {
-  /**
-   * Called when this call had to mint, with the token and the user it names.
-   *
-   * `GET /token` reads that row to mint, so the user arrives with the token and
-   * costs nothing extra. Seeding a cache from here is what lets a cold boot
-   * render from one request. A call served from memory never fires it: nothing
-   * was read, and the user it could report would be as old as the token.
-   */
+  /** Called with the token and its user when this call fetched a new token. */
   onRefresh?: (result: TokenResult) => void
 }
 

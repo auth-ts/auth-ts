@@ -1,52 +1,27 @@
 import type { CookieStorage } from "../lib/cookie-jar"
 import type { Logger, LogLevel } from "../lib/logger"
 
-/** Options accepted by `createAuthClient`. Everything is optional. */
+/** Options accepted by `createAuthClient`. */
 export interface AuthClientOptions {
-  /** Where the auth server is mounted. Must match the server's `basePath`. @default "/api/auth" */
+  /**
+   * Where the auth server is mounted. Match the server's `basePath`.
+   * @default "/api/auth"
+   */
   basePath?: string
-  /**
-   * Absolute origin of the auth server, when it is not this one.
-   *
-   * Only works within the same registrable domain: the refresh cookie is
-   * `SameSite=Lax`, so a genuinely foreign domain never receives it no matter
-   * what CORS says. For a separate domain, reverse-proxy the auth mount under
-   * this origin instead.
-   *
-   * Setting this also costs a signed-out visitor one request per page load: the
-   * cookie that would have told this client not to bother is written by the
-   * auth server, and only reaches a sibling host when the browser accepts the
-   * domain the two share. Same-origin needs no such luck.
-   */
+  /** The auth server's origin, when not this one. Same registrable domain only. */
   baseURL?: string
-  /**
-   * Initial locale, sent as `Accept-Language` on auth requests.
-   *
-   * Setting it replaces the browser's own header, which is how an application's
-   * language setting comes to outrank the browser's — no precedence rule needed,
-   * it falls out of the mechanism.
-   */
+  /** Sent as `Accept-Language`, replacing the browser's. */
   locale?: string
-  /**
-   * Where to keep the auth cookies, for a runtime with no cookie jar of its own.
-   *
-   * A browser holds the refresh cookie itself and never shows it to
-   * JavaScript, so leave this unset there. A native app has no such jar: the
-   * client keeps whatever the server sets and sends it back as the `Cookie`
-   * header on every auth request, with `credentials: "omit"`, and says
-   * `Sec-Fetch-Site: same-origin` itself, since there is no browser to say it.
-   * The server is none the wiser, and the refresh token still travels nowhere
-   * else.
-   *
-   * The storage passed here MUST be one the platform protects — the keychain
-   * or the keystore. What lands in it is the refresh token, and the refresh
-   * token is not rotated, so a copy of it is the session for the session's
-   * whole life. A store any script on the device can read is the one
-   * combination this design excludes.
-   */
+  /** Cookie storage for native apps. Leave unset in browsers. */
   cookieStorage?: CookieStorage
-  /** @default "error" */
+  /**
+   * Minimum level logged.
+   * @default "error"
+   */
   logLevel?: LogLevel
-  /** Log sink override. @default console */
+  /**
+   * Log sink.
+   * @default console
+   */
   logger?: Logger
 }

@@ -4,30 +4,22 @@ import type { Duration } from "../lib/parse-duration"
 import { parseDurationSeconds } from "../lib/parse-duration"
 import type { JwtAlgorithm } from "./import-signing-key"
 
-/**
- * Claims you may put in a token.
- *
- * Anything not listed passes through untouched and wins over the configured
- * `jwt.claims`, `issuer`, and `jwt.audience`, so you can mint a token for another
- * audience or issuer when you need one. Only `iat` and `exp` are typed `never`:
- * they always come from the clock and `jwt.ttl`, so no caller can quietly mint a
- * token that outlives its TTL. `sub` is set through `userId`.
- */
+/** Claims for `signToken`. Other keys pass through; `iat` and `exp` are refused. */
 export type SignTokenClaims = {
-  /** Becomes `sub`, and is the only way to set it. */
+  /** Becomes `sub`, the only way to set it. */
   userId?: string
   /** What row-level security policies read, e.g. `auth.session()->>'type'`. */
   type?: UserType
   /**
-   * The Postgres role PostgREST assumes.
-   *
-   * Override only for a database role that actually exists with grants, or every
-   * query fails. Application-level roles belong in `type`.
+   * The Postgres role PostgREST assumes. It must exist, with grants.
    * @default "authenticated"
    */
   role?: string
+  /** Set `userId` instead. */
   sub?: never
+  /** Always the signing time. */
   iat?: never
+  /** Always `iat` plus `jwt.ttl`. */
   exp?: never
 } & Record<string, unknown>
 
