@@ -1,3 +1,7 @@
+import { Accordion, Accordions } from "fumadocs-ui/components/accordion"
+import { File, Files, Folder } from "fumadocs-ui/components/files"
+import { Step, Steps } from "fumadocs-ui/components/steps"
+import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import { TypeTable } from "fumadocs-ui/components/type-table"
 import defaultComponents from "fumadocs-ui/mdx"
 import type { ComponentType } from "react"
@@ -13,5 +17,18 @@ export type MDXComponents = Record<string, ComponentType<never>>
  * render empty.
  */
 export function getMDXComponents(components?: MDXComponents) {
-  return { ...defaultComponents, TypeTable, ...components }
+  return {
+    ...defaultComponents,
+    Accordion,
+    Accordions,
+    File,
+    Files,
+    Folder,
+    Step,
+    Steps,
+    Tab,
+    Tabs,
+    TypeTable,
+    ...components
+  }
 }

@@ -70,7 +70,7 @@ import { createAuthClient } from "@auth-ts/core/client"
 export const authClient = createAuthClient()
 
 await authClient.sendSignInCode({ email })
-await authClient.signInWithCode({ email, code })
+await authClient.signInWithCode({ code })
 
 // Your PostgREST client asks for the token on every request.
 new NeonPostgrestClient({

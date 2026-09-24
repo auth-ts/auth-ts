@@ -50,7 +50,7 @@ export type LocaleMessages = Partial<Record<AuthErrorCode, string>>
 
 /** Server-side message localization. */
 export interface LocalizationOptions {
-  /** Falls back to this locale when the request matches none. Defaults to `"en"`. */
+  /** Falls back to this locale when the request matches none. @default "en" */
   defaultLocale?: string
   /** Per-locale overrides. Partial — anything missing falls through, never blank. */
   messages?: Record<string, LocaleMessages>

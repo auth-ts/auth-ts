@@ -19,10 +19,11 @@ export type SignTokenClaims = {
   /** What row-level security policies read, e.g. `auth.session()->>'type'`. */
   type?: UserType
   /**
-   * The Postgres role PostgREST assumes. Defaults to `authenticated`.
+   * The Postgres role PostgREST assumes.
    *
    * Override only for a database role that actually exists with grants, or every
    * query fails. Application-level roles belong in `type`.
+   * @default "authenticated"
    */
   role?: string
   sub?: never

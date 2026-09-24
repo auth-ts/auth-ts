@@ -32,13 +32,19 @@ function leaves(node: Node): Node[] {
  */
 function openAPIFolder(node: Folder, folderPath: string) {
   if (folderPath === BASE_DIR) {
+    const children = [...node.children].sort(
+      (left, right) => rankOf(left) - rankOf(right)
+    )
+
     return {
       ...node,
-      name: "OpenAPI",
+      name: "HTTP API",
+      description: "Every endpoint, as OpenAPI",
+      root: true,
       icon: createElement(OpenAPIIcon, { className: "size-4" }),
-      children: [...node.children].sort(
-        (left, right) => rankOf(left) - rankOf(right)
-      )
+      // Layout tabs link to a root's index.
+      index: children.flatMap(leaves).find((leaf) => leaf.type === "page"),
+      children
     }
   }
 

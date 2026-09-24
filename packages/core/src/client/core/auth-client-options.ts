@@ -45,8 +45,8 @@ export interface AuthClientOptions {
    * combination this design excludes.
    */
   cookieStorage?: CookieStorage
-  /** @default "error" — quiet in other people's consoles. */
+  /** @default "error" */
   logLevel?: LogLevel
-  /** Log sink override. Defaults to `console`. */
+  /** Log sink override. @default console */
   logger?: Logger
 }

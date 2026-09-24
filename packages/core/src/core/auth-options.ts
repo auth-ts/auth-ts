@@ -187,8 +187,9 @@ export type JwtClaims =
 /** Token signing and publication. */
 export interface JwtOptions {
   /**
-   * PKCS#8 private key PEM. Defaults to the `JWT_PRIVATE_KEY` environment
-   * variable; construction throws if neither is set.
+   * PKCS#8 private key PEM. Construction throws if neither this nor the
+   * environment variable is set.
+   * @default process.env.JWT_PRIVATE_KEY
    */
   privateKey?: string
   /** ES256 unless a verifier of yours only speaks RSA. @default "ES256" */
@@ -221,8 +222,8 @@ export interface JwtOptions {
 export interface JwksOptions {
   /**
    * The public URL of the key set, advertised as `jwks_uri` in the discovery
-   * document. Defaults to `<baseURL>/jwks.json` — where a `jwks.json` in a public folder
-   * is served — or to the `/jwks` endpoint when {@link JwksOptions.json} is set.
+   * document. The `/jwks` endpoint when {@link JwksOptions.json} is set.
+   * @default "<baseURL>/jwks.json"
    */
   url?: string
   /**
@@ -280,7 +281,7 @@ export interface CookieOptions {
    */
   name?: string
   /**
-   * Defaults to `"/"`, so a page request carries the session.
+   * Rooted at `/` so a page request carries the session.
    *
    * Server-side rendering is the reason: a loader, middleware, or server
    * component runs on a request to your own routes, not to the auth mount, and
@@ -294,6 +295,7 @@ export interface CookieOptions {
    * `SameSite=Lax`, and host-only scoping are what protect the token — so what
    * this buys is exposure hygiene, and it costs you server-side session reads
    * and the `__Host-` prefix, which the browser allows only at `/`.
+   * @default "/"
    */
   path?: string
   /**
@@ -553,7 +555,7 @@ export interface AuthOptions<
   openapi?: boolean
   /** @default "warn" */
   logLevel?: LogLevel
-  /** Log sink override, e.g. pino. Defaults to `console`. */
+  /** Log sink override, e.g. pino. @default console */
   logger?: Logger
   /**
    * Extends work past the response, e.g. Cloudflare's `ctx.waitUntil`.

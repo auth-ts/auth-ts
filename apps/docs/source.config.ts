@@ -1,4 +1,5 @@
 import { defineConfig, defineDocs } from "fumadocs-mdx/config"
+import type { RemarkAutoTypeTableOptions } from "fumadocs-typescript"
 import { createGenerator, remarkAutoTypeTable } from "fumadocs-typescript"
 
 /**
@@ -21,8 +22,29 @@ export const docs = defineDocs({
   docs: { postprocess: { includeProcessedMarkdown: true } }
 })
 
+const typeTables: RemarkAutoTypeTableOptions = {
+  generator,
+  options: {
+    basePath: "../../packages/core/src",
+    typeSimplifier: {
+      // Default shows "union" and "object" instead.
+      override: ({ type, location }) => {
+        const members = type
+          .getText(location)
+          .split(" | ")
+          .filter((member) => member !== "undefined")
+        const joined = members.join(" | ")
+        const text =
+          members.length === 1 ? joined.replace(/^\((.*)\)$/, "$1") : joined
+
+        return text.length <= 40 ? text : undefined
+      }
+    }
+  }
+}
+
 export default defineConfig({
   mdxOptions: {
-    remarkPlugins: [[remarkAutoTypeTable, { generator }]]
+    remarkPlugins: [[remarkAutoTypeTable, typeTables]]
   }
 })

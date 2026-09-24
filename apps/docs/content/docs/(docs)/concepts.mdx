@@ -1,7 +1,6 @@
 ---
 title: Concepts
 description: Two tokens, one cookie, and where authorization actually happens.
-icon: Lightbulb
 ---
 
 ## Two tokens
@@ -67,8 +66,8 @@ out, and nothing on the server can compensate for it.
 ## Revocation has a latency, and it is the access token's lifetime
 
 The database verifies a signature and an expiry. It does not call you. So a
-revoked session keeps working until its current access token expires — ten
-minutes by default.
+revoked session keeps working until its current access token expires — an
+hour by default.
 
 This is worth saying plainly next to any "sign out everywhere" button, because
 the alternative is a support conversation. Shorten `jwt.ttl` if you want a
@@ -95,7 +94,7 @@ endpoint reads the session row and refuses when it is gone.
   "type": "user",
   "amr": ["otp"],
   "iat": 1771200000,
-  "exp": 1771200600
+  "exp": 1771203600
 }
 ```
 

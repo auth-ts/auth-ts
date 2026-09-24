@@ -68,7 +68,7 @@ const loadPage = createServerFn({ method: "GET" })
 const clientLoader = browserCollections.docs.createClientLoader({
   component({ frontmatter, toc, default: MDX }) {
     return (
-      <DocsPage toc={toc}>
+      <DocsPage toc={toc} tableOfContent={{ style: "clerk" }}>
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <DocsBody>
@@ -88,9 +88,15 @@ function MDXContent({ path }: { path: string }) {
 
 function DocumentationPage() {
   const data = useFumadocsLoader(Route.useLoaderData())
+  const options = baseOptions()
 
   return (
-    <NotebookLayout {...baseOptions()} tree={data.pageTree}>
+    <NotebookLayout
+      {...options}
+      nav={{ ...options.nav, mode: "top" }}
+      tabMode="navbar"
+      tree={data.pageTree}
+    >
       {data.type === "openapi" ? (
         <DocsPage full>
           <DocsTitle>{data.title}</DocsTitle>

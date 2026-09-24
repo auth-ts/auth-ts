@@ -1,1 +1,7 @@
-{ "icon": "Braces" }
+{
+  "title": "Reference",
+  "description": "Options, methods and types",
+  "icon": "Braces",
+  "root": true,
+  "pages": ["create-auth", "client", "auth-database", "cli"]
+}

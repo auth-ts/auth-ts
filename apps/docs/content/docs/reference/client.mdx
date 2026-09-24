@@ -22,7 +22,7 @@ Every method here has an identically named callable on the server —
 `auth`. Moving a call between a loader and a component is changing
 `auth` to `authClient` and nothing else.
 
-<auto-type-table path="../../../../../packages/core/src/client/core/auth-client-options.ts" name="AuthClientOptions" />
+<auto-type-table path="client/core/auth-client-options.ts" name="AuthClientOptions" />
 
 ## The two reads
 
@@ -106,7 +106,7 @@ const token = await authClient.getToken({
 })
 ```
 
-<auto-type-table path="../../../../../packages/core/src/client/methods/get-token.ts" name="GetTokenOptions" />
+<auto-type-table path="client/methods/get-token.ts" name="GetTokenOptions" />
 
 It fires only when that call actually minted. A token served from memory read
 nothing, and the user it could report would be as old as the token — so a warm

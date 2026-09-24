@@ -25,7 +25,7 @@ produces: `AuthConfig`, with every default applied and every value
 validated, exposed as `auth.config`. When options cannot be resolved into
 a config, construction throws an `AuthConfigError`.
 
-<auto-type-table path="../../../../../packages/core/src/core/auth-options.ts" name="AuthOptions" />
+<auto-type-table path="core/auth-options.ts" name="AuthOptions" />
 
 ## Generating ids
 
@@ -211,7 +211,7 @@ Every refusal is logged at `debug` with a `reason` of `missing`, `expired`, or
 healthy deployment refuses about never — a rate above that is a client that has
 stopped refreshing, showing up as a graph rather than as user reports.
 
-<auto-type-table path="../../../../../packages/core/src/jwt/sign-token.ts" name="SignTokenClaims" />
+<auto-type-table path="jwt/sign-token.ts" name="SignTokenClaims" />
 
 ## Additional fields
 
@@ -258,7 +258,7 @@ createAuth({
 })
 ```
 
-<auto-type-table path="../../../../../packages/core/src/lib/ip-address.ts" name="IpAddressOptions" />
+<auto-type-table path="lib/ip-address.ts" name="IpAddressOptions" />
 
 During development — `NODE_ENV=development` — a request with no forwarded header
 reports `127.0.0.1` rather than nothing, so per-IP limits are testable on the one
