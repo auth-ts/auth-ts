@@ -56,7 +56,7 @@ driver.
 
 ### Create the server
 
-<include meta='twoslash title="lib/auth.ts"'>../../snippets/auth.ts</include>
+<include meta='title="lib/auth.ts"'>../../snippets/auth.ts</include>
 
 </Step>
 <Step>
@@ -111,9 +111,9 @@ export default app
 
 ### Sign in from the browser
 
-<include meta='twoslash title="lib/auth-client.ts"'>../../snippets/auth-client.ts</include>
+<include meta='title="lib/auth-client.ts"'>../../snippets/auth-client.ts</include>
 
-```ts twoslash
+```ts
 import { authClient } from "./lib/auth-client"
 
 declare const email: string
@@ -138,7 +138,7 @@ decide access.
 
 Send the token from the browser:
 
-```ts twoslash
+```ts
 import { authClient } from "./lib/auth-client"
 // ---cut---
 const response = await fetch("/api/todos", {
@@ -149,7 +149,7 @@ const response = await fetch("/api/todos", {
 Verify it on the server. `verifyToken` checks the signature locally, with no
 database call:
 
-```ts twoslash title="src/routes/api/todos.ts"
+```ts title="src/routes/api/todos.ts"
 import { auth } from "./lib/auth"
 // ---cut---
 export async function GET(request: Request) {

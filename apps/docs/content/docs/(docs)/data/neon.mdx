@@ -65,7 +65,12 @@ from a server or script; row-level security does that.
 Limit it to your schema, or it offers to drop Neon's `auth` schema:
 
 ```ts title="drizzle.config.ts"
+import { defineConfig } from "drizzle-kit"
+
 export default defineConfig({
-  schemaFilter: ["public"]
+  dialect: "postgresql",
+  schema: "./src/db/schema.ts",
+  schemaFilter: ["public"], // [!code highlight]
+  dbCredentials: { url: process.env.DATABASE_URL as string }
 })
 ```

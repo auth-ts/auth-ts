@@ -7,19 +7,21 @@ A page request carries the refresh cookie. `auth.getToken` turns it into a
 token and the user, or `null` when nobody is signed in:
 
 ```ts
-const session = await auth.getToken({ headers: request.headers })
+export async function load(request: Request) {
+  const session = await auth.getToken({ headers: request.headers })
 
-if (!session) return { user: null }
+  if (!session) return { user: null }
 
-session.user // the user row
-session.token // a token for your data API
+  session.user // the user row
+  session.token // a token for your data API
+}
 ```
 
 Call it once per request, then reuse the token. Every other server call on
 `auth` takes that token:
 
 ```ts
-await auth.updateUser({ token: session.token, name })
+await auth.updateUser({ token: session.token, name: "Ada" })
 ```
 
 To query your data API on the server, send the same token as a bearer. The

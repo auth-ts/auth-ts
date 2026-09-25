@@ -155,15 +155,35 @@ const typeTables: RemarkAutoTypeTableOptions = {
 const authDatabaseStub = `import type { AuthDatabase } from "@auth-ts/core"
 export declare const authDatabase: AuthDatabase`
 
+const globalsReference =
+  '/// <reference path="./globals.d.ts" />\n/// <reference path="./modules.d.ts" />\n'
+
 const twoslash = transformerTwoslash({
+  explicitTrigger: false,
   twoslashOptions: {
     compilerOptions: {
       target: "ES2022",
       module: "ESNext",
       moduleResolution: "Bundler",
+      moduleDetection: "force",
+      resolveJsonModule: true,
+      types: ["node"],
       strict: true
     },
     extraFiles: {
+      "index.ts": { prepend: globalsReference },
+      "index.tsx": { prepend: globalsReference },
+      "globals.d.ts": readFileSync(
+        "content/snippets/twoslash/globals.d.ts",
+        "utf8"
+      ),
+      "modules.d.ts": readFileSync(
+        "content/snippets/twoslash/modules.d.ts",
+        "utf8"
+      ),
+      "auth.ts": 'export { auth } from "./lib/auth"',
+      "schema.ts": readFileSync("content/snippets/schema.ts", "utf8"),
+      "jwks.json": '{ "keys": [] }',
       "auth-database.ts": authDatabaseStub,
       "lib/auth-database.ts": authDatabaseStub,
       "lib/auth.ts": readFileSync("content/snippets/auth.ts", "utf8"),

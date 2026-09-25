@@ -1,3 +1,4 @@
+// @noStaticSemanticInfo
 import {
   type AuthDatabaseOperator,
   type AuthOrderBy,

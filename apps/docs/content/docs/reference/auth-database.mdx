@@ -17,7 +17,7 @@ joins, no `OR` and no expressions. For working implementations, see
    exclusive bounds. Values are never `null`.
 
    ```ts
-   where: { userId: { eq: id }, updatedAt: { gt: cutoff } }
+   const where = { userId: { eq: id }, updatedAt: { gt: cutoff } }
    ```
 
 2. **`select` always gets `limit` and `orderBy`.** `orderBy` is one column and a
@@ -49,6 +49,8 @@ export const authDatabase = defineAuthDatabase({
           limit
         ])
       // ...
+      default:
+        throw new Error(`No query for ${table}`)
     }
   }
   // insert, update, delete
@@ -69,7 +71,7 @@ Declare `user.additionalFields` once and pass it as the second type parameter,
 so `users` rows carry those columns, typed:
 
 ```ts
-import { type AdditionalFieldsSchema, defineAuthDatabase } from "@auth-ts/core"
+import type { AdditionalFieldsSchema } from "@auth-ts/core"
 
 export const additionalFields = { plan: "string" } satisfies AdditionalFieldsSchema
 

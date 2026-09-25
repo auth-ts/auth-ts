@@ -44,7 +44,10 @@
     {
       "includes": ["apps/docs/content/snippets/**"],
       "linter": {
-        "rules": { "correctness": { "noUnusedVariables": "off" } }
+        "rules": {
+          "correctness": { "noUnusedVariables": "off" },
+          "suspicious": { "noExplicitAny": "off" }
+        }
       }
     }
   ],

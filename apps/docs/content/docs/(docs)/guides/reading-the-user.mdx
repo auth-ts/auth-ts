@@ -10,6 +10,8 @@ library you already use. These examples use TanStack Query.
 ## The token
 
 ```ts
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+
 export function useToken() {
   const queryClient = useQueryClient()
 
@@ -33,6 +35,8 @@ for. Seeding the cache from it means a cold load costs one request.
 ## The user
 
 ```ts
+import { skipToken, useQuery } from "@tanstack/react-query"
+
 export function useUser() {
   const { data: token, isPending } = useToken()
 
@@ -71,6 +75,8 @@ Your data API sees the token directly, so an expired one is a plain 401. Drop
 the token and retry once:
 
 ```ts
+import { fetchWithToken } from "@neondatabase/postgrest-js"
+
 const send = fetchWithToken(authClient.getToken)
 
 let response = await send(url)
