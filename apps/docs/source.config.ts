@@ -161,8 +161,14 @@ const globalsReference =
 const twoslash = transformerTwoslash({
   explicitTrigger: false,
   twoslashOptions: {
-    // Longer types are unreadable in a popup.
-    filterNode: (node) => node.type !== "hover" || node.text.length <= 1000,
+    filterNode: (node) => {
+      if (node.type !== "hover") return true
+
+      // Virtual paths leak this machine and change per run.
+      node.text = node.text.replace(/\/[^"'\s]*\/\.twoslash\/\d+\//g, "./")
+      // Longer types are unreadable in a popup.
+      return node.text.length <= 1000
+    },
     compilerOptions: {
       target: "ES2022",
       module: "ESNext",
