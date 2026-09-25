@@ -212,3 +212,8 @@
     animation: none;
   }
 }
+
+/* Keeps macOS overlay scrollbars that auto-hide. */
+.fd-scroll-container {
+  scrollbar-width: thin;
+}

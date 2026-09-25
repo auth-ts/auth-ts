@@ -105,7 +105,7 @@ const FEATURES = [
   {
     icon: Scale,
     title: "Free forever",
-    body: "Apache-2.0. No hosted service, no per-user pricing."
+    body: "Apache-2.0. No hosted service, no per‑user pricing."
   }
 ]
 
@@ -144,24 +144,23 @@ function Hero() {
         <div className="hero-noise" />
       </div>
       <div
-        className={`${FRAME} grid grid-cols-1 gap-x-12 gap-y-10 px-6 py-16 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-end lg:py-28 2xl:grid-cols-[minmax(0,40rem)_minmax(0,34rem)] 2xl:justify-center 2xl:gap-x-32 2xl:py-24`}
+        className={`${FRAME} grid grid-cols-1 gap-10 px-4 py-10 md:gap-12 md:px-6 md:py-12 lg:grid-cols-2 lg:items-end`}
       >
         <div className="min-w-0">
           <h1 className="flex flex-col gap-4">
-            <span className="flex items-center gap-2 font-mono text-5xl font-semibold tracking-tighter md:gap-3 md:text-7xl 2xl:text-8xl">
-              <Logo className="text-fd-primary size-15 md:size-22 2xl:size-28" />
+            <span className="flex items-center gap-2 font-mono text-4xl font-semibold tracking-tighter md:gap-3 md:text-6xl">
+              <Logo className="text-fd-primary size-11 md:size-18" />
               auth.ts
             </span>
-            <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl 2xl:max-w-xl 2xl:text-4xl">
+            <span className="max-w-lg text-2xl font-medium tracking-tight text-balance md:text-3xl lg:max-w-none">
               <span className="before:bg-fd-primary relative whitespace-nowrap before:absolute before:inset-x-0 before:bottom-[-0.015em] before:h-[max(3px,0.07em)] before:rounded-full before:content-['']">
                 Free forever
               </span>{" "}
               auth in TypeScript.
             </span>
           </h1>
-          <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty 2xl:max-w-xl 2xl:text-lg">
-            Sign-in, sessions and JWTs for any TypeScript app. Bring your own
-            database and framework.
+          <p className="text-fd-muted-foreground mt-6 max-w-lg text-pretty lg:max-w-none">
+            Sign-in, sessions and JWTs for any TypeScript app.
           </p>
           <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-medium">
             {CLAIMS.map((claim, index) => (
@@ -192,11 +191,12 @@ function Hero() {
               GitHub
             </a>
           </div>
-          <div className="mt-8 max-w-md 2xl:max-w-xl">
+          <div className="mt-8 max-w-md md:max-w-none">
             <DynamicCodeBlock
               lang="bash"
               code={`npm install @auth-ts/core
 npx @auth-ts/cli keygen`}
+              codeblock={{ className: "shadow-none" }}
             />
           </div>
         </div>
@@ -204,7 +204,7 @@ npx @auth-ts/cli keygen`}
           <p className="text-fd-muted-foreground mb-3 font-mono text-xs tracking-wider uppercase">
             Package
           </p>
-          <dl className="text-sm md:grid md:grid-cols-2 md:gap-x-12 lg:block">
+          <dl className="text-sm md:grid md:grid-cols-2 md:gap-x-6 lg:block">
             {SPECS.map(([term, value]) => (
               <div
                 key={term}
@@ -223,8 +223,8 @@ npx @auth-ts/cli keygen`}
 
 function SectionHeading({ title, body }: { title: string; body: string }) {
   return (
-    <div className="px-6 pt-16 pb-10 md:px-6">
-      <h2 className="text-3xl font-semibold tracking-tight text-balance">
+    <div className="px-4 py-6 md:px-6 md:py-8">
+      <h2 className="text-2xl font-semibold tracking-tight text-balance">
         {title}
       </h2>
       <p className="text-fd-muted-foreground mt-3 max-w-xl text-pretty">
@@ -241,11 +241,11 @@ function Steps() {
         title="Three steps to a signed-in user"
         body="The quickstart walks through each one, with the database tables."
       />
-      <ol className="border-fd-border divide-fd-border grid divide-y border-t xl:grid-cols-3 xl:divide-x xl:divide-y-0">
+      <ol className="border-fd-border divide-fd-border grid divide-y border-t lg:grid-cols-3 lg:divide-x lg:divide-y-0">
         {STEPS.map((step, index) => (
           <li
             key={step.title}
-            className="flex min-w-0 flex-col gap-1 p-6 md:max-xl:grid md:max-xl:grid-cols-[13rem_minmax(0,1fr)] md:max-xl:grid-rows-[auto_auto_1fr] md:max-xl:gap-x-8"
+            className="flex min-w-0 flex-col gap-1 p-4 md:p-6 md:max-lg:grid md:max-lg:grid-cols-2 md:max-lg:grid-rows-[auto_auto_1fr] md:max-lg:gap-x-4"
           >
             <p className="text-fd-primary font-mono text-xs">0{index + 1}</p>
             <h3 className="font-medium">{step.title}</h3>
@@ -256,7 +256,7 @@ function Steps() {
               codeblock={{
                 title: step.file,
                 className:
-                  "my-0 flex-1 [&_pre]:text-xs md:max-xl:col-start-2 md:max-xl:row-span-3 md:max-xl:row-start-1"
+                  "my-0 flex flex-1 flex-col shadow-none [&_pre]:text-xs [&>div:last-child]:flex-1 md:max-lg:col-start-2 md:max-lg:row-span-3 md:max-lg:row-start-1"
               }}
             />
           </li>
@@ -269,8 +269,8 @@ function Steps() {
 function Token() {
   return (
     <section className="border-fd-border divide-fd-border grid divide-y border-t lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-      <div className="px-6 py-16 md:px-6">
-        <h2 className="text-3xl font-semibold tracking-tight text-balance">
+      <div className="px-4 py-6 md:px-6 md:py-8">
+        <h2 className="text-2xl font-semibold tracking-tight text-balance">
           A JWT anything can verify
         </h2>
         <p className="text-fd-muted-foreground mt-3 max-w-lg text-pretty">
@@ -292,11 +292,14 @@ function Token() {
           ))}
         </ul>
       </div>
-      <div className="flex min-w-0 items-center px-6 py-16 md:px-6">
+      <div className="flex min-w-0 items-center p-4 md:p-6">
         <DynamicCodeBlock
           lang="jsonc"
           code={TOKEN}
-          codeblock={{ title: "Access token", className: "my-0 w-full" }}
+          codeblock={{
+            title: "Access token",
+            className: "my-0 w-full shadow-none"
+          }}
         />
       </div>
     </section>
@@ -312,7 +315,7 @@ function Features() {
       />
       <ul className="border-fd-border bg-fd-border grid gap-px border-t sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map(({ icon: Icon, title, body }) => (
-          <li key={title} className="bg-fd-background p-6 md:px-6">
+          <li key={title} className="bg-fd-background p-4 md:p-6">
             <Icon className="text-fd-primary size-5" />
             <h3 className="mt-4 font-medium">{title}</h3>
             <p className="text-fd-muted-foreground mt-1.5 text-sm text-pretty">
@@ -327,8 +330,8 @@ function Features() {
 
 function Closing() {
   return (
-    <section className="border-fd-border flex flex-col items-center border-t px-6 py-20 text-center">
-      <h2 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
+    <section className="border-fd-border flex flex-col items-center border-t px-4 py-10 text-center md:px-6 md:py-12">
+      <h2 className="text-2xl font-semibold tracking-tight text-balance md:text-3xl">
         Add sign-in to your app
       </h2>
       <p className="text-fd-muted-foreground mt-3 max-w-md text-pretty">
@@ -348,8 +351,8 @@ function Closing() {
 
 function Footer() {
   return (
-    <footer className="border-fd-border flex flex-wrap items-center justify-between gap-6 border-t px-6 py-8 text-sm md:px-6">
-      <nav className="flex flex-wrap gap-x-6 gap-y-2 font-medium">
+    <footer className="border-fd-border flex flex-col items-center gap-4 border-t p-4 text-center text-sm md:flex-row md:justify-between md:gap-6 md:p-6 md:text-start">
+      <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 font-medium">
         <Link to="/docs/$" params={{ _splat: "quickstart" }}>
           Quickstart
         </Link>
@@ -365,7 +368,10 @@ function Footer() {
           Lucia
         </a>{" "}
         and{" "}
-        <a href="https://thecopenhagenbook.com" className="underline">
+        <a
+          href="https://thecopenhagenbook.com"
+          className="whitespace-nowrap underline"
+        >
           The Copenhagen Book
         </a>
         .
