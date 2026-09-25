@@ -18,18 +18,18 @@ at `/login?error=<code>` if something went wrong.
 
 ## Create the OAuth app
 
-The callback URL is your origin, the auth path, and `/callback/<provider>`:
-
-```
-https://your.app/api/auth/callback/github
-https://your.app/api/auth/callback/google
-```
+The callback URL is your origin, the auth path, and `/callback/<provider>`.
 
 <Tabs items={["GitHub", "Google"]}>
 <Tab value="GitHub">
 
 1. Open **Settings → Developer settings → OAuth Apps → New OAuth App**.
-2. Set **Authorization callback URL** to the GitHub callback above.
+2. Set **Authorization callback URL** to:
+
+   ```
+   https://your.app/api/auth/callback/github
+   ```
+
 3. Copy the **Client ID**, then generate and copy a **Client secret**.
 
 </Tab>
@@ -37,7 +37,12 @@ https://your.app/api/auth/callback/google
 
 1. In Google Cloud Console, open **APIs & Services → Credentials**.
 2. Choose **Create credentials → OAuth client ID**, type **Web application**.
-3. Add the Google callback above under **Authorized redirect URIs**.
+3. Under **Authorized redirect URIs**, add:
+
+   ```
+   https://your.app/api/auth/callback/google
+   ```
+
 4. Copy the client ID and secret.
 
 </Tab>
