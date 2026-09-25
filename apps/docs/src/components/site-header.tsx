@@ -1,9 +1,15 @@
 import { Link } from "@tanstack/react-router"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "fumadocs-ui/components/ui/popover"
+import {
   FullSearchTrigger,
   SearchTrigger
 } from "fumadocs-ui/layouts/shared/slots/search-trigger"
 import { ThemeSwitch } from "fumadocs-ui/layouts/shared/slots/theme-switch"
+import { Sidebar } from "lucide-react"
 import { GitHubIcon } from "~/components/github-icon"
 import { tabClassName } from "~/components/section-tabs"
 import { navTitle, REPO_URL } from "~/lib/layout.shared"
@@ -56,9 +62,36 @@ export function SiteHeader() {
           hideIfDisabled
           className="mx-auto my-auto w-full max-w-sm rounded-xl ps-2.5 max-md:hidden"
         />
-        <div className="flex flex-1 items-center justify-end gap-2 md:flex-none md:ps-4">
-          <SearchTrigger hideIfDisabled className="p-2 md:hidden" />
-          <HeaderActions />
+        <div className="flex flex-1 items-center justify-end md:flex-none md:ps-4">
+          <div className="flex items-center md:hidden">
+            <SearchTrigger hideIfDisabled className="p-2" />
+            <Popover>
+              <PopoverTrigger
+                aria-label="Open menu"
+                className="hover:bg-fd-accent hover:text-fd-accent-foreground -me-1.5 inline-flex items-center justify-center rounded-md p-2 transition-colors [&_svg]:size-4.5"
+              >
+                <Sidebar />
+              </PopoverTrigger>
+              <PopoverContent align="end" className="flex flex-col">
+                {LINKS.map(([text, splat]) => (
+                  <Link
+                    key={text}
+                    to="/docs/$"
+                    params={{ _splat: splat }}
+                    className="hover:bg-fd-accent rounded-md p-2 font-medium transition-colors"
+                  >
+                    {text}
+                  </Link>
+                ))}
+                <div className="border-fd-border mt-2 border-t pt-2">
+                  <HeaderActions />
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="max-md:hidden">
+            <HeaderActions />
+          </div>
         </div>
       </div>
     </header>
