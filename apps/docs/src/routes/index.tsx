@@ -193,7 +193,6 @@ function Hero() {
               lang="bash"
               code={`npm install @auth-ts/core
 npx @auth-ts/cli keygen`}
-              codeblock={{ className: "shadow-none" }}
             />
           </div>
         </div>
@@ -253,7 +252,7 @@ function Steps() {
               codeblock={{
                 title: step.file,
                 className:
-                  "my-0 flex flex-1 flex-col shadow-none [&_pre]:text-xs [&>div:last-child]:flex-1 md:max-lg:col-start-2 md:max-lg:row-span-3 md:max-lg:row-start-1"
+                  "my-0 flex flex-1 flex-col [&_pre]:text-xs [&>div:last-child]:flex-1 md:max-lg:col-start-2 md:max-lg:row-span-3 md:max-lg:row-start-1"
               }}
             />
           </li>
@@ -295,7 +294,7 @@ function Token() {
           code={TOKEN}
           codeblock={{
             title: "Access token",
-            className: "my-0 w-full shadow-none"
+            className: "my-0 w-full"
           }}
         />
       </div>
