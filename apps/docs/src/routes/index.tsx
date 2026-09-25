@@ -15,6 +15,9 @@ import { GitHubIcon } from "~/components/github-icon"
 import { Logo } from "~/components/logo"
 import { SiteHeader } from "~/components/site-header"
 import { REPO_URL } from "~/lib/layout.shared"
+import configureSource from "../../content/snippets/home/configure.ts?raw"
+import routeSource from "../../content/snippets/home/route.ts?raw"
+import signInSource from "../../content/snippets/home/sign-in.ts?raw"
 
 export const Route = createFileRoute("/")({ component: LandingPage })
 
@@ -27,37 +30,31 @@ const SPECS = [
   ["License", "Apache-2.0"]
 ]
 
+const CUT = "// ---cut---\n"
+
+// Hides each snippet's typecheck-only header.
+function shown(source: string) {
+  return source.slice(source.indexOf(CUT) + CUT.length).trim()
+}
+
 const STEPS = [
   {
     title: "Configure",
     body: "One file on your server.",
     file: "lib/auth.ts",
-    code: `import { createAuth } from "@auth-ts/core"
-import { authDatabase } from "./auth-database"
-
-export const auth = createAuth({
-  database: authDatabase,
-  email: { sendCode: sendEmail }
-})`
+    code: shown(configureSource)
   },
   {
     title: "Mount",
     body: "One catch-all route, in any framework.",
     file: "app/api/auth/[...all]/route.ts",
-    code: `import { auth } from "@/lib/auth"
-
-export const GET = auth.handler
-export const POST = auth.handler
-export const DELETE = auth.handler`
+    code: shown(routeSource)
   },
   {
     title: "Sign in",
     body: "From the browser, with no UI to adopt.",
     file: "components/sign-in.tsx",
-    code: `await authClient.sendSignInCode({ email })
-await authClient.signInWithCode({ code })
-
-const token = await authClient.getToken()`
+    code: shown(signInSource)
   }
 ]
 

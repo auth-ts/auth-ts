@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "test:types": "fumadocs-mdx && tsc -p tsconfig.json"
+    "test:types": "fumadocs-mdx && tsc -p tsconfig.json && tsc -p tsconfig.snippets.json"
   },
   "dependencies": {
     "@auth-ts/core": "workspace:*",

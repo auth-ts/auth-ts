@@ -40,6 +40,14 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["apps/docs/content/snippets/**"],
+      "linter": {
+        "rules": { "correctness": { "noUnusedVariables": "off" } }
+      }
+    }
+  ],
   "css": {
     "parser": {
       "tailwindDirectives": true
