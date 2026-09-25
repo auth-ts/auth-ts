@@ -68,7 +68,7 @@ const TOKEN = `{
 
 const VERIFIERS = [
   ["Your own routes", "data/server-routes"],
-  ["Neon", "data/neon"],
+  ["Neon Data API", "data/neon-data-api"],
   ["Supabase", "data/supabase"],
   ["Any JWKS library", "data/jwks"]
 ]

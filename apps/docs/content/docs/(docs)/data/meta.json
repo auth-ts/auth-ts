@@ -1,3 +1,9 @@
 {
-  "pages": ["server-routes", "row-level-security", "neon", "supabase", "jwks"]
+  "pages": [
+    "server-routes",
+    "row-level-security",
+    "neon-data-api",
+    "supabase",
+    "jwks"
+  ]
 }
