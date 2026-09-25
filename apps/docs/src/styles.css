@@ -217,3 +217,8 @@
 .fd-scroll-container {
   scrollbar-width: thin;
 }
+
+/* Long inline URLs wrap instead of clipping. */
+.prose :not(pre) > code {
+  overflow-wrap: anywhere;
+}

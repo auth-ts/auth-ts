@@ -70,19 +70,24 @@ function linkTypeNames(node: HastNode) {
     if (child.tagName && UNLINKABLE.has(child.tagName)) continue
 
     const [text] = child.children ?? []
+    const [, before = "", name = "", after = ""] =
+      /^(\s*)(.*?)(\s*)$/s.exec(String(text?.value)) ?? []
     const href =
       child.children?.length === 1 &&
       text?.type === "text" &&
-      typeLinks.get(String(text.value).trim())
+      typeLinks.get(name)
 
-    if (text && href) {
+    if (href) {
+      // Keep spaces out of the underline.
       child.children = [
+        { type: "text", value: before },
         {
           type: "element",
           tagName: "a",
           properties: { href, className: ["underline"] },
-          children: [text]
-        }
+          children: [{ type: "text", value: name }]
+        },
+        { type: "text", value: after }
       ]
     } else {
       linkTypeNames(child)
@@ -100,18 +105,26 @@ interface MdastNode {
 /** Anchors each type table at its type name. */
 function remarkTypeTableIds() {
   function visit(node: MdastNode) {
-    for (const child of node.children ?? []) {
+    node.children = node.children?.map((child) => {
       const name = child.attributes?.find(
         (attribute) => attribute.name === "name"
       )
-      if (child.name === "auto-type-table" && typeof name?.value === "string") {
-        child.attributes?.push(
+      if (child.name !== "auto-type-table" || typeof name?.value !== "string") {
+        visit(child)
+        return child
+      }
+
+      // A table id makes rows rewrite the hash.
+      return {
+        type: "mdxJsxFlowElement",
+        name: "div",
+        attributes: [
           { type: "mdxJsxAttribute", name: "id", value: name.value },
           { type: "mdxJsxAttribute", name: "className", value: "scroll-m-28" }
-        )
+        ],
+        children: [child]
       }
-      visit(child)
-    }
+    })
   }
 
   return visit

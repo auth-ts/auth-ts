@@ -5,7 +5,7 @@ import { Step, Steps } from "fumadocs-ui/components/steps"
 import { Tab, Tabs } from "fumadocs-ui/components/tabs"
 import { TypeTable } from "fumadocs-ui/components/type-table"
 import defaultComponents from "fumadocs-ui/mdx"
-import type { ComponentType } from "react"
+import type { ComponentProps, ComponentType } from "react"
 
 /** The components every MDX page can use. */
 export type MDXComponents = Record<string, ComponentType<never>>
@@ -30,7 +30,10 @@ export function getMDXComponents(components?: MDXComponents) {
     Steps,
     Tab,
     Tabs,
-    TypeTable,
+    // Row ids rewrite the hash, which scrolls.
+    TypeTable: ({ id: _, ...props }: ComponentProps<typeof TypeTable>) => (
+      <TypeTable {...props} />
+    ),
     ...components
   }
 }
