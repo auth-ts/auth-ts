@@ -220,5 +220,5 @@
 
 /* Long inline URLs wrap instead of clipping. */
 .prose :not(pre) > code {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
