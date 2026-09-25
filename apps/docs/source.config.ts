@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins"
 import { defineConfig, defineDocs } from "fumadocs-mdx/config"
 import { transformerTwoslash } from "fumadocs-twoslash"
@@ -161,6 +161,8 @@ const globalsReference =
 const twoslash = transformerTwoslash({
   explicitTrigger: false,
   twoslashOptions: {
+    // Longer types are unreadable in a popup.
+    filterNode: (node) => node.type !== "hover" || node.text.length <= 1000,
     compilerOptions: {
       target: "ES2022",
       module: "ESNext",
@@ -195,7 +197,17 @@ const twoslash = transformerTwoslash({
   }
 })
 
+const MDX_CACHE = "node_modules/.cache/mdx"
+
+// Cache ignores snippets, so drop old runs.
+for (const run of existsSync(MDX_CACHE) ? readdirSync(MDX_CACHE) : []) {
+  if (run !== String(process.pid))
+    rmSync(`${MDX_CACHE}/${run}`, { recursive: true })
+}
+
 export default defineConfig({
+  // Server build reuses the client's compiled pages.
+  experimentalBuildCache: `${MDX_CACHE}/${process.pid}`,
   mdxOptions: {
     remarkPlugins: [remarkTypeTableIds, [remarkAutoTypeTable, typeTables]],
     rehypePlugins: [() => linkTypeNames],
