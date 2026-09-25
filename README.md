@@ -1,7 +1,6 @@
 # auth.ts
 
-**Sign-in, sessions and JWTs for any TypeScript app. Bring your own database and
-framework.**
+**Sign-in, sessions and JWTs for any TypeScript app.**
 
 Free forever. No limits, no service, no company. Built on
 [Lucia](https://lucia-auth.com) and [The Copenhagen Book](https://thecopenhagenbook.com).

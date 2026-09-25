@@ -20,8 +20,7 @@ export const Route = createRootRoute({
       { title: "auth.ts | Free forever auth" },
       {
         name: "description",
-        content:
-          "Sign-in, sessions and JWTs for any TypeScript app. Bring your own database and framework."
+        content: "Sign-in, sessions and JWTs for any TypeScript app."
       },
       // The home-screen label, which has room for far less than the title.
       { name: "apple-mobile-web-app-title", content: "auth.ts" }
