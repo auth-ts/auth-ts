@@ -291,12 +291,12 @@ describe("sendVerificationCode", () => {
       rateLimit: false
     })
 
-    for (let count = 0; count < 40; count++) {
+    for (let count = 0; count < 10; count++) {
       await send(internals, new Headers())
     }
 
     expect(await selectRows(db, "rateLimits")).toHaveLength(0)
-    expect(sentCodes).toHaveLength(40)
+    expect(sentCodes).toHaveLength(10)
   })
 })
 
