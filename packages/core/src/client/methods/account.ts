@@ -211,29 +211,29 @@ async function verifyUpdate(
     : { status: "verificationRequired" }
 }
 
-/** `POST /user/email-update/send-code`; the verification challenge is reported as a result, not thrown. */
+/** `POST /user/update-email/send-code`; the verification challenge is reported as a result, not thrown. */
 export const sendEmailUpdateCode = (
   internals: AuthClientInternals,
   input: SendEmailUpdateCodeInput
-) => sendUpdateCode(internals, "email-update", input)
+) => sendUpdateCode(internals, "update-email", input)
 
-/** `POST /user/email-update/verify`; the verification challenge is reported as a result, not thrown. */
+/** `POST /user/update-email/verify`; the verification challenge is reported as a result, not thrown. */
 export const verifyEmailUpdate = (
   internals: AuthClientInternals,
   input: VerifyUpdateInput
-) => verifyUpdate(internals, "email-update", input)
+) => verifyUpdate(internals, "update-email", input)
 
-/** `POST /user/phone-update/send-code`; the verification challenge is reported as a result, not thrown. */
+/** `POST /user/update-phone/send-code`; the verification challenge is reported as a result, not thrown. */
 export const sendPhoneUpdateCode = (
   internals: AuthClientInternals,
   input: SendPhoneUpdateCodeInput
-) => sendUpdateCode(internals, "phone-update", input)
+) => sendUpdateCode(internals, "update-phone", input)
 
-/** `POST /user/phone-update/verify`; the verification challenge is reported as a result, not thrown. */
+/** `POST /user/update-phone/verify`; the verification challenge is reported as a result, not thrown. */
 export const verifyPhoneUpdate = (
   internals: AuthClientInternals,
   input: VerifyUpdateInput
-) => verifyUpdate(internals, "phone-update", input)
+) => verifyUpdate(internals, "update-phone", input)
 
 /** `POST /user/verify/send-code`. */
 export async function sendIdentityCode(

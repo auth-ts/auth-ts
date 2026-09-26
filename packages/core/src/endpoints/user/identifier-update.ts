@@ -306,7 +306,7 @@ function updateEndpoints<K extends IdentifierKind>(spec: UpdateSpec<K>) {
 
 const email = updateEndpoints({
   kind: "email",
-  route: "email-update",
+  route: "update-email",
   purpose: "emailChange",
   taken: "emailTaken",
   noun: "email address",
@@ -325,7 +325,7 @@ const email = updateEndpoints({
 
 const phone = updateEndpoints({
   kind: "phoneNumber",
-  route: "phone-update",
+  route: "update-phone",
   purpose: "phoneChange",
   taken: "phoneNumberTaken",
   noun: "phone number",
@@ -337,13 +337,13 @@ const phone = updateEndpoints({
     })
 })
 
-/** How `POST /user/email-update/send-code` appears in the OpenAPI document. */
+/** How `POST /user/update-email/send-code` appears in the OpenAPI document. */
 export const sendEmailUpdateCodeDocs = email.sendCodeDocs
-/** How `POST /user/email-update/verify` appears in the OpenAPI document. */
+/** How `POST /user/update-email/verify` appears in the OpenAPI document. */
 export const verifyEmailUpdateDocs = email.verifyDocs
-/** How `POST /user/phone-update/send-code` appears in the OpenAPI document. */
+/** How `POST /user/update-phone/send-code` appears in the OpenAPI document. */
 export const sendPhoneUpdateCodeDocs = phone.sendCodeDocs
-/** How `POST /user/phone-update/verify` appears in the OpenAPI document. */
+/** How `POST /user/update-phone/verify` appears in the OpenAPI document. */
 export const verifyPhoneUpdateDocs = phone.verifyDocs
 
 /**

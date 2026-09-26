@@ -58,7 +58,7 @@ const sendCode = (
   body: Record<string, unknown> = { email: NEW }
 ) =>
   context.auth.handler(
-    request("POST", "/api/auth/user/email-update/send-code", {
+    request("POST", "/api/auth/user/update-email/send-code", {
       cookies: refreshCookieFor(session.refreshToken),
       token: session.token,
       body
@@ -71,7 +71,7 @@ const verify = (
   body: Record<string, unknown>
 ) =>
   context.auth.handler(
-    request("POST", "/api/auth/user/email-update/verify", {
+    request("POST", "/api/auth/user/update-email/verify", {
       cookies: refreshCookieFor(session.refreshToken),
       token: session.token,
       body
@@ -317,7 +317,7 @@ describe("changing the phone number", () => {
     await insertUser(context.db, { phoneNumber: "+15550100199" })
     const call = (path: string, body: Record<string, unknown>) =>
       context.auth.handler(
-        request("POST", `/api/auth/user/phone-update/${path}`, {
+        request("POST", `/api/auth/user/update-phone/${path}`, {
           cookies: refreshCookieFor(session.refreshToken),
           token: session.token,
           body

@@ -33,10 +33,10 @@ method. Authenticated ones take `{ token }` or `{ headers }` carrying
 | `deleteUser` | `DELETE /user` | |
 | `sendIdentityCode` | `POST /user/verify/send-code` | |
 | `verifyIdentity` | `POST /user/verify` | |
-| `sendEmailUpdateCode` | `POST /user/email-update/send-code` |  |
-| `verifyEmailUpdate` | `POST /user/email-update/verify` |  |
-| `sendPhoneUpdateCode` | `POST /user/phone-update/send-code` |  |
-| `verifyPhoneUpdate` | `POST /user/phone-update/verify` |  |
+| `sendEmailUpdateCode` | `POST /user/update-email/send-code` |  |
+| `verifyEmailUpdate` | `POST /user/update-email/verify` |  |
+| `sendPhoneUpdateCode` | `POST /user/update-phone/send-code` |  |
+| `verifyPhoneUpdate` | `POST /user/update-phone/verify` |  |
 | `revokeSession` | `DELETE /sessions/:id` | |
 | `listUsers` | `GET /users` | `multiUser` |
 | `switchUser` | `POST /users/switch` | `multiUser` |

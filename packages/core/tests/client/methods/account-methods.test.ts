@@ -292,8 +292,8 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
         message: "Confirm it's you to continue."
       }
     }
-    server.on("POST", "/api/auth/user/email-update/send-code", challenge)
-    server.on("POST", "/api/auth/user/email-update/verify", challenge)
+    server.on("POST", "/api/auth/user/update-email/send-code", challenge)
+    server.on("POST", "/api/auth/user/update-email/verify", challenge)
     const client = await signedIn()
 
     expect(
@@ -307,10 +307,10 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
   })
 
   it("carries the attempt out of the send and the user out of the verify", async () => {
-    server.on("POST", "/api/auth/user/email-update/send-code", {
+    server.on("POST", "/api/auth/user/update-email/send-code", {
       body: { sent: true, attempt: "attempt-2" }
     })
-    server.on("POST", "/api/auth/user/email-update/verify", {
+    server.on("POST", "/api/auth/user/update-email/verify", {
       body: { ...user, email: "ada@lovelace.example" }
     })
     const client = await signedIn()
@@ -329,10 +329,10 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
   })
 
   it("routes the phone pair the same way", async () => {
-    server.on("POST", "/api/auth/user/phone-update/send-code", {
+    server.on("POST", "/api/auth/user/update-phone/send-code", {
       body: { sent: true, attempt: "attempt-3" }
     })
-    server.on("POST", "/api/auth/user/phone-update/verify", {
+    server.on("POST", "/api/auth/user/update-phone/verify", {
       body: { ...user, phoneNumber: "+15550100" }
     })
     const client = await signedIn()
@@ -349,7 +349,7 @@ describe("sendEmailUpdateCode and verifyEmailUpdate", () => {
   })
 
   it("still throws for a taken address", async () => {
-    server.on("POST", "/api/auth/user/email-update/send-code", {
+    server.on("POST", "/api/auth/user/update-email/send-code", {
       status: 409,
       body: { code: "emailTaken", message: "Taken." }
     })
