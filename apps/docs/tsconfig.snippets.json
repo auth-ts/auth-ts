@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": true,
+    "declaration": false,
+    "paths": {
+      "@auth-ts/core": ["../../packages/core/src/index.ts"],
+      "@auth-ts/core/client": ["../../packages/core/src/client.ts"],
+      "@/lib/auth": ["./content/snippets/home/configure.ts"]
+    }
+  },
+  "include": ["content/snippets/home", "content/snippets/auth-client.ts"]
+}

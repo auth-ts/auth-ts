@@ -1,0 +1,24 @@
+cleanupUnusedCatalogs: true
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+blockExoticSubdeps: true
+minimumReleaseAge: 1440
+trustPolicy: 'no-downgrade'
+trustPolicyExclude:
+  - 'semver@6.3.1' # Babel via @nx/js
+
+packages:
+  - packages/*
+  - apps/*
+  - examples/*/*
+
+allowBuilds:
+  nx: true
+  lefthook: true
+  esbuild: true
+  workerd: true
+  core-js-pure: false
+
+# Neon's client pins this exact version
+overrides:
+  '@supabase/postgrest-js': 2.79.0

@@ -1,0 +1,276 @@
+import {
+  type AuthApiError,
+  isAuthApiError,
+  notFound
+} from "../http/auth-api-error"
+import { AuthConfigError } from "../http/auth-config-error"
+import type { AuthHandler } from "../http/create-handler"
+import { createHandler, handleRequest } from "../http/create-handler"
+import type { AnyEndpoint, EndpointDefinition } from "../http/define-endpoint"
+import { requirementMet } from "../http/endpoint-requirement"
+import { compileRoutes, matchRoute } from "../http/match-route"
+import { decodeToken } from "../jwt/decode-token"
+import type { SignTokenClaims } from "../jwt/sign-token"
+import { signToken } from "../jwt/sign-token"
+import type { TokenClaims } from "../jwt/verify-token"
+import { verifyToken } from "../jwt/verify-token"
+import { selectOne } from "../lib/select-one"
+import type { CallerInput } from "../session/authenticate"
+import type { ResolvedSession } from "../session/resolve-session"
+import {
+  readRefreshToken,
+  resolveTokenSession
+} from "../session/resolve-session"
+import type { AuthConfig } from "./auth-config"
+import { resolveAuthConfig } from "./auth-config"
+import type { AdditionalFieldsSchema, AuthUser } from "./auth-database"
+import type { AuthInternals } from "./auth-internals"
+import { createAuthInternals } from "./auth-internals"
+import type { AuthOptions } from "./auth-options"
+import type { EndpointRegistry } from "./endpoint-registry"
+import { endpointRegistry } from "./endpoint-registry"
+
+/**
+ * `T` with every user inside it carrying the declared additional fields.
+ *
+ * Endpoints are written once, against the erased `AuthUser`; this is what puts
+ * the schema back on the way out, so `updateUser()` returns `user.plan` typed
+ * when `plan` was declared. Everything that is not a user passes through
+ * unchanged.
+ */
+export type WithUserFields<
+  T,
+  S extends AdditionalFieldsSchema
+> = T extends AuthUser
+  ? AuthUser<S>
+  : T extends ReadonlyArray<infer Item>
+    ? WithUserFields<Item, S>[]
+    : T extends Date | ((...args: never[]) => unknown)
+      ? T
+      : T extends object
+        ? { [K in keyof T]: WithUserFields<T[K], S> }
+        : T
+
+/** The callable form of an endpoint: its input in, its data out. */
+type EndpointCallable<Endpoint, S extends AdditionalFieldsSchema> =
+  Endpoint extends EndpointDefinition<infer Input, infer Data>
+    ? (input: Input) => Promise<WithUserFields<Data, S>>
+    : never
+
+/** Every endpoint as a directly callable function. */
+export type AuthCallables<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+> = {
+  [Name in keyof EndpointRegistry]: EndpointCallable<EndpointRegistry[Name], S>
+}
+
+/** Every endpoint as an HTTP handler. */
+export type AuthHandlers = { [Name in keyof EndpointRegistry]: AuthHandler }
+
+/** The configured server. `S` is the declared additional fields; see {@link AuthOptions}. */
+export interface Auth<S extends AdditionalFieldsSchema = AdditionalFieldsSchema>
+  extends AuthCallables<S> {
+  /** The options after defaults and validation. */
+  config: AuthConfig
+  /** The catch-all handler to mount at `<basePath>/*`. */
+  handler: AuthHandler
+  /** One handler per endpoint, for mounting routes yourself. */
+  handlers: AuthHandlers
+  /** Verifies a token locally, with no database or network call. */
+  verifyToken: (token: string) => Promise<TokenClaims | null>
+  /**
+   * Verifies a token and checks its session still exists. Two database reads.
+   * @remarks `({ headers?, token? }) => Promise<{ session, user } | null>`
+   */
+  verifySession: (
+    input: CallerInput
+  ) => Promise<WithUserFields<ResolvedSession, S> | null>
+  /** Signs any claims with your key. Never expose it through a route. */
+  signToken: (claims?: SignTokenClaims) => Promise<string>
+  /** Reads a token's claims without verifying it. Never authorize with it. */
+  decodeToken: typeof decodeToken
+  /** One connected account's provider refresh token, for background jobs. */
+  getProviderRefreshToken: (identityId: string) => Promise<string | null>
+}
+
+/**
+ * Creates the auth server.
+ *
+ * Synchronous and free of input/output: every default is applied and every
+ * misconfiguration is thrown here rather than on the first request, and the
+ * signing key is imported lazily. That makes it cheap to memoize one instance per
+ * tenant and dispatch to it from your own routing.
+ *
+ * The returned object exposes the same endpoints three ways — as callables, as
+ * individual handlers, and behind one catch-all handler — all derived from a
+ * single registry, so they cannot disagree about what exists or what it does.
+ *
+ * @throws {AuthConfigError} When the configuration is incomplete or contradictory.
+ */
+export function createAuth<
+  S extends AdditionalFieldsSchema = AdditionalFieldsSchema
+>(options: AuthOptions<S>): Auth<S> {
+  const resolved = resolveAuthConfig(options)
+  const internals = createAuthInternals(resolved)
+  const routes = compileRoutes(endpointRegistry)
+  warnAboutInertIpLimits(internals)
+
+  const callables = {} as Record<string, (input: unknown) => Promise<unknown>>
+  const handlers = {} as Record<string, AuthHandler>
+
+  for (const [name, endpoint] of Object.entries(endpointRegistry) as Array<
+    [string, AnyEndpoint]
+  >) {
+    callables[name] = async (input: unknown) => {
+      if (endpoint.requires && !requirementMet(resolved, endpoint.requires)) {
+        throw notFound()
+      }
+      // `getToken` is the one callable that reads the cookie, and called
+      // in-process is where the "server-side rendering never sees the cookie"
+      // trap is explained instead of silently resolving to null.
+      if (name === "getToken") {
+        assertCookieReachable(
+          resolved,
+          (input as CallerInput | undefined)?.headers,
+          internals
+        )
+      }
+
+      const result = await endpoint.run(internals, input as never)
+      return result.data
+    }
+    handlers[name] = createHandler(internals, endpoint)
+  }
+
+  const handler: AuthHandler = async (request) => {
+    try {
+      // The router already parsed the URL and pulled out the `$params`, so they
+      // are handed straight to the endpoint rather than matched a second time.
+      const { endpoint, params } = matchRoute(internals, request, routes)
+      return await handleRequest(internals, endpoint, request, params)
+    } catch (error) {
+      if (!isAuthApiError(error)) throw error
+      return handleRequest(
+        internals,
+        notFoundEndpoint(error, request),
+        request,
+        {}
+      )
+    }
+  }
+
+  return {
+    ...(callables as unknown as AuthCallables<S>),
+    config: resolved,
+    handler,
+    handlers: handlers as AuthHandlers,
+    verifyToken: async (token) => {
+      const { verificationKeys } = await internals.keys()
+
+      return verifyToken(
+        {
+          keys: verificationKeys,
+          algorithm: resolved.jwt.alg,
+          ...(resolved.issuer ? { issuer: resolved.issuer } : {}),
+          ...(resolved.jwt.audience ? { audience: resolved.jwt.audience } : {})
+        },
+        token
+      )
+    },
+    verifySession: async (input) =>
+      (await resolveTokenSession(internals, input)) as WithUserFields<
+        ResolvedSession,
+        S
+      > | null,
+    signToken: async (claims = {}) => {
+      const { signingKey, kid } = await internals.keys()
+
+      return signToken(
+        {
+          signingKey,
+          algorithm: resolved.jwt.alg,
+          kid,
+          ttl: resolved.jwt.ttl,
+          // A `jwt.claims` function is given the user and session a token is
+          // for, and this signs tokens that are for neither.
+          claims:
+            typeof resolved.jwt.claims === "function"
+              ? {}
+              : resolved.jwt.claims,
+          ...(resolved.issuer ? { issuer: resolved.issuer } : {}),
+          ...(resolved.jwt.audience ? { audience: resolved.jwt.audience } : {})
+        },
+        claims
+      )
+    },
+    decodeToken,
+    getProviderRefreshToken: async (identityId) => {
+      const secrets = await selectOne(internals, "identitySecrets", {
+        identityId: { eq: identityId }
+      })
+
+      return secrets?.refreshToken ?? null
+    }
+  }
+}
+
+/**
+ * Says out loud that the per-IP limit is configured and cannot fire.
+ *
+ * `ipAddress.disableTracking` derives no address at all, which leaves
+ * `guestsPerIP` inert and `session.ipAddress` null — a safe failure, and
+ * exactly the kind that is never noticed until someone creates guests in
+ * bulk. A warning rather than an error, because turning tracking off on
+ * purpose is a legitimate thing to do and `rateLimit` is on by default.
+ *
+ * The other way the limits go quiet — a deployment where no header ever carries
+ * a usable address — cannot be seen from here: it takes a request to find out.
+ * That one is warned about once, at the point it happens, in `ipRateLimitKey`.
+ */
+function warnAboutInertIpLimits(internals: AuthInternals) {
+  const { config } = internals
+  if (config.rateLimit === false || !config.ipAddress.disableTracking) return
+
+  internals.log.warn(
+    "the per-IP rate limit is configured but will not apply: ipAddress.disableTracking is on, so no client address is derived. " +
+      "guestsPerIP is inert and session.ipAddress will be null."
+  )
+}
+
+/**
+ * Turns a routing failure into an endpoint, so it flows through the usual
+ * middleware. It claims the request's own method so the handler's method check
+ * is a no-op here and the router's verdict — 404 or 405 — is what gets served.
+ */
+function notFoundEndpoint(error: AuthApiError, request: Request): AnyEndpoint {
+  return {
+    method: request.method,
+    path: "/",
+    run: async () => {
+      throw error
+    }
+  } as AnyEndpoint
+}
+
+/**
+ * Explains the "server-side rendering is always signed out" trap before it happens.
+ *
+ * A `cookie.path` narrowed to the auth mount means the refresh cookie is never
+ * sent to a page request, so a server-side read answers `null` — the same
+ * answer a real visitor gets, and therefore indistinguishable from one. That
+ * presents as a bug in the application rather than the cost of a configuration
+ * choice, so it throws with the fix in the message instead. The default path is
+ * `"/"`, so this is only ever reached by opting into scoping.
+ */
+function assertCookieReachable(
+  resolved: AuthConfig,
+  headers: Headers | undefined,
+  internals: AuthInternals
+) {
+  if (resolved.cookie.path === "/") return
+  if (headers && readRefreshToken(internals, headers)) return
+  throw new AuthConfigError(
+    `No auth cookie on this request, and cookie.path is "${resolved.cookie.path}" rather than "/". ` +
+      'Server-side rendering only receives the refresh cookie when cookie.path is "/".'
+  )
+}

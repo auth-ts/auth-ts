@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreWorkspaces": ["examples/**"],
+  "ignore": ["apps/docs/content/snippets/**"],
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    "apps/docs": {
+      "ignoreDependencies": [
+        "@electric-sql/pglite",
+        "@neondatabase/postgrest-js",
+        "@supabase/supabase-js",
+        "@tanstack/react-query",
+        "@types/pg",
+        "drizzle-kit",
+        "drizzle-orm",
+        "hono",
+        "jose",
+        "pg"
+      ]
+    }
+  }
+}

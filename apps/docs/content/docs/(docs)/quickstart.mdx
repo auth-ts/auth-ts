@@ -1,0 +1,213 @@
+---
+title: Quickstart
+description: Email sign-in and a JWT you verify in your API or database.
+---
+
+You need an app with a server route that takes a `Request` and returns a
+`Response`. The tables here are Postgres; for other databases, see
+[Database](/docs/database).
+
+<Steps>
+<Step>
+
+### Install
+
+```package-install
+@auth-ts/core
+```
+
+</Step>
+<Step>
+
+### Generate a signing key
+
+```bash
+npx @auth-ts/cli keygen
+```
+
+Answer yes. It appends `JWT_PRIVATE_KEY` to `.env` and writes the public key
+set to `public/jwks.json`, which your app then serves at `/jwks.json`.
+
+</Step>
+<Step>
+
+### Create the tables
+
+<include meta='tab="SQL" title="schema.sql"'>../../snippets/schema.sql</include>
+
+<include meta='tab="Drizzle" title="lib/schema.ts"'>../../snippets/schema.ts</include>
+
+The unique constraints are required. See [Database](/docs/database) for why.
+
+</Step>
+<Step>
+
+### Connect your database
+
+auth.ts talks to your tables through four functions. Copy the one for your
+driver.
+
+<include meta='tab="Drizzle" title="lib/auth-database.ts"'>../../snippets/auth-database-drizzle.ts</include>
+
+<include meta='tab="node-postgres" title="lib/auth-database.ts"'>../../snippets/auth-database-pg.ts</include>
+
+</Step>
+<Step>
+
+### Create the server
+
+<include meta='title="lib/auth.ts"'>../../snippets/auth.ts</include>
+
+</Step>
+<Step>
+
+### Mount the handler
+
+Serve every method under `/api/auth`.
+
+```ts tab="TanStack Start" title="src/routes/api/auth/$.ts"
+import { createFileRoute } from "@tanstack/react-router"
+import { auth } from "~/lib/auth"
+
+export const Route = createFileRoute("/api/auth/$")({
+  server: {
+    handlers: {
+      ANY: ({ request }) => auth.handler(request)
+    }
+  }
+})
+```
+
+```ts tab="Next.js" title="app/api/auth/[...all]/route.ts"
+import { auth } from "@/lib/auth"
+
+export const GET = auth.handler
+export const POST = auth.handler
+export const DELETE = auth.handler
+```
+
+```ts tab="SolidStart" title="src/routes/api/auth/[...auth].ts"
+import type { APIEvent } from "@solidjs/start/server"
+import { auth } from "~/lib/auth"
+
+const handler = ({ request }: APIEvent) => auth.handler(request)
+
+export { handler as DELETE, handler as GET, handler as POST }
+```
+
+```ts tab="Hono" title="src/index.ts"
+import { Hono } from "hono"
+import { auth } from "./lib/auth"
+
+const app = new Hono()
+
+app.on(["GET", "POST", "DELETE"], "/api/auth/*", (c) => auth.handler(c.req.raw))
+
+export default app
+```
+
+</Step>
+<Step>
+
+### Sign in from the browser
+
+<include meta='title="lib/auth-client.ts"'>../../snippets/auth-client.ts</include>
+
+```ts
+import { authClient } from "./lib/auth-client"
+
+declare const email: string
+declare const code: string
+// ---cut---
+await authClient.sendSignInCode({ email })
+
+// The code is in your server log.
+const { user } = await authClient.signInWithCode({ code })
+```
+
+</Step>
+<Step>
+
+### Use the token
+
+Every request to your API or database carries the JWT. Check it where you
+decide access.
+
+<Tabs items={["Your API", "Neon Data API"]}>
+<Tab value="Your API">
+
+Send the token from the browser:
+
+```ts
+import { authClient } from "./lib/auth-client"
+// ---cut---
+const response = await fetch("/api/todos", {
+  headers: { authorization: `Bearer ${await authClient.getToken()}` }
+})
+```
+
+Verify it on the server. `verifyToken` checks the signature locally, with no
+database call:
+
+```ts title="src/routes/api/todos.ts"
+import { auth } from "./lib/auth"
+// ---cut---
+export async function GET(request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer /, "")
+  const claims = token ? await auth.verifyToken(token) : null
+
+  if (!claims) return new Response("Unauthorized", { status: 401 })
+
+  return Response.json({ userId: claims.sub })
+}
+```
+
+</Tab>
+<Tab value="Neon Data API">
+
+Set the Data API's JWKS URL to `https://your.app/jwks.json`, then give a table a
+policy:
+
+```sql
+create table "todos" (
+  "id" uuid primary key default gen_random_uuid(),
+  "userId" uuid not null default (auth.user_id()::uuid) references "users",
+  "title" text not null
+);
+
+alter table "todos" enable row level security;
+
+create policy "own todos" on "todos" for all to authenticated
+  using ((select auth.user_id()::uuid) = "userId")
+  with check ((select auth.user_id()::uuid) = "userId");
+```
+
+The data client sends the token, and gets back only the user's rows:
+
+```ts
+import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
+
+const postgrest = new NeonPostgrestClient({
+  dataApiUrl: DATA_API_URL,
+  options: { global: { fetch: fetchWithToken(authClient.getToken) } }
+})
+
+const { data: todos } = await postgrest.from("todos").select()
+```
+
+See [Neon Data API](/docs/data/neon-data-api) for local development.
+
+</Tab>
+</Tabs>
+
+</Step>
+</Steps>
+
+## Next
+
+<Cards>
+  <Card title="Your own API" href="/docs/data/server-routes" description="Protect routes and actions with the token." />
+  <Card title="OAuth" href="/docs/sign-in/providers" description="Add GitHub and Google sign-in." />
+  <Card title="Reading the user" href="/docs/guides/reading-the-user" description="Keep the user and token in your query cache." />
+  <Card title="Deploying" href="/docs/guides/deploying" description="Email delivery, proxies, and origins." />
+</Cards>

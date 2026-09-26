@@ -1,0 +1,42 @@
+{
+  "name": "docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "test:types": "fumadocs-mdx && tsc -p tsconfig.json && tsc -p tsconfig.snippets.json"
+  },
+  "dependencies": {
+    "@auth-ts/core": "workspace:*",
+    "@tanstack/react-router": "1.170.39",
+    "@tanstack/react-start": "1.168.58",
+    "fumadocs-core": "^16.15.13",
+    "fumadocs-openapi": "^12.0.2",
+    "fumadocs-ui": "^16.15.13",
+    "lucide-react": "1.47.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@neondatabase/postgrest-js": "0.2.0-beta",
+    "@supabase/supabase-js": "2.79.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@tanstack/react-query": "5.103.2",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "drizzle-kit": "1.0.0-rc.4",
+    "drizzle-orm": "1.0.0-rc.4",
+    "fumadocs-mdx": "15.4.3",
+    "fumadocs-twoslash": "4.0.1",
+    "fumadocs-typescript": "5.4.1",
+    "hono": "4.13.8",
+    "jose": "6.2.12",
+    "pg": "8.23.0",
+    "tailwindcss": "4.3.3",
+    "zod": "4.6.5"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tanstack-start-neon",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "vite", "dev", "--port", "3002", "--strictPort"],
+      "cwd": "examples/react/tanstack-start-neon",
+      "port": 3002
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["exec", "vite", "dev", "--port", "3004", "--strictPort"],
+      "cwd": "apps/docs",
+      "port": 3004
+    }
+  ]
+}

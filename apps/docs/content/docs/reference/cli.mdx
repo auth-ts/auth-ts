@@ -1,0 +1,38 @@
+---
+title: CLI
+description: Generate your signing key and jwks.json.
+---
+
+```bash
+npx @auth-ts/cli keygen
+```
+
+`keygen` prints a new private key and its public key set, then asks whether to
+save them:
+
+```text
+JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
+jwks.json
+{ "keys": [{ "kty": "EC", "crv": "P-256", "alg": "ES256", "use": "sig", "kid": "...", ... }] }
+
+Write /your/app/.env and /your/app/public/jwks.json? [y/N]
+```
+
+Yes appends `JWT_PRIVATE_KEY` to `.env` and writes `public/jwks.json`. No, or
+piping the output, writes nothing. Only the two values go to stdout.
+
+If `.env` already sets `JWT_PRIVATE_KEY`, it asks before replacing it, even with
+`--yes`. A new key must be deployed with its own `jwks.json`, so keeping the
+old key also keeps the old file.
+
+## Options
+
+| flag | default | |
+| --- | --- | --- |
+| `--alg ES256\|RS256` | `ES256` | Signing algorithm. Match `jwt.alg` on the server. |
+| `--out DIR` | `public` | Where `jwks.json` goes. |
+| `--env FILE` | `.env` | Which env file the key is appended to. |
+| `--yes`, `-y` | off | Write without asking, except to replace a key. |
+
+To rotate keys, see [Rotating keys](/docs/guides/key-rotation).

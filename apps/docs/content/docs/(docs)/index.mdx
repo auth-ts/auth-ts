@@ -1,0 +1,43 @@
+---
+title: Introduction
+description: Sign-in, sessions and JWTs for any TypeScript app.
+---
+
+auth.ts is sign-in, sessions and JWTs for any TypeScript app. You bring the
+database and the framework; it handles codes, providers, sessions and tokens.
+
+The JWT it issues can be verified anywhere: in your own API routes, or by
+anything that trusts a JWKS URL, like Neon's Data API, Supabase or PostgREST.
+It is built on [Lucia](https://lucia-auth.com) and
+[The Copenhagen Book](https://thecopenhagenbook.com).
+
+## How it works
+
+1. The browser signs in through your `/api/auth` route and gets an `HttpOnly`
+   refresh cookie.
+2. The client trades the cookie for a short-lived JWT signed with your key, and
+   keeps it in memory.
+3. Your API or database verifies the JWT against your public `jwks.json`.
+
+## What you get
+
+- Email and SMS codes, GitHub and Google, and guest sign-in
+- Sessions, sign-out, device lists and account switching
+- JWTs you verify in your own routes or hand to your database
+- Connected accounts with refreshed provider tokens
+- Rate limiting, CSRF protection and code guessing limits
+- A browser client with no dependencies
+
+## What you write
+
+- Six tables and four functions that read and write them
+- A `sendCode` function for your email or SMS provider
+- One route that serves `/api/auth`
+
+auth.ts is a library, not a hosted service. It has no adapter packages and
+never owns your schema.
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart" description="Sign in and use the token in eight steps." />
+  <Card title="How it works" href="/docs/concepts" description="Two tokens, one cookie, and where the token is checked." />
+</Cards>

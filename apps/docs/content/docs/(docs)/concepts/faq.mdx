@@ -1,0 +1,34 @@
+---
+title: FAQ
+description: Questions the other pages don't answer.
+---
+
+## Why no database adapters?
+
+Adapters have to track someone else's schema conventions, and they break
+whenever your table differs. Four small functions are about the same amount of
+code, and you can read and change them. auth.ts asks for six tables, a few
+unique constraints, and a `delete` that returns what it removed.
+
+## Why a code, not a magic link?
+
+A code works when the email opens in a different browser from the one that
+asked, which is common on phones. Links may come later.
+
+## Do I need PostgREST or row-level security?
+
+No. Most apps check the token in their own API routes with `verifyToken`. See
+[Your own API](/docs/data/server-routes). Row-level security is an option when
+the browser queries your database directly.
+
+## Does it run on edge runtimes?
+
+Yes. It uses Web Crypto and `jose`, with no `node:` imports except `scrypt` for
+hashing codes, which Node, Bun, Deno and Cloudflare Workers all provide.
+
+## Why JWTs and sessions?
+
+The session, in an `HttpOnly` cookie, is what keeps someone signed in and what
+you revoke. The JWT is what every request carries: your API checks it with
+`verifyToken` without a database lookup, and a database like Neon or Supabase
+can check it too. See [Sessions and revocation](/docs/concepts/sessions).

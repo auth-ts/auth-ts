@@ -1,0 +1,71 @@
+---
+title: createAuth
+description: Every server option, its type and its default.
+---
+
+```ts title="lib/auth.ts"
+import { createAuth } from "@auth-ts/core"
+
+export const auth = createAuth({
+  database: authDatabase,
+  email: { sendCode }
+})
+```
+
+`createAuth` does no I/O and throws an `AuthConfigError` naming the bad option,
+so a broken config fails at startup, not on the first sign-in. It returns the
+[server API](/docs/reference/server).
+
+<auto-type-table path="core/auth-options.ts" name="AuthOptions" />
+
+## Sign-in methods
+
+<auto-type-table path="core/auth-options.ts" name="EmailOptions" />
+
+<auto-type-table path="core/auth-options.ts" name="SmsOptions" />
+
+<auto-type-table path="core/auth-options.ts" name="SendCodeContext" />
+
+<auto-type-table path="core/auth-options.ts" name="ProvidersOptions" />
+
+<auto-type-table path="core/auth-options.ts" name="ProviderCredentials" />
+
+<auto-type-table path="core/auth-options.ts" name="VerificationCodeOptions" />
+
+## Tokens
+
+<auto-type-table path="core/auth-options.ts" name="JwtOptions" />
+
+<auto-type-table path="core/auth-options.ts" name="JwksOptions" />
+
+## Sessions and cookies
+
+<auto-type-table path="core/auth-options.ts" name="SessionOptions" />
+
+<auto-type-table path="core/auth-options.ts" name="CookieOptions" />
+
+## Users
+
+<auto-type-table path="core/auth-options.ts" name="UserOptions" />
+
+## Rate limits
+
+<auto-type-table path="core/auth-options.ts" name="RateLimitOptions" />
+
+<auto-type-table path="core/auth-options.ts" name="RateLimitBucket" />
+
+## Network
+
+<auto-type-table path="lib/ip-address.ts" name="IpAddressOptions" />
+
+See [Deploying](/docs/guides/deploying) for which `ipAddress` setting fits your
+host.
+
+## Localization
+
+<auto-type-table path="http/get-error-message.ts" name="LocalizationOptions" />
+
+## Durations
+
+Durations are strings like `"30s"`, `"10m"`, `"1h"` or `"10d"`. Months aren't
+supported, because their length varies.

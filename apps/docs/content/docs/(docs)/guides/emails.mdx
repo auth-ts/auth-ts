@@ -1,0 +1,92 @@
+---
+title: Emails and messages
+description: Code emails, notifications, and translated error messages.
+---
+
+## Code emails
+
+`sendCode` gets a `purpose`, so each email can say what the code is for:
+
+| purpose | sent when |
+| --- | --- |
+| `signIn` | Someone signs in. |
+| `identity` | A signed-in user confirms it's them. |
+| `emailChange` | A user moves to a new email address. |
+| `phoneChange` | A user moves to a new phone number. |
+
+```ts title="lib/auth.ts"
+const subjects = {
+  signIn: "Your sign-in code",
+  identity: "Confirm it's you",
+  emailChange: "Verify your new email address",
+  phoneChange: "Verify your new phone number"
+}
+
+createAuth({
+  email: {
+    sendCode: async ({ email, code, purpose }) => {
+      await yourEmailProvider.send({
+        to: email,
+        subject: subjects[purpose],
+        text: `Your code is ${code}. If you didn't ask for it, ignore this email.`
+      })
+    }
+  }
+  // ...
+})
+```
+
+`locale` is the request's language, and `headers` has the rest of the request,
+like `Host` for multi-tenant branding.
+
+## Notifications
+
+| function | sent when |
+| --- | --- |
+| `email.sendSignedInNotification` | An existing account signs in, by code or provider. |
+| `email.sendEmailChangedNotification` | To the old address, after an email change. |
+| `sms.sendPhoneNumberChangedNotification` | To the old number, after a phone change. |
+
+```ts
+createAuth({
+  email: {
+    sendCode,
+    sendSignedInNotification: async ({ email, session }) => {
+      await yourEmailProvider.send({
+        to: email,
+        subject: "New sign-in to your account",
+        text: `Signed in from ${session.userAgent ?? "an unknown device"}.`
+      })
+    }
+  }
+  // ...
+})
+```
+
+A failed notification is logged and never fails the request. Set `waitUntil`
+and they're sent after the response.
+
+## Translating messages
+
+Error messages are English by default. Add others per locale; anything missing
+falls back to English:
+
+```ts
+createAuth({
+  localization: {
+    messages: {
+      de: { rateLimited: "Zu viele Versuche. Bitte warte {retryAfter} Sekunden." }
+    }
+  }
+  // ...
+})
+```
+
+The locale comes from the request's `Accept-Language`. To use your app's
+setting instead, set it on the client:
+
+```ts
+authClient.setLocale("de")
+```
+
+Error codes never change, so branch on `error.code`, never on the message.

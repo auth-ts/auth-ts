@@ -1,0 +1,17 @@
+{
+  "title": "Reference",
+  "description": "Options, methods and types",
+  "icon": "Braces",
+  "root": true,
+  "pages": [
+    "create-auth",
+    "server",
+    "client",
+    "auth-database",
+    "claims",
+    "errors",
+    "cli",
+    "---HTTP API---",
+    "...http-api"
+  ]
+}

@@ -1,0 +1,59 @@
+---
+title: Testing your database
+description: Check your four functions against a real database.
+---
+
+`@auth-ts/core/testing` exports the [AuthDatabase](/docs/reference/auth-database)
+contract as checks you run in any test runner:
+
+```ts title="auth-database.test.ts"
+import { authDatabaseChecks } from "@auth-ts/core/testing"
+import { describe, it } from "vitest"
+import { authDatabase } from "./lib/auth-database"
+
+describe("authDatabase", () => {
+  for (const check of authDatabaseChecks) {
+    it(check.name, () => check.run(authDatabase))
+  }
+})
+```
+
+Each check cleans up after itself, so it's safe against your real database.
+Run it there at least once: the unique constraints and `delete ... returning`
+are the things most likely to be wrong, and a mock can't show either.
+
+The duplicate checks insert twice in a row. They prove a constraint exists,
+but the race it prevents can't be reproduced in a test.
+
+## Without a database server
+
+[PGlite](https://pglite.dev) runs Postgres in the test process, so CI needs no
+database:
+
+```ts
+// @noStaticSemanticInfo
+import { PGlite } from "@electric-sql/pglite"
+import { drizzle } from "drizzle-orm/pglite"
+
+const client = new PGlite()
+export const db = drizzle({ client })
+```
+
+Create the tables from the same schema you deploy, such as
+[`schema.sql`](/docs/database), so the two can't drift.
+
+## Testing code that uses auth
+
+For code above the database, use the in-memory store. It enforces the same
+unique constraints:
+
+```ts
+import { createMemoryDatabase } from "@auth-ts/core/testing"
+
+const auth = createAuth({
+  database: createMemoryDatabase(),
+  email: { sendCode: ({ code }) => void (lastCode = code) }
+})
+```
+
+Capturing the code in `sendCode` lets a test sign in without an inbox.

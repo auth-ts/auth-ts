@@ -1,0 +1,97 @@
+---
+title: AuthDatabase
+description: The contract your four database functions implement.
+---
+
+auth.ts reads and writes six tables through four functions you write. Every
+query is one of them, against one table, matching named columns. There are no
+joins, no `OR` and no expressions. For working implementations, see
+[Database](/docs/database).
+
+<auto-type-table path="core/auth-database.ts" name="AuthDatabase" />
+
+## The rules
+
+1. **`where` is a set of conditions that must all match.** Every column takes
+   `{ eq }`. `createdAt` and `updatedAt` also take `{ lt }` and `{ gt }`, with
+   exclusive bounds. Values are never `null`.
+
+   ```ts
+   const where = { userId: { eq: id }, updatedAt: { gt: cutoff } }
+   ```
+
+2. **`select` always gets `limit` and `orderBy`.** `orderBy` is one column and a
+   direction, like `{ createdAt: "desc" }`. There is no `offset`.
+3. **`insert` returns the row as stored,** including the id your database
+   generated. A unique violation must throw, never merge.
+4. **`update` returns the rows it changed.** Its `values` are never empty.
+5. **`delete` returns the rows it removed, atomically.** Two callers deleting the
+   same row must not both get it back; that is what makes a code single-use.
+6. **Nothing receives request headers.** For multiple tenants, create one
+   `auth` per tenant and close over the tenant in the functions.
+
+`createdAt` and `updatedAt` are written by auth.ts on every write, so your
+columns need no triggers for its own writes.
+
+## Writing one
+
+Wrap your functions in `defineAuthDatabase` so they typecheck without casts.
+Either run one generic query per function, as the Drizzle and node-postgres
+examples do, or `switch` on the table:
+
+```ts
+export const authDatabase = defineAuthDatabase({
+  async select({ table, where, limit }) {
+    switch (table) {
+      case "users":
+        return run(`select * from "users" where "email" = $1 limit $2`, [
+          where.email?.eq,
+          limit
+        ])
+      // ...
+      default:
+        throw new Error(`No query for ${table}`)
+    }
+  }
+  // insert, update, delete
+})
+```
+
+`where` is typed for the table in each `case`.
+
+### Timestamps as strings
+
+Pass `timestamps: "string"` when your driver returns ISO strings. The functions
+are then typed in strings, and auth.ts converts at the boundary. The strings
+must include a time zone, as `timestamptz` does.
+
+### Additional fields
+
+Declare `user.additionalFields` once and pass it as the second type parameter,
+so `users` rows carry those columns, typed:
+
+```ts
+import type { AdditionalFieldsSchema } from "@auth-ts/core"
+
+export const additionalFields = { plan: "string" } satisfies AdditionalFieldsSchema
+
+export const authDatabase = defineAuthDatabase<"date", typeof additionalFields>({
+  // ...
+})
+
+createAuth({ database: authDatabase, user: { additionalFields } })
+```
+
+## The rows
+
+<auto-type-table path="core/auth-database.ts" name="CoreUserFields" />
+
+<auto-type-table path="core/auth-database.ts" name="AuthSession" />
+
+<auto-type-table path="core/auth-database.ts" name="AuthVerification" />
+
+<auto-type-table path="core/auth-database.ts" name="AuthRateLimit" />
+
+<auto-type-table path="core/auth-database.ts" name="AuthIdentity" />
+
+<auto-type-table path="core/auth-database.ts" name="AuthIdentitySecret" />

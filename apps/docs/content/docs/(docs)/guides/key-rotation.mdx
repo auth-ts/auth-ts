@@ -1,0 +1,25 @@
+---
+title: Rotating keys
+description: Replace your signing key without signing anyone out.
+---
+
+A key and its `jwks.json` always ship together, so rotating is the setup step
+again:
+
+```bash
+npx @auth-ts/cli keygen
+```
+
+Answer yes to replace `JWT_PRIVATE_KEY`, then deploy the new key and the new
+`public/jwks.json` together. On Supabase, also
+[import the new key](/docs/data/supabase).
+
+## What users notice
+
+Almost nothing. Sessions don't depend on the signing key, so nobody is signed
+out. Access tokens signed with the old key stop verifying once your data API
+picks up the new key set, and the client fetches a new token on the next 401.
+At most, one request fails and is retried, within the token lifetime.
+
+The new key has a new `kid`, which tells verifiers holding a cached key set to
+fetch it again.

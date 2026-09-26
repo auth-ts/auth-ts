@@ -1,0 +1,39 @@
+---
+title: Native apps
+description: Use the client in React Native, Expo, or a desktop shell.
+---
+
+A browser keeps the refresh cookie for you. A native app has no cookie jar, so
+give the client storage to keep it in:
+
+```ts title="lib/auth-client.ts"
+import * as SecureStore from "expo-secure-store"
+import { createAuthClient } from "@auth-ts/core/client"
+
+export const authClient = createAuthClient({
+  baseURL: "https://your.app",
+  cookieStorage: {
+    getItem: (key) => SecureStore.getItemAsync(key),
+    setItem: (key, value) => SecureStore.setItemAsync(key, value),
+    removeItem: (key) => SecureStore.deleteItemAsync(key)
+  }
+})
+```
+
+<Callout type="warn">
+Use storage the platform protects, like the keychain or keystore. What's
+stored is the refresh token, and it lasts as long as the session.
+</Callout>
+
+The client sends the stored cookie on every auth request and deletes it when
+the server clears it. Everything else works as in the browser: `getToken()`
+keeps the access token in memory for your data client.
+
+## Provider sign-in
+
+`signInWithProvider` fetches the provider's URL and navigates to it. In a native
+shell, open that URL in the system browser instead of a webview, as Google
+requires. The return trip into the app isn't supported yet, because the system
+browser's cookies aren't the app's.
+
+<auto-type-table path="client/lib/cookie-jar.ts" name="CookieStorage" />

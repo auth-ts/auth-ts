@@ -1,0 +1,43 @@
+---
+title: OpenAPI
+description: A spec and a browsable reference for your own deployment.
+---
+
+The [HTTP API](/docs/reference/http-api/session/get/token) reference documents every endpoint
+with every feature on. To describe your deployment instead, serve it from your
+server:
+
+```ts title="lib/auth.ts"
+createAuth({ openapi: true /* ... */ })
+```
+
+| route | what |
+| --- | --- |
+| `GET /api/auth/openapi.json` | The OpenAPI 3.1 document |
+| `GET /api/auth/reference` | A browsable reference |
+
+It's off by default, because it lists your providers and fields.
+
+## Generating it yourself
+
+```ts
+import { buildOpenAPIDocument } from "@auth-ts/core"
+
+const document = buildOpenAPIDocument(auth.config)
+```
+
+Write it to a file at build time and point any OpenAPI tool at it.
+`operationId` matches the method name on `auth` and `authClient`, so generated
+clients line up with both.
+
+## What it reflects
+
+- Your `basePath` and `baseURL`.
+- Only the endpoints you enabled, like `/sign-in/guest` with `guest: true`.
+- Only the providers you configured.
+- Your additional user fields.
+- Your cookie name.
+
+The refresh cookie never appears in a response body, so an API playground can't
+show or set it. `GET /callback/{provider}` is a browser redirect, not something
+to fetch.

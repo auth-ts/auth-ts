@@ -1,0 +1,72 @@
+---
+title: createAuthClient
+description: The browser client, its options and its methods.
+---
+
+```ts title="lib/auth-client.ts"
+import { createAuthClient } from "@auth-ts/core/client"
+
+export const authClient = createAuthClient()
+```
+
+`@auth-ts/core/client` has no dependencies and none of the server code.
+Creating the client makes no request and touches no storage, so it's safe during
+server-side rendering. The access token lives only in memory.
+
+<auto-type-table path="client/core/auth-client-options.ts" name="AuthClientOptions" />
+
+## Methods
+
+Each method, except `getToken`, `refresh`, `setLocale`, `clearToken` and
+`decodeToken`, calls the endpoint of the same name on the
+[server](/docs/reference/server).
+
+<auto-type-table path="client/core/create-auth-client.ts" name="AuthClient" />
+
+## Inputs and results
+
+<auto-type-table path="client/methods/sign-in.ts" name="SignInWithCodeInput" />
+
+<auto-type-table path="client/methods/sign-in.ts" name="SignInResult" />
+
+<auto-type-table path="client/methods/sign-in.ts" name="SendCodeResult" />
+
+<auto-type-table path="client/methods/oauth.ts" name="OAuthNavigationInput" />
+
+<auto-type-table path="client/methods/get-token.ts" name="GetTokenOptions" />
+
+<auto-type-table path="client/methods/account.ts" name="SignOutInput" />
+
+<auto-type-table path="client/lib/cookie-jar.ts" name="CookieStorage" />
+
+## Errors
+
+Every failure is an `AuthError` with a stable `code`. Branch on the code; the
+message is translatable and may change.
+
+```ts
+import { isAuthError } from "@auth-ts/core/client"
+
+try {
+  await authClient.sendSignInCode({ email })
+} catch (error) {
+  if (isAuthError(error) && error.code === "rateLimited") {
+    showCountdown(error.retryAfter)
+  }
+}
+```
+
+A dropped connection throws `AuthNetworkError` instead. The full list of codes
+is on [Errors](/docs/reference/errors).
+
+With TanStack Query, register the type once and every `error` has `code`:
+
+```ts
+import type { AuthError } from "@auth-ts/core/client"
+
+declare module "@tanstack/react-query" {
+  interface Register {
+    defaultError: AuthError
+  }
+}
+```
