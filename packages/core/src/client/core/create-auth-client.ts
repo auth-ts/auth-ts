@@ -55,7 +55,7 @@ import {
 import { createAuthClientInternals } from "./auth-client-internals"
 import type { AuthClientOptions } from "./auth-client-options"
 
-/** The browser client returned by `createAuthClient`. */
+/** Browser and native clients share JWT authentication. */
 export interface AuthClient {
   /** A valid access token, refreshed when needed, or `null` when signed out. */
   getToken: (options?: GetTokenOptions) => Promise<string | null>

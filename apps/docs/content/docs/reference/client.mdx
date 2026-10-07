@@ -1,6 +1,6 @@
 ---
 title: createAuthClient
-description: The browser client, its options and its methods.
+description: Browser and native clients, their options and methods.
 ---
 
 ```ts title="lib/auth-client.ts"
@@ -17,11 +17,14 @@ server-side rendering. The access token lives only in memory.
 
 ## Methods
 
-Each method, except `getToken`, `refresh`, `setLocale`, `clearToken` and
-`decodeToken`, calls the endpoint of the same name on the
+Browser methods, except `getToken`, `refresh`, `setLocale`, `clearToken` and
+`decodeToken`, call the endpoint of the same name on the
 [server](/docs/reference/server).
 
 <auto-type-table path="client/core/create-auth-client.ts" name="AuthClient" />
+
+Native account listing and switching operate over securely stored sessions.
+The token exchange uses POST in both transports. See [Native apps](/docs/guides/native-apps).
 
 ## Inputs and results
 
@@ -37,12 +40,14 @@ Each method, except `getToken`, `refresh`, `setLocale`, `clearToken` and
 
 <auto-type-table path="client/methods/account.ts" name="SignOutInput" />
 
-<auto-type-table path="client/lib/cookie-jar.ts" name="CookieStorage" />
+<auto-type-table path="client/lib/session-storage.ts" name="SessionStorage" />
 
 ## Errors
 
-Every failure is an `AuthError` with a stable `code`. Branch on the code; the
-message is translatable and may change.
+Server refusals are an `AuthError` with a stable `code`. Branch on the code;
+the message is translatable and may change. Invalid native configuration,
+unsupported provider navigation and superseded account changes raise a local
+`Error` before an unsafe result can be used.
 
 ```ts
 import { isAuthError } from "@auth-ts/core/client"

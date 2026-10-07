@@ -4,6 +4,7 @@ import { endpointRegistry } from "../core/endpoint-registry"
 import { SAFE_METHODS } from "../http/check-origin"
 import type { AnyEndpoint } from "../http/define-endpoint"
 import { requirementMet } from "../http/endpoint-requirement"
+import { SESSION_TRANSPORT_HEADER } from "../shared/session-transport"
 import { componentResponses, componentSchemas } from "./components"
 import type { AnyEndpointDocs, EndpointResponse } from "./endpoint-docs"
 import { endpointDocs, summaries } from "./endpoint-docs-registry"
@@ -32,11 +33,12 @@ const TAG_ORDER = [
 // both meet what they expect.
 const REFRESH_COOKIE = "cookieAuth"
 const BEARER = "bearerAuth"
+const SESSION_BEARER = "sessionBearerAuth"
 
 function expand(schema: JsonSchema | ComponentName): JsonSchema {
   if (typeof schema === "string")
     return { $ref: `#/components/schemas/${schema}` }
-  if (!schema.properties && !schema.items) return schema
+  if (!schema.properties && !schema.items && !schema.oneOf) return schema
 
   const properties =
     schema.properties &&
@@ -49,6 +51,7 @@ function expand(schema: JsonSchema | ComponentName): JsonSchema {
 
   return {
     ...schema,
+    ...(schema.oneOf ? { oneOf: schema.oneOf.map(expand) } : {}),
     ...(properties ? { properties } : {}),
     ...(schema.items ? { items: expand(schema.items) } : {})
   }
@@ -168,9 +171,11 @@ function operation(
   const security =
     docs.auth === "none"
       ? []
-      : docs.auth === "cookie"
-        ? [{ [REFRESH_COOKIE]: [] }]
-        : [{ [BEARER]: [] }]
+      : docs.auth === "session"
+        ? [{ [REFRESH_COOKIE]: [] }, { [SESSION_BEARER]: [] }]
+        : docs.auth === "cookie"
+          ? [{ [REFRESH_COOKIE]: [] }]
+          : [{ [BEARER]: [] }]
 
   const body = docs.body && {
     required: true,
@@ -178,6 +183,14 @@ function operation(
   }
 
   const parameters = [
+    {
+      name: SESSION_TRANSPORT_HEADER,
+      in: "header",
+      required: false,
+      schema: { type: "string", enum: ["cookie", "bearer"], default: "cookie" },
+      description:
+        "Bearer transport ignores cookies. Native sign-in returns a session credential; other authenticated routes still require an access JWT."
+    },
     ...pathParameters(
       endpoint.path,
       docs,
@@ -245,7 +258,7 @@ export function buildOpenAPIDocument(config?: AuthConfig): OpenAPIDocument {
       title: "auth.ts",
       version: "0.1.0",
       description:
-        "Sign-in responses set an HttpOnly refresh cookie that `GET /token` reads; it never appears in a body. `GET /callback/{provider}` answers a top-level navigation with a redirect, so it is not something to fetch."
+        "Browser sign-in sets an HttpOnly refresh cookie. Explicit bearer transport returns a native session credential. `POST /token` exchanges the session for an access JWT. `GET /callback/{provider}` answers a top-level navigation with a redirect, so it is not something to fetch."
     },
     servers: [{ url: (config?.baseURL ?? "") + basePath }],
     tags: TAG_ORDER.map((name) => ({ name })),
@@ -262,11 +275,18 @@ export function buildOpenAPIDocument(config?: AuthConfig): OpenAPIDocument {
       },
       responses: componentResponses,
       securitySchemes: {
+        [SESSION_BEARER]: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "Opaque session",
+          description:
+            "Native session credential for POST /token with X-Auth-Transport: bearer. Access JWTs cannot renew sessions."
+        },
         [BEARER]: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-          description: "An access token from `GET /token`."
+          description: "An access token from `POST /token`."
         },
         [REFRESH_COOKIE]: {
           type: "apiKey",

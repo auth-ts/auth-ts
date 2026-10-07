@@ -7,6 +7,7 @@ import { insertRow } from "../lib/insert-row"
 import { clearCookie, shouldUseSecureCookies } from "../lib/serialize-cookie"
 import { sweepExpired } from "../lib/sweep-expired"
 import { bytesToBase64 } from "../shared/base64url"
+import { isBearerTransport } from "../shared/session-transport"
 import { deleteSessions } from "./delete-sessions"
 import { presentedSessions } from "./presented-sessions"
 import type { ResolvedSession } from "./resolve-session"
@@ -20,6 +21,8 @@ export interface IssueResult {
   session: AuthSession
   /** `Set-Cookie` headers the caller must send. */
   headers: Headers
+  sessionToken?: string
+  multiUser?: boolean
 }
 
 /** Everything issuing needs from the request. */
@@ -40,6 +43,7 @@ export async function issueSession(
   { user, headers, requestURL, caller, amr }: IssueSessionInput
 ): Promise<IssueResult> {
   const { config } = internals
+  const bearer = isBearerTransport(headers)
   const secret = new Uint8Array(32)
   crypto.getRandomValues(secret)
   const secretHash = new Uint8Array(
@@ -69,7 +73,10 @@ export async function issueSession(
       credential ? [[credential.id, toHex(credential.secretHash)] as const] : []
     )
   )
-  if (caller?.user.type === "guest") {
+  if (
+    caller &&
+    (caller.user.type === "guest" || (bearer && !config.multiUser))
+  ) {
     superseded.set(caller.session.id, caller.session.secretHash)
   }
   // Only after the replacement exists
@@ -88,6 +95,16 @@ export async function issueSession(
 
   const responseHeaders = new Headers()
   internals.log.info("session issued", { userType: user.type, amr })
+
+  if (bearer)
+    return {
+      token,
+      user,
+      session,
+      headers: responseHeaders,
+      sessionToken: rawToken,
+      multiUser: config.multiUser
+    }
 
   const secure = shouldUseSecureCookies(requestURL)
   for (const { userId } of stranded) {

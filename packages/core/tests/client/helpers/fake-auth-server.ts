@@ -5,6 +5,8 @@ import { HINT_COOKIE_NAME } from "../../../src/shared/hint-cookie"
 export interface RecordedRequest {
   method: string
   path: string
+  url: string
+  transport: string | null
   body: unknown
   credentials: RequestCredentials | undefined
   acceptLanguage: string | null
@@ -52,7 +54,9 @@ export function setSessionHint(value: string | undefined) {
 /** Builds an unsigned JWT with the given lifetime, which is all the client reads. */
 export function fakeAccessToken({
   issuedAt = Date.now(),
-  lifetimeSeconds = 600
+  lifetimeSeconds = 600,
+  userId = "user-1",
+  sessionId = "session-1"
 } = {}) {
   const encode = (value: unknown) =>
     btoa(JSON.stringify(value))
@@ -61,8 +65,8 @@ export function fakeAccessToken({
       .replace(/=+$/, "")
 
   const payload = {
-    sub: "user-1",
-    sid: "session-1",
+    sub: userId,
+    sid: sessionId,
     iat: Math.floor(issuedAt / 1000),
     exp: Math.floor(issuedAt / 1000) + lifetimeSeconds
   }
@@ -106,6 +110,8 @@ export function fakeAuthServer(): FakeAuthServer {
       requests.push({
         method,
         path: url.pathname,
+        url: url.href,
+        transport: headers.get("x-auth-transport"),
         body: init?.body ? JSON.parse(init.body as string) : undefined,
         credentials: init?.credentials,
         acceptLanguage: headers.get("accept-language"),

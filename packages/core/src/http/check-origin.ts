@@ -1,6 +1,7 @@
 import type { AuthConfig } from "../core/auth-config"
 import type { AuthInternals } from "../core/auth-internals"
 import { getRequestOrigin } from "../lib/get-base-url"
+import { isBearerTransport } from "../shared/session-transport"
 import { AuthApiError } from "./auth-api-error"
 
 /** Methods that must not have side effects, and so need no origin check. */
@@ -77,36 +78,7 @@ function configuredOrigins(config: AuthConfig) {
   return origins
 }
 
-/**
- * Refuses a state-changing request that did not come from this site.
- *
- * The book's check, as in Lucia's `auth_session.ts` and the author's
- * `actionRoute`: every non-GET request must carry `Sec-Fetch-Site:
- * same-origin`. The browser sets that header on every request and forbids a
- * page from touching it, so a cross-site page cannot forge it; and a browser
- * too old to send it is refused rather than trusted, which is what makes
- * "missing" a refusal. Cross-site request forgery is a browser attack — a
- * client that is not a browser may set the header itself, and the
- * `cookieStorage` client does.
- *
- * The book's one fallback, for subdomains and older browsers, is an explicit
- * `Origin` allowlist. That is what lets a request whose header says
- * `same-site` or `cross-site` — or that has no header at all — through: only
- * when its `Origin` is this server's own, as the runtime sees it or as a
- * trusted proxy forwarded it, its `baseURL`, or one of its `trustedOrigins`.
- *
- * A body, when there is one, must be `application/json`, with `utf-8` as the
- * only charset a parameter may name — the author's check. A page cannot send
- * that content type cross-site without a preflight, so the browser stops most
- * of these before any header reaches the server; the check runs regardless,
- * because whoever answers the preflight is the application's business.
- *
- * Both run before the body is parsed, so a refused request does no work.
- *
- * @throws {AuthApiError} `forbiddenOrigin` (403) for a request that is not
- * same-origin and not from an allowlisted origin; `unsupportedMediaType` (415)
- * for a body that is not JSON.
- */
+/** Ambient cookies require trusted browser origins. */
 export function assertAllowedOrigin(
   internals: AuthInternals,
   request: Request
@@ -114,12 +86,21 @@ export function assertAllowedOrigin(
   if (SAFE_METHODS.has(request.method)) return
 
   // Lucia's auth_session.ts, 0BSD
+  const explicitOrigin = request.headers.get("origin")
+  if (
+    isBearerTransport(request.headers) &&
+    explicitOrigin !== null &&
+    !isAllowedOrigin(internals.config, request, explicitOrigin)
+  )
+    throw new AuthApiError("forbiddenOrigin")
+
   const secFetchSiteHeader = request.headers.get("Sec-Fetch-Site")
   if (secFetchSiteHeader !== "same-origin") {
     const origin = request.headers.get("origin")
     if (
-      origin === null ||
-      !isAllowedOrigin(internals.config, request, origin)
+      origin === null
+        ? !isBearerTransport(request.headers)
+        : !isAllowedOrigin(internals.config, request, origin)
     ) {
       internals.log.warn("refused a request that is not same-origin", {
         secFetchSite: secFetchSiteHeader,

@@ -2,7 +2,9 @@ import type { AuthSession, AuthUser } from "../core/auth-database"
 import type { AuthInternals } from "../core/auth-internals"
 import { readCookie } from "../lib/parse-cookies"
 import { selectOne } from "../lib/select-one"
+import { base64ToBytes } from "../shared/base64url"
 import { HINT_COOKIE_NAME } from "../shared/hint-cookie"
+import { isBearerTransport } from "../shared/session-transport"
 import type { CallerInput } from "./authenticate"
 import { verifyBearer } from "./authenticate"
 import { readRefreshCookies } from "./session-cookies"
@@ -146,9 +148,12 @@ export async function resolveCallerSession(
   internals: AuthInternals,
   input: CallerInput
 ): Promise<ResolvedSession | null> {
+  const tokenSession = await resolveTokenSession(internals, input)
   return (
-    (await resolveTokenSession(internals, input)) ??
-    (input.headers ? resolveSession(internals, input.headers) : null)
+    tokenSession ??
+    (!isBearerTransport(input.headers) && input.headers
+      ? resolveSession(internals, input.headers)
+      : null)
   )
 }
 
@@ -189,4 +194,23 @@ export async function resolveTokenSession(
       : await selectOne(internals, "users", { id: { eq: session.userId } })
 
   return user ? { session, user } : null
+}
+
+/** Session ownership comes from the validated credential. */
+export async function resolveBearerSession(
+  internals: AuthInternals,
+  headers: Headers
+): Promise<ResolvedSession | null> {
+  const token = headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]
+  if (
+    !token ||
+    base64ToBytes(token.slice(token.lastIndexOf(".") + 1))?.length !== 32
+  )
+    return null
+  const session = await validateSessionToken(internals, token, headers)
+  if (!session) return null
+  const user = await selectOne(internals, "users", {
+    id: { eq: session.userId }
+  })
+  return user ? { user, session } : null
 }

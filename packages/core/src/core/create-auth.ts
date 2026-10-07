@@ -21,6 +21,7 @@ import {
   readRefreshToken,
   resolveTokenSession
 } from "../session/resolve-session"
+import { isBearerTransport } from "../shared/session-transport"
 import type { AuthConfig } from "./auth-config"
 import { resolveAuthConfig } from "./auth-config"
 import type { AdditionalFieldsSchema, AuthUser } from "./auth-database"
@@ -128,7 +129,10 @@ export function createAuth<
       // `getToken` is the one callable that reads the cookie, and called
       // in-process is where the "server-side rendering never sees the cookie"
       // trap is explained instead of silently resolving to null.
-      if (name === "getToken") {
+      if (
+        name === "getToken" &&
+        !isBearerTransport((input as CallerInput | undefined)?.headers)
+      ) {
         assertCookieReachable(
           resolved,
           (input as CallerInput | undefined)?.headers,

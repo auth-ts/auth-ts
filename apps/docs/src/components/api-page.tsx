@@ -18,10 +18,7 @@ export const OpenAPIPage = createOpenAPIPage({
   playground: {
     enabled: Boolean(apiURL),
     fetchOptions: {
-      // Sent by default only to the page's own origin, and the playground is
-      // pointed at another one. `GET /token` authenticates from the refresh
-      // cookie and nothing else, so without this it always answers null. The
-      // server still has to allow this origin by name for the browser to agree.
+      // Cross-origin requests MUST include browser session cookies.
       onRequestInit: (init) => ({ ...init, credentials: "include" })
     }
   }

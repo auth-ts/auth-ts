@@ -62,14 +62,14 @@ export function matchRoute(
   const requestSegments = splitPathSegments(pathname, internals.config.basePath)
   if (!requestSegments) throw new AuthApiError("notFound")
 
-  let pathMatchedWithOtherMethod = false
+  const allowed = new Set<string>()
 
   for (const route of routes) {
     const params = matchSegments(route.segments, requestSegments)
     if (!params) continue
 
     if (route.endpoint.method !== request.method) {
-      pathMatchedWithOtherMethod = true
+      allowed.add(route.endpoint.method)
       continue
     }
 
@@ -77,7 +77,10 @@ export function matchRoute(
   }
 
   throw new AuthApiError(
-    pathMatchedWithOtherMethod ? "methodNotAllowed" : "notFound"
+    allowed.size ? "methodNotAllowed" : "notFound",
+    allowed.size
+      ? { headers: new Headers({ allow: [...allowed].join(", ") }) }
+      : {}
   )
 }
 

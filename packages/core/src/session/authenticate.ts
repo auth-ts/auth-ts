@@ -75,26 +75,7 @@ export async function verifyBearer(
   }
 }
 
-/**
- * Authenticates a request from its access token, and only from its token.
- *
- * The token names the caller without a database round trip, so an endpoint that
- * needs a user id does no work to find one — no session read, no session write,
- * no signature. That is the whole point of issuing tokens, and it only holds if
- * there is no second way in: a cookie fallback here would mean every endpoint
- * slides a session and mints a replacement for any caller that arrived without
- * a token, which is every server-rendered request.
- *
- * Exchanging the cookie for a token is `GET /token`, and it is the only
- * endpoint that reads the cookie to authenticate. A caller whose token is spent
- * goes there and comes back; there is nothing to self-heal here.
- *
- * The cost of trusting the token is revocation latency — a session revoked
- * elsewhere keeps working here until the token expires. That is the same bound
- * the database already lives with, since it authorizes on the token too.
- *
- * @throws {AuthApiError} `unauthenticated` when no live token was presented.
- */
+/** Access JWTs never fall back to cookies. */
 export async function authenticate(
   internals: AuthInternals,
   input: CallerInput

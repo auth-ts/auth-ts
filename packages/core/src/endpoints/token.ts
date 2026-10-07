@@ -1,20 +1,28 @@
 import type { AuthUser } from "../core/auth-database"
+import { unauthenticated } from "../http/auth-api-error"
 import { defineEndpoint } from "../http/define-endpoint"
+import { readBody } from "../http/read-body"
 import { selectOne } from "../lib/select-one"
 import type { EndpointDocs } from "../openapi/endpoint-docs"
 import { deleteSessions } from "../session/delete-sessions"
 import { mintAccessToken } from "../session/issue-session"
 import { presentedSessions } from "../session/presented-sessions"
 import type { HeadersInput } from "../session/resolve-session"
-import { readRefreshToken, resolveSession } from "../session/resolve-session"
+import {
+  readRefreshToken,
+  resolveBearerSession,
+  resolveSession
+} from "../session/resolve-session"
 import {
   clearedRefreshCookies,
   refreshCookies
 } from "../session/session-cookies"
+import { isBearerTransport } from "../shared/session-transport"
 
-/** What `GET /token` and `auth.getToken` return when somebody is signed in. */
+/** A live access token and its user. */
 export interface TokenResult {
   token: string
+  multiUser?: boolean
   /**
    * The user the token was minted for.
    *
@@ -30,56 +38,37 @@ export interface TokenInput extends HeadersInput {
   requestURL?: string
 }
 
-/** How `GET /token` appears in the OpenAPI document. */
+/** Documents cookie and bearer session exchange. */
 export const getTokenDocs: EndpointDocs<TokenInput> = {
   description: "Answers 200 with null when nobody is signed in.",
   tag: "Session",
-  auth: "cookie",
+  auth: "session",
   responses: {
+    401: "Unauthenticated",
     200: {
       description:
         "The access token and its user, or `null` when nobody is signed in.",
       setsCookie: "refresh",
-      schema: "TokenResult"
+      schema: { oneOf: ["TokenResult", { type: "null" }] }
     }
   }
 }
 
-/**
- * Get an access token.
- *
- * The only endpoint that authenticates from the cookie, and therefore the only
- * one that touches a session: every other endpoint reads the token this
- * produces and does no session work at all. A page that calls four of them
- * costs one session write, not four.
- *
- * No session answers `null` with a 200 rather than a 401. This is the one
- * question in the library whose honest answer can be "nobody", and the callers
- * asking it — a client deciding what to render, a loader deciding whether to
- * greet someone — are not in a failure state. It also lets the answer carry
- * `Set-Cookie`, which a thrown error cannot: whatever dead credential the
- * browser presented is expired on the way out, so the next page load asks
- * nothing at all.
- *
- * An `Authorization` header is ignored rather than honoured. A caller holding a
- * live token has no reason to be here, and one holding a spent token is here
- * precisely because it is spent.
- *
- * The refresh token is **not** rotated. The cookie is `HttpOnly`, host-only,
- * and never crosses an origin, so rotation would buy very little; what it would
- * reliably buy is a race between concurrent tabs, where the second presents a
- * token the first has already spent.
- */
+/** Get an access token. */
 export const getToken = defineEndpoint({
-  method: "GET",
+  method: "POST",
   path: "/token",
-  parse: ({ request }): TokenInput => ({
-    headers: request.headers,
-    requestURL: request.url
-  }),
+  parse: async ({ request }): Promise<TokenInput> => {
+    await readBody(request, [])
+    return { headers: request.headers, requestURL: request.url }
+  },
   run: async (internals, input: TokenInput) => {
     const { config } = internals
-    const resolved = await resolveSession(internals, input.headers)
+    const bearer = isBearerTransport(input.headers)
+    const resolved = bearer
+      ? await resolveBearerSession(internals, input.headers)
+      : await resolveSession(internals, input.headers)
+    if (bearer && !resolved) throw unauthenticated()
     if (!resolved) {
       // Every credential is resolved before any of it is retired. This answer
       // is about the one cookie the hint named; a browser holding another
@@ -136,7 +125,11 @@ export const getToken = defineEndpoint({
     }
 
     return {
-      data: { token, user: resolved.user } satisfies TokenResult,
+      data: {
+        token,
+        user: resolved.user,
+        ...(bearer ? { multiUser: config.multiUser } : {})
+      } satisfies TokenResult,
       headers
     }
   }

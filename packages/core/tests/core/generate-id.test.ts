@@ -52,7 +52,7 @@ describe("generateId", () => {
     expect(sessionIdOf(refresh)).toMatch(/^sessions\.v1\./)
 
     const token = await context.auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor(refresh)
       })
     )

@@ -1,4 +1,8 @@
 import type { AuthInternals } from "../core/auth-internals"
+import {
+  isBearerTransport,
+  SESSION_TRANSPORT_HEADER
+} from "../shared/session-transport"
 import { AuthApiError, isAuthApiError, notFound } from "./auth-api-error"
 import { assertAllowedOrigin } from "./check-origin"
 import type { AnyEndpoint } from "./define-endpoint"
@@ -73,7 +77,17 @@ export async function handleRequest(
 
   try {
     if (request.method !== endpoint.method) {
-      throw new AuthApiError("methodNotAllowed")
+      throw new AuthApiError("methodNotAllowed", {
+        headers: new Headers({ allow: endpoint.method })
+      })
+    }
+    const transport = request.headers.get(SESSION_TRANSPORT_HEADER)
+    if (transport !== null && transport !== "bearer" && transport !== "cookie")
+      throw new AuthApiError("invalidField")
+    if (isBearerTransport(request.headers)) {
+      const headers = new Headers(request.headers)
+      headers.delete("cookie")
+      request = new Request(request, { headers })
     }
     assertAllowedOrigin(internals, request)
     if (endpoint.requires && !requirementMet(config, endpoint.requires)) {
@@ -86,6 +100,7 @@ export async function handleRequest(
     const result = await endpoint.run(internals, input as never)
 
     const headers = responseHeaders(result.headers)
+    if (isBearerTransport(request.headers)) headers.delete("set-cookie")
     const status = result.status ?? 200
 
     if (result.body !== undefined) {
@@ -103,13 +118,7 @@ export async function handleRequest(
   }
 }
 
-/**
- * The headers every response starts from.
- *
- * The author's `no-cache, no-store, must-revalidate`, because responses here carry tokens and per-user bodies on a
- * cookie-authenticated GET, which is exactly what a shared cache would serve to
- * the next person. An endpoint that sets its own policy — `jwks` — keeps it.
- */
+// Tokens MUST stay out of shared caches.
 function responseHeaders(init?: Headers) {
   const headers = new Headers(init)
   if (!headers.has("cache-control")) {
@@ -131,6 +140,8 @@ function toErrorResponse(
   const headers = responseHeaders(
     isAuthApiError(error) ? error.headers : undefined
   )
+
+  if (isBearerTransport(request.headers)) headers.delete("set-cookie")
 
   if (isAuthApiError(error)) {
     internals.log.debug("request refused", {

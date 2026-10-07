@@ -885,7 +885,7 @@ describe("oauth callback", () => {
     expect(((await whoami.json()) as { id: string }).id).toBe(owner.id)
     // The guest session was replaced by the callback, not left live beside it.
     const refused = await auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor(guestRefresh)
       })
     )

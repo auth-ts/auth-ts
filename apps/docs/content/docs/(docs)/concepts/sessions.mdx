@@ -32,14 +32,16 @@ because some provider tokens never expire.
 
 ## Why the refresh token isn't rotated
 
-Rotation limits the damage of a stolen refresh token. This one is `HttpOnly`
-and never leaves its origin, so stealing it takes a compromise that would defeat
-rotation too. What rotation reliably causes is a race between tabs, where one
-tab uses a token another already spent.
+The opaque session credential remains stable while its database session lives.
+Refreshing issues a new short-lived JWT and periodically extends the session's
+expiry. Signing out deletes the session. Browsers protect the credential with an
+HttpOnly cookie; native apps use the keychain or keystore.
 
-That only holds while the token stays in an `HttpOnly` cookie, or the keychain
-in a [native app](/docs/guides/native-apps). Storing it anywhere a script can
-read would need rotation, so that isn't supported.
+Rotation with reuse detection can detect some replay of stolen credentials, but
+requires additional concurrency and lost-response handling. This implementation
+uses stable database sessions, following Lucia's session model. It does not
+provide refresh-token reuse detection. Neither approach revokes an already-issued
+JWT at a data API that checks only its signature and expiry.
 
 ## Signing out
 

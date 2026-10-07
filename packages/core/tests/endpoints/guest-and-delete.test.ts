@@ -224,7 +224,7 @@ describe("guest conversion", () => {
     // token buys, not a session surviving.
     expect(context.db.sessions()).toHaveLength(1)
     const refused = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies })
+      request("POST", "/api/auth/token", { cookies })
     )
 
     expect(refused.status).toBe(200)
@@ -335,7 +335,7 @@ describe("guest conversion", () => {
     expect(context.db.sessions()).toHaveLength(1)
     expect(context.db.sessions()[0]?.userId).toBe(existing.id)
     const refused = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies })
+      request("POST", "/api/auth/token", { cookies })
     )
 
     expect(refused.status).toBe(200)
@@ -810,7 +810,7 @@ describe("identity verification, revoking a device, deleting the account", () =>
     expect(
       (
         await context.auth.handler(
-          request("GET", "/api/auth/token", {
+          request("POST", "/api/auth/token", {
             cookies: refreshCookieFor(other.refreshToken)
           })
         )
@@ -819,7 +819,7 @@ describe("identity verification, revoking a device, deleting the account", () =>
     expect(
       await (
         await context.auth.handler(
-          request("GET", "/api/auth/token", {
+          request("POST", "/api/auth/token", {
             cookies: refreshCookieFor(other.refreshToken)
           })
         )

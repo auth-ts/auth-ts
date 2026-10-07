@@ -38,6 +38,8 @@ export interface TokenStore {
   /** Stores a token, reading its own lifetime claims to know when to refresh. */
   set(token: string): void
   clear(): void
+  invalidate(): number
+  generation(): number
   /** Changes on every `set` or `clear`. */
   version(): number
   /** True when there is no token, or it is inside the refresh-ahead window. */
@@ -60,11 +62,19 @@ export function createTokenStore(log?: LeveledLogger): TokenStore {
   let state: TokenState | null = null
   let inFlight: Promise<unknown> | null = null
   let version = 0
+  let generation = 0
 
   return {
     get: () => state,
 
     version: () => version,
+    generation: () => generation,
+
+    invalidate() {
+      inFlight = null
+      version += 1
+      return ++generation
+    },
 
     set(token) {
       const decoded = decodeToken(token)
@@ -76,11 +86,13 @@ export function createTokenStore(log?: LeveledLogger): TokenStore {
 
       state = { token, issuedAt, expiresAt, receivedAt: now }
       version += 1
+      inFlight = null
     },
 
     clear() {
       state = null
       version += 1
+      inFlight = null
     },
 
     isExpiringSoon() {
@@ -107,9 +119,12 @@ export function createTokenStore(log?: LeveledLogger): TokenStore {
     },
 
     async singleFlight<Result>(refresh: () => Promise<Result>) {
-      inFlight ??= refresh().finally(() => {
-        inFlight = null
-      })
+      if (!inFlight) {
+        const pending = refresh().finally(() => {
+          if (inFlight === pending) inFlight = null
+        })
+        inFlight = pending
+      }
 
       return inFlight as Promise<Result>
     }

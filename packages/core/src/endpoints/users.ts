@@ -21,21 +21,7 @@ export const listUsersDocs: EndpointDocs<never> = {
   }
 }
 
-/**
- * List the signed in users.
- *
- * The switcher. One refresh cookie per user means this is a read of what the
- * browser presented and nothing else — no parked list to prune, and no
- * `Set-Cookie` on the way out.
- *
- * A cookie whose session has died is skipped rather than returned, so a revoked
- * device stops appearing here on the next request rather than lingering until
- * someone clicks it. The cookie itself is left alone: the session is already
- * gone, so the worst it can do is be skipped again.
- *
- * Which of them is active is the caller's comparison — `GET /token` already
- * says who that is, so a flag here would be the same answer written twice.
- */
+/** List the signed in users. */
 export const listUsers = defineEndpoint({
   method: "GET",
   path: "/users",

@@ -1,12 +1,13 @@
 import type { TokenResult } from "../../endpoints/token"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
+import { decodeToken } from "../lib/decode-token"
 import { reviveUser } from "../lib/revive-user"
 import { mayHaveSession } from "../lib/session-hint"
 
 /** A token refresh, and the three ways of asking for its result. */
 export interface RefreshToken {
-  /** Exchanges the refresh cookie for a token and its user, or `null` when there is no session. */
+  /** Renews through the selected session transport. */
   refresh: () => Promise<TokenResult | null>
   /** A usable token, or `null` when nobody is signed in. */
   getToken: (options?: GetTokenOptions) => Promise<string | null>
@@ -22,67 +23,153 @@ export interface GetTokenOptions {
 
 /** Builds the token refresh and the cached read over it. */
 export function createGetToken(internals: AuthClientInternals): RefreshToken {
-  const forget = async () => {
-    internals.tokenStore.clear()
-    // The refresh cookie is what was just refused, so a jar holding it is
-    // holding a dead credential. A browser's own jar is the browser's.
-    await internals.cookieJar?.clear()
-  }
-
+  const accepted = new WeakMap<TokenResult, number>()
   const refresh = (): Promise<TokenResult | null> =>
     internals.tokenStore.singleFlight(async () => {
-      if (!mayHaveSession(internals.config)) {
-        internals.log.debug("no session hint, skipping the refresh")
-        // Another tab may have signed out since this one last looked.
+      if (!internals.sessionStore && !mayHaveSession(internals.config)) {
         internals.tokenStore.clear()
-
         return null
       }
-
-      internals.log.debug("refreshing access token")
-
       const started = internals.tokenStore.version()
+      const stored = await internals.sessionStore?.read()
+      const userId = stored?.active
+      const credential = userId && stored?.accounts[userId]
+      if (internals.sessionStore && !credential) {
+        if (internals.tokenStore.version() === started)
+          internals.tokenStore.clear()
+        return null
+      }
       try {
         const wire = await internals.fetchJson<TokenResult | null>({
-          method: "GET",
-          path: "/token"
+          method: "POST",
+          path: "/token",
+          body: {},
+          ...(credential ? { bearer: credential } : {})
         })
         const result = wire && { ...wire, user: reviveUser(wire.user) }
-        if (!result) {
-          internals.log.debug("no session, clearing local state")
-          await forget()
-
+        const current = await internals.sessionStore?.read()
+        if (
+          internals.tokenStore.version() !== started ||
+          (current &&
+            (current.active !== userId ||
+              current.accounts[userId ?? ""] !== credential))
+        )
+          return null
+        if (result && credential && result.user.id !== userId) {
+          internals.tokenStore.invalidate()
+          internals.tokenStore.clear()
+          if (userId) await internals.sessionStore?.remove(userId, credential)
           return null
         }
-        // A sign-out or switch since then wins
-        if (internals.tokenStore.version() === started) {
+        if (result) {
+          if (
+            userId &&
+            credential &&
+            result.multiUser !== undefined &&
+            result.multiUser !== stored?.multiUser
+          ) {
+            const committed = await internals.sessionStore?.put(
+              userId,
+              credential,
+              result.multiUser,
+              (data) =>
+                internals.tokenStore.version() === started &&
+                data.active === userId &&
+                data.accounts[userId] === credential
+            )
+            if (!committed) return null
+          }
+          if (internals.tokenStore.version() !== started) return null
           internals.tokenStore.set(result.token)
+          accepted.set(result, internals.tokenStore.version())
+        } else {
+          if (internals.sessionStore) internals.tokenStore.invalidate()
+          internals.tokenStore.clear()
+          if (userId && credential)
+            await internals.sessionStore?.remove(userId, credential)
         }
-
         return result
       } catch (error) {
-        // Only the server saying "no session" is grounds to forget the user. A
-        // 500, a 502 from the proxy, a 429 — every non-2xx becomes an AuthError,
-        // and most of them say nothing about whether the cookie is still good.
-        if (error instanceof AuthError && error.code === "unauthenticated") {
-          internals.log.debug("refresh refused, clearing local state")
-          await forget()
+        if (
+          error instanceof AuthError &&
+          error.code === "unauthenticated" &&
+          internals.tokenStore.version() === started
+        ) {
+          const current = await internals.sessionStore?.read()
+          if (
+            internals.tokenStore.version() === started &&
+            (!current ||
+              (current.active === userId &&
+                current.accounts[userId ?? ""] === credential))
+          ) {
+            if (internals.sessionStore) internals.tokenStore.invalidate()
+            internals.tokenStore.clear()
+            if (userId && credential)
+              await internals.sessionStore?.remove(userId, credential)
+          }
         }
-
         throw error
       }
     })
 
   const requireToken = async (options?: GetTokenOptions) => {
+    if (internals.sessionStore) {
+      const stored = await internals.sessionStore.read()
+      const held = internals.tokenStore.get()
+      const claims =
+        held &&
+        internals.config.sessionStorage &&
+        decodeToken(held.token)?.claims
+      const credential = stored.active && stored.accounts[stored.active]
+      if (
+        held &&
+        (!credential ||
+          claims?.sub !== stored.active ||
+          claims?.sid !== credential.slice(0, credential.lastIndexOf(".")))
+      ) {
+        internals.tokenStore.invalidate()
+        internals.tokenStore.clear()
+      }
+    }
     const cached = internals.tokenStore.get()
     if (!cached || internals.tokenStore.mustRefresh()) {
-      const result = await refresh()
+      let result: TokenResult | null
+      try {
+        result = await refresh()
+      } catch (error) {
+        const current = internals.tokenStore.get()
+        if (
+          error instanceof AuthError &&
+          error.code === "unauthenticated" &&
+          current &&
+          !internals.tokenStore.mustRefresh()
+        )
+          return current.token
+        throw error
+      }
+      if (result && accepted.get(result) !== internals.tokenStore.version())
+        result = null
+      const held = internals.tokenStore.get()
+      if (!result && held && !internals.tokenStore.mustRefresh())
+        return held.token
+      if (
+        !result &&
+        internals.sessionStore &&
+        (await internals.sessionStore.read()).active
+      )
+        result = await refresh()
       if (!result) {
         // Built here rather than caught from the server, because a client that
         // never sent the request still owes `requireToken` the same error it
         // would have.
         throw new AuthError("unauthenticated", 401, "You are not signed in.")
       }
+      if (accepted.get(result) !== internals.tokenStore.version())
+        throw new AuthError(
+          "unauthenticated",
+          401,
+          "The account changed during the request."
+        )
       options?.onRefresh?.(result)
 
       return result.token
@@ -96,7 +183,12 @@ export function createGetToken(internals: AuthClientInternals): RefreshToken {
       // Concurrent callers share the one refresh, so each of their callbacks
       // sees the same result rather than only the first.
       void refresh()
-        .then((result) => result && options?.onRefresh?.(result))
+        .then(
+          (result) =>
+            result &&
+            accepted.get(result) === internals.tokenStore.version() &&
+            options?.onRefresh?.(result)
+        )
         .catch(() => {})
     }
 

@@ -50,7 +50,15 @@ const providerToken: ObjectSchemaFor<ProviderTokenResult> = {
 
 const tokenResult: ObjectSchemaFor<TokenResult> = {
   type: "object",
-  properties: { token: { type: "string" }, user: "User" },
+  properties: {
+    token: { type: "string" },
+    user: "User",
+    multiUser: {
+      type: "boolean",
+      description:
+        "Native transport only: whether multiple accounts are enabled."
+    }
+  },
   required: ["token", "user"]
 }
 
@@ -89,6 +97,17 @@ const authError: ObjectSchemaFor<AuthErrorBody> = {
 export const componentSchemas: Record<ComponentName, JsonSchema> = {
   User: user,
   TokenResult: tokenResult,
+  SignInResult: {
+    ...tokenResult,
+    properties: {
+      ...tokenResult.properties,
+      sessionToken: {
+        type: "string",
+        description:
+          "Persistent session credential; bearer transport only. Store in native secure storage."
+      }
+    }
+  },
   ProviderToken: providerToken,
   AuthorizeURL: {
     type: "object",

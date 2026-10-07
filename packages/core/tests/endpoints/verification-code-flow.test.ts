@@ -379,7 +379,7 @@ describe("token and user endpoints", () => {
     const { auth, refreshToken } = await signIn()
 
     const response = await auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor(refreshToken)
       })
     )
@@ -479,7 +479,7 @@ describe("token and user endpoints", () => {
     ).toContain("Max-Age=0")
 
     const afterSignOut = await auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor(refreshToken)
       })
     )
@@ -581,12 +581,12 @@ describe("jwks and discovery", () => {
   })
 })
 
-describe("GET /token", () => {
+describe("POST /token", () => {
   it("answers null and retires the credential a stranger presented", async () => {
     const { auth } = await createTestServer({ multiUser: true })
 
     const response = await auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor("a token no session was ever issued for")
       })
     )
@@ -618,7 +618,7 @@ describe("GET /token", () => {
     })
 
     const response = await auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         origin: "https://api.example.com",
         headers: { origin: "https://app.example.com" }
       })
@@ -661,7 +661,7 @@ describe("GET /token", () => {
     })
     await new Promise((resolve) => setTimeout(resolve, 5))
     const read = await auth.handler(
-      request("GET", "/api/auth/token", { cookies })
+      request("POST", "/api/auth/token", { cookies })
     )
     expect(read.status).toBe(200)
 
@@ -696,7 +696,7 @@ describe("GET /token", () => {
     expect(db.sessions()).toHaveLength(1)
 
     const response = await auth.handler(
-      request("GET", "/api/auth/token", { cookies })
+      request("POST", "/api/auth/token", { cookies })
     )
 
     expect(response.status).toBe(200)
@@ -746,7 +746,7 @@ describe("where a token comes from", () => {
     const { context, cookies } = await signedIn()
 
     const refreshed = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies })
+      request("POST", "/api/auth/token", { cookies })
     )
     expect(((await refreshed.json()) as { token: string }).token).toEqual(
       expect.any(String)
@@ -780,7 +780,7 @@ describe("where a token comes from", () => {
     const { context, cookies } = await signedIn()
 
     const response = await context.auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies,
         headers: { authorization: "Bearer not.a.token" }
       })
@@ -824,7 +824,7 @@ describe("where a token comes from", () => {
       update.mock.calls.filter(([input]) => input.table === "sessions")
     ).toHaveLength(0)
 
-    await context.auth.handler(request("GET", "/api/auth/token", { cookies }))
+    await context.auth.handler(request("POST", "/api/auth/token", { cookies }))
     expect(
       update.mock.calls.filter(([input]) => input.table === "sessions")
     ).toHaveLength(1)

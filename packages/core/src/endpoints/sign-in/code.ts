@@ -44,7 +44,7 @@ export const signInWithCodeDocs: EndpointDocs<SignInWithCodeInput> = {
     200: {
       description: "Signed in.",
       setsCookie: "refresh",
-      schema: "TokenResult"
+      schema: "SignInResult"
     },
     400: "InvalidField",
     401: {
@@ -136,7 +136,13 @@ export const signInWithCode = defineEndpoint({
       )
     )
     return {
-      data: { user: issued.user, token: issued.token },
+      data: {
+        user: issued.user,
+        token: issued.token,
+        ...(issued.sessionToken
+          ? { sessionToken: issued.sessionToken, multiUser: issued.multiUser }
+          : {})
+      },
       headers: issued.headers
     }
   }

@@ -23,3 +23,24 @@ describe("createTokenStore", () => {
     }
   })
 })
+
+it("keeps a newer flight when an invalidated flight finishes", async () => {
+  const store = createTokenStore()
+  let releaseOld = () => {}
+  let releaseNew = () => {}
+  const old = new Promise<string>((resolve) => {
+    releaseOld = () => resolve("old")
+  })
+  const next = new Promise<string>((resolve) => {
+    releaseNew = () => resolve("new")
+  })
+  const oldRead = store.singleFlight(() => old)
+  store.invalidate()
+  const newRead = store.singleFlight(() => next)
+  releaseOld()
+  expect(await oldRead).toBe("old")
+  const duplicate = store.singleFlight(() => Promise.resolve("wrong"))
+  releaseNew()
+  expect(await newRead).toBe("new")
+  expect(await duplicate).toBe("new")
+})

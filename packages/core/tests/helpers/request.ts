@@ -130,7 +130,7 @@ export async function mintToken(
   userId?: string
 ) {
   const response = await auth.handler(
-    request("GET", "/api/auth/token", {
+    request("POST", "/api/auth/token", {
       cookies: refreshCookieFor(refreshToken, userId)
     })
   )

@@ -1,13 +1,14 @@
 import type { AuthErrorBody } from "../../http/error-response"
+import { SESSION_TRANSPORT_HEADER } from "../../shared/session-transport"
 import type { AuthClientConfig } from "../core/auth-client-config"
 import { AuthError, AuthNetworkError } from "./auth-error"
-import type { CookieJar } from "./cookie-jar"
 
 /** Per-request options. */
 export interface FetchJsonOptions {
   method: "GET" | "POST" | "DELETE"
   path: string
   body?: unknown
+  bearer?: string
   /**
    * Get a live token before sending, and retry once if the server refuses it.
    *
@@ -21,21 +22,8 @@ export interface FetchJsonOptions {
 /** Issues authenticated requests to the auth server and unwraps its responses. */
 export type FetchJson = <Result>(options: FetchJsonOptions) => Promise<Result>
 
-/**
- * Builds the request function every client method uses.
- *
- * `credentials: "include"` is what makes the refresh cookie travel, and is the
- * reason a cross-origin server must answer with an explicit origin rather than a
- * wildcard. With `cookieStorage` configured the client is the cookie jar
- * instead: it sends what it holds as the `Cookie` header and keeps what comes
- * back in `Set-Cookie`, with credentials omitted so the two cannot disagree.
- *
- * A failed request and a refused one are turned into different errors on
- * purpose: the caller must be able to tell "your session is gone" from "the
- * train went into a tunnel", because only one of those should clear local state.
- */
+/** Explicit credentials cannot fall back to cookies. */
 export function createFetchJson(
-  jar: CookieJar | undefined,
   config: AuthClientConfig,
   getLocale: () => string | undefined,
   /** The token held right now, sent opportunistically on every request. */
@@ -43,7 +31,8 @@ export function createFetchJson(
   /** Returns a live token, refreshing through `/token` when the held one is spent. */
   ensureToken: () => Promise<string>,
   /** Drops the held token, so the retry cannot present the one just refused. */
-  clearToken: () => void
+  clearToken: () => void,
+  getGeneration: () => number
 ): FetchJson {
   const base = `${config.baseURL}${config.basePath}`
 
@@ -68,26 +57,29 @@ export function createFetchJson(
     method,
     path,
     body,
-    authenticated
+    authenticated,
+    bearer: providedBearer
   }: FetchJsonOptions) => {
+    const generation = getGeneration()
     const send = async (bearer: string | undefined) => {
+      if (authenticated && generation !== getGeneration())
+        throw new AuthError(
+          "unauthenticated",
+          401,
+          "The account changed during the request."
+        )
       const headers = new Headers()
       const locale = getLocale()
       if (locale) headers.set("accept-language", locale)
       if (body !== undefined) headers.set("content-type", "application/json")
       if (bearer) headers.set("authorization", `Bearer ${bearer}`)
-      // Read per attempt, not once: a retry follows a refresh that may have
-      // taken a `Set-Cookie` with it.
-      const cookie = await jar?.header()
-      if (cookie) headers.set("cookie", cookie)
-      // Not a browser, so the server's same-origin check hears it from us.
-      if (jar) headers.set("sec-fetch-site", "same-origin")
+      if (config.sessionStorage) headers.set(SESSION_TRANSPORT_HEADER, "bearer")
 
       try {
         return await fetch(`${base}${path}`, {
           method,
           headers,
-          credentials: jar ? "omit" : "include",
+          credentials: config.sessionStorage ? "omit" : "include",
           ...(body === undefined ? {} : { body: JSON.stringify(body) })
         })
       } catch (cause) {
@@ -96,9 +88,13 @@ export function createFetchJson(
     }
 
     let response = await send(
-      authenticated ? await ensureToken() : getHeldToken()
+      providedBearer ??
+        (path === "/token"
+          ? undefined
+          : authenticated
+            ? await ensureToken()
+            : getHeldToken())
     )
-    await jar?.absorb(response)
     let failure = await readError(response)
 
     // One retry, and only for a refused credential: the held token may have
@@ -106,11 +102,20 @@ export function createFetchJson(
     // off that the refresh-ahead window never fired. Narrowed to
     // `unauthenticated` because the other 401s — a wrong deletion code — are
     // verdicts on the request, and resending one would repeat it for nothing.
-    if (authenticated && failure?.code === "unauthenticated") {
+    if (
+      authenticated &&
+      providedBearer === undefined &&
+      failure?.code === "unauthenticated"
+    ) {
+      if (generation !== getGeneration())
+        throw new AuthError(
+          "unauthenticated",
+          401,
+          "The account changed during the request."
+        )
       clearToken()
       // A refusal here throws, so there is no third attempt.
       response = await send(await ensureToken())
-      await jar?.absorb(response)
       failure = await readError(response)
     }
 

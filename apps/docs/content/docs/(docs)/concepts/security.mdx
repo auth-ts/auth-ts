@@ -31,7 +31,8 @@ Codes are six symbols from 32 by default, drawn from a secure random source
 without modulo bias. They're stored under scrypt (16 MiB), so a leaked table
 takes far longer to crack than a code lives. Codes last an hour.
 
-Each code is bound to the browser that asked for it, through an attempt cookie.
+Each code is bound to the client that asked for it, through an attempt token.
+Browsers carry a cookie; native clients send the token explicitly.
 Someone requesting a code for your address gets their own code; they can't
 replace or use yours. A code whose email fails to send is deleted.
 
@@ -42,13 +43,15 @@ lowercased.
 </Accordion>
 <Accordion title="Cross-site request forgery">
 
-Every request except `GET` and `HEAD` must carry `Sec-Fetch-Site: same-origin`,
-which browsers set and pages can't forge. Other origins pass only when listed in
-`trustedOrigins`. Bodies must be `application/json` and under 16 KiB.
+Browser requests other than GET and HEAD require a trusted origin, through
+`Sec-Fetch-Site` or the explicit Origin allowlist. Native bearer transport ignores
+incoming cookies and requires explicit credentials or a verified sign-in code.
+The transport selector grants no authority. Explicit untrusted origins are
+refused in either mode. Request bodies must be JSON and stay under 16 KiB.
 
-Only `GET /token` accepts the cookie alone, and a cross-site page can't read its
-response. Everything else needs the bearer token, so a request carrying only
-the cookie can't act for anyone.
+`POST /token` accepts the browser session cookie or an opaque native bearer
+credential. Access JWTs cannot renew sessions. An invalid native credential
+never falls back to a browser cookie. Ordinary authenticated routes require JWTs.
 
 </Accordion>
 <Accordion title="Cookies">

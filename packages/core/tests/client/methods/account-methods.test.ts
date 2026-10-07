@@ -152,7 +152,7 @@ describe("sendSignInCode", () => {
     // A 401 makes the client refresh its token and retry once, so both the
     // refresh and the retried request need answers.
     server.on("POST", "/api/auth/user", { status: 401, body: wireBody })
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -228,7 +228,7 @@ describe("signOut", () => {
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
     // The first sign-out drops the token, so the second buys another.
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })

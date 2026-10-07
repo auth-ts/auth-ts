@@ -28,7 +28,7 @@ hashing codes, which Node, Bun, Deno and Cloudflare Workers all provide.
 
 ## Why JWTs and sessions?
 
-The session, in an `HttpOnly` cookie, is what keeps someone signed in and what
-you revoke. The JWT is what every request carries: your API checks it with
+The session is what keeps someone signed in and what you revoke. Browsers keep
+its credential in an HttpOnly cookie; native apps use protected device storage. The JWT is what every request carries: your API checks it with
 `verifyToken` without a database lookup, and a database like Neon or Supabase
 can check it too. See [Sessions and revocation](/docs/concepts/sessions).

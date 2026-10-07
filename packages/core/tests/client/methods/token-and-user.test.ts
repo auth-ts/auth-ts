@@ -73,7 +73,7 @@ describe("decodeToken", () => {
 
 describe("getToken", () => {
   it("reports the user it minted from, and only when it minted", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -92,7 +92,7 @@ describe("getToken", () => {
   })
 
   it("refreshes once and caches the token", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -108,7 +108,7 @@ describe("getToken", () => {
   })
 
   it("sends credentials, which is what carries the refresh cookie", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -119,7 +119,7 @@ describe("getToken", () => {
   })
 
   it("makes exactly one request for ten concurrent callers", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -135,7 +135,7 @@ describe("getToken", () => {
 
   it("refreshes early, inside the 60 second window before expiry", async () => {
     vi.useFakeTimers()
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken({ lifetimeSeconds: 600 })
     })
@@ -156,7 +156,7 @@ describe("getToken", () => {
   })
 
   it("clears the token and resolves null on 401, because signed out is an answer", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -165,7 +165,7 @@ describe("getToken", () => {
 
     server.restore()
     server = fakeAuthServer()
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       status: 401,
       body: { code: "unauthenticated", message: "You are not signed in." }
     })
@@ -177,7 +177,7 @@ describe("getToken", () => {
   })
 
   it("resolves null and clears the token when the server says nobody is here", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -187,7 +187,7 @@ describe("getToken", () => {
     server.restore()
     server = fakeAuthServer()
     // 200 with a null body: the answer to "who is here", not a failure.
-    server.on("GET", "/api/auth/token", { body: null })
+    server.on("POST", "/api/auth/token", { body: null })
     client.clearToken()
 
     expect(await client.getToken()).toBeNull()
@@ -195,7 +195,7 @@ describe("getToken", () => {
   })
 
   it("still throws from the methods that need a credential", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       status: 401,
       body: { code: "unauthenticated", message: "You are not signed in." }
     })
@@ -209,7 +209,7 @@ describe("getToken", () => {
   })
 
   it("throws on a server failure and keeps the token, because a 500 is not a verdict", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -232,7 +232,7 @@ describe("getToken", () => {
     ]) {
       server.restore()
       server = fakeAuthServer()
-      server.on("GET", "/api/auth/token", reply)
+      server.on("POST", "/api/auth/token", reply)
       client.clearToken()
 
       await expect(
@@ -243,7 +243,7 @@ describe("getToken", () => {
   })
 
   it("surfaces retryAfter from a throttled response", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       status: 429,
       body: {
         code: "rateLimited",
@@ -259,7 +259,7 @@ describe("getToken", () => {
   })
 
   it("surfaces requestId from an unexpected failure", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       status: 500,
       body: {
         code: "internalError",
@@ -298,7 +298,7 @@ describe("the session hint", () => {
   })
 
   it("reads a user id as a live session and asks", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -318,7 +318,7 @@ describe("the session hint", () => {
   })
 
   it("asks the server when two hints disagree, rather than trusting either", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -339,7 +339,7 @@ describe("the session hint", () => {
 
   it("forgets a token it is still holding when the hint has gone", async () => {
     // Another tab signed out; this one must not keep serving from its cache.
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -358,27 +358,27 @@ describe("the session hint", () => {
     // out" is worse than a wasted request.
     setSessionHint(undefined)
     const client = createAuthClient({ baseURL: "https://api.example.test" })
-    server.on("GET", "/api/auth/token", { body: null })
+    server.on("POST", "/api/auth/token", { body: null })
 
     expect(await client.getToken()).toBeNull()
     expect(server.requests).toHaveLength(1)
   })
 
-  it("is ignored by a client holding its own cookie jar", async () => {
-    // A native app has the refresh cookie itself; nothing to hint about.
+  it("is ignored by a client using native session storage", async () => {
     setSessionHint(undefined)
     const storage = new Map<string, string>()
     const client = createAuthClient({
-      cookieStorage: {
+      baseURL: "https://app.example.com",
+      sessionStorage: {
         getItem: (key) => storage.get(key) ?? null,
         setItem: (key, value) => void storage.set(key, value),
         removeItem: (key) => void storage.delete(key)
       }
     })
-    server.on("GET", "/api/auth/token", { body: null })
+    server.on("POST", "/api/auth/token", { body: null })
 
     expect(await client.getToken()).toBeNull()
-    expect(server.requests).toHaveLength(1)
+    expect(server.requests).toHaveLength(0)
   })
 })
 
@@ -396,7 +396,7 @@ describe("a refused token", () => {
       body: { code: "unauthenticated", message: "You are not signed in." }
     })
     server.on("GET", "/api/auth/users", { body: [] })
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -419,7 +419,7 @@ describe("a refused token", () => {
       token: fakeAccessToken()
     })
     server.on("GET", "/api/auth/users", refused)
-    server.on("GET", "/api/auth/token", refused)
+    server.on("POST", "/api/auth/token", refused)
     const client = createAuthClient()
     await client.signInWithCode({ code: "123456" })
 
@@ -434,11 +434,11 @@ describe("a refused token", () => {
 
 describe("a network failure", () => {
   it("throws AuthNetworkError and keeps the token it holds", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("GET", "/api/auth/token", { networkError: true })
+    server.on("POST", "/api/auth/token", { networkError: true })
     const client = createAuthClient()
     const held = await client.getToken()
 
@@ -472,7 +472,7 @@ describe("a network failure", () => {
 
 describe("refresh", () => {
   it("costs one request on a cold start, since the refresh carries the user", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -485,7 +485,7 @@ describe("refresh", () => {
   })
 
   it("asks every time, so it is a reload rather than a read", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
@@ -501,7 +501,7 @@ describe("refresh", () => {
   })
 
   it("resolves null when the session is gone", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       status: 401,
       body: { code: "unauthenticated", message: "You are not signed in." }
     })
@@ -516,11 +516,11 @@ describe("refresh", () => {
     try {
       const first = fakeAccessToken()
       const second = fakeAccessToken()
-      server.on("GET", "/api/auth/token", {
+      server.on("POST", "/api/auth/token", {
         body: { user },
         token: first
       })
-      server.on("GET", "/api/auth/token", {
+      server.on("POST", "/api/auth/token", {
         body: { user },
         token: second
       })
@@ -550,12 +550,18 @@ describe("refresh", () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
+    let finished = () => {}
+    const completed = new Promise<void>((resolve) => {
+      finished = resolve
+    })
     vi.stubGlobal(
       "fetch",
       async (input: string | URL | Request, init?: RequestInit) => {
         if (String(input).endsWith("/api/auth/token")) await gate
 
-        return scripted(input, init)
+        const response = await scripted(input, init)
+        if (String(input).endsWith("/api/auth/token")) finished()
+        return response
       }
     )
     vi.useFakeTimers()
@@ -564,32 +570,28 @@ describe("refresh", () => {
       token: fakeAccessToken()
     })
     server.on("POST", "/api/auth/sign-out", { status: 204 })
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })
-    server.on("GET", "/api/auth/token", { body: null })
+    server.on("POST", "/api/auth/token", { body: null })
     const client = createAuthClient()
 
     try {
       const nearingExpiry = await client.signInWithCode({
         code: "123456"
       })
-      let landed = () => {}
-      const refreshed = new Promise<void>((resolve) => {
-        landed = resolve
-      })
+      const onRefresh = vi.fn()
       // 55 seconds left: refreshing behind the caller
       vi.setSystemTime(Date.now() + 545_000)
-      expect(await client.getToken({ onRefresh: () => landed() })).toBe(
-        nearingExpiry.token
-      )
+      expect(await client.getToken({ onRefresh })).toBe(nearingExpiry.token)
 
       await client.signOut()
       release()
-      await refreshed
+      await completed
 
       expect(await client.getToken()).toBeNull()
+      expect(onRefresh).not.toHaveBeenCalled()
       expect(
         server.requests.filter((request) => request.path === "/api/auth/token")
       ).toHaveLength(2)
@@ -604,11 +606,11 @@ describe("refresh", () => {
     try {
       const spent = fakeAccessToken()
       const fresh = fakeAccessToken()
-      server.on("GET", "/api/auth/token", {
+      server.on("POST", "/api/auth/token", {
         body: { user },
         token: spent
       })
-      server.on("GET", "/api/auth/token", {
+      server.on("POST", "/api/auth/token", {
         body: { user },
         token: fresh
       })
@@ -625,7 +627,7 @@ describe("refresh", () => {
   })
 
   it("shares one refresh between concurrent callers", async () => {
-    server.on("GET", "/api/auth/token", {
+    server.on("POST", "/api/auth/token", {
       body: { user },
       token: fakeAccessToken()
     })

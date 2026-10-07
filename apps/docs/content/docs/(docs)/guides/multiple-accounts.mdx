@@ -42,3 +42,12 @@ await authClient.signOut() // everyone in this browser
 ```
 
 Each user has their own refresh cookie, named `auth-ts.refresh.<userId>`.
+
+## Native apps
+
+Native clients store one opaque session credential per account in secure storage.
+The server's `multiUser` setting controls whether accounts are retained.
+`listUsers` validates credentials individually without changing the active
+account. `switchUser` exchanges the selected credential before committing the
+switch. `signOut` revokes each targeted session before removing it from storage.
+No cookie jar or bulk credential header is used. See [Native apps](/docs/guides/native-apps).

@@ -7,6 +7,8 @@ import { insertRow } from "../../lib/insert-row"
 import type { EndpointDocs } from "../../openapi/endpoint-docs"
 import { issueSession } from "../../session/issue-session"
 import { presentedSessions } from "../../session/presented-sessions"
+import { resolveCallerSession } from "../../session/resolve-session"
+import { isBearerTransport } from "../../shared/session-transport"
 
 /** Body accepted by `POST /sign-in/guest`. */
 export interface SignInAsGuestInput {
@@ -26,7 +28,7 @@ export const signInAsGuestDocs: EndpointDocs<SignInAsGuestInput> = {
     200: {
       description: "Signed in as a new guest.",
       setsCookie: "refresh",
-      schema: "TokenResult"
+      schema: "SignInResult"
     },
     409: "Conflict",
     429: "RateLimited"
@@ -71,7 +73,11 @@ export const signInAsGuest = defineEndpoint({
     // guest would displace or park a real account, and a guest parked behind
     // one is a row nothing will ever convert. A dead cookie does not count.
     const presented = await presentedSessions(internals, headers)
-    if (presented.some(({ session }) => session)) {
+    if (
+      presented.some(({ session }) => session) ||
+      (isBearerTransport(headers) &&
+        (await resolveCallerSession(internals, { headers })))
+    ) {
       throw new AuthApiError("guestRequiresSignOut")
     }
 
@@ -100,7 +106,13 @@ export const signInAsGuest = defineEndpoint({
     })
 
     return {
-      data: { user: issued.user, token: issued.token },
+      data: {
+        user: issued.user,
+        token: issued.token,
+        ...(issued.sessionToken
+          ? { sessionToken: issued.sessionToken, multiUser: issued.multiUser }
+          : {})
+      },
       headers: issued.headers
     }
   }

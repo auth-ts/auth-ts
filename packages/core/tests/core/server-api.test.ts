@@ -239,7 +239,7 @@ describe("getToken as a function", () => {
     const { refreshToken } = await signIn(context)
 
     const response = await context.auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor(refreshToken)
       })
     )
@@ -263,7 +263,7 @@ describe("getToken as a function", () => {
     const { refreshToken } = await signIn(context)
 
     const response = await context.auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor(refreshToken)
       })
     )
@@ -465,7 +465,7 @@ describe("calling with a token instead of a request", () => {
     const { refreshToken } = await signIn(context)
     // How a caller holding only the cookie gets a token to pass along.
     const minted = await context.auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: refreshCookieFor(refreshToken)
       })
     )

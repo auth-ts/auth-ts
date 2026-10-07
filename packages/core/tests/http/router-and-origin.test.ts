@@ -13,7 +13,7 @@ describe("matchRoute", () => {
     // Unauthenticated is fine here — what matters is that none of these 404.
     const probes: Array<[string, string]> = [
       ["POST", "/api/auth/sign-in/send-code"],
-      ["GET", "/api/auth/token"],
+      ["POST", "/api/auth/token"],
       ["POST", "/api/auth/sign-in/code"],
       ["POST", "/api/auth/sign-out"],
       ["POST", "/api/auth/user"],

@@ -25,6 +25,10 @@ async function startFlow(
   input: OAuthNavigationInput,
   authenticated: boolean
 ) {
+  if (internals.sessionStore)
+    throw new Error(
+      "Native provider sign-in requires an OAuth handoff and is not supported yet."
+    )
   const { url } = await internals.fetchJson<AuthorizeURLResult>({
     method: "POST",
     path: `${path}/${encodeURIComponent(input.provider)}`,

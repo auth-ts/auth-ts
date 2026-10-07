@@ -7,8 +7,8 @@ export {
   AuthNetworkError,
   isAuthError
 } from "./client/lib/auth-error"
-export type { CookieStorage } from "./client/lib/cookie-jar"
 export type { Logger, LogLevel } from "./client/lib/logger"
+export type { SessionStorage } from "./client/lib/session-storage"
 export type {
   DeleteUserInput,
   DeleteUserResult,

@@ -2,6 +2,7 @@ import type { AuthUser } from "../../core/auth-database"
 import type { AuthClientInternals } from "../core/auth-client-internals"
 import { AuthError } from "../lib/auth-error"
 import { reviveUser } from "../lib/revive-user"
+import { currentAttempt, rememberAttempt } from "../lib/session-storage"
 import type { SendCodeResult } from "./sign-in"
 
 /** The flat body accepted by profile updates. */
@@ -44,6 +45,36 @@ export async function signOut(
   input: SignOutInput = {}
 ): Promise<void> {
   const scope = input.scope ?? "local"
+  const generation = internals.sessionStore
+    ? internals.tokenStore.invalidate()
+    : internals.tokenStore.generation()
+  if (internals.sessionStore) {
+    const stored = await internals.sessionStore.read()
+    const targets = Object.entries(stored.accounts).filter(
+      ([id]) => input.userId === undefined || id === input.userId
+    )
+    if (input.userId !== undefined && !targets.length)
+      throw new AuthError("notFound", 404, "No such signed-in account.")
+    for (const [id, credential] of targets) {
+      const result = await internals.exchangeSession(credential)
+      if (result)
+        await internals.fetchJson({
+          method: "POST",
+          path: "/sign-out",
+          body: { scope },
+          bearer: result.token
+        })
+      await internals.sessionStore.remove(id, credential)
+    }
+    if (
+      internals.tokenStore.generation() === generation &&
+      (input.userId === undefined || input.userId === stored.active)
+    ) {
+      internals.tokenStore.clear()
+      internals.attempts = {}
+    }
+    return
+  }
   try {
     await internals.fetchJson({
       method: "POST",
@@ -59,7 +90,10 @@ export async function signOut(
     }
   }
 
-  internals.tokenStore.clear()
+  if (internals.tokenStore.generation() === generation) {
+    internals.tokenStore.invalidate()
+    internals.tokenStore.clear()
+  }
 }
 
 /** Where no cookie carries it, the attempt token `sendIdentityCode` returned. */
@@ -110,17 +144,28 @@ export async function deleteUser(
   internals: AuthClientInternals,
   input: DeleteUserInput = {}
 ): Promise<DeleteUserResult> {
+  if (internals.sessionStore) await internals.requireToken()
+  const identity = input.attempt ?? currentAttempt(internals, "identity")
+  const stored = await internals.sessionStore?.read()
+  const generation = internals.tokenStore.generation()
   const deleted = await verifiedAction(() =>
     internals.fetchJson({
       method: "DELETE",
       path: "/user",
-      body: input,
+      body: { ...input, ...(identity ? { attempt: identity } : {}) },
       authenticated: true
     })
   )
   if (!deleted) return { status: "verificationRequired" }
 
-  internals.tokenStore.clear()
+  const credential = stored?.active && stored.accounts[stored.active]
+  if (stored?.active && credential)
+    await internals.sessionStore?.remove(stored.active, credential)
+  if (internals.tokenStore.generation() === generation) {
+    internals.tokenStore.invalidate()
+    internals.tokenStore.clear()
+    internals.attempts = {}
+  }
 
   return { status: "deleted" }
 }
@@ -130,11 +175,13 @@ export async function revokeSession(
   internals: AuthClientInternals,
   { id, ...body }: RevokeSessionInput
 ): Promise<RevokeSessionResult> {
+  if (internals.sessionStore) await internals.requireToken()
+  const attempt = body.attempt ?? currentAttempt(internals, "identity")
   const revoked = await verifiedAction(() =>
     internals.fetchJson({
       method: "DELETE",
       path: `/sessions/${encodeURIComponent(id)}`,
-      body,
+      body: { ...body, ...(attempt ? { attempt } : {}) },
       authenticated: true
     })
   )
@@ -178,16 +225,26 @@ async function sendUpdateCode(
   route: string,
   body: unknown
 ): Promise<SendUpdateCodeResult> {
+  if (internals.sessionStore) await internals.requireToken()
+  const input = body as { attempt?: string }
+  const identity = input.attempt ?? currentAttempt(internals, "identity")
+  const generation = internals.tokenStore.generation()
   let attempt = ""
   const sent = await verifiedAction(async () => {
     ;({ attempt } = await internals.fetchJson<SendCodeResult>({
       method: "POST",
       path: `/user/${route}/send-code`,
-      body,
+      body: { ...input, ...(identity ? { attempt: identity } : {}) },
       authenticated: true
     }))
   })
 
+  if (sent && internals.tokenStore.generation() === generation)
+    rememberAttempt(
+      internals,
+      route === "update-email" ? "emailChange" : "phoneChange",
+      attempt
+    )
   return sent ? { status: "sent", attempt } : { status: "verificationRequired" }
 }
 
@@ -196,16 +253,27 @@ async function verifyUpdate(
   route: string,
   body: unknown
 ): Promise<VerifyUpdateResult> {
+  if (internals.sessionStore) await internals.requireToken()
+  const input = body as VerifyUpdateInput
+  const purpose = route === "update-email" ? "emailChange" : "phoneChange"
+  const attempt = input.attempt ?? currentAttempt(internals, purpose)
+  const identityAttempt =
+    input.identityAttempt ?? currentAttempt(internals, "identity")
   let user: AuthUser | undefined
   const updated = await verifiedAction(async () => {
     user = await internals.fetchJson<AuthUser>({
       method: "POST",
       path: `/user/${route}/verify`,
-      body,
+      body: {
+        ...input,
+        ...(attempt ? { attempt } : {}),
+        ...(identityAttempt ? { identityAttempt } : {})
+      },
       authenticated: true
     })
   })
 
+  if (updated) delete internals.attempts[purpose]
   return updated && user
     ? { status: "updated", user: reviveUser(user) }
     : { status: "verificationRequired" }
@@ -239,12 +307,16 @@ export const verifyPhoneUpdate = (
 export async function sendIdentityCode(
   internals: AuthClientInternals
 ): Promise<SendCodeResult> {
+  if (internals.sessionStore) await internals.requireToken()
+  const generation = internals.tokenStore.generation()
   const { attempt } = await internals.fetchJson<SendCodeResult>({
     method: "POST",
     path: "/user/verify/send-code",
     authenticated: true
   })
 
+  if (internals.tokenStore.generation() === generation)
+    rememberAttempt(internals, "identity", attempt)
   return { attempt }
 }
 
@@ -253,10 +325,15 @@ export async function verifyIdentity(
   internals: AuthClientInternals,
   input: VerifyIdentityInput
 ): Promise<void> {
+  if (internals.sessionStore) await internals.requireToken()
+  const attempt = input.attempt ?? currentAttempt(internals, "identity")
+  const generation = internals.tokenStore.generation()
   await internals.fetchJson({
     method: "POST",
     path: "/user/verify",
-    body: input,
+    body: { ...input, ...(attempt ? { attempt } : {}) },
     authenticated: true
   })
+  if (attempt && internals.tokenStore.generation() === generation)
+    rememberAttempt(internals, "identity", attempt, true)
 }

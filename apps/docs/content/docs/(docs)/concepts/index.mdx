@@ -1,12 +1,12 @@
 ---
 title: How it works
-description: Two tokens, one cookie, and where authorization happens.
+description: Persistent sessions, short-lived JWTs, and where authorization happens.
 ---
 
 ## Two tokens
 
-**The refresh token is the session.** It lives only in an `HttpOnly`, `Secure`,
-`SameSite=Lax` cookie that scripts can't read. It's the session's row id and 32
+**The refresh token is the session.** Browsers keep it in an `HttpOnly`, `Secure`,
+`SameSite=Lax` cookie. Native apps keep it in protected device storage. It's the session's row id and 32
 random bytes, joined as `id.secret`. Your database stores only a SHA-256 of the
 secret, so a leaked table can't be replayed.
 
@@ -15,18 +15,19 @@ variable for at most an hour and never writes it to storage.
 
 ## The flow
 
-1. Signing in sets the refresh cookie and returns the first access token.
-2. When the access token nears expiry, the client trades the cookie for a new
-   one at `GET /token`. That's the only request that reads the cookie.
+1. Signing in stores the persistent session credential and returns the first JWT.
+2. When the access token nears expiry, the client exchanges the session credential for
+   a fresh JWT at `POST /token`. Browsers send the cookie; native clients send
+   the opaque credential as a bearer.
 3. Every other request, to auth.ts or your data API, carries the access token
    as a bearer.
 
-Because only `GET /token` reads the cookie, a forged cross-site request
-carrying just the cookie can't do anything.
+The browser token exchange enforces origin checks. Other authenticated routes
+require an access JWT; the native transport ignores cookies.
 
 ## The hint cookie
 
-Beside the refresh cookie, auth.ts sets `auth-ts.hint` to `in` or `out`, which
+Beside the refresh cookie, auth.ts sets `auth-ts.hint` to the active user ID or `out`, which
 scripts can read. A signed-out visitor makes no request at all: the client sees
 `out` and answers `null` without asking the server. It carries no credential.
 

@@ -27,7 +27,7 @@ const usersInCookies = (cookies: Cookies) =>
  */
 async function tokenFor(context: TestContext, cookies: Cookies) {
   const response = await context.auth.handler(
-    request("GET", "/api/auth/token", { cookies })
+    request("POST", "/api/auth/token", { cookies })
   )
   const body = (await response.json()) as { token?: string } | null
 
@@ -168,7 +168,7 @@ describe("multiUser enabled", () => {
     expect(after["auth-ts.hint"]).toBe(ada.user.id)
 
     const whoami = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies: after })
+      request("POST", "/api/auth/token", { cookies: after })
     )
     expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
       ada.user.id
@@ -276,7 +276,7 @@ describe("multiUser enabled", () => {
     ).toHaveLength(1)
 
     const whoami = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies: after })
+      request("POST", "/api/auth/token", { cookies: after })
     )
     expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
       ada.user.id
@@ -322,7 +322,7 @@ describe("multiUser enabled", () => {
       [ada.user.id, grace.user.id].sort()
     )
     const whoami = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies: after })
+      request("POST", "/api/auth/token", { cookies: after })
     )
     expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
       ada.user.id
@@ -428,7 +428,7 @@ describe("a refresh cookie carrying somebody else's name", () => {
     const attacker = await signIn(context, "attacker@example.com")
 
     const response = await context.auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: relabelled(attacker.cookies, victim.user.id)
       })
     )
@@ -509,7 +509,7 @@ describe("retiring a browser's cookies", () => {
     })
 
     const response = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies: grace.cookies })
+      request("POST", "/api/auth/token", { cookies: grace.cookies })
     )
     expect(await response.clone().json()).toBeNull()
 
@@ -522,7 +522,7 @@ describe("retiring a browser's cookies", () => {
       await selectRows(context.db, "sessions", { userId: { eq: ada.user.id } })
     ).toHaveLength(1)
     const whoami = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies: after })
+      request("POST", "/api/auth/token", { cookies: after })
     )
     expect(((await whoami.json()) as { user: { id: string } }).user.id).toBe(
       ada.user.id
@@ -536,7 +536,7 @@ describe("retiring a browser's cookies", () => {
     await context.db.delete({ table: "sessions", where: {} })
 
     const response = await context.auth.handler(
-      request("GET", "/api/auth/token", { cookies: grace.cookies })
+      request("POST", "/api/auth/token", { cookies: grace.cookies })
     )
 
     expect(await response.clone().json()).toBeNull()
@@ -554,7 +554,7 @@ describe("retiring a browser's cookies", () => {
     )
 
     const response = await context.auth.handler(
-      request("GET", "/api/auth/token", {
+      request("POST", "/api/auth/token", {
         cookies: { [refreshCookie("someone-else")]: own }
       })
     )

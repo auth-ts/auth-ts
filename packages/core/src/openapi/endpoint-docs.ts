@@ -16,7 +16,7 @@ export type EndpointTag =
   | "Discovery"
 
 /** Which credential an operation reads. `"none"` is published, not left blank. */
-export type EndpointAuth = "bearer" | "cookie" | "none"
+export type EndpointAuth = "bearer" | "cookie" | "session" | "none"
 
 /** One documented response. */
 export interface EndpointResponse {

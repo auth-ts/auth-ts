@@ -20,7 +20,7 @@ method. Authenticated ones take `{ token }` or `{ headers }` carrying
 
 | function | route | needs |
 | --- | --- | --- |
-| `getToken` | `GET /token` | |
+| `getToken` | `POST /token` | |
 | `sendSignInCode` | `POST /sign-in/send-code` | `email` or `sms` |
 | `signInWithCode` | `POST /sign-in/code` | |
 | `signInAsGuest` | `POST /sign-in/guest` | `guest` |
@@ -46,7 +46,7 @@ method. Authenticated ones take `{ token }` or `{ headers }` carrying
 | `getReference` | `GET /reference` | `openapi` |
 
 Routes are relative to `basePath`. Each one's request and response are in the
-[HTTP API](/docs/reference/http-api/session/get/token) reference. An endpoint whose option isn't
+[HTTP API](/docs/reference/http-api/session/post/token) reference. An endpoint whose option isn't
 set answers `notFound`.
 
 ## Errors

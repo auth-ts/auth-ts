@@ -1,9 +1,11 @@
-import type { CookieJar } from "../lib/cookie-jar"
-import { createCookieJar } from "../lib/cookie-jar"
+import type { TokenResult } from "../../endpoints/token"
+import { AuthError } from "../lib/auth-error"
 import type { FetchJson } from "../lib/fetch-json"
 import { createFetchJson } from "../lib/fetch-json"
 import type { LeveledLogger } from "../lib/logger"
 import { createLogger } from "../lib/logger"
+import type { SessionStore } from "../lib/session-storage"
+import { createSessionStore } from "../lib/session-storage"
 import type { AuthClientConfig } from "./auth-client-config"
 import { resolveAuthClientConfig } from "./auth-client-config"
 import type { AuthClientOptions } from "./auth-client-options"
@@ -24,8 +26,14 @@ export interface AuthClientInternals {
    * `fetchJson`, which needs this — one of the two has to be filled in after.
    */
   requireToken: () => Promise<string>
-  /** The client's own cookie jar, where `cookieStorage` stands in for a browser's. */
-  cookieJar: CookieJar | undefined
+  sessionStore: SessionStore | undefined
+  exchangeSession: (token: string) => Promise<TokenResult | null>
+  attempts: Partial<
+    Record<
+      "signIn" | "identity" | "emailChange" | "phoneChange",
+      { token: string; expiresAt: number; sessionId?: string }
+    >
+  >
   log: LeveledLogger
   /** The current locale, which `setLocale` replaces at runtime. */
   locale: string | undefined
@@ -38,22 +46,17 @@ export function createAuthClientInternals(
   const config = resolveAuthClientConfig(options)
   const log = createLogger(config.logLevel, config.logger)
   const tokenStore = createTokenStore(log)
-  const cookieJar = config.cookieStorage
-    ? createCookieJar(config.cookieStorage)
+  const sessionStore = config.sessionStorage
+    ? createSessionStore(config.sessionStorage, config.baseURL, config.basePath)
     : undefined
 
-  // Reads `internals.locale` on each request, so setLocale takes effect
-  // immediately rather than only for clients constructed afterwards.
   const fetchJson = createFetchJson(
-    cookieJar,
     config,
     () => internals.locale,
-    // Sent even when it is close to expiry: the server reads it to know which
-    // session this browser thinks it is on — which is what lets a verification
-    // code upgrade the right guest — and nothing here depends on withholding it.
     () => tokenStore.get()?.token,
     () => internals.requireToken(),
-    () => tokenStore.clear()
+    () => tokenStore.clear(),
+    () => tokenStore.generation()
   )
 
   const internals: AuthClientInternals = {
@@ -63,7 +66,22 @@ export function createAuthClientInternals(
     requireToken: () => {
       throw new Error("requireToken not wired: use createAuthClient")
     },
-    cookieJar,
+    sessionStore,
+    exchangeSession: async (bearer) => {
+      try {
+        return await fetchJson({
+          method: "POST",
+          path: "/token",
+          body: {},
+          bearer
+        })
+      } catch (error) {
+        if (error instanceof AuthError && error.code === "unauthenticated")
+          return null
+        throw error
+      }
+    },
+    attempts: {},
     log,
     locale: config.locale
   }

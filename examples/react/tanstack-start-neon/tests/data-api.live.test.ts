@@ -10,7 +10,7 @@ const live = Boolean(process.env.LIVE && dataApiUrl)
 const memory = new Map<string, string>()
 const authClient = createAuthClient({
   baseURL: process.env.LIVE_AUTH_URL ?? "http://localhost:3002",
-  cookieStorage: {
+  sessionStorage: {
     getItem: (key) => memory.get(key) ?? null,
     setItem: (key, value) => void memory.set(key, value),
     removeItem: (key) => void memory.delete(key)

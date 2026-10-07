@@ -8,7 +8,8 @@ const ALLOWED_ORIGINS =
 const CORS_HEADERS = {
   "access-control-allow-credentials": "true",
   "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
-  "access-control-allow-headers": "content-type, authorization",
+  "access-control-allow-headers":
+    "content-type, authorization, x-auth-transport",
   "access-control-max-age": "600"
 }
 

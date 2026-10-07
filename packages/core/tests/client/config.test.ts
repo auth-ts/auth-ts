@@ -18,3 +18,31 @@ describe("basePath", () => {
     expect(resolveAuthClientConfig({ basePath: "/" }).basePath).toBe("/")
   })
 })
+
+describe("native origin", () => {
+  const sessionStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {}
+  }
+  it.each([
+    undefined,
+    "/auth",
+    "http://example.com",
+    "https://a.example/path",
+    "https://a.example?key=value",
+    "https://user:password@a.example"
+  ])("rejects ambiguous or unsafe origin %s", (baseURL) => {
+    expect(() => resolveAuthClientConfig({ sessionStorage, baseURL })).toThrow()
+  })
+  it.each([
+    "https://example.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://[::1]:3000"
+  ])("accepts native origin %s", (baseURL) => {
+    expect(resolveAuthClientConfig({ sessionStorage, baseURL }).baseURL).toBe(
+      baseURL
+    )
+  })
+})

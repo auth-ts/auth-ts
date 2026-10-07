@@ -1,5 +1,5 @@
-import type { CookieStorage } from "../lib/cookie-jar"
 import type { Logger, LogLevel } from "../lib/logger"
+import type { SessionStorage } from "../lib/session-storage"
 
 /** Options accepted by `createAuthClient`. */
 export interface AuthClientOptions {
@@ -8,12 +8,12 @@ export interface AuthClientOptions {
    * @default "/api/auth"
    */
   basePath?: string
-  /** The auth server's origin, when not this one. Same registrable domain only. */
+  /** Browser cookies require the same registrable domain. */
   baseURL?: string
   /** Sent as `Accept-Language`, replacing the browser's. */
   locale?: string
-  /** Cookie storage for native apps. Leave unset in browsers. */
-  cookieStorage?: CookieStorage
+  /** Use native secure storage; omit in browsers. */
+  sessionStorage?: SessionStorage
   /**
    * Minimum level logged.
    * @default "error"

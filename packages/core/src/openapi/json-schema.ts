@@ -22,6 +22,7 @@ export interface JsonSchema {
   additionalProperties?: boolean | JsonSchema
   example?: unknown
   $ref?: string
+  oneOf?: readonly (JsonSchema | ComponentName)[]
 }
 
 /**
@@ -35,6 +36,7 @@ export interface JsonSchema {
 export type ComponentName =
   | "User"
   | "TokenResult"
+  | "SignInResult"
   | "AuthorizeURL"
   | "ProviderToken"
   | "AuthError"

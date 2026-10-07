@@ -154,7 +154,7 @@ describe("buildOpenAPIDocument", () => {
 
     expect(setCookie("/sign-in/provider/{provider}", "post")).toContain("state")
     expect(setCookie("/sign-out", "post")).toContain("Clears")
-    expect(setCookie("/token", "get")).toContain("Writes `auth-ts.refresh`")
+    expect(setCookie("/token", "post")).toContain("Writes `auth-ts.refresh`")
   })
 
   it("documents the failures each route actually answers", () => {
@@ -209,7 +209,11 @@ describe("buildOpenAPIDocument, given a real config", () => {
         >
       | undefined
 
-    expect(item?.post?.parameters[0]?.schema.enum).toEqual(["github", "google"])
+    expect(
+      item?.post?.parameters.find(
+        (parameter) => "in" in parameter && parameter.in === "path"
+      )?.schema.enum
+    ).toEqual(["github", "google"])
   })
 
   it("adds the declared additional fields to the user it describes", async () => {

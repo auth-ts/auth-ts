@@ -347,11 +347,11 @@ already have.
 
 ### Native applications
 
-The token model is settled and shipped: the refresh token travels only as a
-cookie, and a runtime with no cookie jar passes `cookieStorage` to
-`createAuthClient` — the client keeps what the server sets in the platform's
-keychain and sends it back as the `Cookie` header. No second credential, no
-server change. What remains is the OAuth half:
+The native client persists opaque session credentials in protected device storage
+and exchanges them through POST /token. Ordinary requests use short-lived JWTs.
+Browser clients keep the persistent credential in an HttpOnly cookie.
+
+What remains is the OAuth half:
 
 - **Deep-link redirects.** `validateRedirect` and the origin check admit only
   same-origin paths and http(s) origins. A native flow needs `myapp://…` as an
@@ -379,7 +379,7 @@ different edge of the design and should be built in roughly this order:
 - **Supabase with row-level security.** The same data-plane story as Neon, with
   `auth.jwt()` policies instead of `auth.session()`, and the JWKS published
   where Supabase's verifier can find it. Proves the token is portable.
-- **Expo.** `cookieStorage` over `expo-secure-store`, and the test bed for
+- **Expo.** `sessionStorage` over `expo-secure-store`, and the test bed for
   deep-link OAuth and ID-token sign-in above. Nothing native ships as "done"
   until this runs on a device.
 - **Solid.js 2.0 with SolidStart.** A non-React client consumer, so nothing in
@@ -408,20 +408,16 @@ implement yourself owes you a way to check your work.
 Refresh tokens themselves are core to the design — stable per session, revoked
 by deleting the session row. Only the rotate-on-every-refresh pattern is excluded.
 
-The cookie is `HttpOnly`, host-only, and never crosses an origin, so rotation
-mostly defends against theft requiring a compromise that defeats rotation anyway.
-What it reliably causes is a race between concurrent tabs, where the second
-presents a token the first has already spent — and a race the server-rendered
-case cannot even resolve, since a rotated token has to be written back on a
-response and frameworks do not always permit that where the session is read.
+Browsers keep the credential in an HttpOnly, host-only cookie. Native clients
+keep it in platform-protected secure storage, scoped by auth backend and mount.
+The credential stays stable while the database session remains valid; renewal
+issues a new short-lived JWT and periodically extends session expiry.
 
-If you store the refresh token outside an `HttpOnly` cookie, rotation and reuse
-detection become mandatory — which is precisely why that mode is unsupported.
-GoTrue is the worked example of the other path: rotation on by default, a
-parent/revoked chain per token, and a configurable reuse interval to survive
-the concurrent case. That is a coherent design, and the opposite one from this.
-The combination to avoid is half of each — a token a script can read that never
-rotates.
+Refresh-token rotation and reuse detection can detect some credential replay,
+but add concurrency and lost-response handling. GoTrue implements that design.
+This library follows Lucia's stable session model and does not provide reuse
+detection. Rotation is not claimed to be universally mandatory for bearer
+transport, and neither design immediately revokes independently verified JWTs.
 
 ### Organisations and role-based access control
 
