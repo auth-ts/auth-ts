@@ -289,6 +289,191 @@ describe("oauth redirect_uri origin", () => {
   })
 })
 describe("oauth callback", () => {
+  it.each(
+    (["signIn", "connect"] as const).flatMap((intent) =>
+      ["missing", "malformed", "mismatched", "conflicting"].map(
+        (protectedState) => ({ intent, protectedState })
+      )
+    )
+  )(
+    "rejects plain $intent state with $protectedState protected state",
+    async ({ intent, protectedState }) => {
+      const context = await createTestServer(OAUTH_OPTIONS)
+      const { auth, db } = context
+      await auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", {
+          body: { email: "victim@example.com" }
+        })
+      )
+      const signedIn = await auth.handler(
+        request("POST", "/api/auth/sign-in/code", {
+          body: { code: required(context.sentCodes.at(-1), "code").code }
+        })
+      )
+      const refresh = required(readRefreshCookie(signedIn), "refresh").value
+      const user = required(db.users()[0], "user")
+      const { stateCookie, state } = await startSignIn(auth)
+      const plain = forgeState({
+        ...decodeState(stateCookie),
+        intent,
+        userId: user.id
+      })
+      const cookies = [
+        `auth-ts.state=${plain}`,
+        ...Object.entries(refreshCookieFor(refresh, user.id)).map(
+          ([name, value]) => `${name}=${encodeURIComponent(value)}`
+        )
+      ]
+      if (protectedState === "malformed") {
+        cookies.push(`${STATE_COOKIE}=garbage`)
+      } else if (protectedState === "mismatched") {
+        cookies.push(
+          `${STATE_COOKIE}=${forgeState({
+            ...decodeState(stateCookie),
+            state: "another-flow"
+          })}`
+        )
+      } else if (protectedState === "conflicting") {
+        cookies.push(`${STATE_COOKIE}=${stateCookie}`, `${STATE_COOKIE}=other`)
+      }
+      const users = db.users()
+      const sessions = db.sessions()
+      const fetchSpy = stubGitHub({
+        id: 4242,
+        emails: verifiedEmails("attacker@example.com")
+      })
+
+      const response = await auth.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          headers: { cookie: cookies.join("; ") }
+        })
+      )
+
+      expect(callbackError(response)).toBe("invalidState")
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(db.users()).toEqual(users)
+      expect(db.sessions()).toEqual(sessions)
+      expect(db.rows("identities")).toHaveLength(0)
+      expect(db.rows("identitySecrets")).toHaveLength(0)
+      expect(
+        required(readSetCookies(response).get(STATE_COOKIE), "state").value
+      ).toBe("")
+    }
+  )
+
+  it.each(
+    (["signIn", "connect"] as const).flatMap((intent) =>
+      [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://[::1]:3000",
+        "https://localhost:3000",
+        "https://127.0.0.1:3000",
+        "https://[::1]:3000"
+      ].map((origin) => ({ intent, origin }))
+    )
+  )(
+    "uses the issued $intent state cookie at $origin",
+    async ({ intent, origin }) => {
+      const context = await createTestServer({
+        ...OAUTH_OPTIONS,
+        baseURL: origin
+      })
+      const { auth, db } = context
+      const secure = origin.startsWith("https:")
+      const name = secure ? STATE_COOKIE : "auth-ts.state"
+      let token: string | undefined
+      let cookies: Record<string, string> = {}
+      if (intent === "connect") {
+        await auth.handler(
+          request("POST", "/api/auth/sign-in/send-code", {
+            origin,
+            body: { email: "victim@example.com" }
+          })
+        )
+        const signedIn = await auth.handler(
+          request("POST", "/api/auth/sign-in/code", {
+            origin,
+            body: { code: required(context.sentCodes.at(-1), "code").code }
+          })
+        )
+        token = ((await signedIn.json()) as { token: string }).token
+        cookies = Object.fromEntries(
+          [...readSetCookies(signedIn)].map(([name, { value }]) => [
+            name,
+            value
+          ])
+        )
+      }
+      const start = await auth.handler(
+        request(
+          "POST",
+          intent === "connect"
+            ? "/api/auth/identities/connect/github"
+            : "/api/auth/sign-in/provider/github",
+          { origin, token }
+        )
+      )
+      const issued = required(readSetCookies(start).get(name), "state")
+      const { state } = decodeState(issued.value)
+      expect(issued.attributes.includes("Secure")).toBe(secure)
+      stubGitHub({ id: 4242, emails: verifiedEmails("ada@example.com") })
+
+      const response = await auth.handler(
+        request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+          origin,
+          cookies: { ...cookies, [name]: issued.value }
+        })
+      )
+
+      expect(response.headers.get("location")).toBe("/")
+      expect(db.users()[0]?.email).toBe(
+        intent === "connect" ? "victim@example.com" : "ada@example.com"
+      )
+      expect(db.rows("identities")[0]?.userId).toBe(db.users()[0]?.id)
+      expect(required(readSetCookies(response).get(name), "state").value).toBe(
+        ""
+      )
+    }
+  )
+
+  it.each(["/", "/api/auth"])(
+    "requires protected state with refresh cookie path %s",
+    async (path) => {
+      const { auth, db } = await createTestServer({
+        ...OAUTH_OPTIONS,
+        cookie: { name: "custom.refresh", path }
+      })
+      const name = auth.config.cookie.stateName
+      const protectedName = `__Host-${name}`
+      const start = await auth.handler(
+        request("POST", "/api/auth/sign-in/provider/github")
+      )
+      const issued = required(readSetCookies(start).get(protectedName), "state")
+      const { state } = decodeState(issued.value)
+      const fetchSpy = stubGitHub({
+        id: 4242,
+        emails: verifiedEmails("ada@example.com")
+      })
+      const callback = `/api/auth/callback/github?code=abc&state=${state}`
+
+      const rejected = await auth.handler(
+        request("GET", callback, { cookies: { [name]: issued.value } })
+      )
+      expect(callbackError(rejected)).toBe("invalidState")
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(db.users()).toHaveLength(0)
+
+      const accepted = await auth.handler(
+        request("GET", callback, {
+          cookies: { [protectedName]: issued.value, [name]: "garbage" }
+        })
+      )
+      expect(accepted.headers.get("location")).toBe("/")
+      expect(db.users()[0]?.email).toBe("ada@example.com")
+    }
+  )
+
   it("signs in, sets the session cookie, and returns to the validated path", async () => {
     const { auth, db } = await createTestServer(OAUTH_OPTIONS)
     const { stateCookie, state } = await startSignIn(auth, {

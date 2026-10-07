@@ -105,17 +105,13 @@ export const callbackProvider = defineEndpoint({
         internals,
         input.headers,
         input.state,
-        input.provider
+        input.provider,
+        secure
       )
 
       if (input.providerError || !input.code)
         throw new AuthApiError("providerDenied")
 
-      // Validated again here, not trusted from the cookie. The signature proves
-      // the payload came from this server; it does not prove the fields are
-      // still declared, or that every path able to sign a payload validated
-      // them first. The write is what matters, so the check sits next to it —
-      // otherwise an undeclared column rides into user creation.
       const additionalFields = validateAdditionalFields(
         config.user.additionalFields,
         payload.additionalFields

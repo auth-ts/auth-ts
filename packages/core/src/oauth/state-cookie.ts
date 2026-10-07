@@ -3,7 +3,11 @@ import { AuthApiError } from "../http/auth-api-error"
 import { randomBytesBase64url } from "../lib/generate-random"
 import { readCookie } from "../lib/parse-cookies"
 import { parseDuration } from "../lib/parse-duration"
-import { clearCookie, serializeCookie } from "../lib/serialize-cookie"
+import {
+  clearCookie,
+  hostPrefixed,
+  serializeCookie
+} from "../lib/serialize-cookie"
 import { validateRedirect } from "../lib/validate-redirect"
 import { decodeBase64url, encodeBase64url } from "../shared/base64url"
 import { codeChallengeS256, createCodeVerifier } from "./pkce"
@@ -68,16 +72,7 @@ export interface OAuthStatePayload {
   userId?: string
 }
 
-/**
- * Serializes a state payload as `base64url(json)`.
- *
- * Not signed. The cookie is the callback's only memory of how the flow began,
- * and a cookie is writable by more than this server — but nothing in it is
- * trusted on its own: the state has to match the provider's echo, the redirect
- * is validated, sign-up fields are checked against the schema, and a connect
- * has to be finished by the session that started it. Whoever can rewrite the
- * cookie already controls the browser it lives in, and gains nothing by it.
- */
+/** Unsigned; production requires a protected cookie. */
 export function encodeStatePayload(payload: OAuthStatePayload) {
   return encodeBase64url(JSON.stringify(payload))
 }
@@ -170,11 +165,13 @@ export async function readStateCookie(
   internals: AuthInternals,
   headers: Headers,
   stateParameter: string | null,
-  provider: string
+  provider: string,
+  secure: boolean
 ) {
-  const raw =
-    readCookie(headers, `__Host-${internals.config.cookie.stateName}`) ??
-    readCookie(headers, internals.config.cookie.stateName)
+  const raw = readCookie(
+    headers,
+    hostPrefixed(internals.config.cookie.stateName, secure, "/")
+  )
   if (!raw || !stateParameter) throw new AuthApiError("invalidState")
 
   const payload = decodeStatePayload(raw)
