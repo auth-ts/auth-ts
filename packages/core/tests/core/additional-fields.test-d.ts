@@ -88,6 +88,19 @@ describe("the table types the four functions take", () => {
   const sessionsWhere = (where: AuthWhere<"date", Numeric, "sessions">) => where
   const usersOrder = (orderBy: AuthOrderBy<Declared, "users">) => orderBy
 
+  it("allows null only for the guest merge condition", () => {
+    expectTypeOf(
+      usersWhere({ primaryUserId: { eq: null } }).primaryUserId
+    ).toEqualTypeOf<{ eq: string | null } | undefined>()
+    usersWhere({ primaryUserId: { eq: "account-id" } })
+    // @ts-expect-error identifiers MUST NOT match null
+    usersWhere({ phoneNumber: { eq: null } })
+    // @ts-expect-error additional fields MUST NOT match null
+    usersWhere({ plan: { eq: null } })
+    // @ts-expect-error timestamps MUST NOT match null
+    sessionsWhere({ updatedAt: { eq: null } })
+  })
+
   it("queries a declared field at its declared type", () => {
     expectTypeOf(usersWhere({ plan: { eq: 3 } }).plan).toEqualTypeOf<
       { eq: number } | undefined

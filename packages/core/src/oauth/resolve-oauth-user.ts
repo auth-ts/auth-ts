@@ -11,11 +11,7 @@ import type { ProviderIdentity } from "./providers/oauth-provider"
 export interface ResolveOAuthUserOptions {
   /** Consumer-declared fields for a user created by this sign-in. */
   additionalFields?: Record<string, string | number | boolean>
-  /**
-   * The guest currently signed in, if any. A guest never causes a new user to be
-   * created: they are upgraded in place, or merged into the account the identity
-   * already belongs to.
-   */
+  /** Guest whose data this sign-in may claim. */
   guest?: AuthUser
 }
 
@@ -84,14 +80,11 @@ export async function resolveOAuthUser(
   // name and picture on their first OAuth sign-in.
   const resolved = guest
     ? await convertGuest(internals, guest, {
-        email: identity.email,
+        identifier: { kind: "email", value: identity.email },
         ...(identity.name ? { name: identity.name } : {}),
         ...(identity.image ? { image: identity.image } : {}),
         additionalFields
-      }).then(({ user, outcome }) => ({
-        user,
-        created: outcome === "upgraded"
-      }))
+      })
     : await findOrCreateUser(internals, {
         identifier: { kind: "email", value: identity.email },
         ...(identity.name ? { name: identity.name } : {}),

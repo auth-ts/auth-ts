@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import type { AuthUser } from "../../src/core/auth-database"
 import { codeChallengeS256 } from "../../src/oauth/pkce"
 import { createTestServer } from "../helpers/create-test-server"
 import {
@@ -7,7 +8,8 @@ import {
   readSetCookies,
   refreshCookieFor,
   request,
-  STATE_COOKIE
+  STATE_COOKIE,
+  sessionIdOf
 } from "../helpers/request"
 import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
@@ -995,6 +997,148 @@ describe("oauth callback", () => {
       )?.userId
     ).toBe(owner.id)
   })
+
+  it.each([false, true])(
+    "isolates an OAuth callback racing OTP with linked identity %s",
+    async (linked) => {
+      const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })
+      const { auth, db } = context
+      const owner = linked
+        ? await insertUser(db, { email: "grace@example.com" })
+        : undefined
+      if (owner) {
+        await db.insert({
+          table: "identities",
+          values: {
+            userId: owner.id,
+            provider: "github",
+            providerUserId: "5555",
+            label: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        })
+      }
+      const guestResponse = await auth.handler(
+        request("POST", "/api/auth/sign-in/guest")
+      )
+      const guestRefresh = required(
+        readRefreshCookie(guestResponse),
+        "guest refresh"
+      ).value
+      const guestBody = (await guestResponse.json()) as {
+        user: AuthUser
+        token: string
+      }
+      const cookies = refreshCookieFor(guestRefresh)
+      const sent = await auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", {
+          body: { email: "ada@example.com" }
+        })
+      )
+      const { attempt } = (await sent.json()) as { attempt: string }
+      const code = required(context.sentCodes.at(-1), "code").code
+      const { stateCookie, state } = await startSignIn(auth)
+      stubGitHub({ id: 5555, emails: verifiedEmails("grace@example.com") })
+
+      let release = () => {}
+      const ready = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let arrived = 0
+      const update = db.update.bind(db)
+      vi.spyOn(db, "update").mockImplementation(async (input) => {
+        if (
+          input.table === "users" &&
+          input.where.id?.eq === guestBody.user.id
+        ) {
+          arrived += 1
+          if (arrived === 2) release()
+          await ready
+        }
+        return (await update(input)) as never
+      })
+      const [otp, oauth] = await Promise.all([
+        auth.handler(
+          request("POST", "/api/auth/sign-in/code", {
+            cookies,
+            token: guestBody.token,
+            body: { code, attempt }
+          })
+        ),
+        auth.handler(
+          request("GET", `/api/auth/callback/github?code=abc&state=${state}`, {
+            cookies: { ...cookies, [STATE_COOKIE]: stateCookie }
+          })
+        )
+      ])
+      expect(otp.status).toBe(200)
+      expect(oauth.status).toBe(302)
+      expect(callbackError(oauth)).toBeNull()
+      expect(arrived).toBeGreaterThanOrEqual(2)
+      const otpBody = (await otp.json()) as { user: AuthUser; token: string }
+      const oauthRefresh = required(
+        readRefreshCookie(oauth),
+        "OAuth refresh"
+      ).value
+      const refreshed = await auth.handler(
+        request("POST", "/api/auth/token", {
+          cookies: refreshCookieFor(oauthRefresh)
+        })
+      )
+      const oauthBody = (await refreshed.json()) as {
+        user: AuthUser
+        token: string
+      }
+
+      expect(otpBody.user.email).toBe("ada@example.com")
+      expect(oauthBody.user.email).toBe("grace@example.com")
+      expect(otpBody.user.id).not.toBe(oauthBody.user.id)
+      if (owner) expect(oauthBody.user.id).toBe(owner.id)
+      expect(
+        await selectRow(db, "identities", {
+          provider: { eq: "github" },
+          providerUserId: { eq: "5555" }
+        })
+      ).toMatchObject({ userId: oauthBody.user.id })
+      for (const [body, response] of [
+        [otpBody, otp],
+        [oauthBody, oauth]
+      ] as const) {
+        expect(
+          JSON.parse(
+            JSON.stringify(
+              await selectRow(db, "users", { id: { eq: body.user.id } })
+            )
+          )
+        ).toEqual(body.user)
+        expect((await auth.verifyToken(body.token))?.sub).toBe(body.user.id)
+        const refresh = required(readRefreshCookie(response), "refresh").value
+        expect(
+          await selectRow(db, "sessions", { id: { eq: sessionIdOf(refresh) } })
+        ).toMatchObject({ userId: body.user.id })
+      }
+      expect(db.sessions()).toHaveLength(2)
+      expect(
+        await selectRow(db, "sessions", {
+          id: { eq: sessionIdOf(guestRefresh) }
+        })
+      ).toBeNull()
+      const storedGuest = required(
+        await selectRow(db, "users", {
+          id: { eq: guestBody.user.id }
+        }),
+        "guest row"
+      )
+      if (storedGuest.type === "user") {
+        expect(storedGuest.primaryUserId).toBeNull()
+        expect([otpBody.user.id, oauthBody.user.id]).toContain(storedGuest.id)
+      } else {
+        expect(storedGuest.primaryUserId).toBe(owner?.id)
+        expect(storedGuest.email).toBeNull()
+      }
+    }
+  )
 
   it("upgrades a guest in place for a new provider identity and records the link", async () => {
     const context = await createTestServer({ ...OAUTH_OPTIONS, guest: true })

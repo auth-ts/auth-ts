@@ -7,7 +7,9 @@ auth.ts has no database adapters. You create six tables and write four
 functions (`select`, `insert`, `update` and `delete`) that run its queries
 against them. Every query is an equality match on named columns, so the four
 functions are short in any driver. The examples use Postgres, but any database
-with unique constraints and a delete that returns what it removed works.
+with unique constraints and atomic updates and deletes that return the affected
+rows works. Guest conversion uses `primaryUserId: { eq: null }`; implement this
+as `IS NULL`, as the examples below do.
 
 ## The tables
 

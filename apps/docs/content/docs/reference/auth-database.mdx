@@ -14,7 +14,8 @@ joins, no `OR` and no expressions. For working implementations, see
 
 1. **`where` is a set of conditions that must all match.** Every column takes
    `{ eq }`. `createdAt` and `updatedAt` also take `{ lt }` and `{ gt }`, with
-   exclusive bounds. Values are never `null`.
+   exclusive bounds. Only `primaryUserId` accepts `{ eq: null }`, which MUST
+   match SQL `IS NULL` semantics. Identifier conditions never accept `null`.
 
    ```ts
    const where = { userId: { eq: id }, updatedAt: { gt: cutoff } }
@@ -24,7 +25,10 @@ joins, no `OR` and no expressions. For working implementations, see
    direction, like `{ createdAt: "desc" }`. There is no `offset`.
 3. **`insert` returns the row as stored,** including the id your database
    generated. A unique violation must throw, never merge.
-4. **`update` returns the rows it changed.** Its `values` are never empty.
+4. **`update` checks conditions and changes matching rows atomically.** It MUST
+   return the stored rows it changed, or an empty array when nothing matched.
+   Two updates competing to convert the same guest MUST NOT both succeed.
+   Its `values` are never empty.
 5. **`delete` returns the rows it removed, atomically.** Two callers deleting the
    same row must not both get it back; that is what makes a code single-use.
 6. **Nothing receives request headers.** For multiple tenants, create one

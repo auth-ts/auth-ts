@@ -110,12 +110,9 @@ export const signInWithCode = defineEndpoint({
     const { user, created } =
       active?.user.type === "guest"
         ? await convertGuest(internals, active.user, {
-            [identifier.kind]: identifier.value,
+            identifier,
             additionalFields
-          }).then(({ user, outcome }) => ({
-            user,
-            created: outcome === "upgraded"
-          }))
+          })
         : await findOrCreateUser(internals, { identifier, additionalFields })
 
     const issued = await issueSession(internals, {

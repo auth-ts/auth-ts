@@ -273,6 +273,79 @@ export const authDatabaseChecks: AuthDatabaseCheck[] = [
       )
   },
   {
+    name: "guest claims atomically match type and unassigned primaryUserId",
+    run: (db) =>
+      withUser(db, (first) =>
+        withUser(db, (second) =>
+          withUser(
+            db,
+            async (guest) => {
+              const where = {
+                id: { eq: guest.id },
+                type: { eq: "guest" as const },
+                primaryUserId: { eq: null }
+              }
+              const [unclaimed] = await db.select({
+                table: "users",
+                where,
+                limit: 1,
+                orderBy: { id: "asc" }
+              })
+              expect(
+                unclaimed?.id === guest.id,
+                "null equality MUST match an unassigned primaryUserId"
+              )
+              const refused = await db.update({
+                table: "users",
+                where: { ...where, type: { eq: "user" } },
+                values: { primaryUserId: first.id }
+              })
+              expect(
+                refused.length === 0,
+                "a guest claim MUST match every condition"
+              )
+
+              const claims = await Promise.all(
+                [first, second].map((target) =>
+                  db.update({
+                    table: "users",
+                    where,
+                    values: { primaryUserId: target.id }
+                  })
+                )
+              )
+              const changed = claims.flat()
+              expect(
+                changed.length === 1,
+                "competing guest claims MUST return exactly one changed row"
+              )
+              const stale = await db.update({
+                table: "users",
+                where,
+                values: { type: "user" }
+              })
+              expect(
+                stale.length === 0,
+                "a merged guest MUST NOT be upgraded by a stale claim"
+              )
+              const [stored] = await db.select({
+                table: "users",
+                where: { id: { eq: guest.id } },
+                limit: 1,
+                orderBy: { id: "asc" }
+              })
+              expect(
+                stored?.type === "guest" &&
+                  stored.primaryUserId === changed[0]?.primaryUserId,
+                "a losing guest claim MUST NOT overwrite the stored winner"
+              )
+            },
+            { type: "guest", email: null }
+          )
+        )
+      )
+  },
+  {
     name: "a range matches on order, and only within its bounds",
     async run(db) {
       const identifier = `${unique()}@example.test`

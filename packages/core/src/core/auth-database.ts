@@ -257,21 +257,7 @@ export type AuthCondition<V> =
   | { gt: V }
   | { lt: V; gt: V }
 
-/**
- * A query: column/condition pairs, **all** of which must match.
- *
- * Every column takes `{ eq }`, and `createdAt` and `updatedAt` also take an
- * order — that one exception is what lets core find a live session, used
- * within its lifetime, in the same statement that updates it, rather than
- * reading first to find out whether it may write.
- *
- * **`null` is not a value here**, though the columns are nullable. Core looks
- * accounts up by an identifier, and an identifier that came back null would
- * otherwise compile into a query matching the first row that has none — some
- * arbitrary guest. Excluding it makes that a type error at the call site
- * instead of a check somebody has to remember, and leaves every implementation
- * with one comparison rather than an `IS NULL` branch it will never reach.
- */
+/** Conditions MUST match together; primaryUserId permits null. */
 export type AuthWhere<
   M extends AuthTimestampMode = "date",
   S extends AdditionalFieldsSchema = AdditionalFieldsSchema,
@@ -283,7 +269,9 @@ export type AuthWhere<
         | "createdAt"
         | "updatedAt"
         ? AuthCondition<NonNullable<AuthRow<M, S, T>[K]>>
-        : { eq: NonNullable<AuthRow<M, S, T>[K]> }
+        : K extends "primaryUserId"
+          ? { eq: NonNullable<AuthRow<M, S, T>[K]> | null }
+          : { eq: NonNullable<AuthRow<M, S, T>[K]> }
     }
   : never
 
@@ -398,10 +386,7 @@ export interface AuthDatabase<
     values: AuthInsert<"date", S, T>
   }): Promise<AuthRow<"date", S, T> | undefined>
 
-  /**
-   * Updates every row matching `where` and returns them.
-   * @remarks `({ table, where, values }) => Promise<Row[]>`
-   */
+  /** Atomically updates matches and returns stored rows. */
   update<T extends AuthTable>(input: {
     table: T
     where: AuthWhere<"date", S, T>

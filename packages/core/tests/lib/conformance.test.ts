@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { AuthDatabase } from "../../src/core/auth-database"
+import { defineAuthDatabase } from "../../src/core/auth-database"
 import { createMemoryDatabase } from "../../src/lib/memory-database"
 import { authDatabaseChecks } from "../../src/testing"
 
@@ -23,6 +24,60 @@ describe("authDatabaseChecks", () => {
   for (const check of authDatabaseChecks) {
     it(`passes: ${check.name}`, () => check.run(createMemoryDatabase()))
   }
+
+  it("catches null predicates that never match", async () => {
+    const db = createMemoryDatabase()
+    const failed = await failures(
+      defineAuthDatabase({
+        ...db,
+        select: (input) =>
+          input.table === "users" && input.where.primaryUserId?.eq === null
+            ? Promise.resolve([])
+            : db.select(input)
+      })
+    )
+
+    expect(failed).toContain(
+      "guest claims atomically match type and unassigned primaryUserId"
+    )
+  })
+
+  it("catches updates that check conditions before a separate write", async () => {
+    const db = createMemoryDatabase()
+    const failed = await failures(
+      defineAuthDatabase({
+        ...db,
+        update: async (input) => {
+          if (
+            input.table !== "users" ||
+            input.where.primaryUserId?.eq !== null
+          ) {
+            return db.update(input)
+          }
+          const matches = await db.select({
+            table: "users",
+            where: input.where,
+            limit: 100,
+            orderBy: { id: "asc" }
+          })
+          const changed = await Promise.all(
+            matches.map((row) =>
+              db.update({
+                table: "users",
+                where: { id: { eq: row.id } },
+                values: input.values
+              })
+            )
+          )
+          return changed.flat() as never
+        }
+      })
+    )
+
+    expect(failed).toContain(
+      "guest claims atomically match type and unassigned primaryUserId"
+    )
+  })
 
   it("catches a delete that does not return what it removed", async () => {
     const db = createMemoryDatabase()

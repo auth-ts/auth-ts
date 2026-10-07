@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import type { AuthUser } from "../../src/core/auth-database"
 import { createTestServer } from "../helpers/create-test-server"
 import {
   mintToken,
@@ -12,6 +13,10 @@ import { required } from "../helpers/required"
 import { insertUser, selectRow, selectRows } from "../helpers/rows"
 
 const guestOptions = { guest: true }
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 async function signInGuest(
   context: Awaited<ReturnType<typeof createTestServer>>
@@ -188,6 +193,159 @@ describe("guests and multiUser never mix", () => {
 })
 
 describe("guest conversion", () => {
+  it.each([
+    { name: "different emails", second: { email: "grace@example.com" } },
+    { name: "email and phone", second: { phoneNumber: "+15551234567" } },
+    { name: "the same email", second: { email: "ada@example.com" } },
+    {
+      name: "an upgrade and a merge",
+      second: { email: "grace@example.com" },
+      existingSecond: true
+    },
+    {
+      name: "two merges",
+      second: { email: "grace@example.com" },
+      existingFirst: true,
+      existingSecond: true
+    }
+  ])("isolates concurrent sign-ins for $name", async (scenario) => {
+    const smsCodes: string[] = []
+    const context = await createTestServer({
+      guest: true,
+      rateLimit: false,
+      user: { additionalFields: { plan: "string" } },
+      sms: {
+        sendCode: ({ code }) => {
+          smsCodes.push(code)
+        }
+      }
+    })
+    const existingFirst = scenario.existingFirst
+      ? await insertUser(context.db, {
+          email: "ada@example.com",
+          plan: "existing"
+        })
+      : undefined
+    const existingSecond = scenario.existingSecond
+      ? await insertUser(context.db, { ...scenario.second, plan: "existing" })
+      : undefined
+    const { refreshToken, user: guest, token } = await signInGuest(context)
+    const cookies = refreshCookieFor(refreshToken)
+    const attempts: Array<{ attempt: string; code: string }> = []
+    for (const identifier of [{ email: "ada@example.com" }, scenario.second]) {
+      const response = await context.auth.handler(
+        request("POST", "/api/auth/sign-in/send-code", { body: identifier })
+      )
+      expect(response.status).toBe(200)
+      const { attempt } = (await response.json()) as { attempt: string }
+      const code =
+        "phoneNumber" in identifier
+          ? required(smsCodes.at(-1), "sms code")
+          : required(context.sentCodes.at(-1), "email code").code
+      attempts.push({ attempt, code })
+    }
+
+    let release = () => {}
+    const ready = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let arrived = 0
+    const update = context.db.update.bind(context.db)
+    vi.spyOn(context.db, "update").mockImplementation(async (input) => {
+      if (input.table === "users" && input.where.id?.eq === guest.id) {
+        arrived += 1
+        if (arrived === 2) release()
+        await ready
+      }
+      return (await update(input)) as never
+    })
+    const responses = await Promise.all(
+      attempts.map((attempt, index) =>
+        context.auth.handler(
+          request("POST", "/api/auth/sign-in/code", {
+            cookies,
+            token,
+            body: { ...attempt, additionalFields: { plan: `request-${index}` } }
+          })
+        )
+      )
+    )
+    expect(arrived).toBeGreaterThanOrEqual(2)
+    const bodies: Array<{ user: AuthUser; token: string }> = []
+    for (const response of responses) {
+      expect(response.status).toBe(200)
+      bodies.push((await response.json()) as { user: AuthUser; token: string })
+    }
+    const first = required(bodies[0], "first result")
+    const second = required(bodies[1], "second result")
+    expect(first.user.email).toBe("ada@example.com")
+    expect(second.user).toMatchObject(scenario.second)
+    const sameIdentifier = scenario.second.email === "ada@example.com"
+    if (sameIdentifier) {
+      expect(first.user.id).toBe(second.user.id)
+    } else {
+      expect(first.user.id).not.toBe(second.user.id)
+    }
+    if (existingFirst) expect(first.user.id).toBe(existingFirst.id)
+    if (existingSecond) expect(second.user.id).toBe(existingSecond.id)
+    for (const [index, body] of bodies.entries()) {
+      expect(
+        JSON.parse(
+          JSON.stringify(
+            await selectRow(context.db, "users", { id: { eq: body.user.id } })
+          )
+        )
+      ).toEqual(body.user)
+      expect((await context.auth.verifyToken(body.token))?.sub).toBe(
+        body.user.id
+      )
+      const response = required(responses[index], "sign-in response")
+      const refresh = required(readRefreshCookie(response), "refresh").value
+      expect(
+        await selectRow(context.db, "sessions", {
+          id: { eq: sessionIdOf(refresh) }
+        })
+      ).toMatchObject({ userId: body.user.id })
+      const existing = index === 0 ? existingFirst : existingSecond
+      if (sameIdentifier) {
+        expect(body.user.plan).toBe(first.user.plan)
+        expect(body.user.plan).toMatch(/^request-[01]$/)
+      } else {
+        expect(body.user.plan).toBe(existing ? "existing" : `request-${index}`)
+      }
+    }
+    expect(context.db.sessions()).toHaveLength(2)
+    expect(
+      await selectRow(context.db, "sessions", {
+        id: { eq: sessionIdOf(refreshToken) }
+      })
+    ).toBeNull()
+    expect(context.sentNotifications).toHaveLength(
+      sameIdentifier
+        ? 1
+        : Number(Boolean(existingFirst)) + Number(Boolean(existingSecond))
+    )
+    const storedGuest = required(
+      await selectRow(context.db, "users", {
+        id: { eq: guest.id }
+      }),
+      "stored guest"
+    )
+    if (storedGuest.type === "user") {
+      expect(storedGuest.primaryUserId).toBeNull()
+      expect(
+        bodies.some(
+          ({ user }) => user.id === guest.id && user.email === storedGuest.email
+        )
+      ).toBe(true)
+    } else {
+      expect([existingFirst?.id, existingSecond?.id]).toContain(
+        storedGuest.primaryUserId
+      )
+      expect(storedGuest.email).toBeNull()
+    }
+  })
+
   it("upgrades the guest in place when the identifier is new, keeping every row they own", async () => {
     const context = await createTestServer(guestOptions)
     const { refreshToken, user: guest } = await signInGuest(context)

@@ -9,6 +9,7 @@ import {
   and,
   type Column,
   getColumns,
+  isNull,
   operators,
   orderByOperators
 } from "drizzle-orm"
@@ -28,7 +29,9 @@ const buildWhere = (table: AuthTable, where: AuthWhere<"string">) => {
   return and(
     ...Object.entries(where).flatMap(([name, condition]) =>
       Object.entries(condition).map(([operator, value]) =>
-        operators[operator as AuthDatabaseOperator](columns[name], value)
+        operator === "eq" && value === null
+          ? isNull(columns[name])
+          : operators[operator as AuthDatabaseOperator](columns[name], value)
       )
     )
   )

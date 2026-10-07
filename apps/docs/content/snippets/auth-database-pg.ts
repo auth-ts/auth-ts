@@ -8,6 +8,9 @@ const operators: Record<string, string> = { eq: "=", lt: "<", gt: ">" }
 function buildWhere(where: AuthWhere, params: unknown[]) {
   const clauses = Object.entries(where).flatMap(([column, condition]) =>
     Object.entries(condition).map(([operator, value]) => {
+      if (operator === "eq" && value === null) {
+        return `"${column}" IS NULL`
+      }
       params.push(value)
       return `"${column}" ${operators[operator]} $${params.length}`
     })
