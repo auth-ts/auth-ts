@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { buildOpenAPIDocument } from "../../src/openapi/build-document"
+import type { JsonSchema } from "../../src/openapi/json-schema"
 import { createTestServer } from "../helpers/create-test-server"
 import {
   mintToken,
@@ -116,6 +118,50 @@ describe("storing a provider grant", () => {
     expect(second.secrets.refreshToken).toBe("second-refresh-token")
   })
 
+  it.each([false, true])(
+    "replaces access expiry on a later sign-in, rotating refresh token %s",
+    async (rotate) => {
+      const context = await createTestServer(OAUTH_OPTIONS)
+      const first = await signInWithGitHub(context, {
+        ...GRANT,
+        grant: {
+          ...GRANT.grant,
+          expires_in: 1,
+          refresh_token_expires_in: 86400
+        }
+      })
+      const originalRefreshExpiry = first.secrets.refreshTokenExpiresAt
+      const second = await signInWithGitHub(context, {
+        ...GRANT,
+        token: "replacement-access-token",
+        grant: rotate ? { refresh_token: "replacement-refresh-token" } : {}
+      })
+
+      expect(second.identity.id).toBe(first.identity.id)
+      expect(second.secrets.accessToken).toBe("replacement-access-token")
+      expect(second.secrets.accessTokenExpiresAt).toBeNull()
+      expect(second.secrets.refreshToken).toBe(
+        rotate ? "replacement-refresh-token" : "provider-refresh-token"
+      )
+      expect(second.secrets.refreshTokenExpiresAt).toEqual(
+        rotate ? null : originalRefreshExpiry
+      )
+      const fetchSpy = vi.spyOn(globalThis, "fetch")
+      const response = await context.auth.handler(
+        request("GET", `/api/auth/identities/${second.identity.id}/token`, {
+          token: await mintToken(context.auth, second.refreshToken)
+        })
+      )
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({
+        token: "replacement-access-token",
+        expiresAt: null,
+        scope: GRANT.grant.scope
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    }
+  )
+
   it("keeps every token column out of identities, so the table reads whole", async () => {
     // What makes `identities` safe for an application to select without naming
     // columns: there is nothing on the row to leave out.
@@ -153,6 +199,121 @@ describe("GET /identities/:id/token", () => {
         token: await mintToken(context.auth, refreshToken)
       })
     )
+
+  it.each([false, true])(
+    "matches stored provider metadata with the schema, dated %s",
+    async (dated) => {
+      const context = await createTestServer(OAUTH_OPTIONS)
+      const { refreshToken, identity, secrets } = await signInWithGitHub(
+        context,
+        {
+          ...GRANT,
+          grant: dated ? GRANT.grant : {}
+        }
+      )
+      const fetchSpy = vi.spyOn(globalThis, "fetch")
+      const response = await tokenRequest(context, refreshToken, identity.id)
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({
+        token: GRANT.token,
+        expiresAt: dated ? secrets.accessTokenExpiresAt?.toISOString() : null,
+        scope: dated ? GRANT.grant.scope : null
+      })
+      const schemas = buildOpenAPIDocument(context.auth.config).components
+        .schemas as Record<string, JsonSchema>
+      const schema = required(schemas.ProviderToken, "provider schema")
+      expect(schema.required).toEqual(["token", "expiresAt", "scope"])
+      expect(schema.properties?.expiresAt).toMatchObject({
+        oneOf: [{ type: "string", format: "date-time" }, { type: "null" }]
+      })
+      expect(schema.properties?.scope).toMatchObject({
+        oneOf: [{ type: "string" }, { type: "null" }]
+      })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([false, true])(
+    "clears replaced access expiry and avoids a second refresh, scope known %s",
+    async (knownScope) => {
+      const context = await createTestServer(OAUTH_OPTIONS)
+      const { refreshToken, identity } = await signInWithGitHub(context, {
+        ...GRANT,
+        grant: {
+          refresh_token: GRANT.grant.refresh_token,
+          refresh_token_expires_in: 86400,
+          expires_in: 1,
+          ...(knownScope ? { scope: GRANT.grant.scope } : {})
+        }
+      })
+      const expiry = new Date(Date.now() - 60000)
+      await context.db.update({
+        table: "identitySecrets",
+        where: { identityId: { eq: identity.id } },
+        values: { accessTokenExpiresAt: expiry }
+      })
+      const before = required(
+        await selectRow(context.db, "identitySecrets", {
+          identityId: { eq: identity.id }
+        }),
+        "original grant"
+      )
+      const fetchSpy = stubGitHub({
+        ...GRANT,
+        refreshed: { access_token: "fresh-access-token" }
+      })
+      const expected = {
+        token: "fresh-access-token",
+        expiresAt: null,
+        scope: knownScope ? GRANT.grant.scope : null
+      }
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await tokenRequest(context, refreshToken, identity.id)
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual(expected)
+      }
+      const stored = required(
+        await selectRow(context.db, "identitySecrets", {
+          identityId: { eq: identity.id }
+        }),
+        "stored grant"
+      )
+      expect(stored.accessToken).toBe(expected.token)
+      expect(stored.accessTokenExpiresAt).toBeNull()
+      expect(stored.refreshToken).toBe(before.refreshToken)
+      expect(stored.refreshTokenExpiresAt).toEqual(before.refreshTokenExpiresAt)
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it("clears the old expiry when the refresh token rotates without expiry", async () => {
+    const context = await createTestServer(OAUTH_OPTIONS)
+    const { refreshToken, identity } = await signInWithGitHub(context, {
+      ...GRANT,
+      grant: { ...GRANT.grant, expires_in: 1, refresh_token_expires_in: 86400 }
+    })
+    stubGitHub({
+      ...GRANT,
+      refreshed: {
+        access_token: "fresh-access-token",
+        refresh_token: "rotated-refresh-token",
+        expires_in: 3600
+      }
+    })
+    const response = await tokenRequest(context, refreshToken, identity.id)
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { expiresAt: string; scope: string }
+    const stored = required(
+      await selectRow(context.db, "identitySecrets", {
+        identityId: { eq: identity.id }
+      }),
+      "stored grant"
+    )
+    expect(stored.refreshToken).toBe("rotated-refresh-token")
+    expect(stored.refreshTokenExpiresAt).toBeNull()
+    expect(stored.accessTokenExpiresAt?.toISOString()).toBe(body.expiresAt)
+    expect(body.scope).toBe(GRANT.grant.scope)
+  })
 
   it("returns the stored token without calling the provider", async () => {
     const context = await createTestServer(OAUTH_OPTIONS)

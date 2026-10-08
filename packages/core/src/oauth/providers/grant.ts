@@ -38,7 +38,7 @@ export async function readTokenResponse<
   return (await response.json().catch(() => ({}))) as T
 }
 
-/** Each field is kept only when the provider sent it, so a refresh erases nothing. */
+/** Parses only metadata the provider supplied. */
 export function readTokens(token: TokenResponse): ProviderTokens {
   return {
     ...(token.access_token ? { accessToken: token.access_token } : {}),

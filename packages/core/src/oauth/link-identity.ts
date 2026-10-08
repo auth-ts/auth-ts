@@ -31,13 +31,17 @@ export function splitTokens(tokens: ProviderTokens): {
       ...(tokens.scope ? { scope: tokens.scope } : {})
     },
     secrets: {
-      ...(tokens.accessToken ? { accessToken: tokens.accessToken } : {}),
-      ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
-      ...(tokens.accessTokenExpiresAt
-        ? { accessTokenExpiresAt: tokens.accessTokenExpiresAt }
+      ...(tokens.accessToken
+        ? {
+            accessToken: tokens.accessToken,
+            accessTokenExpiresAt: tokens.accessTokenExpiresAt ?? null
+          }
         : {}),
-      ...(tokens.refreshTokenExpiresAt
-        ? { refreshTokenExpiresAt: tokens.refreshTokenExpiresAt }
+      ...(tokens.refreshToken
+        ? {
+            refreshToken: tokens.refreshToken,
+            refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? null
+          }
         : {})
     }
   }
