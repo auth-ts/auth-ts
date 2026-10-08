@@ -1,0 +1,55 @@
+import { waitUntil } from "cloudflare:workers"
+import { createAuth } from "@auth-ts/core"
+import { authDatabase } from "./auth-database"
+
+export const auth = createAuth({
+  database: authDatabase,
+  waitUntil,
+  // The key in .env predates the ES256 default
+  jwt: { alg: "RS256" },
+  email: {
+    sendCode: ({ email, code, purpose }) => {
+      const [subject, intro] =
+        purpose === "emailChange"
+          ? [
+              "Verify your new account email address",
+              "Your email address verification code is"
+            ]
+          : ["Sign in to your account", "Your sign-in code is"]
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `To ${email}: ${subject}\n${intro}: ${code}\n\nDo not share this code with anyone. If you didn't request this, you can safely ignore this email.`
+        )
+      }
+    },
+    sendEmailChangedNotification: ({ email }) => {
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `Your account email address was recently updated (${email}): This email address is no longer tied to your account.`
+        )
+      }
+    },
+    sendSignedInNotification: ({ email, session }) => {
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `New sign-in to your account (${email}): We detected a recent login to your account. If this wasn't you, please secure your account immediately. Session ${session.id}, ${session.userAgent ?? "unknown device"}`
+        )
+      }
+    }
+  },
+  guest: true,
+  multiUser: true,
+  openapi: true,
+  // Docs playground; CORS lives in start.ts
+  ...(process.env.NODE_ENV === "development"
+    ? { trustedOrigins: ["http://localhost:3001"] }
+    : {}),
+  providers: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID as string,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET as string
+    }
+  }
+})
+
+export type Auth = typeof auth

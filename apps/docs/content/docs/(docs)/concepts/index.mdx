@@ -1,0 +1,48 @@
+---
+title: How it works
+description: Persistent sessions, short-lived JWTs, and where authorization happens.
+---
+
+## Two tokens
+
+**The refresh token is the session.** Browsers keep it in an `HttpOnly`, `Secure`,
+`SameSite=Lax` cookie. Native apps keep it in protected device storage. It's the session's row id and 32
+random bytes, joined as `id.secret`. Your database stores only a SHA-256 of the
+secret, so a leaked table can't be replayed.
+
+**The access token is a JWT** your database verifies. The client keeps it in a
+variable for at most an hour and never writes it to storage.
+
+## The flow
+
+1. Signing in stores the persistent session credential and returns the first JWT.
+2. When the access token nears expiry, the client exchanges the session credential for
+   a fresh JWT at `POST /token`. Browsers send the cookie; native clients send
+   the opaque credential as a bearer.
+3. Every other request, to auth.ts or your data API, carries the access token
+   as a bearer.
+
+The browser token exchange enforces origin checks. Other authenticated routes
+require an access JWT; the native transport ignores cookies.
+
+## The hint cookie
+
+Beside the refresh cookie, auth.ts sets `auth-ts.hint` to the active user ID or `out`, which
+scripts can read. A signed-out visitor makes no request at all: the client sees
+`out` and answers `null` without asking the server. It carries no credential.
+
+## Why memory, not storage
+
+A token in `localStorage` turns any script injection into a credential the
+attacker keeps after the tab closes. In memory, it dies with the page, and the
+cookie that outlives it can't be read by script.
+
+## Where the token is checked
+
+Wherever you decide access: in your API routes with `verifyToken`, or in your
+database with row-level security. The user object in the browser is only for
+display. If someone tampers with it, they see the wrong name and nothing else,
+because the server and database read the verified token, not the client.
+
+auth.ts follows [Lucia](https://lucia-auth.com)'s session patterns and the
+guidance in [Pilcrow's Auth Book](https://auth.pilcrowonpaper.com).

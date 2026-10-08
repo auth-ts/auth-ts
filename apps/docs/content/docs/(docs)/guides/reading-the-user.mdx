@@ -1,0 +1,91 @@
+---
+title: Reading the user
+description: Keep the token and user in your query cache.
+---
+
+The client keeps no user state of its own. `getToken()` answers who is signed
+in, and the user is a row in your `users` table. Cache both with the query
+library you already use. These examples use TanStack Query.
+
+## The token
+
+```ts
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+
+export function useToken() {
+  const queryClient = useQueryClient()
+
+  return useQuery({
+    queryKey: ["token"],
+    queryFn: () =>
+      authClient.getToken({
+        onRefresh: ({ user }) => queryClient.setQueryData(["user"], user)
+      })
+  })
+}
+```
+
+`data` is the token, or `null` when nobody is signed in. `getToken` serves
+from memory and refreshes ahead of expiry, so calling it often is free. A
+signed-out browser makes no request.
+
+`onRefresh` fires when a new token was fetched, with the user it was issued
+for. Seeding the cache from it means a cold load costs one request.
+
+## The user
+
+```ts
+import { skipToken, useQuery } from "@tanstack/react-query"
+
+export function useUser() {
+  const { data: token, isPending } = useToken()
+
+  return useQuery({
+    queryKey: ["user"],
+    queryFn: isPending
+      ? skipToken
+      : async () => {
+          if (!token) return null
+
+          const { data } = await postgrest.from("users").select().single()
+          return data
+        }
+  })
+}
+```
+
+Resolve to `null` when signed out. A query that stays disabled never leaves
+`isPending`, and your sign-in screen never shows.
+
+## After sign-in and sign-out
+
+Nothing updates your cache for you:
+
+```ts
+await authClient.signInWithCode({ code })
+await queryClient.invalidateQueries({ queryKey: ["token"] })
+
+await authClient.signOut()
+queryClient.clear()
+```
+
+## Retrying a data request
+
+Your data API sees the token directly, so an expired one is a plain 401. Drop
+the token and retry once:
+
+```ts
+import { fetchWithToken } from "@neondatabase/postgrest-js"
+
+const send = fetchWithToken(authClient.getToken)
+
+let response = await send(url)
+
+if (response.status === 401) {
+  authClient.clearToken()
+  response = await send(url)
+}
+```
+
+Never loop. If the second attempt fails too, the session is gone. The client's
+own methods already retry this way.

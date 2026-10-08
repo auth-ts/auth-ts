@@ -1,0 +1,76 @@
+---
+title: Neon Data API
+description: Point Neon's Data API at your key set.
+---
+
+Neon's Data API is PostgREST. It verifies each JWT against a JWKS URL and runs
+the query as the `authenticated` role.
+
+## Connect Neon
+
+When you enable the Data API, or later under its settings, choose
+**Other provider** and set:
+
+| setting | value |
+| --- | --- |
+| JWKS URL | `https://your.app/jwks.json` |
+| JWT audience | blank, unless you set `jwt.audience` |
+
+Neon's defaults match the rest:
+
+- The role comes from the `role` claim, which auth.ts sets to `authenticated`.
+- `auth.user_id()` reads the `sub` claim, which is the user id.
+- Tokens are signed with ES256, or RS256 if you chose it at `keygen`.
+
+<Callout>
+If you set your own `jwt.claims`, include `role: "authenticated"`. The default
+is replaced, not merged.
+</Callout>
+
+## Local development
+
+Neon can't reach `localhost`. Host a copy of `public/jwks.json` somewhere
+public, such as a gist, and use that URL while developing. Upload it again
+whenever you run `keygen`.
+
+## Protect your tables
+
+Neon grants `authenticated` access to every table in `public`. Follow
+[Row-level security](/docs/data/row-level-security) before you ship.
+
+## Query with the token
+
+```ts
+import { fetchWithToken, NeonPostgrestClient } from "@neondatabase/postgrest-js"
+
+export const postgrest = new NeonPostgrestClient<Database>({
+  dataApiUrl: DATA_API_URL,
+  options: { global: { fetch: fetchWithToken(authClient.getToken) } }
+})
+
+const { data } = await postgrest.from("todos").select()
+```
+
+The query has no user filter. The database returns only the signed-in user's
+rows. If a request gets a 401, see [retrying](/docs/guides/reading-the-user#retrying-a-data-request).
+
+## Allowed origins
+
+Set the Data API's allowed origins to your domain. That stops other websites
+from calling it from a visitor's browser. It doesn't stop a leaked token used
+from a server or script; row-level security does that.
+
+## drizzle-kit push
+
+Limit it to your schema, or it offers to drop Neon's `auth` schema:
+
+```ts title="drizzle.config.ts"
+import { defineConfig } from "drizzle-kit"
+
+export default defineConfig({
+  dialect: "postgresql",
+  schema: "./src/db/schema.ts",
+  schemaFilter: ["public"], // [!code highlight]
+  dbCredentials: { url: process.env.DATABASE_URL as string }
+})
+```

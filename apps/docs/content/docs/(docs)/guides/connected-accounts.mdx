@@ -1,0 +1,81 @@
+---
+title: Connected accounts
+description: Call a user's GitHub or Google API with their permission.
+---
+
+Ask for the scopes you need, and auth.ts stores the provider's tokens and
+refreshes them for you.
+
+## Ask for access
+
+```ts title="lib/auth.ts"
+export const auth = createAuth({
+  database: authDatabase,
+  providers: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
+      offlineAccess: true
+    }
+  }
+})
+```
+
+Google only issues a refresh token with `offlineAccess`, which also shows its
+consent screen on every sign-in. Without it, access ends when the first token
+expires.
+
+A signed-in user links another account with `connectProvider`:
+
+```ts
+await authClient.connectProvider({ provider: "google", redirect: "/account" })
+```
+
+## Call the API
+
+Get a live token by identity id, then call the provider from the browser:
+
+```ts
+const { data: google } = await postgrest
+  .from("identities")
+  .select()
+  .eq("provider", "google")
+  .single()
+
+const { token } = await authClient.getProviderToken({ id: google.id })
+
+const events = await fetch(
+  "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+  { headers: { authorization: `Bearer ${token}` } }
+).then((response) => response.json())
+```
+
+Ask for a token each time and keep it in a variable, never in storage. The
+server refreshes it when needed; the refresh token never leaves the server.
+
+On the server, `auth.getProviderToken({ token, id })` does the same.
+Background jobs with no signed-in user can use
+`auth.getProviderRefreshToken(identityId)`.
+
+## When access is gone
+
+`providerReconnectRequired` means the user revoked access, or it expired.
+Send them through `connectProvider` again:
+
+```ts
+try {
+  await authClient.getProviderToken({ id })
+} catch (error) {
+  if (isAuthError(error) && error.code === "providerReconnectRequired") {
+    await authClient.connectProvider({ provider: "google", redirect: "/account" })
+  }
+}
+```
+
+## Errors when connecting
+
+| code | when |
+| --- | --- |
+| `providerConflict` | That provider account is linked to another user. |
+| `unauthenticated` | Nobody was signed in when the flow finished. |

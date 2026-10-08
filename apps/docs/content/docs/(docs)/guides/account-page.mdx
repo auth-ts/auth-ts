@@ -1,0 +1,105 @@
+---
+title: Account page
+description: Show and change a user's profile, devices and connected accounts.
+---
+
+Most of an account page is reading your own tables. `users`, `sessions` and
+`identities` hold nothing that can sign anyone in, so row-level security lets
+each user read their own rows. Only actions involving a cookie, a code or a
+provider go through auth.ts.
+
+The examples use a PostgREST client. See
+[Row-level security](/docs/data/row-level-security) for the policies they rely on.
+
+## The user
+
+```ts
+const { data: user } = await postgrest.from("users").select().single()
+```
+
+No filter is needed; the policy returns only the signed-in user.
+
+## Renaming
+
+```ts
+await postgrest.from("users").update({ name }).throwOnError()
+```
+
+This relies on the column grant that lets users change only `name` and
+`image`. Email and phone number have their own flow; see
+[Changing email or phone](/docs/guides/changing-email-or-phone).
+
+## Devices
+
+```ts
+const { data: sessions } = await postgrest
+  .from("sessions")
+  .select()
+  .order("createdAt", { ascending: false })
+
+// The token names this device's session.
+const currentSessionId = authClient.decodeToken(token)?.claims.sid
+```
+
+## Confirming it's you
+
+Signing out another device, changing email or phone, and deleting the account
+all need a fresh code. Until the user enters one, those methods return
+`{ status: "verificationRequired" }`:
+
+```ts
+async function confirmed<T extends { status: string }>(action: () => Promise<T>) {
+  const result = await action()
+  if (result.status !== "verificationRequired") return result
+
+  await authClient.sendIdentityCode()
+  const code = await askForCode() // your "confirm it's you" dialog
+  await authClient.verifyIdentity({ code })
+
+  return action()
+}
+```
+
+One confirmation lasts an hour for this session in this browser. Guests have
+no email or phone, so they get `guestCannotReceiveCode`.
+
+## Signing out a device
+
+```ts
+await confirmed(() => authClient.revokeSession({ id }))
+```
+
+The device can't get new tokens, but its current one works until it expires,
+an hour by default. To sign out this device, use `signOut()`.
+
+## Connected accounts
+
+```ts
+const { data: identities } = await postgrest.from("identities").select()
+
+// Connect another provider
+await authClient.connectProvider({ provider: "google", redirect: "/account" })
+
+// Disconnect one, by row id
+await postgrest.from("identities").delete().eq("id", id).throwOnError()
+```
+
+Deleting the identity also deletes its stored tokens. See
+[Connected accounts](/docs/guides/connected-accounts) to call the provider's API.
+
+## Signing out
+
+```ts
+await authClient.signOut() // this browser
+await authClient.signOut({ scope: "global" }) // every device
+```
+
+## Deleting the account
+
+```ts
+await confirmed(() => authClient.deleteUser())
+```
+
+This deletes the user, their sessions, identities and codes, and signs this
+browser out. Rows in your own tables are yours to delete, for example with
+`on delete cascade`.

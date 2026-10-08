@@ -1,0 +1,99 @@
+---
+title: Email code
+description: Sign in with a one-time code sent by email.
+---
+
+The user enters their email, you send a six-character code, and they enter it
+back. New addresses get an account on first sign-in.
+
+## Full example
+
+```ts title="sign-in.ts"
+import { isAuthError } from "@auth-ts/core/client"
+import { authClient } from "./lib/auth-client"
+
+export async function sendCode(email: string) {
+  await authClient.sendSignInCode({ email })
+}
+
+export async function verifyCode(code: string) {
+  try {
+    const { user } = await authClient.signInWithCode({ code })
+    return user
+  } catch (error) {
+    if (isAuthError(error)) return error.message
+    throw error
+  }
+}
+```
+
+The code is tied to the browser that asked for it, through a cookie. Calling
+`sendCode` again sends a fresh code.
+
+## Enable it
+
+Pass an `email.sendCode` function. `purpose` says why the code was sent, so each
+email can read differently:
+
+```ts title="lib/auth.ts"
+export const auth = createAuth({
+  database: authDatabase,
+  email: {
+    sendCode: async ({ email, code, purpose }) => {
+      const subject =
+        purpose === "emailChange"
+          ? "Verify your new email address"
+          : "Your sign-in code"
+
+      await yourEmailProvider.send({
+        to: email,
+        subject,
+        text: `Your code is ${code}. If you didn't ask for it, ignore this email.`
+      })
+    }
+  }
+})
+```
+
+<auto-type-table path="core/auth-options.ts" name="SendCodeContext" />
+
+## Errors
+
+| code | when |
+| --- | --- |
+| `invalidEmailAddress` | The address isn't lowercase, has no dotted domain, or is over 100 characters. |
+| `rateLimited` | Too many codes or guesses. `error.retryAfter` is in seconds. |
+| `invalidCode` | The code expired, was already used, or was sent to another browser. |
+| `incorrectCode` | The code is live but wrong. |
+
+Messages come in English and can be [translated](/docs/guides/emails#translating-messages).
+Branch on `error.code`, never on the message.
+
+## Code format
+
+Codes are six characters from `A`–`Z` and `2`–`9`, leaving out `I`, `O`, `0`
+and `1`. For phone autofill, use digits:
+
+```ts
+createAuth({ verificationCode: { alphabet: "numeric" } /* ... */ })
+```
+
+Five wrong guesses per address are allowed, then one a minute. See
+[Rate limiting](/docs/concepts/rate-limiting) for the odds.
+
+## Testing
+
+In tests, capture the code from `sendCode` instead of sending an email:
+
+```ts
+let lastCode = ""
+
+createAuth({
+  email: { sendCode: ({ code }) => void (lastCode = code) }
+  // ...
+})
+```
+
+## Options
+
+<auto-type-table path="core/auth-options.ts" name="EmailOptions" />

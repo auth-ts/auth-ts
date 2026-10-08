@@ -1,0 +1,105 @@
+---
+title: OAuth
+description: Sign in with GitHub, Google and other OAuth providers.
+---
+
+## Full example
+
+```ts
+authClient.signInWithProvider({
+  provider: "github",
+  redirect: "/dashboard",
+  errorRedirect: "/login"
+})
+```
+
+This sends the browser to GitHub. It comes back signed in at `/dashboard`, or
+at `/login?error=<code>` if something went wrong.
+
+## Create the OAuth app
+
+The callback URL is your origin, the auth path, and `/callback/<provider>`.
+
+<Tabs items={["GitHub", "Google"]}>
+<Tab value="GitHub">
+
+1. Open **Settings → Developer settings → OAuth Apps → New OAuth App**.
+2. Set **Authorization callback URL** to:
+
+   ```
+   https://your.app/api/auth/callback/github
+   ```
+
+3. Copy the **Client ID**, then generate and copy a **Client secret**.
+
+</Tab>
+<Tab value="Google">
+
+1. In Google Cloud Console, open **APIs & Services → Credentials**.
+2. Choose **Create credentials → OAuth client ID**, type **Web application**.
+3. Under **Authorized redirect URIs**, add:
+
+   ```
+   https://your.app/api/auth/callback/google
+   ```
+
+4. Copy the client ID and secret.
+
+</Tab>
+</Tabs>
+
+For local development, create a second app with
+`http://localhost:3000/api/auth/callback/<provider>`.
+
+## Enable it
+
+```ts title="lib/auth.ts"
+export const auth = createAuth({
+  database: authDatabase,
+  providers: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID as string,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET as string
+    },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string
+    }
+  }
+})
+```
+
+GitHub asks for `read:user user:email`, and Google for `openid email profile`.
+Add more with `scopes`; see [Connected accounts](/docs/guides/connected-accounts).
+
+## Accounts
+
+- A new provider account creates a user, if it has a verified email address.
+- If a user already has that email, the provider account is linked to them.
+- After that, the provider account signs in to the same user even if its email
+  changes.
+
+Only verified addresses count: GitHub's primary verified address, and Google's
+when `email_verified` is true.
+
+## Errors
+
+A failed sign-in returns to `errorRedirect` with `?error=<code>`:
+
+| code | when |
+| --- | --- |
+| `providerDenied` | The user cancelled at the provider. |
+| `providerEmailUnverified` | The provider has no verified email for this account. |
+| `invalidState` | The sign-in took over ten minutes, or started in another browser. |
+| `providerRejected` | The provider refused the code exchange. |
+| `providerUnavailable` | The provider timed out or returned an error. |
+
+Always pass `errorRedirect`. Without it, failures go to `baseURL`, or show as
+JSON when that isn't set.
+
+`redirect` and `errorRedirect` must be paths on your own site, like
+`/dashboard`. Anything else becomes `/`.
+
+## Options
+
+<auto-type-table path="core/auth-options.ts" name="ProviderCredentials" />

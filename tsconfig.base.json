@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "noEmit": true,
+    "paths": {
+      "@auth-ts/core": ["./packages/core/src/index.ts"],
+      "@auth-ts/core/client": ["./packages/core/src/client.ts"],
+      "@auth-ts/core/testing": ["./packages/core/src/testing.ts"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}

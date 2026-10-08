@@ -1,0 +1,60 @@
+---
+title: Supabase
+description: Let Supabase's Data API accept your tokens.
+---
+
+Supabase's Data API accepts tokens signed by any of the project's JWT signing
+keys. Import your private key as one of them, and it accepts yours.
+
+Supabase's third-party auth only works with specific hosted providers, so it
+isn't the route here.
+
+## Import your key
+
+Convert your key to the JSON form Supabase asks for, with the same `kid` your
+tokens carry:
+
+```ts title="scripts/supabase-key.ts"
+import { calculateJwkThumbprint, exportJWK, importPKCS8 } from "jose"
+
+const alg = "ES256" // or RS256, if you chose it at keygen
+const key = await importPKCS8(process.env.JWT_PRIVATE_KEY as string, alg, {
+  extractable: true
+})
+const jwk = await exportJWK(key)
+
+console.log(JSON.stringify({ ...jwk, alg, kid: await calculateJwkThumbprint(jwk) }))
+```
+
+In the Supabase dashboard, open **Settings → JWT signing keys**, create a
+standby key, and paste the JSON. Keep it as a standby key; rotating it would
+make Supabase Auth sign its own tokens with it.
+
+## Claims
+
+Supabase needs `sub`, `role` and `exp`. auth.ts sets all three. `role` is
+`authenticated` unless you replace `jwt.claims`, so keep it if you do.
+
+In policies, `auth.uid()` is the user id:
+
+```sql
+create policy "own todos" on "todos" for all to authenticated
+  using ((select auth.uid()) = "userId")
+  with check ((select auth.uid()) = "userId");
+```
+
+Protect the auth tables as described in
+[Row-level security](/docs/data/row-level-security), swapping `auth.user_id()`
+for `auth.uid()`.
+
+## Query with the token
+
+```ts
+import { createClient } from "@supabase/supabase-js"
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  accessToken: () => authClient.getToken()
+})
+```
+
+When you rotate your own key with `keygen`, import the new one too.

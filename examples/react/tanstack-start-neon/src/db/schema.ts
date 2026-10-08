@@ -1,0 +1,241 @@
+import type { UserType, VerificationPurpose } from "@auth-ts/core"
+import { sql } from "drizzle-orm"
+import { authenticatedRole } from "drizzle-orm/neon"
+import type { AnyPgColumn } from "drizzle-orm/pg-core"
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgPolicy,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid
+} from "drizzle-orm/pg-core"
+
+const authUuid = (userIdColumn: AnyPgColumn) =>
+  sql`(select cast(auth.user_id() as uuid) = ${userIdColumn})`
+
+export const users = pgTable.withRLS(
+  "users",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    email: text("email").unique(),
+    phoneNumber: text("phoneNumber").unique(),
+    name: text("name"),
+    image: text("image"),
+    type: text("type").$type<UserType>().notNull().default("user"),
+    primaryUserId: uuid("primaryUserId").references(
+      (): AnyPgColumn => users.id,
+      {
+        onDelete: "cascade"
+      }
+    ),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date().toISOString())
+  },
+  (table) => [
+    index("usersPrimaryUserIdIndex").on(table.primaryUserId),
+    pgPolicy("selectOwnUser", {
+      for: "select",
+      to: authenticatedRole,
+      using: authUuid(table.id)
+    }),
+    pgPolicy("updateOwnUser", {
+      for: "update",
+      to: authenticatedRole,
+      using: authUuid(table.id),
+      withCheck: authUuid(table.id)
+    }),
+    check("usersTypeCheck", sql`"type" in ('guest', 'user', 'admin')`)
+  ]
+)
+
+export const sessions = pgTable.withRLS(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    secretHash: text("secretHash").notNull(),
+    userAgent: text("userAgent"),
+    ipAddress: text("ipAddress"),
+    amr: text("amr").array(),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date().toISOString())
+  },
+  (table) => [
+    index("sessionsUserIdIndex").on(table.userId),
+    index("sessionsUpdatedAtIndex").on(table.updatedAt),
+    pgPolicy("selectOwnSessions", {
+      for: "select",
+      to: authenticatedRole,
+      using: authUuid(table.userId)
+    })
+  ]
+)
+
+export const verifications = pgTable.withRLS(
+  "verifications",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    identifier: text("identifier").notNull(),
+    codeHash: text("codeHash").notNull(),
+    attemptHash: text("attemptHash").notNull(),
+    purpose: text("purpose")
+      .$type<VerificationPurpose>()
+      .notNull()
+      .default("signIn"),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date().toISOString())
+  },
+  (table) => [
+    index("verificationsAttemptIndex").on(
+      table.identifier,
+      table.purpose,
+      table.attemptHash
+    ),
+    index("verificationsAttemptHashIndex").on(table.attemptHash),
+    index("verificationsUpdatedAtIndex").on(table.updatedAt),
+    check(
+      "verificationsPurposeCheck",
+      sql`"purpose" in ('signIn', 'identity', 'emailChange', 'phoneChange')`
+    )
+  ]
+)
+
+// No policy: key holds emails and IPs
+export const rateLimits = pgTable.withRLS(
+  "rateLimits",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    key: text("key").notNull().unique(),
+    tokenCount: integer("tokenCount").notNull(),
+    lastRefilledAt: timestamp("lastRefilledAt", {
+      withTimezone: true,
+      mode: "string"
+    }).notNull(),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date().toISOString())
+  },
+  (table) => [index("rateLimitsUpdatedAtIndex").on(table.updatedAt)]
+)
+
+export const identities = pgTable.withRLS(
+  "identities",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    providerUserId: text("providerUserId").notNull(),
+    label: text("label"),
+    scope: text("scope"),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date().toISOString())
+  },
+  (table) => [
+    index("identitiesUserIdIndex").on(table.userId),
+    uniqueIndex("identitiesProviderUserIndex").on(
+      table.provider,
+      table.providerUserId
+    ),
+    pgPolicy("selectOwnIdentities", {
+      for: "select",
+      to: authenticatedRole,
+      using: authUuid(table.userId)
+    }),
+    pgPolicy("deleteOwnIdentities", {
+      for: "delete",
+      to: authenticatedRole,
+      using: authUuid(table.userId)
+    })
+  ]
+)
+
+// No policy, ever: these are secrets
+export const identitySecrets = pgTable.withRLS(
+  "identitySecrets",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    identityId: uuid("identityId")
+      .notNull()
+      .references(() => identities.id, { onDelete: "cascade" }),
+    accessToken: text("accessToken"),
+    accessTokenExpiresAt: timestamp("accessTokenExpiresAt", {
+      withTimezone: true,
+      mode: "string"
+    }),
+    refreshToken: text("refreshToken"),
+    refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", {
+      withTimezone: true,
+      mode: "string"
+    }),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date().toISOString())
+  },
+  (table) => [uniqueIndex("identitySecretsIdentityIndex").on(table.identityId)]
+)
+
+export const todos = pgTable.withRLS(
+  "todos",
+  {
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
+    userId: uuid("userId")
+      .notNull()
+      .default(sql`cast(auth.user_id() as uuid)`)
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    completed: boolean("completed").notNull().default(false),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date().toISOString())
+  },
+  (table) => [
+    index("todosUserIdIndex").on(table.userId),
+    pgPolicy("manageOwnTodos", {
+      for: "all",
+      to: authenticatedRole,
+      using: authUuid(table.userId),
+      withCheck: authUuid(table.userId)
+    })
+  ]
+)

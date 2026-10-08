@@ -1,0 +1,60 @@
+---
+title: Custom claims and fields
+description: Put your own data in the token, or on the user.
+---
+
+## Custom claims
+
+`jwt.claims` is merged into every token. Pass an object, or a function of the
+user and session:
+
+```ts title="lib/auth.ts"
+createAuth({
+  jwt: {
+    claims: async (user) => ({
+      role: "authenticated",
+      organizationIds: await organizationIdsFor(user.id)
+    })
+  }
+  // ...
+})
+```
+
+<Callout type="warn">
+Your claims replace the default `{ role: "authenticated" }`. Include `role`, or
+your data API won't know which role to use.
+</Callout>
+
+The function runs each time a token is issued, not on every request. `sub`,
+`iat` and `exp` can't be set.
+
+A claim is fixed for the token's lifetime, an hour by default. If a user loses
+access to an organization, their current token still lists it until it
+expires. For permissions that must change immediately, join your membership
+table in the policy instead of reading a claim.
+
+## Additional user fields
+
+Declare extra columns on `users`, and sign-up can set them and `updateUser` can
+change them:
+
+```ts title="lib/auth.ts"
+createAuth({
+  user: { additionalFields: { plan: "string", seats: "number" } }
+  // ...
+})
+```
+
+```ts
+await authClient.signInWithCode({ code, additionalFields: { plan: "free" } })
+await authClient.updateUser({ plan: "pro" })
+```
+
+- Types are `"string"`, `"number"` or `"boolean"`.
+- Undeclared fields or wrong types are rejected with `invalidField`.
+- Sign-up values apply only when the account is created.
+- The server's user objects are typed with your fields.
+
+Add the columns to your `users` table, and see
+[AuthDatabase](/docs/reference/auth-database#additional-fields) to type your
+database functions with them.

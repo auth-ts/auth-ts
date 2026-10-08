@@ -1,0 +1,172 @@
+import type { CoreUserFields } from "../core/auth-database"
+import type { ProviderTokenResult } from "../endpoints/identities/$id/token"
+import type { TokenResult } from "../endpoints/token"
+import type { AuthErrorBody, AuthErrorCode } from "../http/error-response"
+import { ERROR_STATUS } from "../http/error-response"
+import type {
+  ComponentName,
+  ComponentResponseName,
+  JsonSchema,
+  ObjectSchemaFor
+} from "./json-schema"
+
+const user: ObjectSchemaFor<CoreUserFields> = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    email: {
+      oneOf: [{ type: "string", format: "email" }, { type: "null" }],
+      description:
+        "Lowercase; letters, digits and . _ + - before one @, a dotted domain after; at most 100 characters. Taken as sent, never modified."
+    },
+    phoneNumber: {
+      oneOf: [{ type: "string" }, { type: "null" }],
+      description: "E.164."
+    },
+    name: { oneOf: [{ type: "string" }, { type: "null" }] },
+    image: { oneOf: [{ type: "string" }, { type: "null" }] },
+    type: { type: "string", enum: ["user", "guest", "admin"] },
+    primaryUserId: {
+      oneOf: [{ type: "string" }, { type: "null" }],
+      description: "On a guest whose sign-in resolved to an existing account."
+    },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" }
+  },
+  required: ["id", "type", "createdAt", "updatedAt"]
+}
+
+const providerToken: ObjectSchemaFor<ProviderTokenResult> = {
+  type: "object",
+  properties: {
+    token: { type: "string" },
+    expiresAt: {
+      oneOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+      description: "Null when the provider supplies no expiry."
+    },
+    scope: {
+      oneOf: [{ type: "string" }, { type: "null" }],
+      description: "Space-delimited granted scopes, when known."
+    }
+  },
+  required: ["token", "expiresAt", "scope"]
+}
+
+const tokenResult: ObjectSchemaFor<TokenResult> = {
+  type: "object",
+  properties: {
+    token: { type: "string" },
+    user: "User",
+    multiUser: {
+      type: "boolean",
+      description:
+        "Native transport only: whether multiple accounts are enabled."
+    }
+  },
+  required: ["token", "user"]
+}
+
+/** Every value `code` can take, for the schema's enum. */
+export const ERROR_CODES = Object.keys(ERROR_STATUS) as AuthErrorCode[]
+
+const authError: ObjectSchemaFor<AuthErrorBody> = {
+  type: "object",
+  properties: {
+    name: { type: "string", enum: ["AuthError"] },
+    code: { type: "string", enum: ERROR_CODES },
+    message: {
+      type: "string",
+      description: "Localized. Switch on `code`, never on this."
+    },
+    retryAfter: {
+      type: "integer",
+      description: "Seconds; on `rateLimited`."
+    },
+    requestId: {
+      type: "string",
+      description: "On `internalError`; matches the server's log line."
+    }
+  },
+  required: ["name", "code", "message"]
+}
+
+/**
+ * The shapes every operation shares, declared once.
+ *
+ * Typed against the real interfaces, so a field added to `AuthSession` or
+ * `AuthErrorBody` stops this compiling until it is described here. The builder
+ * turns a bare {@link ComponentName} anywhere a schema is expected into a `$ref`
+ * pointing at one of these.
+ */
+export const componentSchemas: Record<ComponentName, JsonSchema> = {
+  User: user,
+  TokenResult: tokenResult,
+  SignInResult: {
+    ...tokenResult,
+    properties: {
+      ...tokenResult.properties,
+      sessionToken: {
+        type: "string",
+        description:
+          "Persistent session credential; bearer transport only. Store in native secure storage."
+      }
+    }
+  },
+  ProviderToken: providerToken,
+  AuthorizeURL: {
+    type: "object",
+    properties: { url: { type: "string", format: "uri" } },
+    required: ["url"]
+  },
+  AuthError: authError
+}
+
+function failure(description: string) {
+  return {
+    description,
+    content: {
+      "application/json": { schema: { $ref: "#/components/schemas/AuthError" } }
+    }
+  }
+}
+
+/**
+ * The failures every operation draws from, so the envelope is described once.
+ *
+ * Statuses are the author's to pick per endpoint — the same status carries
+ * different codes on different routes, and `code` is what a client switches on.
+ */
+export const componentResponses: Record<
+  ComponentResponseName,
+  ReturnType<typeof failure>
+> = {
+  Unauthenticated: failure("No session, or a session that no longer resolves."),
+  NotFound: failure("No such route, provider, session, or account."),
+  InvalidField: failure(
+    "A field was unknown, reserved, or the wrong primitive type — or, as `invalidEmailAddress`, an email address outside the rules: lowercase, one @, a dotted domain, at most 100 characters."
+  ),
+  RateLimited: {
+    ...failure(
+      "A fixed-window limit was exceeded. `retryAfter` carries the wait, mirrored into the `Retry-After` header."
+    ),
+    headers: { "Retry-After": { schema: { type: "integer" } } }
+  } as ReturnType<typeof failure>,
+  Forbidden: failure("The origin is not one this server serves."),
+  VerificationRequired: failure(
+    "The action needs identity confirmed first, or the origin is not one this server serves. `code` says which."
+  ),
+  Conflict: failure(
+    "That provider identity is already linked to a different user."
+  ),
+  GuestCannotReceiveCode: failure(
+    "The account has no email or phone number to send a code to."
+  ),
+  UnsupportedMediaType: failure(
+    "A request body was sent as something other than `application/json`."
+  ),
+  PayloadTooLarge: failure("The request body is over 16 KiB."),
+  MethodNotAllowed: failure("The method is not allowed for this path."),
+  InternalError: failure(
+    "Something threw that this library did not anticipate."
+  )
+}

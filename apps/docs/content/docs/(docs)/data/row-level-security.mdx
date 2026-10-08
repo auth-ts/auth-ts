@@ -1,0 +1,112 @@
+---
+title: Row-level security
+description: Policies that read the token, and the auth tables you never expose.
+---
+
+Your data API verifies the JWT, switches to the `authenticated` role, and makes
+the claims available to SQL. Policies then decide which rows that role sees.
+The examples use Neon's helpers; Supabase and PostgREST have equivalents.
+
+| | Neon | Supabase | PostgREST |
+| --- | --- | --- | --- |
+| user id | `auth.user_id()` | `auth.uid()` | `current_setting('request.jwt.claims', true)::json->>'sub'` |
+| all claims | `auth.session()` | `auth.jwt()` | `current_setting('request.jwt.claims', true)::json` |
+
+## Protect a table
+
+Take the owner from the token, never from the request:
+
+```sql
+create table "todos" (
+  "id" uuid primary key default gen_random_uuid(),
+  "userId" uuid not null default (auth.user_id()::uuid) references "users",
+  "title" text not null
+);
+
+alter table "todos" enable row level security;
+alter table "todos" force row level security;
+
+create policy "own todos" on "todos" for all to authenticated
+  using ((select auth.user_id()::uuid) = "userId")
+  with check ((select auth.user_id()::uuid) = "userId");
+
+grant select, insert, update, delete on "todos" to authenticated;
+```
+
+`force` applies the policy to the table owner too, so a query on your owner
+connection can't see everything by accident.
+
+## Protect the auth tables
+
+<Callout type="warn">
+Neon's Data API grants `authenticated` access to every table in `public`.
+Without the policies below, any signed-in user could read every account and
+every code.
+</Callout>
+
+Row-level security is already on for all six tables if you used the
+[schema](/docs/database). A table with no policy is closed to everyone but its
+owner, and your server connects as the owner.
+
+Three tables get no policy, ever:
+
+- `verifications` holds codes
+- `rateLimits` holds addresses and IPs
+- `identitySecrets` holds provider tokens
+
+Three get ownership policies, because an account page reads them:
+
+```sql
+create policy "own user" on "users" for select to authenticated
+  using ((select auth.user_id()::uuid) = "id");
+create policy "update own user" on "users" for update to authenticated
+  using ((select auth.user_id()::uuid) = "id")
+  with check ((select auth.user_id()::uuid) = "id");
+
+create policy "own sessions" on "sessions" for select to authenticated
+  using ((select auth.user_id()::uuid) = "userId");
+
+create policy "own identities" on "identities" for select to authenticated
+  using ((select auth.user_id()::uuid) = "userId");
+create policy "disconnect identities" on "identities" for delete to authenticated
+  using ((select auth.user_id()::uuid) = "userId");
+```
+
+Nothing in these three tables can sign anyone in. `sessions.secretHash` is a
+hash; the session token itself is never stored.
+
+Don't `force` row-level security on the auth tables. The server must still read
+every row.
+
+### Limit which user columns can change
+
+Policies pick rows, not columns. Without this, a user could set their own
+`type` to `admin` or change `email`:
+
+```sql
+revoke update on table "users" from authenticated;
+grant update ("name", "image", "updatedAt") on table "users" to authenticated;
+```
+
+### Check it
+
+```sql
+set local role authenticated;
+select count(*) from "identitySecrets"; -- must be 0
+```
+
+## Claims in policies
+
+Besides the user id, every token carries `type` (`guest`, `user` or `admin`)
+and `amr` (how they signed in):
+
+```sql
+-- Only admins
+using (auth.session()->>'type' = 'admin')
+
+-- Only people who signed in with a provider
+using (auth.session()->'amr' ? 'fed')
+```
+
+See [Token claims](/docs/reference/claims) for the full list, and
+[Custom claims](/docs/guides/claims-and-fields) to add your own.

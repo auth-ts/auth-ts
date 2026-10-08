@@ -1,0 +1,73 @@
+---
+title: Native apps
+description: Persist sessions in native secure storage and use JWTs for API requests.
+---
+
+A native app stores its persistent session credential in the platform's keychain
+or keystore. The client exchanges that credential for a short-lived JWT through
+`POST /token`. Ordinary auth and data requests use the JWT.
+
+```ts title="lib/auth-client.ts"
+import * as SecureStore from "expo-secure-store"
+import { createAuthClient } from "@auth-ts/core/client"
+
+export const authClient = createAuthClient({
+  baseURL: "https://your.app",
+  sessionStorage: {
+    getItem: (key) => SecureStore.getItemAsync(key),
+    setItem: (key, value) => SecureStore.setItemAsync(key, value),
+    removeItem: (key) => SecureStore.deleteItemAsync(key)
+  }
+})
+```
+
+`baseURL` must be an HTTPS origin, or an HTTP loopback origin for local development.
+The SDK scopes storage keys by origin and auth mount, with separate credentials
+for each account. JWTs stay in memory. The SDK sends no cookies and does not read
+`Set-Cookie` responses.
+
+## Sign in and verify
+
+Email, SMS and guest sign-in use the same methods as the browser client. The SDK
+keeps verification attempt handles in memory and sends them explicitly. Identity
+verification handles are tied to the session that requested them. Switching
+accounts clears them; after restarting the app, request a new code when needed.
+
+A native sign-in request carries `X-Auth-Transport: bearer`. Successful sign-in
+returns `sessionToken` and `multiUser` alongside `token` and `user`. The SDK saves
+the session credential and returns the user and access JWT. Browser responses
+keep the session credential in an HttpOnly cookie instead.
+
+The transport header grants no authority. A native exchange must prove possession
+of its opaque session credential; an access JWT cannot renew a session, and an
+invalid credential never falls back to a cookie.
+
+## Accounts and sign-out
+
+With `multiUser: true` on the server, the same `listUsers`, `switchUser` and
+`signOut` methods manage locally stored accounts. Each credential is validated
+independently. Listing does not change the active account; switching commits only
+after the target validates. With `multiUser` disabled, a new sign-in replaces the
+previously held accounts.
+
+Sign-out revokes the session on the server before removing its stored credential.
+A network failure retains credentials so revocation can be retried. Global
+sign-out revokes the selected accounts on all devices. Already-issued JWTs remain
+valid until expiry where an API verifies only their signature and expiration.
+
+## Provider sign-in
+
+Native provider sign-in and account connection require a system-browser return
+flow that is not implemented yet. The SDK rejects these methods before starting
+an OAuth request. Native runtimes may have cookie stores, but an app's networking
+store and the system browser's store are not reliably shared.
+
+## Migration
+
+Replace `cookieStorage` with `sessionStorage` and sign in again. The SDK does not
+import the old `auth-ts.cookies` entry because it contains no reliable backend
+ownership information. Custom HTTP clients must change token exchange from GET
+to POST and explicitly select bearer transport. Browser clients continue using
+cookies with the POST exchange.
+
+<auto-type-table path="client/lib/session-storage.ts" name="SessionStorage" />

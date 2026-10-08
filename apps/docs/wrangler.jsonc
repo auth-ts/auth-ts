@@ -1,0 +1,7 @@
+{
+  // Cloudflare Pages serves the prerendered output directly — there is no server
+  // at request time, which is the point of building fully static.
+  "name": "authts-dev",
+  "compatibility_date": "2026-08-21",
+  "pages_build_output_dir": "dist/client"
+}

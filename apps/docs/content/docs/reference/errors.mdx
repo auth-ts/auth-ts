@@ -1,0 +1,17 @@
+---
+title: Errors
+description: Every error code and the HTTP status it answers with.
+---
+
+Every failed response has the same flat body:
+
+```json
+{ "name": "AuthError", "code": "rateLimited", "message": "…", "retryAfter": 30 }
+```
+
+The client throws it as an `AuthError`. Branch on `code`: codes never change,
+while messages can be [translated](/docs/guides/emails#translating-messages).
+
+Each row below is a code, with its HTTP status in the type column.
+
+<auto-type-table path="http/error-response.ts" type="typeof ERROR_STATUS" />

@@ -1,0 +1,20 @@
+{
+  "title": "Docs",
+  "description": "Guides and concepts",
+  "icon": "BookOpen",
+  "root": true,
+  "pages": [
+    "---Get started---",
+    "index",
+    "quickstart",
+    "database",
+    "---Sign-in methods---",
+    "...sign-in",
+    "---Using the token---",
+    "...data",
+    "---Guides---",
+    "...guides",
+    "---Concepts---",
+    "...concepts"
+  ]
+}
