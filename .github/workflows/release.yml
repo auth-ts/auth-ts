@@ -206,10 +206,24 @@ jobs:
       - name: npm supports trusted publishing
         run: |
           node -e '
-            const [major, minor, patch] = process.versions.npm.split(".").map(Number);
+            const { spawnSync } = require("node:child_process");
+            const result = spawnSync("npm", ["--version"], { encoding: "utf8" });
+            if (result.error || result.status !== 0) {
+              console.error("Unable to read npm version");
+              process.exit(1);
+            }
+            const version = result.stdout.trim();
+            if (!/^\d+\.\d+\.\d+$/.test(version)) {
+              console.error("Invalid npm version");
+              process.exit(1);
+            }
+            const [major, minor, patch] = version.split(".").map(Number);
             const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
-            if (!ok) { console.error(`npm ${process.versions.npm} is too old for trusted publishing (needs 11.5.1+)`); process.exit(1); }
-            console.log(`npm ${process.versions.npm}`);
+            if (!ok) {
+              console.error(`npm ${version} is too old for trusted publishing (needs 11.5.1+)`);
+              process.exit(1);
+            }
+            console.log(`npm ${version}`);
           '
 
       # Bootstrap only. npm cannot attach a trusted publisher to a package that
