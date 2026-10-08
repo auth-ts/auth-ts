@@ -12,7 +12,13 @@ and write the key set to `public/jwks.json`. Nothing is written unless you say
 so, and a variable the env file already sets is never overwritten without being
 asked about first.
 
-`--out` moves the key set, `--env` moves the variable, `--yes` skips the
-question, and `--alg RS256` switches from the default ES256.
+Existing assignments are recognized with indentation, `export`, or spaces
+around `=`. Keeping a key also keeps its existing `jwks.json`. Approved
+replacement updates every assignment of that variable, including duplicates.
+
+`--out` moves the key set, `--env` moves the variable, and `--alg RS256` switches
+from the default ES256. `--yes` skips the save question; replacing an existing
+key still requires an interactive answer. An unreadable env file stops the
+command before either file is written.
 
 Full documentation: [authts.dev](https://authts.dev/docs/reference/cli)

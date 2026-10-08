@@ -24,7 +24,11 @@ piping the output, writes nothing. Only the two values go to stdout.
 
 If `.env` already sets `JWT_PRIVATE_KEY`, it asks before replacing it, even with
 `--yes`. A new key must be deployed with its own `jwks.json`, so keeping the
-old key also keeps the old file.
+old key also keeps the old file. This protection recognizes indentation,
+`export`, spaces around `=`, and quoted multiline values. Approved replacement
+updates every assignment of the variable, including duplicates, while preserving
+its indentation, `export` prefix and spacing around `=`. An unreadable env file
+stops the command before either file is written.
 
 ## Options
 

@@ -2,6 +2,18 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { Jwks } from "./keygen"
 
+const ENV_ASSIGNMENT =
+  /^([^\S\r\n]*(?:export[^\S\r\n]+)?([\w.-]+)[^\S\r\n]*=[^\S\r\n]*)(?:"[^"]*"|'[^']*'|`[^`]*`|[^\r\n]*)[^\r\n]*/gm
+
+async function readExistingFile(path: string) {
+  try {
+    return await readFile(path, "utf8")
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return ""
+    throw error
+  }
+}
+
 /** Writes the key set, creating the directory if it is not there. */
 export async function writeKeySet(directory: string, jwks: Jwks) {
   await mkdir(directory, { recursive: true })
@@ -11,44 +23,45 @@ export async function writeKeySet(directory: string, jwks: Jwks) {
   return path
 }
 
-/** The variables an env file already sets, of the ones given. */
+/** Finds assigned names without returning their values. */
 export async function existingEnvNames(path: string, names: string[]) {
-  const contents = await readFile(path, "utf8").catch(() => "")
+  const contents = await readExistingFile(path)
+  const assigned = new Set(
+    [...contents.matchAll(ENV_ASSIGNMENT)].map((match) => match[2])
+  )
 
-  return names.filter((name) => new RegExp(`^${name}=`, "m").test(contents))
+  return names.filter((name) => assigned.has(name))
 }
 
-/**
- * Appends variables to an env file, replacing only the ones named in `replace`.
- *
- * Append-only by default: a value already in the file is a live key, and
- * overwriting it invalidates everything signed with it. Replacing is possible
- * but never assumed — the caller asks first, and passes the answer here.
- *
- * A file with no trailing newline gets one before anything is added, so the
- * first variable does not land on the end of an existing line.
- */
+/** Replaces named assignments only when explicitly authorized. */
 export async function writeEnvFile(
   path: string,
   values: Record<string, string>,
   replace: string[] = []
 ) {
-  let contents = await readFile(path, "utf8").catch(() => "")
+  let contents = await readExistingFile(path)
 
   for (const [name, value] of Object.entries(values)) {
-    const line = `${name}=${value}`
-    const existing = new RegExp(`^${name}=.*$`, "m")
+    const matches = [...contents.matchAll(ENV_ASSIGNMENT)].filter(
+      (match) => match[2] === name
+    )
 
-    if (existing.test(contents)) {
-      if (replace.includes(name)) contents = contents.replace(existing, line)
+    if (matches.length > 0) {
+      if (replace.includes(name)) {
+        for (const match of matches.reverse()) {
+          contents =
+            contents.slice(0, match.index) +
+            `${match[1]}${value}` +
+            contents.slice(match.index + match[0].length)
+        }
+      }
       continue
     }
 
     const separator = contents && !contents.endsWith("\n") ? "\n" : ""
-    contents = `${contents}${separator}${line}\n`
+    contents = `${contents}${separator}${name}=${value}\n`
   }
 
   await writeFile(path, contents)
-
   return path
 }
