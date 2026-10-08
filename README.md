@@ -3,7 +3,7 @@
 **Sign-in, sessions and JWTs for any TypeScript app.**
 
 Free forever. No limits, no service, no company. Built on
-[Lucia](https://lucia-auth.com) and [The Copenhagen Book](https://thecopenhagenbook.com).
+[Lucia](https://lucia-auth.com) and [Pilcrow's Auth Book](https://auth.pilcrowonpaper.com).
 
 - Email and SMS codes, GitHub and Google, and guest sign-in
 - Sessions, sign-out, device lists and account switching

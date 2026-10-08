@@ -365,10 +365,10 @@ function Footer() {
         </a>{" "}
         and{" "}
         <a
-          href="https://thecopenhagenbook.com"
+          href="https://auth.pilcrowonpaper.com"
           className="whitespace-nowrap underline"
         >
-          The Copenhagen Book
+          Pilcrow's Auth Book
         </a>
         .
       </p>
