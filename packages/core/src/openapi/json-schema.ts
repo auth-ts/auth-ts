@@ -77,19 +77,25 @@ type RequiredKeys<T> = {
   [K in keyof T]-?: Record<string, never> extends Pick<T, K> ? never : K
 }[keyof T]
 
-type PropertySchemaFor<V> = [V] extends [string]
-  ? JsonSchema & { type: "string" }
-  : [V] extends [number]
-    ? JsonSchema & { type: "number" | "integer" }
-    : [V] extends [boolean]
-      ? JsonSchema & { type: "boolean" }
-      : [V] extends [Date]
-        ? JsonSchema & { type: "string"; format: "date-time" }
-        : [V] extends [readonly (infer I)[]]
-          ? JsonSchema & { type: "array"; items: PropertySchemaFor<I> }
-          : [V] extends [object]
-            ? ObjectSchemaFor<V> | ComponentName
-            : JsonSchema
+type PropertySchemaFor<V> = [V] extends [null]
+  ? JsonSchema & { type: "null" }
+  : null extends V
+    ? JsonSchema & {
+        oneOf: readonly [PropertySchemaFor<Exclude<V, null>>, { type: "null" }]
+      }
+    : [V] extends [string]
+      ? JsonSchema & { type: "string" }
+      : [V] extends [number]
+        ? JsonSchema & { type: "number" | "integer" }
+        : [V] extends [boolean]
+          ? JsonSchema & { type: "boolean" }
+          : [V] extends [Date]
+            ? JsonSchema & { type: "string"; format: "date-time" }
+            : [V] extends [readonly (infer I)[]]
+              ? JsonSchema & { type: "array"; items: PropertySchemaFor<I> }
+              : [V] extends [object]
+                ? ObjectSchemaFor<V> | ComponentName
+                : JsonSchema
 
 /**
  * A JSON Schema for `T` that names every one of its fields.
@@ -103,7 +109,7 @@ export type ObjectSchemaFor<T> = {
   properties: {
     [K in keyof T]-?: unknown extends T[K]
       ? JsonSchema
-      : PropertySchemaFor<NonNullable<T[K]>>
+      : PropertySchemaFor<Exclude<T[K], undefined>>
   }
   required?: ReadonlyArray<RequiredKeys<T> & string>
   additionalProperties?: boolean

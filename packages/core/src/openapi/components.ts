@@ -15,17 +15,19 @@ const user: ObjectSchemaFor<CoreUserFields> = {
   properties: {
     id: { type: "string" },
     email: {
-      type: "string",
-      format: "email",
+      oneOf: [{ type: "string", format: "email" }, { type: "null" }],
       description:
         "Lowercase; letters, digits and . _ + - before one @, a dotted domain after; at most 100 characters. Taken as sent, never modified."
     },
-    phoneNumber: { type: "string", description: "E.164." },
-    name: { type: "string" },
-    image: { type: "string" },
-    type: { type: "string", enum: ["user", "guest"] },
+    phoneNumber: {
+      oneOf: [{ type: "string" }, { type: "null" }],
+      description: "E.164."
+    },
+    name: { oneOf: [{ type: "string" }, { type: "null" }] },
+    image: { oneOf: [{ type: "string" }, { type: "null" }] },
+    type: { type: "string", enum: ["user", "guest", "admin"] },
     primaryUserId: {
-      type: "string",
+      oneOf: [{ type: "string" }, { type: "null" }],
       description: "On a guest whose sign-in resolved to an existing account."
     },
     createdAt: { type: "string", format: "date-time" },
@@ -39,11 +41,13 @@ const providerToken: ObjectSchemaFor<ProviderTokenResult> = {
   properties: {
     token: { type: "string" },
     expiresAt: {
-      type: "string",
-      format: "date-time",
-      description: "Null for a provider whose tokens do not expire."
+      oneOf: [{ type: "string", format: "date-time" }, { type: "null" }],
+      description: "Null when the provider supplies no expiry."
     },
-    scope: { type: "string", description: "Space-delimited, as granted." }
+    scope: {
+      oneOf: [{ type: "string" }, { type: "null" }],
+      description: "Space-delimited granted scopes, when known."
+    }
   },
   required: ["token", "expiresAt", "scope"]
 }

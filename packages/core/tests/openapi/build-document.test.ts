@@ -4,7 +4,14 @@ import type { AnyEndpoint } from "../../src/http/define-endpoint"
 import { buildOpenAPIDocument } from "../../src/openapi/build-document"
 import { ERROR_CODES } from "../../src/openapi/components"
 import { endpointDocs } from "../../src/openapi/endpoint-docs-registry"
+import type { JsonSchema } from "../../src/openapi/json-schema"
 import { createTestServer } from "../helpers/create-test-server"
+import {
+  readRefreshCookie,
+  refreshCookieFor,
+  request
+} from "../helpers/request"
+import { required } from "../helpers/required"
 
 const reference = buildOpenAPIDocument()
 
@@ -35,6 +42,47 @@ function operations(document: typeof reference) {
 }
 
 describe("buildOpenAPIDocument", () => {
+  it("describes required provider metadata as nullable", () => {
+    const schemas = reference.components.schemas as Record<string, JsonSchema>
+    const provider = required(schemas.ProviderToken, "provider schema")
+    expect(provider.required).toEqual(["token", "expiresAt", "scope"])
+    expect(provider.properties?.expiresAt).toMatchObject({
+      oneOf: [{ type: "string", format: "date-time" }, { type: "null" }]
+    })
+    expect(provider.properties?.scope).toMatchObject({
+      oneOf: [{ type: "string" }, { type: "null" }]
+    })
+    expect(provider.properties?.token).toEqual({ type: "string" })
+  })
+
+  it("describes nullable user properties without making them required", () => {
+    const schemas = reference.components.schemas as Record<string, JsonSchema>
+    const user = required(schemas.User, "user schema")
+    expect(user.required).toEqual(["id", "type", "createdAt", "updatedAt"])
+    for (const field of [
+      "email",
+      "phoneNumber",
+      "name",
+      "image",
+      "primaryUserId"
+    ]) {
+      expect(user.properties?.[field]).toMatchObject({
+        oneOf: [{ type: "string" }, { type: "null" }]
+      })
+    }
+    expect(user.properties?.email).toMatchObject({
+      oneOf: [{ type: "string", format: "email" }, { type: "null" }]
+    })
+    expect(user.properties?.type).toEqual({
+      type: "string",
+      enum: ["user", "guest", "admin"]
+    })
+    expect(user.properties?.createdAt).toEqual({
+      type: "string",
+      format: "date-time"
+    })
+  })
+
   it("describes every endpoint when nothing is configured away", () => {
     expect(operations(reference)).toHaveLength(
       Object.keys(endpointRegistry).length
@@ -191,6 +239,64 @@ describe("buildOpenAPIDocument, given a real config", () => {
     expect(document.paths).not.toHaveProperty("/users")
     expect(document.paths).not.toHaveProperty("/identities/connect/{provider}")
     expect(document.paths).toHaveProperty("/sign-in/send-code")
+  })
+
+  it("matches actual user nulls and admin responses", async () => {
+    const context = await createTestServer({
+      guest: true,
+      user: {
+        additionalFields: { plan: "string", seats: "number", beta: "boolean" }
+      }
+    })
+    const signedIn = await context.auth.handler(
+      request("POST", "/api/auth/sign-in/guest")
+    )
+    const refreshToken = required(readRefreshCookie(signedIn), "refresh").value
+    const { user } = (await signedIn.json()) as { user: { id: string } }
+    await context.db.update({
+      table: "users",
+      where: { id: { eq: user.id } },
+      values: { type: "admin", plan: null, seats: null, beta: null }
+    })
+    const response = await context.auth.handler(
+      request("POST", "/api/auth/token", {
+        cookies: refreshCookieFor(refreshToken)
+      })
+    )
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { user: Record<string, unknown> }
+    expect(body.user.type).toBe("admin")
+    const document = buildOpenAPIDocument(context.auth.config)
+    const schemas = document.components.schemas as Record<string, JsonSchema>
+    const publishedUser = required(schemas.User, "user schema")
+    expect(publishedUser.properties?.type).toMatchObject({
+      enum: ["user", "guest", "admin"]
+    })
+    for (const field of [
+      "email",
+      "phoneNumber",
+      "name",
+      "image",
+      "primaryUserId",
+      "plan",
+      "seats",
+      "beta"
+    ]) {
+      expect(body.user[field]).toBeNull()
+      expect(publishedUser.properties?.[field]).toMatchObject({
+        oneOf: [expect.anything(), { type: "null" }]
+      })
+      expect(publishedUser.required).not.toContain(field)
+    }
+    for (const [field, type] of [
+      ["plan", "string"],
+      ["seats", "number"],
+      ["beta", "boolean"]
+    ]) {
+      expect(publishedUser.properties?.[required(field, "field")]).toEqual({
+        oneOf: [{ type }, { type: "null" }]
+      })
+    }
   })
 
   it("narrows {provider} to the providers actually configured", async () => {

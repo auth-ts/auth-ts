@@ -88,7 +88,10 @@ function userSchema(config?: AuthConfig) {
     properties: {
       ...base.properties,
       ...Object.fromEntries(
-        declared.map(([field, kind]) => [field, { type: kind }])
+        declared.map(([field, kind]) => [
+          field,
+          { oneOf: [{ type: kind }, { type: "null" }] } satisfies JsonSchema
+        ])
       )
     }
   }
